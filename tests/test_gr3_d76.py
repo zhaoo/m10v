@@ -29,7 +29,7 @@ class D76Tests(unittest.TestCase):
     for axis in axes:corners.append(corners[-1]+[675,45,3][axis])
     expected=[(sum(w[j]*table[corners[j]+c] for j in range(4))+127)//255 for c in range(3)]
     out=(C.c_uint8*3)();self.rgb(variant,(C.c_uint8*3)(*rgb),out);self.assertEqual(list(out),expected)
- def test_new_id_journals_are_atomic_and_complete_masks_cannot_skip_monochrome_or_touch_padding(self):
+ def test_new_id_journals_are_atomic_and_native_completion_preserves_color_and_padding(self):
   self.assertEqual(C.sizeof(State),184);state=State();self.lib.m10v_library_init(C.byref(state));good=STORE(lambda c,s:0);bad=STORE(lambda c,s:-1)
   for film in range(299,306):
    before=bytes(state);self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,film,bad,None),-2);self.assertEqual(bytes(state),before)
@@ -38,8 +38,17 @@ class D76Tests(unittest.TestCase):
    for mask in (0,31):
     y=(C.c_uint8*6)(70,110,150,190,91,92);uv=(C.c_uint8*6)(80,180,145,90,93,94);image=Image(y,uv,6,6,4,1,6)
     self.assertEqual(self.lib.m10v_library_render_native(C.byref(image),C.byref(state),0,None,1,None,0,mask),0)
-    self.assertEqual(list(y)[4:],[91,92]);self.assertEqual(list(uv),[128,128,128,128,93,94]);outputs.append((list(y),list(uv)))
-   self.assertEqual(outputs[0],outputs[1])
+    self.assertEqual(list(y)[4:],[91,92]);self.assertEqual(list(uv)[4:],[93,94]);outputs.append((list(y),list(uv)))
+   self.assertEqual(outputs[0][1],[128,128,128,128,93,94])
+   self.assertEqual(outputs[1],([70,110,150,190,91,92],[80,180,145,90,93,94]))
+ def test_fitted_color_completion_does_not_repeat_the_cpu_lut(self):
+  for film in (77,298,*range(291,298),*range(299,306)):
+   state=State();self.lib.m10v_library_init(C.byref(state));good=STORE(lambda c,s:0)
+   self.assertEqual(self.lib.m10v_library_select(C.byref(state),0,film,good,None),0)
+   y=(C.c_uint8*6)(70,110,150,190,91,92);uv=(C.c_uint8*6)(80,180,145,90,93,94);image=Image(y,uv,6,6,4,1,6)
+   before=(bytes(y),bytes(uv),bytes(state))
+   self.assertEqual(self.lib.m10v_library_render_native(C.byref(image),C.byref(state),0,None,1,None,0,1),0)
+   self.assertEqual((bytes(y),bytes(uv),bytes(state)),before,film)
  def test_stdlib_provenance_and_neutral_interpolation_targets(self):
   from scripts.verify_gr3_d76_reference import verify
   self.assertEqual(len(verify(ROOT)),7)

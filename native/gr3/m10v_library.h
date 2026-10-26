@@ -97,7 +97,8 @@ enum { M10V_NATIVE_COLOR=1u, M10V_NATIVE_GRAIN=2u, M10V_NATIVE_SOFT=4u,
 static inline uint32_t m10v_library_cpu_stages(const m10v_library_state *state,uint32_t slot,uint32_t completed){
     if(!state||slot>=M10V_SLOT_COUNT||!state->slots[slot].film)return 0;
     const m10v_slot *v=&state->slots[slot];
-    uint32_t stages=(v->film>M10V_FILM_COUNT||!(completed&M10V_NATIVE_COLOR))?M10V_NATIVE_COLOR:0;
+    uint32_t software_color=M10V_CUSTOM(v->film)||v->film==M10V_CHAR_ID||v->film==M10V_PIXEL_ID;
+    uint32_t stages=(software_color||!(completed&M10V_NATIVE_COLOR))?M10V_NATIVE_COLOR:0;
     if(m10v_halo_enabled(v->film,v->halo_gain,v->halo_profile)&&!(completed&M10V_NATIVE_HALO))stages|=M10V_NATIVE_HALO;
     if(state->stamp||(state->reserved&1u))stages|=M10V_CPU_STAMP;
     return stages;

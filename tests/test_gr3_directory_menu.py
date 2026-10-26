@@ -47,7 +47,7 @@ int main(void){
   m10v_library_image a={y1,u1,12,12,4,2,6},b={y2,u2,12,12,4,2,6};
   assert(m10v_library_render_native(&a,&s,0,0,1,scratch,sizeof(scratch),0)==0);
   assert(m10v_library_render_native(&b,&s,0,0,1,scratch,sizeof(scratch),31)==0);
-  assert(!memcmp(y1,y2,12)&&!memcmp(u1,u2,12));assert(memcmp(y1,y0,12)||memcmp(u1,uv0,12));
+  assert(!memcmp(y2,y0,12)&&!memcmp(u2,uv0,12));assert(memcmp(y1,y0,12)||memcmp(u1,uv0,12));
   assert(y1[4]==91&&y1[5]==92&&y1[10]==93&&y1[11]==94);
  }
  assert(!strcmp(m10v_library_name(298),"5213"));assert(!strcmp(m10v_library_name(290),"Pixel Worlds"));
