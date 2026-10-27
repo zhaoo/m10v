@@ -34,7 +34,7 @@
 - 原厂 Loader 构造 `0x536789f0` 把矩形写为 `+0xa0..+0xa6`，Store 构造 `0x5368c3d8` 写为 `+0xa4..+0xaa`；每个坐标由 `bfi ... #0, #14` 写入，右/下边界使用 `origin + size - 1`。
 - 执行原厂构造器，6320×4640、横竖交换及内图偏移 (160,160,6000,4000) 均保留正确坐标；另检查端点 16383。这个 14-bit 序列化范围不是硅片最大吞吐或 buffer 容量保证。
 - 原厂 JPEG 请求函数 `0x53663a8c` 把低层图像描述符中的 stride/width/height 写入请求 `+0x0c/+0x0e/+0x10`，在 `0x53663b4c` 交给引擎 `0x53791044`。两机型原厂请求构造在 6320×4640 等扩展尺寸下保留正确值；图像及 JPEG 输出地址均未映射，编码引擎、事件与释放为明确测试边界。
-- 原厂 JPEG 寄存器 setter `0x53792128` 和 `0x53791d8c` 对尺寸执行 `uxth`，并向 `0x298c0000` 相对 `0x418/0x41c` 和 `0x1c/0x18` 写低 16 位。仅静态检查不足以证明硬件真正接受这些值；不得将源码/寄存器位宽写成相机尺寸验收。
+- 原厂 JPEG 寄存器 setter `0x53792128` 和 `0x53791d8c` 对尺寸执行 `uxth`，并向 `0x298c0000` 相对 `0x418/0x41c` 和 `0x1c/0x18` 写低 16 位。继续执行原厂 JPEG driver 到这些实际 setter，寄存器地址由普通模拟 RAM 承载，控制/图像启动服务被替代；6320×4640、4320×6640、6480×4480 在两组寄存器中均保持宽高，没有 6144/4096 截断。此用例证明参数序列化，不能证明硅片响应、真实解码、内存或性能。
 - 现有 M10V `thumb_load` 的 6144×4096 是当前软件接入限制，不能据此宣称原厂硬件上限，也不能只改数值来接纳更大的缓冲。
 
 ## 为什么还不能启用相机边框
@@ -58,7 +58,30 @@
 
 ## 检查与复现
 
-新增两个测试模块共 13 项通过：`tests.test_gr3_border`（6 项）和 `tests.test_gr3_border_iip`（7 项）。另运行现有原厂等待/释放用例 2 项通过，确认失败风险的控制流；不是修复通过。
+新增两个测试模块共 14 项通过：`tests.test_gr3_border`（6 项）和 `tests.test_gr3_border_iip`（8 项）。另运行现有原厂等待/释放用例 2 项通过，确认失败风险的控制流；不是修复通过。
+
+从已提供的官方 BIN 恢复 ignored RTOS fixture（在仓库根目录运行；不会下载固件）：
+
+```sh
+node --input-type=module <<'JS'
+import {readFileSync, writeFileSync, mkdirSync} from 'node:fs';
+import {officialResources} from './node/gr3-stock-presets.mjs';
+import {inspectOfficial} from './node/firmware.mjs';
+const out = 'builds/gr3-border-iip-20261027';
+mkdirSync(out, {recursive:true});
+for (const [model, name, file] of [
+  ['gr3', 'GR III', 'bin/fwdc239b-gr3-official.bin'],
+  ['gr3x', 'GR IIIx', 'bin/fwdc243b-gr3x-official.bin'],
+]) {
+  const input = readFileSync(file);
+  if (inspectOfficial(input).model !== name) throw Error('official model mismatch');
+  const {decoded, sections} = officialResources(input), section = sections.RTOS;
+  writeFileSync(`${out}/${model}-official-rtos.bin`, decoded.subarray(section.offset, section.offset + section.size));
+}
+JS
+```
+
+然后执行以下命令；分析器会再次校验完整 RTOS 哈希与型号：
 
 ```sh
 /Users/zhaoo/Desktop/code/zhaoo/m10v/.venv/bin/python -m unittest tests.test_gr3_border tests.test_gr3_border_iip -v

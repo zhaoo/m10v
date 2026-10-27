@@ -35,12 +35,12 @@
 
 **Interfaces:** `analyze(rom: bytes, model: str) -> dict` accepts only locked official RTOS and emits source hashes, exact original instruction evidence, identified graph/dimension contracts and explicit unproved gates. It never emits firmware or simulates hardware pixels.
 
-- [ ] Restore ignored official fixtures locally from verified existing copies; check GR III and IIIx identities and RTOS parity. Verify linked worktree and current branch.
+- [x] Restore ignored official fixtures locally from verified existing copies; check GR III and IIIx identities and RTOS parity. Verify linked worktree and current branch.
 - [ ] Read original Loader/Store/FreeRect/Blend constructors and native callers, original graph scheduler/wait/release, BackResize sizing and JPEG encoder setup. Trace the actual fields for output dimensions, origin and fill values.
-- [ ] Write tests rejecting wrong input hashes/model labels and checking independently established instruction/field observations for both official images; run failing tests before implementing the persistent analyzer.
-- [ ] Implement the hash-pinned analyzer with small exact instruction evidence records, avoiding a whole-binary disassembly. Run `python -m unittest tests.test_gr3_border_iip -v` and retain JSON evidence in ignored builds.
-- [ ] Record what is proven by executing original ARM and what still requires hardware; no fabricated image output or performance claim. If graph execution or large-output allocation remains unproved, do not enable capture.
-- [ ] Commit evidence tooling and report.
+- [x] Write tests rejecting wrong input hashes/model labels and checking independently established instruction/field observations for both official images; run failing tests before implementing the persistent analyzer.
+- [x] Implement the hash-pinned analyzer with small exact instruction evidence records, avoiding a whole-binary disassembly. Run `python -m unittest tests.test_gr3_border_iip -v` and retain JSON evidence in ignored builds.
+- [x] Record what is proven by executing original ARM and what still requires hardware; no fabricated image output or performance claim. If graph execution or large-output allocation remains unproved, do not enable capture.
+- [x] Commit evidence tooling and report.
 
 ### Task 2: Shared border geometry
 
@@ -48,10 +48,10 @@
 
 **Interfaces:** `int m10v_border_layout(uint32_t style, uint32_t width, uint32_t height, m10v_border_layout_info *out)` returns a complete immutable inner/outer rectangle, aligned margins and bounded hole descriptors; no image pointer or allocation is accepted. It consumes only actual cropped output dimensions, never model focal lengths.
 
-- [ ] Test default off identity, 6000×4000 Polaroid 6320×4640 before hardware alignment, XPan/6×7/small dimensions, portrait layout, overflow and invalid style leaving output untouched. Watch missing API fail before implementation.
-- [ ] Implement bounded integer layout and alignment selected from Task 1's verified format contract; asymmetric Polaroid bottom, film holes confined to border. Do not guess hardware alignment if Task 1 has not established it; keep natural geometry distinct from target admission.
-- [ ] Run host geometry checks and ARM ABI build appropriate to this isolated module; record that successful geometry does not prove hardware capability.
-- [ ] Commit shared geometry.
+- [x] Test default off identity, 6000×4000 Polaroid 6320×4640 before hardware alignment, XPan/6×7/small dimensions, portrait layout, overflow and invalid style leaving output untouched. Watch missing API fail before implementation.
+- [x] Implement bounded integer layout and alignment selected from Task 1's verified format contract; asymmetric Polaroid bottom, film holes confined to border. Do not guess hardware alignment if Task 1 has not established it; keep natural geometry distinct from target admission.
+- [x] Run host geometry checks and ARM ABI build appropriate to this isolated module; record that successful geometry does not prove hardware capability.
+- [x] Commit shared geometry.
 
 ### Task 3: Integrate only a verified hardware capture route
 
@@ -68,3 +68,5 @@
 ## Execution record
 
 Use `.superpowers/sdd/2026-10-27-gr3-gr3x-borders/progress.md` for evidence and rulings. User authorized continued execution of the approved design; use inline execution without another permission round for the plan.
+
+2026-10-27 checkpoint: Task 1's original fill, Loader/Store, JPEG request and JPEG register serialization execute offline for both pinned models. Hardware execution, output allocation and failure quiescence are NOT proven; the remaining Task 1 investigation and Task 3 prerequisites stay open. Task 2 pure shared geometry is implemented and isolated, not linked to firmware. Fourteen new tests and two existing failure-path tests pass. Independent review covers the latest additions; no actionable findings remain. See `docs/research/gr3-gr3x-border-iip-20261027.md` for the exact proof boundary and remaining work.

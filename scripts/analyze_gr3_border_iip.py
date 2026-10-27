@@ -25,6 +25,9 @@ CONTRACTS = {
     'copy_graph': (0x53681260, 0x536814b8),
     'release': (0x5376ed74, 0x5376f164),
     'jpeg_request': (0x53663a8c, 0x53663ba4),
+    'jpeg_driver': (0x53791044, 0x537913e4),
+    'jpeg_image_size_setter': (0x53791d8c, 0x53791dc8),
+    'jpeg_dma_size_setter': (0x53792128, 0x53792164),
 }
 
 
@@ -81,6 +84,7 @@ class OriginalArm:
         u.reg_write(A.UC_ARM_REG_PC, u.reg_read(A.UC_ARM_REG_LR))
 
     def call(self, address, *args):
+        from unicorn import UcError
         A, u = self.A, self.u
         sp, stop = 0x55ffe000, 0x55fff000
         for n in range(13):
@@ -93,7 +97,11 @@ class OriginalArm:
                 self.words(sp + 4 * (n - 4), value)
         u.reg_write(A.UC_ARM_REG_SP, sp)
         u.reg_write(A.UC_ARM_REG_LR, stop)
-        u.emu_start(address, stop, count=500000)
+        try:
+            u.emu_start(address, stop, count=500000)
+        except UcError as error:
+            raise AssertionError(f'{error}; PC={u.reg_read(A.UC_ARM_REG_PC):#x}, '
+                                 f'LR={u.reg_read(A.UC_ARM_REG_LR):#x}') from error
         if u.reg_read(A.UC_ARM_REG_PC) != stop or u.reg_read(A.UC_ARM_REG_SP) != sp:
             raise AssertionError('original ARM did not return within budget with balanced stack')
         return u.reg_read(A.UC_ARM_REG_R0)
@@ -152,6 +160,7 @@ def analyze(rom, model):
              for name, (start, end) in CONTRACTS.items()}
     contract = b''.join(rom[a - BASE:b - BASE] for a, b in CONTRACTS.values())
     return {'schema': 'm10v-border-iip-research/v1', 'model': model, 'rtos_sha256': digest,
+            'analyzer_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             'contracts': spans, 'contract_sha256': hashlib.sha256(contract).hexdigest(),
             'firmware_emitted': False, 'hardware_pixels_executed': False,
             'camera_tested': False, 'activation_ready': False,
@@ -161,7 +170,8 @@ def analyze(rom, model):
             'expanded_fill': probe_fill(rom, 6320, 4640),
             'expanded_fill_driver': probe_fill_driver(rom, 6320, 4640, (255, 128, 128)),
             'failed_fill_driver_wait': probe_fill_driver(rom, 160, 120, (255, 128, 128), 0),
-            'expanded_jpeg_request': probe_jpeg_request(rom, 6320, 4640)}
+            'expanded_jpeg_request': probe_jpeg_request(rom, 6320, 4640),
+            'expanded_jpeg_register_fixture': probe_jpeg_registers(rom, 6320, 4640)}
 
 
 def probe_fill_driver(rom, width, height, constants, wait_result=1):
@@ -236,6 +246,38 @@ def probe_jpeg_request(rom, width, height):
     p.call(0x53663a8c, context, desc, output, 0x3b6, 0, 0)
     record['assertions'] = p.assertions
     return record
+
+
+def probe_jpeg_registers(rom, width, height):
+    """Original JPEG driver arithmetic/setters, MMIO addresses backed by RAM.
+
+    Control services and hardware start are substituted. Register writes are
+    evidence of serialization ONLY: no silicon response/encoding is modeled.
+    """
+    if not (type(width) is int and type(height) is int and
+            1 <= width <= 65535 and 1 <= height <= 65535):
+        raise ValueError('invalid JPEG register probe dimensions')
+    p = OriginalArm(rom)
+    p.u.mem_map(0x298c0000, 0x10000)
+    context, packet = 0x55080000, 0x55081000
+    p.words(context + 0x24, 0x55082000)
+    raw = bytearray(0x24)
+    struct.pack_into('<3I', raw, 0, 0x70000000, 0x74000000, 0x78000000)
+    struct.pack_into('<4H', raw, 0xc, width, width, height, 1)
+    struct.pack_into('<I', raw, 0x14, 32 * 1024 * 1024)
+    raw[0x22] = 1
+    p.u.mem_write(packet, bytes(raw))
+    p.boundaries = {address: (lambda: 0) for address in
+                    (0x5356284c, 0x5377c450, 0x5378fecc, 0x53790e8c, 0x53790b30,
+                     0x53784de0, 0x53783820, 0x53791ec4, 0x53791c20, 0x53791f44)}
+    p.call(0x53791044, context, 0, packet)
+    # Image size registers are V then H; DMA setter is H then V.
+    h, w = p.read_words(0x298c0018, 2)
+    dw, dh = p.read_words(0x298c0418, 2)
+    return {'image_size': [w & 0xffff, h & 0xffff],
+            'dma_size': [dw & 0xffff, dh & 0xffff],
+            'assertions': p.assertions, 'hardware_executed': False,
+            'scope': 'RAM register image; hardware start/control boundaries substituted'}
 
 
 def main():

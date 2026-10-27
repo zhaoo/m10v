@@ -73,6 +73,15 @@ class BorderIipTests(unittest.TestCase):
                 self.assertEqual(result['source_planes'], [0x70000000, 0x74000000])
                 self.assertFalse(result['encoding_executed'])
 
+    def test_original_jpeg_driver_serializes_expanded_dimensions_to_ram_register_fixture(self):
+        from scripts.analyze_gr3_border_iip import probe_jpeg_registers
+        for rom in self.roms.values():
+            for width, height in ((6320, 4640), (4320, 6640), (6480, 4480)):
+                result = probe_jpeg_registers(rom, width, height)
+                self.assertEqual(result['image_size'], [width, height])
+                self.assertEqual(result['dma_size'], [width, height])
+                self.assertFalse(result['hardware_executed'])
+
     def test_original_fill_expanded_canvas_never_accesses_unmapped_planes(self):
         for model, rom in self.roms.items():
             for width, height in ((6320, 4640), (4480, 6640), (6480, 4480), (160, 120)):
@@ -82,12 +91,22 @@ class BorderIipTests(unittest.TestCase):
                         self.assertEqual(result['assertions'], [])
                         self.assertEqual(sum(r['height'] for r in result['requests']), height)
                         self.assertEqual(result['locks'], ['acquire', 'release'])
+                        covered = 0
                         for request in result['requests']:
+                            self.assertGreater(request['height'], 0)
+                            self.assertEqual(request['visible_height'], request['height'])
+                            self.assertEqual((request['left'], request['top']), (0, 0))
+                            y_offset = width * covered
+                            c_offset = y_offset // (2 if fmt == 2 else 1)
+                            self.assertEqual(request['planes'],
+                                             [0x70000000 + y_offset, 0x74000000 + c_offset, c_offset])
                             self.assertEqual(request['width'], width)
                             self.assertEqual(request['stride'], width)
                             self.assertEqual(request['constants'], [77, 88, 99])
                             self.assertEqual(request['format'], 0)
                             self.assertEqual(request['layout_code'], 2 if fmt == 2 else 0)
+                            covered += request['height']
+                        self.assertEqual(covered, height)
                         self.assertFalse(result['pixels_mapped'])
 
 
