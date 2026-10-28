@@ -1,5 +1,8 @@
 /* Generic dispatcher observer. All records are recipe-owned and data-only. */
 #include "m10v_save_trace.h"
+#if M10V_BORDER_ENABLED && M10V_DEBUG_MODE
+#include "m10v_border_shot.h"
+#endif
 static int ram(uint32_t p,uint32_t n){return !(p&3)&&p>=0x55000000u&&p<=0x80000000u-n;}
 void m10v_module_trace_mark(uint32_t module,uint32_t message,uint32_t handler,uint32_t event,uint32_t result){
  if((event!=204&&event!=205)||!ram(module,4)||!ram(message,24)||
@@ -12,7 +15,16 @@ void m10v_module_trace_mark(uint32_t module,uint32_t message,uint32_t handler,ui
     meta<recipe+0x5f0u||message<recipe+0x3b0u)return;
  uint32_t delta=meta-recipe-0x5f0u,kind=delta>>5;
  if((delta&31)||kind>=24||message!=recipe+0x3b0u+24*kind)return;
- m10v_save_trace_recipe_mark(recipe,event,kind,handler,event==204?module:result);
+ /* Border diagnostics: retain the live main descriptor at the handoff after
+  * BackResize and across the following native review/JPEG modules. This is
+  * metadata only and stays in the existing bounded recipe trace. */
+ uint32_t detail=handler;
+#if M10V_BORDER_ENABLED && M10V_DEBUG_MODE
+ if((kind==21u||kind==12u||kind==10u||kind==6u)&&
+    *(const uint32_t *)(uintptr_t)(recipe+M10V_BORDER_SHOT_OFFSET))
+     detail=*(const uint32_t *)(uintptr_t)(recipe+0xc0u);
+#endif
+ m10v_save_trace_recipe_mark(recipe,event,kind,detail,event==204?module:result);
  if(event==204&&handler==0x5350c764u)m10v_save_trace_recipe_mark(recipe,206,kind,*(const uint32_t *)(uintptr_t)(message+4),module);
 }
 #if M10V_MODULE_SAFE_STORE_SINK

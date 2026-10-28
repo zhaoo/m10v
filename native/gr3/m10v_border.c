@@ -25,24 +25,28 @@ int m10v_border_layout(uint32_t style, uint32_t width, uint32_t height,
         result.outer.width = width + margin * 2u;
         result.outer.height = height + margin * (style == M10V_BORDER_POLAROID ? 4u : 2u);
         if (style == M10V_BORDER_FILM) {
-            uint32_t hole_width = at_least_two((margin / 2u) & ~1u);
-            uint32_t hole_height = at_least_two((margin * 3u / 4u) & ~1u);
+            /* A 135 strip runs horizontally in display space: two rows of
+             * sprocket holes above and below the complete photograph. */
+            uint32_t hole_width = at_least_two((margin * 3u / 4u) & ~1u);
+            uint32_t hole_height = at_least_two((margin / 2u) & ~1u);
             uint32_t gap = at_least_two((margin / 2u) & ~1u);
-            uint32_t pitch = hole_height + gap;
-            uint32_t usable = result.outer.height - margin;
-            /* At most 63 bounded control steps; no freestanding variable
+            uint32_t pitch = hole_width + gap;
+            uint32_t usable = result.outer.width - margin;
+            /* At most 60 bounded control steps on each edge, leaving room
+             * for the four black bands in the 132-record hardware bundle.
+             * No freestanding variable
              * divide helper and no work proportional to photo pixels. */
             uint32_t count = 1;
-            while (count < 64u && (count + 1u) * pitch <= usable + gap) ++count;
-            m10v_border_holes left;
-            left.first.x = ((margin - hole_width) / 2u) & ~1u;
-            left.first.y = ((result.outer.height - ((count - 1u) * pitch + hole_height)) / 2u) & ~1u;
-            left.first.width = hole_width;
-            left.first.height = hole_height;
-            left.pitch = pitch;
-            left.count = count;
-            result.holes[0] = result.holes[1] = left;
-            result.holes[1].first.x = result.outer.width - left.first.x - hole_width;
+            while (count < 60u && count * pitch + hole_width <= usable) ++count;
+            m10v_border_holes top;
+            top.first.x = ((result.outer.width - ((count - 1u) * pitch + hole_width)) / 2u) & ~1u;
+            top.first.y = ((margin - hole_height) / 2u) & ~1u;
+            top.first.width = hole_width;
+            top.first.height = hole_height;
+            top.pitch = pitch;
+            top.count = count;
+            result.holes[0] = result.holes[1] = top;
+            result.holes[1].first.y = result.outer.height - top.first.y - hole_height;
         }
     }
     publish_words(out,&result,sizeof(result)/4u);
@@ -87,8 +91,8 @@ int m10v_border_storage_layout(uint32_t style, uint32_t width, uint32_t height,
             s->first = stored_rect(display.holes[i].first, result.outer.width, result.outer.height, orientation);
             s->count = display.holes[i].count;
             int32_t step = (int32_t)display.holes[i].pitch;
-            if (orientation == 3u || orientation == 4u || orientation == 7u || orientation == 8u) step = -step;
-            if (orientation >= 5u) s->dx = step; else s->dy = step;
+            if (orientation == 2u || orientation == 3u || orientation == 6u || orientation == 7u) step = -step;
+            if (orientation >= 5u) s->dy = step; else s->dx = step;
         }
     }
     publish_words(out,&result,sizeof(result)/4u);

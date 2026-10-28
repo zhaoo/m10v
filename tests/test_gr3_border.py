@@ -95,22 +95,23 @@ class BorderGeometryTests(unittest.TestCase):
     def test_film_holes_are_symmetric_bounded_and_never_touch_photo(self):
         for width, height in ((6000, 4000), (4000, 6000), (6000, 1656), (1656, 6000), (2, 2), (2, 65534)):
             result = self.make(2, width, height)
-            left, right = result.holes
-            self.assertEqual(left.count, right.count)
-            self.assertGreaterEqual(left.count, 1)
-            self.assertLessEqual(left.count, 64)
-            self.assertEqual(right.first.x, result.outer.width - left.first.x - left.first.width)
+            top, bottom = result.holes
+            self.assertEqual(top.count, bottom.count)
+            self.assertGreaterEqual(top.count, 1)
+            self.assertLessEqual(top.count, 60)
+            self.assertEqual(bottom.first.x, top.first.x)
+            self.assertEqual(bottom.first.y, result.outer.height - top.first.y - top.first.height)
             for side, band in enumerate(result.holes):
                 hole = band.first
                 self.assertEqual((hole.x | hole.y | hole.width | hole.height | band.pitch) & 1, 0)
                 self.assertGreaterEqual(hole.width, 2)
                 self.assertGreaterEqual(hole.height, 2)
-                self.assertGreaterEqual(band.pitch, hole.height + 2)
-                self.assertLessEqual(hole.y + (band.count - 1) * band.pitch + hole.height, result.outer.height)
+                self.assertGreaterEqual(band.pitch, hole.width + 2)
+                self.assertLessEqual(hole.x + (band.count - 1) * band.pitch + hole.width, result.outer.width)
                 if side == 0:
-                    self.assertLessEqual(hole.x + hole.width, result.inner.x)
+                    self.assertLessEqual(hole.y + hole.height, result.inner.y)
                 else:
-                    self.assertGreaterEqual(hole.x, result.inner.x + width)
+                    self.assertGreaterEqual(hole.y, result.inner.y + height)
 
     def test_invalid_inputs_and_null_output_reject_without_mutation(self):
         for style, width, height in ((3, 6000, 4000), (1, 0, 4000), (1, 6001, 4000),
