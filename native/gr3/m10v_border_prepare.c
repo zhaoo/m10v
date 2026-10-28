@@ -40,7 +40,8 @@ int m10v_border_prepare(uint32_t module,uint32_t config){
         images[i][j]=word(recipe+0x70u+32u*i+4u*j);
     for(uint32_t j=0;j<8u;++j)output[j]=word(module+0x994cu+4u*j);
     uint32_t width=images[0][4]&65535u,height=images[0][4]>>16;
-    uint32_t native_pitch=half(status+0xaau),source_pitch=images[0][5]&65535u;
+    uint32_t native_pitch=half(status+0xaau),native_rows=half(status+0xacu);
+    uint32_t source_pitch=images[0][5]&65535u;
     uint32_t crop_enabled=byte(status+0xd0u);
     uint32_t write_height=crop_enabled?half(status+0xd8u):height;
     uint32_t roi_y=crop_enabled?half(status+0xd4u):0u;
@@ -51,7 +52,9 @@ int m10v_border_prepare(uint32_t module,uint32_t config){
     if((output[0]&255u)!=1u)return -22;
     if(output[3])return -23;
     if((output[4]>>16)!=write_height)return -24;
-    if((output[5]>>16)!=height)return -25;
+    /* Original 535019e4..535019ec copies status+0xac into this field.
+     * It is an allocation/cache extent and may exceed visible image height. */
+    if((output[5]>>16)!=native_rows)return -25;
     if((output[6]>>16)!=roi_y)return -26;
     if(!write_height||write_height>height+144u)return -27;
     if(output[1]<y||output[2]<c)return -28;
@@ -101,7 +104,8 @@ int m10v_border_prepare(uint32_t module,uint32_t config){
        byte(config+0x49u)||word(module+0x9904u)!=0x01010101u||word(module+0x9908u)||
        word(module+0x9938u)!=0x01010101u||word(module+0x993cu)||
        word(module+0x9944u)!=channel||byte(channel+8u)!=4u||byte(channel+10u)!=crop_enabled||
-       half(status+0xaau)!=native_pitch||byte(status+0xd0u)!=crop_enabled||
+       half(status+0xaau)!=native_pitch||half(status+0xacu)!=native_rows||
+       byte(status+0xd0u)!=crop_enabled||
        (crop_enabled&&(half(status+0xd8u)!=write_height||half(status+0xd4u)!=roi_y)))return -14;
     for(uint32_t i=0;i<4u;++i)if(word(module+0x9914u+4u*i)!=rgb[i]||
         byte(rgb[i])!=8u||word(rgb[i]+4u)||word(rgb[i]+8u)||word(rgb[i]+12u))return -15;

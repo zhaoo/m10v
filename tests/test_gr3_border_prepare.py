@@ -157,6 +157,16 @@ int main(void){
             self.assertEqual(self.prepare(MODULE,CONFIG),reason)
             self.assertEqual(self.snapshot(),before)
 
+    def test_native_cache_rows_can_exceed_visible_height(self):
+        # Original 535019e4 loads status+0xac into inline output+0x16.
+        # The source visible image remains 6000x4000; only the stream's
+        # allocation/cache rows rise to 4096.
+        self.write(RECIPE+0x254,struct.pack('<H',4096))
+        self.write(MODULE+0x9962,struct.pack('<H',4096))
+        self.assertEqual(self.prepare(MODULE,CONFIG),1)
+        self.assertEqual(struct.unpack('<H',self.read(MODULE+0x9962,2))[0],4096)
+        self.assertEqual(struct.unpack('<H',self.read(RECIPE+0x82,2))[0],4000)
+
     def test_off_does_not_access_module_or_image_descriptors(self):
         self.put(CONFIG+0x30,0);self.put(RECIPE+0x304,0)
         for phase in (0,6):

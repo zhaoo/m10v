@@ -37,6 +37,16 @@ plane0, W/H, cacheRows and ROI must match the corresponding native metadata.
 Inline H is status+d8 and ROI Y is status+d4. The source visible W/H and RAW
 status are unchanged.
 
+The inline cache-row halfword at module+0x9962 comes from status+0xac in
+original instructions 0x535019e4..0x535019ec. It need not equal the visible
+source height. GR III camera logs from build 1c71d979 showed border style2
+saved and available at capture, then BORD stage2 reason25: the previous
+adapter compared this field with visible height and rejected the frame before
+border hardware work. The adapter now compares the two stock-owned fields and
+rechecks status+0xac before committing relocated metadata. Expanded-bank and
+conservative write-extent checks remain. Camera pixel and timing acceptance
+of this candidate remains pending.
+
 The existing pure bank planner validates and computes all five relocated low
 descriptors within the original bank5 capacity. Before committing, prepare
 checks every stripe's configured write width against the original common pitch,
