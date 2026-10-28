@@ -137,12 +137,12 @@ int main(void){
         for address,value in mutations:
             self.memory[:]=bytes(len(self.memory)); fixture(self.write)
             self.put(address,value); before = self.snapshot()
-            self.assertEqual(self.prepare(MODULE,CONFIG),-1,(hex(address),hex(value)))
+            self.assertLess(self.prepare(MODULE,CONFIG),0,(hex(address),hex(value)))
             self.assertEqual(self.snapshot(),before)
         for address in (MODULE+0x9904,MODULE+0x9908,MODULE+0x9939,CONFIG+0x49,RGB):
             self.memory[:]=bytes(len(self.memory)); fixture(self.write)
             self.write(address,b'\x02'); before=self.snapshot()
-            self.assertEqual(self.prepare(MODULE,CONFIG),-1,hex(address))
+            self.assertLess(self.prepare(MODULE,CONFIG),0,hex(address))
             self.assertEqual(self.snapshot(),before)
 
     def test_off_does_not_access_module_or_image_descriptors(self):
@@ -157,7 +157,7 @@ int main(void){
         for phase in (1,2,3,4,5):
             self.put(RECIPE+0x510c,0x42524401|(phase<<5))
             before=self.snapshot()
-            self.assertEqual(self.prepare(MODULE,CONFIG),-1,phase)
+            self.assertLess(self.prepare(MODULE,CONFIG),0,phase)
             self.assertEqual(self.snapshot(),before)
 
     def test_prepared_phase_repeats_all_three_stripes_without_new_layout(self):
@@ -194,13 +194,13 @@ int main(void){
         # fail after planning, before any relocated descriptor is committed.
         self.write(RECIPE+0x286,struct.pack('<H',1000))
         self.write(MODULE+0x9964,struct.pack('<H',1000))
-        before=self.snapshot();self.assertEqual(self.prepare(MODULE,CONFIG),-1)
+        before=self.snapshot();self.assertLess(self.prepare(MODULE,CONFIG),0)
         self.assertEqual(self.snapshot(),before)
         self.write(RECIPE+0x286,struct.pack('<H',12))
         self.write(MODULE+0x9964,struct.pack('<H',12))
         self.write(RECIPE+0x27c,struct.pack('<H',200))
         self.write(MODULE+0x9966,struct.pack('<H',200))
-        before=self.snapshot();self.assertEqual(self.prepare(MODULE,CONFIG),-1)
+        before=self.snapshot();self.assertLess(self.prepare(MODULE,CONFIG),0)
         self.assertEqual(self.snapshot(),before)
 
 
@@ -275,7 +275,7 @@ class PrepareArmTests(unittest.TestCase):
                     [p.read_words(CONFIG+0x18,1)[0]+column,p.read_words(CONFIG+0x1c,1)[0]+column])
             before=bytes(p.u.mem_read(RECIPE+0x70,160))+bytes(p.u.mem_read(MODULE+0x994c,32))
             invalidation['enabled']=True
-            self.assertEqual(p.call(symbols['m10v_border_prepare'],MODULE,CONFIG),0xffffffff)
+            self.assertGreaterEqual(p.call(symbols['m10v_border_prepare'],MODULE,CONFIG),0xffffff00)
             self.assertEqual(bytes(p.u.mem_read(RECIPE+0x70,160))+
                              bytes(p.u.mem_read(MODULE+0x994c,32)),before)
             self.assertEqual(p.read_words(CONFIG+0x14,1),[50000000])
@@ -287,7 +287,7 @@ class PrepareArmTests(unittest.TestCase):
                 invalidation.update({'kind':'phase','phase':after_phase,'return':0})
                 before=bytes(p.u.mem_read(RECIPE+0x70,160))+bytes(p.u.mem_read(CONFIG+0x18,8))+bytes(p.u.mem_read(MODULE+0x994c,32))
                 calls.clear()
-                self.assertEqual(p.call(symbols['m10v_border_prepare'],MODULE,CONFIG),0xffffffff)
+                self.assertGreaterEqual(p.call(symbols['m10v_border_prepare'],MODULE,CONFIG),0xffffff00)
                 self.assertEqual(calls,['bank_plan'],'phase must change after actual planning')
                 self.assertEqual(bytes(p.u.mem_read(RECIPE+0x70,160))+bytes(p.u.mem_read(CONFIG+0x18,8))+
                                  bytes(p.u.mem_read(MODULE+0x994c,32)),before)

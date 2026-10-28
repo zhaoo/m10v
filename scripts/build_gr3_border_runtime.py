@@ -26,7 +26,7 @@ MODELS={
  'gr3x':{'version':'1.60','sha256':'0f11b0d28bc67932d044c5d01bc0314844a756057c89984278c73a23449a24c6'},
 }
 REUSED=('m10v_border_shot_read','m10v_border_shot_orientation','m10v_border_shot_phase',
-        'm10v_border_shot_transition','m10v_capture_library')
+        'm10v_border_shot_transition','m10v_capture_library','m10v_save_trace_recipe_mark')
 MODULES=(
  ('native/gr3/m10v_border.c',('m10v_border_layout','m10v_border_storage_layout','m10v_border_preview_fit')),
  ('native/gr3/m10v_border_bank.c',('m10v_border_bank_shape','m10v_border_bank_plan')),

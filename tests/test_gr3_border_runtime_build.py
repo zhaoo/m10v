@@ -11,7 +11,7 @@ from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1]
 EXTERNALS={name:0x540c0000+0x100*i for i,name in enumerate((
     'm10v_border_shot_read','m10v_border_shot_orientation','m10v_border_shot_phase',
-    'm10v_border_shot_transition','m10v_capture_library'))}
+    'm10v_border_shot_transition','m10v_capture_library','m10v_save_trace_recipe_mark'))}
 
 
 def target(at,word):

@@ -18,7 +18,7 @@ const componentSources=[...new Set([...modules.flatMap(([file])=>[file,file.repl
 export const borderSources=[...new Set([...componentSources,'native/gr3/m10v_border_camera.c',
  'native/gr3/m10v_border_camera.h','native/gr3/m10v_border_shot.c'])].sort();
 const reused=['m10v_border_shot_read','m10v_border_shot_orientation','m10v_border_shot_phase',
- 'm10v_border_shot_transition','m10v_capture_library'];
+ 'm10v_border_shot_transition','m10v_capture_library','m10v_save_trace_recipe_mark'];
 const guardNames=[...['client_construct','client_prepare','client_notify','client_done','client_destroy_if_done',
  'client_wait','transfer_construct','transfer_body','transfer_wait','fill_bundle_submit','fill_construct',
  'resize_construct','fill_body','resize_body','fill_wait','resize_wait','resize_dma_wait','fill_release',

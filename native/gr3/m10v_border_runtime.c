@@ -7,6 +7,7 @@
 #include "m10v_border_wait_guard.h"
 #include <stddef.h>
 extern int m10v_capture_library(uint32_t context);
+extern uint32_t m10v_save_trace_recipe_mark(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t);
 extern void border_recovery_transfer_body_hook(void),border_recovery_transfer_wait_hook(void);
 extern void border_recovery_fill_body_hook(void),border_recovery_fill_wait_hook(void);
 extern void border_recovery_resize_body_hook(void),border_recovery_resize_wait_hook(void);
@@ -22,6 +23,9 @@ static int same8(const uint32_t *a,const uint32_t *b){
 }
 static int overlaps(uint32_t a,uint32_t an,uint32_t b,uint32_t bn){return a<b+bn&&b<a+an;}
 static void hold(void){for(;;)((void(*)(uint32_t))0x536b0a74u)(1);}
+static void trace_prepare(uint32_t recipe,uint32_t stage,uint32_t reason){
+    (void)m10v_save_trace_recipe_mark(recipe,197u,0x424f5244u,stage,reason);
+}
 void m10v_border_runtime_before_submit(uint32_t module,uint32_t config){
     if(!ram(config,0x60u)||config<0x5500096cu)return;
     uint32_t recipe=config-0x96cu,style;
@@ -30,9 +34,16 @@ void m10v_border_runtime_before_submit(uint32_t module,uint32_t config){
     if(phase==M10V_BORDER_PHASE_FAILED_BEFORE_LIBRARY)return;
     if(phase!=M10V_BORDER_PHASE_FROZEN&&phase!=M10V_BORDER_PHASE_PREPARED)hold();
     uint32_t mode=word(recipe+0x18u),request=word(recipe+0x5cu);
-    if((mode!=0u&&mode!=5u&&mode!=6u)||!ram(request,16u)||word(request)!=0x53d0fe60u||
-       *(const volatile uint8_t *)(uintptr_t)(request+12u)!=1u||
-       *(const volatile uint8_t *)(uintptr_t)(request+13u)>1u){
+    uint32_t reason=0;
+    if(mode!=0u&&mode!=5u&&mode!=6u)reason|=1u;
+    if(!ram(request,16u))reason|=2u;
+    else {
+        if(word(request)!=0x53d0fe60u)reason|=4u;
+        if(*(const volatile uint8_t *)(uintptr_t)(request+12u)!=1u)reason|=8u;
+        if(*(const volatile uint8_t *)(uintptr_t)(request+13u)>1u)reason|=16u;
+    }
+    if(reason){
+        trace_prepare(recipe,1u,reason);
         if(phase==M10V_BORDER_PHASE_PREPARED)hold();
         if(!m10v_border_shot_transition(recipe,phase,M10V_BORDER_PHASE_FAILED_BEFORE_LIBRARY))hold();
         return;
@@ -46,6 +57,7 @@ void m10v_border_runtime_before_submit(uint32_t module,uint32_t config){
     /* Already-produced stripes cannot be rolled back to the original pitch.
      * Retain original worker, caller stack, recipe and banks on this path. */
     if(phase==M10V_BORDER_PHASE_PREPARED)hold();
+    trace_prepare(recipe,2u,(uint32_t)(-result));
     if(!m10v_border_shot_transition(recipe,phase,M10V_BORDER_PHASE_FAILED_BEFORE_LIBRARY))hold();
 }
 static __attribute__((noinline)) int guard_branch(uint32_t at,uint32_t target){

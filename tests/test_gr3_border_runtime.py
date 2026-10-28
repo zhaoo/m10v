@@ -28,6 +28,7 @@ def build_runtime():
   obj=p/f'{i}.o';subprocess.run([shutil.which('clang'),*FLAGS,'-c',str(source),'-o',str(obj)],check=True,capture_output=True);objs.append(str(obj))
  script=p/'link.ld';script.write_text(f'''m10v_capture_library = 0x53000100;
 m10v_border_camera_snapshot = 0x53000104;
+m10v_save_trace_recipe_mark = 0x53000108;
 SECTIONS {{ . = {BASE}; .text : {{ *(.text*) }} .rodata : {{ *(.rodata*) }}
 /DISCARD/ : {{ *(.ARM.exidx*) *(.ARM.extab*) *(.comment*) *(.note*) }} }}''')
  elf=p/'runtime.elf';subprocess.run([shutil.which('ld.lld'),'-T',str(script),
@@ -57,7 +58,7 @@ class BorderRuntimeArmTests(unittest.TestCase):
   path='builds/gr3-extension-validation/official-rtos.bin' if self.model=='gr3' else 'builds/gr3-border-iip-20261027/gr3x-official-rtos.bin'
   self.stock=(ROOT/path).read_bytes();self.assertEqual(hashlib.sha256(self.stock).hexdigest(),MODELS[self.model]['rtos_sha256'])
   self.p=OriginalArm(self.stock);self.u=self.p.u;self.u.mem_map(BASE,0x10000);self.u.mem_write(BASE,self.code)
-  self.events=[];self.queue=[];self.allocations=[];self.frees=[];self.signals=[];self.body_calls=[];self.bundles=[]
+  self.events=[];self.prepare_traces=[];self.queue=[];self.allocations=[];self.frees=[];self.signals=[];self.body_calls=[];self.bundles=[]
   self.resize_calls=[];self.callbacks=0;self.visited=[];self.stop_on_yield=True;self.library_result=0;self.active_client=0
   self.stubs={0x536a9bf8:0,0x536aa3a4:1,0x536aa34c:0,0x536abc78:0,0x536a9dd4:0,0x536a2954:0,0x536a29b4:0}
   self.u.hook_add(UC_HOOK_CODE,self.hook)
@@ -96,6 +97,9 @@ class BorderRuntimeArmTests(unittest.TestCase):
   if pc==0x5350e624:
    self.assertEqual((self.reg(0),self.reg(1)),(RECIPE,6));self.events.append('setup6');self.ret(0);return
   if pc==0x53000100:self.events.append('library');self.ret(self.library_result);return
+  if pc==0x53000108:
+   self.prepare_traces.append(tuple(self.reg(i) for i in range(4))+(self.word(self.reg(13)),))
+   self.events.append('prepare-trace');self.ret(1);return
   if pc==0x5383c8a8:self.events.append('library-cache');self.ret(0);return
   if pc==self.syms['m10v_border_fill_bundle_submit']:
    b=self.reg(1);self.bundles.append((b,self.word(b+4),bytes(u.mem_read(b,36))))
@@ -266,6 +270,7 @@ class BorderRuntimeArmTests(unittest.TestCase):
    self.put(address,value)
    self.call('m10v_border_runtime_before_submit',MODULE,CONFIG)
    self.assertEqual(self.phase(),5);self.assertEqual(self.allocations,[]);self.assertEqual(self.queue,[])
+   self.assertTrue(self.prepare_traces);self.assertEqual(self.prepare_traces[-1][1:4],(197,0x424f5244,1))
    self.setUp()
   self.prepare();self.put(0x5530000c,0)
   self.invoke('m10v_border_runtime_before_submit',MODULE,CONFIG)
