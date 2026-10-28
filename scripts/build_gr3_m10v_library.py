@@ -391,7 +391,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             stock=capture_stock_rtos()
             stock_path=folder/'capture-original-rtos.bin';stock_path.write_bytes(stock)
             trace_base=(base+len(image)+15)&~15
-            trace,owner_report=build_save_trace(out/'save-trace',trace_base,rtos=stock_path)
+            trace,owner_report=build_save_trace(out/'save-trace',trace_base,rtos=stock_path,
+                                               border_debug=border_enabled and debug_mode)
             image+=bytes(trace_base-base-len(image))+trace;symbols.update(owner_report['exports'])
             phase_obj=folder/'lifecycle.o'
             subprocess.run([compiler,*compile_flags,*debug_flags,'-c',str(ROOT/'native/gr3/m10v_capture_lifecycle.c'),'-o',str(phase_obj)],check=True,capture_output=True)
@@ -414,7 +415,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if save_chain_trace:
                 from scripts.build_gr3_module_dispatch_trace import build as build_module_trace
                 module_base=(base+len(image)+15)&~15
-                module_code,module_report=build_module_trace(out/'module-dispatch-trace',module_base,owner_report['exports']['m10v_save_trace_recipe_mark'],take=owner_report['exports']['m10v_save_trace_recipe_take'],batch=symbols['m10v_debug_batch'],rtos=stock_path)
+                module_code,module_report=build_module_trace(out/'module-dispatch-trace',module_base,owner_report['exports']['m10v_save_trace_recipe_mark'],take=owner_report['exports']['m10v_save_trace_recipe_take'],batch=symbols['m10v_debug_batch'],rtos=stock_path,border_debug=border_enabled and debug_mode)
                 image+=bytes(module_base-base-len(image))+module_code
                 from scripts.build_gr3_pool_release_trace import build as build_pool_trace
                 pool_base=(base+len(image)+15)&~15
