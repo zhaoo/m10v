@@ -27,3 +27,30 @@ descriptor in the reserved trace slot, and source/extra descriptor sizes plus
 source/main Y pointers at the safe event193 flush. All are metadata-only.
 They establish the exact handoff boundary before any repair to saved JPEG or
 XPan is attempted. This build remains a diagnostic, not a working border JPEG.
+
+## GR III debug3 readback and late handoff candidate
+
+The next CRC-valid `M10VCP0/1.BIN` and `M10VIO0/1.BIN` use build ID
+`5a362393`. Files `00004350.JPG` and `00004351.JPG` are again 6000x4000
+and 6000x2208 respectively, without border pixels. Ordinary module10 returned
+with **6480x4480** and frozen film phase Complete. The event193 JPEG owner
+then saw both source/main as 6000x4000, with source Y equal to main Y.
+This narrows the overwrite to after module10's handler return and before the
+JPEG owner entry. XPan's BackResize exited at 6000x4000 and logged stage3,
+reason6; by event193 the native owner had cropped both source/main to
+6000x2208, with frozen phase FailedBeforeLibrary. The residual bridge returned
+stock-tone refusal -4. Physical JPEG SOF dimensions corroborate those paths.
+
+The new candidate calls the existing residual bridge first at the owned JPEG
+handoff. For phase Complete it restores the previously composed full canvas
+only when the native bank's exact Y/C provenance, frozen style, full-frame
+dimensions and bounded canvas layout all match. For a native crop that failed
+the early reason6 check, it admits only a crop within the originally prepared
+bank, performs border Fill plus two preview Resize jobs through the same
+guarded IIP workers, then publishes expanded descriptors. The crop can begin
+at any even X; at most six pixels of the outward margin are shifted to align
+the IIP canvas base. No CPU photo-pixel loop or second full-frame bank was
+introduced. The GR III and GR IIIx ARM tests exercise full frame, XPan and
+an even but non-eight-aligned 6x7-like crop. These are simulated control-flow
+checks, not a physical pixel or silicon teardown acceptance. Exact 6x7 camera
+dimensions and all real orientation/sequence modes still require camera tests.

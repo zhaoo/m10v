@@ -8,7 +8,7 @@ const modules=[
  ['native/gr3/m10v_border_canvas.c',['m10v_border_canvas_plan']],
  ['native/gr3/m10v_border_fill_plan.c',['m10v_border_fill_plan']],
  ['native/gr3/m10v_border_prepare.c',['m10v_border_prepare']],
- ['native/gr3/m10v_border_runtime.c',['m10v_border_runtime_before_submit','m10v_border_runtime_after_resize']],
+ ['native/gr3/m10v_border_runtime.c',['m10v_border_runtime_before_submit','m10v_border_runtime_after_resize','m10v_border_runtime_jpeg']],
 ];
 const guardSources=['native/gr3/m10v_border_wait_guard.c','native/gr3/m10v_border_wait_guard.h',
  'scripts/border_recovery_wait_guard.S','scripts/border_recovery_wait_guard_contract.json',
@@ -144,5 +144,11 @@ export function borderPatches(runtime,m){
  need(submit===h.sections[7].address&&resize===submit+60&&resize+64===end,'hook layout differs');
  check(submit,[...save,0xe2440a09,0xe1a01006,[h.symbols.m10v_border_runtime_before_submit,true],...restore,[0x536abd28,false]]);
  check(resize,[...save,0xe1a00007,0xe1a01004,[h.symbols.m10v_border_runtime_after_resize,true],...restore,0xe51b2028,[0x534ff45c,false]]);
+ const jpeg=h.jpeg_handoff;
+ need(jpeg&&jpeg.target===h.symbols.m10v_border_runtime_jpeg&&
+  jpeg.original_target===m.symbols.m10v_capture_library&&
+  inside(jpeg.callsite,4,m.base,h.base)&&
+  runtime.readUInt32LE(jpeg.callsite-m.base)===branch(jpeg.callsite,jpeg.target,true),
+  'owned JPEG adapter handoff differs');
  return out;
 }

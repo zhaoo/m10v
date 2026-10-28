@@ -245,6 +245,45 @@ class BorderRuntimeArmTests(unittest.TestCase):
   for _ in range(4):
    self.assertEqual(self.u.reg_read(A.UC_ARM_REG_PC),0x536b0a74);self.dispatch_one()
   self.assertEqual(self.u.reg_read(A.UC_ARM_REG_PC),0x55fff000);self.assertEqual(self.reg(0),1)
+ def test_jpeg_handoff_restores_completed_full_canvas_after_owner_reset(self):
+  self.put(RECIPE+0x510c,0x42524402);self.post_fixture()
+  inner=bytes(self.u.mem_read(RECIPE+0xb0,32))
+  self.finish_post();outer=bytes(self.u.mem_read(RECIPE+0xb0,32))
+  self.u.mem_write(RECIPE+0x70,inner);self.u.mem_write(RECIPE+0xb0,inner)
+  self.u.mem_write(RECIPE+0x110,inner)
+  self.events.clear();self.assertEqual(self.call('m10v_border_runtime_jpeg',RECIPE+0x9b8),0)
+  self.assertEqual(bytes(self.u.mem_read(RECIPE+0xb0,32)),outer)
+  self.assertEqual(bytes(self.u.mem_read(RECIPE+0x110,32)),outer)
+  self.assertEqual(self.events[0],'library');self.assertNotIn('alloc',self.events)
+ def test_jpeg_handoff_late_xpan_crop_uses_same_bank_and_hardware(self):
+  self.put(RECIPE+0x510c,0x42524402);self.post_fixture()
+  original=self.word(RECIPE+0xb0+4);chroma=self.word(RECIPE+0xb0+8)
+  stride=self.word(RECIPE+0xb0+20)&65535
+  self.put(RECIPE+0x510c,0x425244a2)
+  self.put(RECIPE+0x70+4,original+896*stride,chroma+896*stride)
+  self.put(RECIPE+0xb0+4,original+896*stride,chroma+896*stride)
+  for at in (RECIPE+0x70,RECIPE+0xb0):self.put(at+16,6000|(2208<<16))
+  self.library_result=(-4)&0xffffffff
+  self.invoke('m10v_border_runtime_jpeg',RECIPE+0x9b8)
+  for _ in range(4):
+   self.assertEqual(self.u.reg_read(A.UC_ARM_REG_PC),0x536b0a74);self.dispatch_one()
+  self.assertEqual(self.u.reg_read(A.UC_ARM_REG_PC),0x55fff000)
+  self.assertEqual(self.phase(),3);self.assertEqual(self.callbacks,4)
+  self.assertEqual(self.word(RECIPE+0xb0+16),6272|(2480<<16))
+  self.assertEqual(self.word(RECIPE+0x110+16),6272|(2480<<16))
+  self.assertEqual(self.events[0],'library')
+ def test_jpeg_handoff_late_6x7_crop_preserves_full_native_height(self):
+  self.put(RECIPE+0x510c,0x42524402);self.post_fixture()
+  y=self.word(RECIPE+0xb0+4);c=self.word(RECIPE+0xb0+8)
+  self.put(RECIPE+0x510c,0x425244a2)
+  for at in (RECIPE+0x70,RECIPE+0xb0):
+   self.put(at+4,y+666,c+666);self.put(at+16,4668|(4000<<16))
+  self.invoke('m10v_border_runtime_jpeg',RECIPE+0x9b8)
+  for _ in range(4):
+   self.assertEqual(self.u.reg_read(A.UC_ARM_REG_PC),0x536b0a74);self.dispatch_one()
+  self.assertEqual(self.u.reg_read(A.UC_ARM_REG_PC),0x55fff000)
+  self.assertEqual(self.phase(),3);self.assertEqual(self.word(RECIPE+0xb0+16),5148|(4480<<16))
+  self.assertEqual(self.word(RECIPE+0x110+16),5148|(4480<<16))
  def test_valid_original_preview_roi_is_normalized_before_fill_resize_and_publication(self):
   self.post_fixture();self.put(RECIPE+0xd0+16,718|(478<<16));self.put(RECIPE+0xd0+24,2|(2<<16))
   self.finish_post()

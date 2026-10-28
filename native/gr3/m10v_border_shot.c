@@ -58,7 +58,8 @@ uint32_t m10v_border_shot_phase(uint32_t recipe){
 }
 int m10v_border_shot_transition(uint32_t recipe,uint32_t before,uint32_t after){
     if(!((before==0u&&(after==1u||after==5u||after==6u))||
-         (before==6u&&(after==1u||after==5u))||(before==1u&&(after==2u||after==5u))||
+         (before==6u&&(after==1u||after==5u))||(before==5u&&after==1u)||
+         (before==1u&&(after==2u||after==5u))||
          (before==2u&&(after==3u||after==4u))))return 0;
     uint32_t *p=shot(recipe);if(!p)return 0;
     uint32_t word=__atomic_load_n(p,__ATOMIC_ACQUIRE);

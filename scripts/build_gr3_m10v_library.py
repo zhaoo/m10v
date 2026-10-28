@@ -872,6 +872,24 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             out_dir=out/'border-runtime')
         image+=bytes(border_base-base-len(image))+border_code
         symbols.update(border_component['symbols'])
+        # Redirect only the owned chain's single capture-library call. The
+        # adapter calls the same library first, then checks the frozen shot and
+        # bank provenance before publishing an outward hardware canvas.
+        def chain_bl(at,target):
+            delta=target-at-8
+            if (at|target)&3 or not -(1<<25)<=delta<(1<<25):
+                raise ValueError('border JPEG handoff branch out of range')
+            return 0xeb000000|((delta>>2)&0xffffff)
+        callsites=[at for at in range(chain_base,chain_base+len(chain)-3,4)
+                   if struct.unpack_from('<I',image,at-base)[0]==chain_bl(at,symbols['m10v_capture_library'])]
+        if len(callsites)!=1:
+            raise ValueError('owned JPEG chain library callsite changed')
+        struct.pack_into('<I',image,callsites[0]-base,
+                         chain_bl(callsites[0],symbols['m10v_border_runtime_jpeg']))
+        if struct.unpack_from('<I',image,callsites[0]-base)[0]!=chain_bl(callsites[0],symbols['m10v_border_runtime_jpeg']):
+            raise ValueError('border JPEG adapter readback failed')
+        border_component['jpeg_handoff']={'callsite':callsites[0],
+            'target':symbols['m10v_border_runtime_jpeg'],'original_target':symbols['m10v_capture_library']}
     manifest = {'camera_model':camera_model,'schema': 'm10v-gr3-native-film-runtime/v2', 'base': base, 'symbols': symbols,
                 'code_bytes': len(image), 'code_sha256': sha(image), 'film_count': 101, 'slots': 10,
                 'sources': {p: sha((ROOT / p).read_bytes()) for p in

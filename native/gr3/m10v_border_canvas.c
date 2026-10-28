@@ -15,12 +15,20 @@ int m10v_border_canvas_plan(uint32_t style,uint32_t orientation,
         uint32_t stride=inner[5]&65535u,rows=inner[5]>>16;
         if((inner[0]&255u)!=1u||inner[3]||inner[6]||(inner[7]&255u)!=2u||
            stride<result.layout.outer.width||stride>16384u||(stride&63u)||
-           rows<h||rows>16384u||((inner[1]|inner[2]|y_base|c_base)&7u)||
+           rows<h||rows>16384u||((inner[1]|inner[2])&1u)||((y_base|c_base)&7u)||
            y_base<0x55000000u||c_base<y_base||c_base>=0x80000000u||!plane_bytes||
            plane_bytes>0x80000000u-c_base||c_base-y_base<plane_bytes)return -1;
         uint32_t offset=result.layout.inner.y*stride+result.layout.inner.x;
         if(inner[1]<offset||inner[2]<offset)return -1;
         uint32_t y=inner[1]-offset,c=inner[2]-offset;
+        /* Native side crops may begin at any even X. Move at most six pixels
+         * within the outward border to keep the IIP base eight aligned. */
+        uint32_t align=y&7u;
+        if(align){
+            if((align&1u)||result.layout.inner.x+align+result.layout.inner.width>=result.layout.outer.width||
+               inner[1]<offset+align||inner[2]<offset+align)return -1;
+            result.layout.inner.x+=align;offset+=align;y-=align;c-=align;
+        }
         uint32_t span=stride*result.layout.allocated_height;
         if((y|c)&7u||!fits(y,span,y_base,plane_bytes)||!fits(c,span,c_base,plane_bytes)||
            !fits(inner[1],stride*h,y_base,plane_bytes)||

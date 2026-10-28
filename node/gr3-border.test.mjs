@@ -20,6 +20,9 @@ r=Path('builds/gr3-border-iip-20261027/${model}-official-rtos.bin').read_bytes()
 build(0x54160000,r,{n:0x540c0000+i*0x100 for i,n in enumerate(REUSED)},camera_model=${JSON.stringify(model)},enabled=True,out_dir=${JSON.stringify(dir)})`],{cwd:new URL('..',import.meta.url),stdio:'pipe'});
    const h=JSON.parse(readFileSync(join(dir,'m10v-border-runtime-arm.json'))),block=readFileSync(join(dir,'m10v-border-runtime-arm.bin'));
    const base=0x540b6000,runtime=Buffer.alloc(h.base-base+block.length);block.copy(runtime,h.base-base);
+   const callsite=base+0x1000,target=h.symbols.m10v_border_runtime_jpeg;
+   h.jpeg_handoff={callsite,target,original_target:h.reused_central_symbols.m10v_capture_library};
+   runtime.writeUInt32LE((0xeb000000|(((target-callsite-8)>>2)&0xffffff))>>>0,callsite-base);
    const sources=Object.fromEntries(borderSources.map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))]));
    cached.set(model,{runtime,m:{base,camera_model:model,symbols:{...h.reused_central_symbols,...h.symbols},sources,
     border:{enabled:true,pixel_pipeline_enabled:true,hardware_component:h},hdf_enabled:false,hdf_default:0,hdf_menu:{route:0x0200f102}}});

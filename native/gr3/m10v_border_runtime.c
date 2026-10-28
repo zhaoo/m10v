@@ -22,6 +22,13 @@ static int same8(const uint32_t *a,const uint32_t *b){
     for(uint32_t i=1;i<7u;++i)if(a[i]!=b[i])return 0;return 1;
 }
 static int overlaps(uint32_t a,uint32_t an,uint32_t b,uint32_t bn){return a<b+bn&&b<a+an;}
+static uint32_t crop_rows(uint32_t displacement,uint32_t stride,uint32_t bound){
+    uint32_t low=0,high=bound;
+    while(low<high){uint32_t mid=(low+high+1u)/2u;
+        if(mid*stride<=displacement)low=mid;else high=mid-1u;
+    }
+    return low;
+}
 static void hold(void){for(;;)((void(*)(uint32_t))0x536b0a74u)(1);}
 static void trace_prepare(uint32_t recipe,uint32_t stage,uint32_t reason){
     (void)m10v_save_trace_recipe_mark(recipe,197u,0x424f5244u,stage,reason);
@@ -217,4 +224,82 @@ int m10v_border_runtime_after_resize(uint32_t module,uint32_t config){
     if(!m10v_border_shot_transition(recipe,M10V_BORDER_PHASE_LIBRARY_ATTEMPTED,M10V_BORDER_PHASE_COMPLETE))hold();
     ((void(*)(void*))0x536af2e4u)(fills);
     if(!m10v_border_stage_leave(gate,recipe))hold();return 1;
+}
+
+/* The owner can replace all three large descriptors after BackResize returned.
+ * Its copied Y/C addresses still identify the already composited bank. The
+ * encoder handoff is the last owned point at which those descriptors may be
+ * restored without touching a photo pixel on the CPU. */
+int m10v_border_runtime_jpeg(uint32_t context){
+    int library=m10v_capture_library(context);
+    if(!ram(context,0x50u)||context<0x550009b8u)return library;
+    uint32_t recipe=context-0x9b8u,style,orientation;
+    if(!m10v_border_shot_read(recipe,&style)||style==M10V_BORDER_OFF||
+       !m10v_border_shot_orientation(recipe,&orientation))return library;
+    uint32_t phase=m10v_border_shot_phase(recipe);
+    if(phase!=M10V_BORDER_PHASE_COMPLETE&&phase!=M10V_BORDER_PHASE_FAILED_BEFORE_LIBRARY)return library;
+    m10v_border_bank_info shape;
+    if(m10v_border_bank_shape(style,orientation,half(recipe+0x256u),half(recipe+0x258u),
+          word(recipe+0x304u),word(recipe+0x364u),&shape))return library;
+    uint32_t *source=(uint32_t *)(uintptr_t)(recipe+0x70u),*main=(uint32_t *)(uintptr_t)(recipe+0xb0u);
+    uint32_t w=main[4]&65535u,h=main[4]>>16;
+    uint32_t fullw=half(recipe+0x256u),fullh=half(recipe+0x258u);
+    if(!same8(source,main)||!w||!h||w>fullw||h>fullh||((w|h)&1u)||
+       (source[0]&255u)!=1u||source[3]||source[6]||(source[7]&255u)!=2u||
+       main[2]-main[1]!=shape.plane_bytes||main[1]<shape.source_y)return library;
+    uint32_t displacement=main[1]-shape.source_y;
+    uint32_t crop_y=crop_rows(displacement,shape.canvas.stride,fullh);
+    uint32_t crop_x=displacement-crop_y*shape.canvas.stride;
+    if((crop_x|crop_y)&1u||crop_x>fullw||w>fullw-crop_x||
+       crop_y>fullh||h>fullh-crop_y||
+       main[2]!=shape.source_c+displacement)return library;
+    uint32_t inner[8];copy8(inner,main);
+    inner[5]=shape.canvas.stride|(h<<16);
+    m10v_border_canvas_info canvas;
+    uint32_t base=shape.preview_base-2u*shape.plane_bytes;
+    if(m10v_border_canvas_plan(style,orientation,inner,base,
+          base+shape.plane_bytes,shape.plane_bytes,&canvas))return library;
+    if(phase==M10V_BORDER_PHASE_COMPLETE){
+        if(w!=fullw||h!=fullh||displacement||
+           canvas.canvas[4]!=(shape.canvas.outer.width|(shape.canvas.outer.height<<16)))return library;
+        copy8(source,canvas.canvas);copy8(main,canvas.canvas);
+        copy8((uint32_t *)(uintptr_t)(recipe+0x110u),canvas.canvas);
+        trace_prepare(recipe,4u,1u);
+        return library;
+    }
+    /* Only a native crop of the prepared full frame may enter this late path.
+     * No fallback bank allocation or CPU frame draw is permitted. */
+    if((w==fullw&&h==fullh)||(library&&library!=-4)||!ready())return library;
+    uint32_t dest[2][8];
+    if(!preview(recipe,0xd0u,&shape,&canvas,dest[0])||
+       !preview(recipe,0xf0u,&shape,&canvas,dest[1])||preview_overlap(dest[0],dest[1]))return library;
+    m10v_border_fill_plan_info *fills=((void*(*)(uint32_t))0x536af2a8u)(sizeof(*fills));
+    if(!fills)return library;
+    if(!ram(U(fills),sizeof(*fills))||overlaps(U(fills),sizeof(*fills),shape.bank,shape.capacity))hold();
+    if(m10v_border_fill_plan(&canvas,U(fills),fills)!=1){
+        ((void(*)(void*))0x536af2e4u)(fills);return library;
+    }
+    if(!m10v_border_shot_transition(recipe,M10V_BORDER_PHASE_FAILED_BEFORE_LIBRARY,M10V_BORDER_PHASE_RUNNING))hold();
+    uint32_t gate=m10v_border_stage_enter(recipe);
+    if(!gate)hold();
+    m10v_border_native_client client;m10v_border_client_construct(&client);
+    if(!m10v_border_fill_bundle_submit(&client,(const m10v_border_fill_bundle *)fills))hold();
+    publish_previews_fill(fills,dest,style);
+    if(!m10v_border_fill_bundle_submit(&client,(const m10v_border_fill_bundle *)fills))hold();
+    for(uint32_t i=0;i<2u;++i){
+        if(!m10v_border_client_prepare(&client,0x03020002u,0x40u))hold();
+        ((void(*)(void*,const void*,const void*,uint32_t))0x534ab6b8u)(&client,canvas.canvas,dest[i],1);
+        if(!m10v_border_client_done(&client)||client.completed!=1u)hold();
+    }
+    if(!m10v_border_client_destroy_if_done(&client))hold();
+    copy8(source,canvas.canvas);copy8(main,canvas.canvas);
+    copy8((uint32_t *)(uintptr_t)(recipe+0x110u),canvas.canvas);
+    copy8((uint32_t *)(uintptr_t)(recipe+0xd0u),dest[0]);
+    copy8((uint32_t *)(uintptr_t)(recipe+0xf0u),dest[1]);
+    if(!m10v_border_shot_transition(recipe,M10V_BORDER_PHASE_RUNNING,M10V_BORDER_PHASE_LIBRARY_ATTEMPTED)||
+       !m10v_border_shot_transition(recipe,M10V_BORDER_PHASE_LIBRARY_ATTEMPTED,M10V_BORDER_PHASE_COMPLETE))hold();
+    ((void(*)(void*))0x536af2e4u)(fills);
+    if(!m10v_border_stage_leave(gate,recipe))hold();
+    trace_prepare(recipe,4u,2u);
+    return library;
 }

@@ -33,7 +33,7 @@ MODULES=(
  ('native/gr3/m10v_border_canvas.c',('m10v_border_canvas_plan',)),
  ('native/gr3/m10v_border_fill_plan.c',('m10v_border_fill_plan',)),
  ('native/gr3/m10v_border_prepare.c',('m10v_border_prepare',)),
- ('native/gr3/m10v_border_runtime.c',('m10v_border_runtime_before_submit','m10v_border_runtime_after_resize')),
+ ('native/gr3/m10v_border_runtime.c',('m10v_border_runtime_before_submit','m10v_border_runtime_after_resize','m10v_border_runtime_jpeg')),
 )
 RUNTIME_SPANS=(
  ('stillmake_configuration',0x5350177c,0x53502578,'e6fa9ea97070dc8a5bca5fc9956718ed52d9096b324db38eee091ba754305855'),
