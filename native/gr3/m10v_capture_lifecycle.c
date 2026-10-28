@@ -56,8 +56,15 @@ void m10v_lifecycle_phase(uint32_t context,uint32_t event,uint32_t result){
            *(const uint32_t *)(uintptr_t)(recipe+M10V_BORDER_SHOT_OFFSET),
            available?style:0xffffffffu,
            *(const uint32_t *)(uintptr_t)(recipe+0xc0u));
+  M10V_LOG(197,recipe,0x53524353u,
+           *(const uint32_t *)(uintptr_t)(recipe+0x80u),
+           *(const uint32_t *)(uintptr_t)(recipe+0x120u));
+  M10V_LOG(197,recipe,0x504c414eu,
+           *(const uint32_t *)(uintptr_t)(recipe+0x74u),
+           *(const uint32_t *)(uintptr_t)(recipe+0xb4u));
   const m10v_save_trace *trace=(const m10v_save_trace *)(uintptr_t)(recipe+M10V_SAVE_RECIPE_BYTES);
-  if(trace->events[31][0]==197u&&trace->events[31][2]==0x424f5244u)
+  if(trace->events[31][0]==197u&&
+     (trace->events[31][2]==0x424f5244u||trace->events[31][2]==0x4d313030u))
    M10V_LOG(197,recipe,trace->events[31][2],trace->events[31][3],trace->events[31][4]);
  }
 #endif

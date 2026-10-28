@@ -177,6 +177,12 @@ class BorderRuntimeArmTests(unittest.TestCase):
    self.assertEqual(result,(-7)&0xffffffff,hex(at))
    self.assertEqual(self.allocations,[]);self.assertEqual(self.queue,[])
    self.assertNotIn('setup6',self.events);self.patch(at,installed)
+ def test_post_resize_admission_failure_retains_reason_for_camera_log(self):
+  self.post_fixture();self.put(POST+0x30,0)
+  self.assertEqual(self.call('m10v_border_runtime_after_resize',MODULE,POST),(-3)&0xffffffff)
+  self.assertEqual(self.phase(),5)
+  self.assertEqual(self.prepare_traces[-1][1:5],(197,0x424f5244,3,3))
+  self.assertEqual(self.queue,[]);self.assertEqual(self.allocations,[])
  def test_missing_each_owned_worker_tag_rejects_before_hardware(self):
   self.post_fixture()
   for worker,offset in zip(WORKERS,(0x44,0x58,0x48)):

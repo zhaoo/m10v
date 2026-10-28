@@ -135,6 +135,8 @@ static void publish_previews_fill(m10v_border_fill_plan_info *p,uint32_t d[2][8]
 static int fail(uint32_t recipe,uint32_t before,int result){
     uint32_t after=before==M10V_BORDER_PHASE_LIBRARY_ATTEMPTED?
         M10V_BORDER_PHASE_FAILED_AFTER_LIBRARY:M10V_BORDER_PHASE_FAILED_BEFORE_LIBRARY;
+    if(after==M10V_BORDER_PHASE_FAILED_BEFORE_LIBRARY)
+        trace_prepare(recipe,3u,(uint32_t)(-result));
     if(!m10v_border_shot_transition(recipe,before,after))hold();return result;
 }
 int m10v_border_runtime_after_resize(uint32_t module,uint32_t config){

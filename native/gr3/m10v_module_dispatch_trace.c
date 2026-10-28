@@ -25,6 +25,12 @@ void m10v_module_trace_mark(uint32_t module,uint32_t message,uint32_t handler,ui
      detail=*(const uint32_t *)(uintptr_t)(recipe+0xc0u);
 #endif
  m10v_save_trace_recipe_mark(recipe,event,kind,detail,event==204?module:result);
+#if M10V_BORDER_ENABLED && M10V_DEBUG_MODE
+ if(event==205&&kind==10u&&
+    *(const uint32_t *)(uintptr_t)(recipe+M10V_BORDER_SHOT_OFFSET))
+  m10v_save_trace_recipe_mark(recipe,197u,0x4d313030u,
+    *(const uint32_t *)(uintptr_t)(recipe+M10V_BORDER_SHOT_OFFSET),detail);
+#endif
  if(event==204&&handler==0x5350c764u)m10v_save_trace_recipe_mark(recipe,206,kind,*(const uint32_t *)(uintptr_t)(message+4),module);
 }
 #if M10V_MODULE_SAFE_STORE_SINK

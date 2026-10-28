@@ -76,6 +76,21 @@ def page_records(data):
         if record['event']==125:
             context,tone,mode,raw=record['arguments']
             record['request_identity']={'context':hex(context),'stock_tone':tone,'sequence_mode':mode,'raw_source':hex(raw)}
+        if record['event']==197:
+            recipe,tag,value,detail=record['arguments']
+            if tag==0x424f5244:
+                record['border_diagnostic']={'recipe':hex(recipe),'kind':'rejection',
+                    'stage':value,'reason':detail}
+            elif tag==0x4d313030:
+                record['border_diagnostic']={'recipe':hex(recipe),'kind':'module10.return',
+                    'shot_word':hex(value),'main_width':detail&65535,'main_height':detail>>16}
+            elif tag==0x53524353:
+                record['border_diagnostic']={'recipe':hex(recipe),'kind':'jpeg.entry.descriptors',
+                    'source_size':[value&65535,value>>16],
+                    'extra_size':[detail&65535,detail>>16]}
+            elif tag==0x504c414e:
+                record['border_diagnostic']={'recipe':hex(recipe),'kind':'jpeg.entry.planes',
+                    'source_y':hex(value),'main_y':hex(detail)}
         if record['event']==184:
             recipe,buffer_id,backing,result=record['arguments']
             record['pool_dispatch']={'recipe':hex(recipe),'buffer_id':buffer_id,'backing':hex(backing),

@@ -39,7 +39,12 @@ uint32_t m10v_save_trace_append(m10v_save_trace *t,uint32_t e,uint32_t a,uint32_
  /* Slot31 is never appended: the ordinary limit is31 and the full ring
   * reserves its final slot. Keep the latest border rejection across earlier
   * trace drains so the camera's bounded file pages cannot hide its reason. */
- if(e==197u&&b==0x424f5244u){uint32_t *last=t->events[31];last[0]=e;last[1]=a;last[2]=b;last[3]=c;last[4]=d;}
+ if(e==197u&&(b==0x424f5244u||b==0x4d313030u)){
+  uint32_t *last=t->events[31];
+  if(b==0x424f5244u||last[2]!=0x424f5244u){
+   last[0]=e;last[1]=a;last[2]=b;last[3]=c;last[4]=d;
+  }
+ }
 #endif
  if(n>=(e>=190u&&e<=199u?M10V_SAVE_TRACE_CAPACITY-1u:M10V_SAVE_TRACE_CAPACITY-7u)){if(t->dropped!=0xffffffffu)t->dropped++;__asm__ volatile("dmb ish":::"memory");t->busy=0;return 0;}
  uint32_t *r=t->events[n];r[0]=e;r[1]=a;r[2]=b;r[3]=c;r[4]=d;
