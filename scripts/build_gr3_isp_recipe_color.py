@@ -13,7 +13,7 @@ SITE=0x53501d68
 EXPECTED=0xe12fff33
 COLOR_BYTES=1796
 
-def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,producer_snapshot=False,native_color=False,native_grain=False,external_noise=False,live_color=False,shared_hdf=False,appended_slots=False):
+def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,producer_snapshot=False,native_color=False,native_grain=False,external_noise=False,live_color=False,shared_hdf=False,appended_slots=False,border_snapshot=False):
     rom=bytes(rom)
     if hashlib.sha256(rom).hexdigest()!=SHA:raise ValueError('wrong official RTOS')
     if struct.unpack_from('<I',rom,SITE-0x53000000)[0]!=EXPECTED:raise ValueError('Develop Still Make callback differs')
@@ -25,14 +25,15 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
     if type(external_noise)is not bool or external_noise:raise ValueError('CPU grain noise shaping has been removed')
     if type(native_grain)is not bool or (native_grain and not native_color):raise ValueError('native grain requires native per-recipe color mode')
     if type(native_color)is not bool or (native_color and observer):raise ValueError('native color requires apply mode')
-    required=(('m10v_hdf_producer','m10v_hdf_settings','m10v_hdf_done') if shared_hdf else ())+ (('m10v_camera_library_preview',) if live_color or producer_snapshot else ())+('m10v_library_valid',)+(('m10v_library_tables',) if not observer else ())+(('m10v_camera_library_mutation_busy',) if producer_snapshot else ())
+    if type(border_snapshot)is not bool or (border_snapshot and not producer_snapshot):raise ValueError('border snapshot requires producer ingress')
+    required=(('m10v_hdf_producer','m10v_hdf_settings','m10v_hdf_done') if shared_hdf else ())+ (('m10v_camera_library_preview',) if live_color or producer_snapshot else ())+('m10v_library_valid',)+(('m10v_library_tables',) if not observer else ())+(('m10v_camera_library_mutation_busy',) if producer_snapshot else ())+(('m10v_border_shot_freeze',) if border_snapshot else ())
     if any(type(library_exports.get(k))!=int or library_exports[k]&3 for k in required):raise ValueError('real library decoder/validator ARM exports required')
     compiler=os.environ.get('M10V_LLVM_CLANG') or '/opt/homebrew/opt/llvm/bin/clang'
     if not Path(compiler).is_file():compiler=shutil.which('clang')
     with tempfile.TemporaryDirectory() as d:
         d=Path(d);src=d/'module.c';obj=d/'module.o'
         src.write_text(''.join('#include "'+str(ROOT/'native/gr3'/name)+'"\n' for name in (('m10v_isp_frame_color.c','m10v_isp_multiaxis.c','m10v_isp_native_look.c','m10v_isp_recipe_color.c') if native_color else ('m10v_isp_frame_color.c','m10v_isp_recipe_color.c'))))
-        subprocess.run([compiler,*FLAGS,'-DM10V_APPENDED_SLOTS='+str(int(appended_slots)),'-DM10V_ISP_SHARED_HDF='+str(int(shared_hdf)),'-DM10V_ISP_LIVE_COLOR='+str(int(live_color)),'-DM10V_ISP_RECIPE_COLOR_OBSERVER='+str(int(observer)),'-DM10V_ISP_RECIPE_COLOR_PRODUCER='+str(int(producer_snapshot)),'-DM10V_ISP_NATIVE_LOOK='+str(int(native_color)),'-DM10V_ISP_NATIVE_GRAIN_MODE='+str(int(native_grain)),'-c',str(src),'-o',str(obj)],check=True,capture_output=True)
+        subprocess.run([compiler,*FLAGS,'-DM10V_BORDER_SHOT='+str(int(border_snapshot)),'-DM10V_APPENDED_SLOTS='+str(int(appended_slots)),'-DM10V_ISP_SHARED_HDF='+str(int(shared_hdf)),'-DM10V_ISP_LIVE_COLOR='+str(int(live_color)),'-DM10V_ISP_RECIPE_COLOR_OBSERVER='+str(int(observer)),'-DM10V_ISP_RECIPE_COLOR_PRODUCER='+str(int(producer_snapshot)),'-DM10V_ISP_NATIVE_LOOK='+str(int(native_color)),'-DM10V_ISP_NATIVE_GRAIN_MODE='+str(int(native_grain)),'-c',str(src),'-o',str(obj)],check=True,capture_output=True)
         code,exports=link_object(obj.read_bytes(),base,externals={k:library_exports[k] for k in required},prefix='m10v_isp_frame_',additional_exports=('m10v_isp_frame_live_prepare','m10v_isp_frame_live_color','m10v_isp_frame_recipe_snapshot','m10v_isp_frame_recipe_state','m10v_isp_frame_recipe_begin','m10v_isp_frame_recipe_finish','m10v_isp_frame_recipe_producer','m10v_isp_frame_recipe_completed','m10v_isp_frame_recipe_grain_settings','m10v_isp_frame_recipe_grain_done')+(('m10v_isp_multiaxis_apply','m10v_isp_native_look_prepare','m10v_isp_native_look_apply','m10v_isp_native_look_matches') if native_color else ()))
     entry=base+len(code)
     # Both preparation and finish preserve all original result/caller registers.

@@ -1,0 +1,42 @@
+{
+  "schema": "m10v-border-owned-wait-guard/v1",
+  "model": "gr3",
+  "firmware": "2.10",
+  "rtos_sha256": "8a4eafcad2716e0b21e9909264e1242e534f0e39e05cba82a53546ceb4070b67",
+  "production_linked": false,
+  "hardware_activation": false,
+  "hardware_dma_idle_proven": false,
+  "abort_acknowledgment_proven": false,
+  "serialized_private_chain_required": true,
+  "stage_gate_scope": "One owned gate held across the complete frame Fill/Resize/Transfer chain",
+  "stage_gate_storage_requirement": "First Transfer worker allocation 0x58; owned tail+0x44..0x53; initialized atomic CAS gate at+0x54; no independent lifetime lease against native teardown",
+  "ungated_native_jobs": "Original stock API producers remain unmodified; their normal release can reduce shared active reservations",
+  "pre_release_observation": "Verified native service locks in order +0x90 then +0x14; native reservation identity intact; active count1; getter53778490 false; setter53778458(driver,0); getter53778474 false",
+  "handoff": "Verify unlock +0x14 then +0x90 before calling original release; no recursive-lock assumption",
+  "failure": "Retain private client, worker stack, caller stack, category and capacity reservations, descriptors and planes; never free or publish completion on busy",
+  "unserialized_two_private_iip_jobs": "May retain active count2 forever; not a production-ready scheduling configuration",
+  "stage_gate_prototype_implemented": true,
+  "stage_gate_installed": false,
+  "stage_gate_token_requirement": "Nonzero identity unique per live frame, not a shared film ID",
+  "native_factory_teardown_requirement": "No destructor/Destroy may reclaim Transfer worker until private chain owner and waiters quiesce",
+  "private_client_bytes": 76,
+  "private_client_append": {
+    "fill_bundle": 68,
+    "bundle_error": 72
+  },
+  "fill_bundle": {
+    "tag": "0x42464231",
+    "maximum_rectangles": 132,
+    "header_bytes": 12,
+    "rectangle_bytes": 12,
+    "public_entry": "0x534abc18",
+    "prepared": 1,
+    "outer_enqueue_count": 1,
+    "final_notification_count": 1,
+    "pixel_loops": false,
+    "cache_ownership": "Caller acquires/releases native REAL whole-canvas ownership once; header is never an image descriptor",
+    "invalid_before_enqueue": "Reject without setting pending or queueing",
+    "invalid_after_enqueue": "Fatal retain, no body or final notify",
+    "immutable_readable_metadata_required": true
+  }
+}

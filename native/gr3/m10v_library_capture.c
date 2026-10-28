@@ -21,6 +21,9 @@
 #include "m10v_save_trace.h"
 #endif
 #include "m10v_isp_recipe_color.h"
+#if M10V_BORDER_ENABLED && M10V_RECIPE_SNAPSHOT
+#include "m10v_border_shot.h"
+#endif
 #if M10V_RECIPE_SNAPSHOT
 #endif
 #if M10V_CAPTURE_PROFILE
@@ -238,6 +241,16 @@ int m10v_capture_library(uint32_t context) {
         *(const uint32_t *)(uintptr_t)request != 0x53d0fe60u) REJECT(-3,5,request,shooting);
     const uint8_t *req = (const uint8_t *)(uintptr_t)request;
     if (req[12] != 1 || req[13] > 1 || ((const uint8_t *)(uintptr_t)jpeg)[16] != 1) REJECT(-4,6,req[12],req[13]);
+#if M10V_BORDER_ENABLED && M10V_RECIPE_SNAPSHOT
+    /* The owned pre-review stage may run the EXISTING residual bridge once
+     * before adding a border. Original Setup6/JPEG still run later; a second
+     * pass would tint the border or move/apply stamps twice. This marker says
+     * only that residual processing was attempted, never that ISP completed. */
+    uint32_t border_phase=m10v_border_shot_phase(recipe);
+    if(border_phase==M10V_BORDER_PHASE_LIBRARY_ATTEMPTED||
+       border_phase==M10V_BORDER_PHASE_COMPLETE||
+       border_phase==M10V_BORDER_PHASE_FAILED_AFTER_LIBRARY)return 0;
+#endif
     uint32_t tone = ((const uint8_t *)(uintptr_t)shooting)[0x77c], slot = M10V_SLOT_COUNT;
 
     for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i) if (m10v_slot_tone(i) == tone) slot = i;
@@ -257,7 +270,12 @@ int m10v_capture_library(uint32_t context) {
         }
     }
 #endif
-    if (slot == M10V_SLOT_COUNT) REJECT(-4,7,tone,0);
+    if (slot == M10V_SLOT_COUNT) {
+#if M10V_BORDER_ENABLED && M10V_RECIPE_SNAPSHOT
+        if(border_phase==M10V_BORDER_PHASE_RUNNING)REJECT(M10V_BORDER_LIBRARY_STOCK_BYPASS,7,tone,0);
+#endif
+        REJECT(-4,7,tone,0);
+    }
     const uint32_t *desc = (const uint32_t *)(uintptr_t)descriptor;
     const uint16_t *dims = (const uint16_t *)(uintptr_t)(descriptor + 16);
     uint32_t width = dims[0], height = dims[1], stride = dims[2], allocated = dims[3];
@@ -305,7 +323,12 @@ int m10v_capture_library(uint32_t context) {
     M10V_PROFILE(3);
     if (settings_source < 0) REJECT(-5,16,(uint32_t)settings_source,0);
     if(state.reserved&510u)REJECT(-5,16,M10V_ISP_RECIPE_MUTATING,0);
-    if(!state.slots[slot].film) REJECT(-4,7,tone,slot);
+    if(!state.slots[slot].film) {
+#if M10V_BORDER_ENABLED && M10V_RECIPE_SNAPSHOT
+        if(border_phase==M10V_BORDER_PHASE_RUNNING)REJECT(M10V_BORDER_LIBRARY_STOCK_BYPASS,7,tone,slot);
+#endif
+        REJECT(-4,7,tone,slot);
+    }
     uint32_t completed=0;
 #if M10V_ISP_NATIVE_LOOK
     completed=m10v_isp_frame_recipe_completed((void *)(uintptr_t)recipe,shooting,tone,&state);

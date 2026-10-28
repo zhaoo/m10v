@@ -1,6 +1,9 @@
 /* Included in the settings adapter: uses its explicit owner and stock ABI.
  * Only UI code accesses this state. No capture worker, mutable global or new
  * parameter bank. The separately journalled pair contains no active flag. */
+#if M10V_BORDER_ENABLED
+#include "m10v_border_camera.h"
+#endif
 extern uint32_t m10v_ab_adj_event_original(uint32_t,uint32_t);
 extern uint32_t m10v_ab_mapper_original(uint32_t,uint32_t);
 extern uint32_t m10v_ab_selector_original(uint32_t,uint32_t);
@@ -199,6 +202,15 @@ uint32_t m10v_settings_controller_ab_live_enter(uint32_t live,uint32_t route,uin
  if(route==0x08000000u){
   /* Reconcile legacy positional selections only from the UI lifecycle. */
   m10v_settings_factory_original(0x55063914u,0x0200004au);
+#if M10V_BORDER_ENABLED
+  /* Normal UI lifecycle after the retained TopMenu factory is published.
+   * Never load SD from the constructor or processing-task producer. */
+  uint32_t border_style;
+  if(!m10v_border_camera_snapshot(&border_style)){
+   m10v_settings_controller *border_page=ab_owner();
+   if(border_page)m10v_border_camera_refresh((uint32_t)(uintptr_t)border_page-M10V_SETTINGS_OWNER_BYTES);
+  }
+#endif
   uint32_t model=((fn1)0x5320ba9cu)(((fn1)0x5320ad88u)(0));
   uint8_t *m=(uint8_t *)(uintptr_t)model;uint8_t prior=m[0x1b];m[0x1b]=0;
   m10v_camera_library_reconcile_legacy_selection(model);m[0x1b]=prior;
