@@ -41,7 +41,7 @@ int m10v_border_camera_refresh(uint32_t owner){
 }
 int m10v_border_camera_save(uint32_t owner,uint32_t style){
  m10v_border_cache *c=cache(owner);if(!c||style>M10V_BORDER_FILM)return -1;
- uint32_t fs=filesystem();if(!fs)return -1;
+ uint32_t fs=filesystem();if(!fs)return -2;
  border_record old,r,back;uint32_t sequence=latest(fs,&old)?old.sequence:0;
  /* UI is the sole journal writer. A stable authenticated cache supplies a
   * lower sequence bound when card reads fail transiently; never rewind it. */
@@ -50,18 +50,19 @@ int m10v_border_camera_save(uint32_t owner,uint32_t style){
   uint32_t floor=c->sequence;__atomic_thread_fence(__ATOMIC_ACQUIRE);
   if(version==__atomic_load_n(&c->version,__ATOMIC_RELAXED)&&floor>sequence)sequence=floor;
  }
- if(sequence==0xffffffffu)return -1;
+ if(sequence==0xffffffffu)return -3;
  r.magic=BORDER_MAGIC;r.version=1;r.sequence=sequence+1;r.style=style;r.reserved=0;r.crc=crc(&r);
  for(uint32_t i=0;i<sizeof(back);i++)((uint8_t *)&back)[i]=0;
- if(!((int (*)(uint32_t,const char *,uint32_t,const void *))0x53825fa8u)(fs,names[r.sequence&1],24,&r)||
-    !((int (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,names[r.sequence&1],24,&back)||!valid(&back))return -1;
- for(uint32_t i=0;i<6;i++)if(((const uint32_t *)&r)[i]!=((const uint32_t *)&back)[i])return -1;
+ if(!((int (*)(uint32_t,const char *,uint32_t,const void *))0x53825fa8u)(fs,names[r.sequence&1],24,&r))return -4;
+ if(!((int (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,names[r.sequence&1],24,&back))return -5;
+ if(!valid(&back))return -6;
+ for(uint32_t i=0;i<6;i++)if(((const uint32_t *)&r)[i]!=((const uint32_t *)&back)[i])return -7;
  /* Readback of one slot does not prove that it wins the journal. In
   * particular an unpublished cache plus failed initial reads can hide an
   * older higher-sequence slot. Report failure instead of false success. */
- if(!latest(fs,&old))return -1;
- for(uint32_t i=0;i<6;i++)if(((const uint32_t *)&r)[i]!=((const uint32_t *)&old)[i])return -1;
- return publish(c,style,r.sequence);
+ if(!latest(fs,&old))return -8;
+ for(uint32_t i=0;i<6;i++)if(((const uint32_t *)&r)[i]!=((const uint32_t *)&old)[i])return -9;
+ return publish(c,style,r.sequence)?-10:0;
 }
 int m10v_border_camera_snapshot(uint32_t *out){
  if(!ram((uintptr_t)out,4)||!(*(const volatile uint32_t *)0x55063910u&1u))return 0;

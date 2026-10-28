@@ -2,6 +2,7 @@
  * no film objects, film selection, film detail page or film journal is used. */
 #include <stdint.h>
 #include <stddef.h>
+#include "m10v_debug.h"
 #ifndef M10V_BORDER_ENABLED
 #define M10V_BORDER_ENABLED 0
 #endif
@@ -98,7 +99,9 @@ uint32_t m10v_hdf_menu_ready(page *p,uint32_t route){
  (void)route;p->error=0;p->root=M10V_HDF_GROUPED;
 #if M10V_BORDER_ENABLED
  p->root=1;p->focus=0;p->child=0;
- if(m10v_border_camera_refresh(ptr(p)-M10V_HDF_OWNER_OFFSET)<0)return 0;
+ int border_refresh=m10v_border_camera_refresh(ptr(p)-M10V_HDF_OWNER_OFFSET);
+ M10V_LOG(205,0x52454652u,(uint32_t)border_refresh,p->border.style,p->border.sequence);
+ if(border_refresh<0)return 0;
 #endif
 #if M10V_HDF_ENABLED
  if(m10v_hdf_load(&p->saved)<0)return 0;p->value=p->saved;
@@ -160,6 +163,7 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
    result=m10v_hdf_save(p->value);
 #endif
   }
+  M10V_LOG(205,0x53415645u,p->child?p->value:0,(uint32_t)result,p->border.sequence);
   if(result){
    /* A successful write followed by failed verification may already persist.
     * Reconcile with the same journal reader used by capture, rather than

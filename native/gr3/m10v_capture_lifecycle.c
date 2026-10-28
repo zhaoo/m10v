@@ -1,5 +1,8 @@
 #include "m10v_save_trace.h"
 #include "m10v_debug.h"
+#if M10V_BORDER_ENABLED
+#include "m10v_border_shot.h"
+#endif
 #include <stdint.h>
 #if M10V_RECIPE_SNAPSHOT
 #include "m10v_isp_recipe_color.h"
@@ -24,6 +27,9 @@ void m10v_lifecycle_phase(uint32_t context,uint32_t event,uint32_t result){
  if(event==193&&recipe<=0x80000000u-M10V_SAVE_RECIPE_EXTENDED_BYTES){
   const m10v_isp_recipe_color *s=(const m10v_isp_recipe_color *)(uintptr_t)(recipe+M10V_SAVE_COLOR_OFFSET);
   if(s->magic==M10V_ISP_RECIPE_COLOR_MAGIC)m10v_save_trace_recipe_mark(recipe,198,0x49535001u,(s->status<<16)|s->tone,s->sequence);
+#if M10V_BORDER_ENABLED
+  m10v_save_trace_recipe_mark(recipe,205,0x53484f54u,*(const uint32_t *)(uintptr_t)(recipe+M10V_BORDER_SHOT_OFFSET),0);
+#endif
 #if M10V_HDF_SHARED_RECIPE
   /* All three words belong to the same sole extended recipe allocation.
    * Read diagnostics only; the trace never controls processing or ownership. */
