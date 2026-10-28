@@ -54,3 +54,33 @@ introduced. The GR III and GR IIIx ARM tests exercise full frame, XPan and
 an even but non-eight-aligned 6x7-like crop. These are simulated control-flow
 checks, not a physical pixel or silicon teardown acceptance. Exact 6x7 camera
 dimensions and all real orientation/sequence modes still require camera tests.
+
+## GR III aspect and playback report
+
+The next camera upload uses build ID `4ee18501` (CRC-valid CP/IO pages).
+`00004352.JPG` is 6480x4480 film and `00004353.JPG` is 4480x4480 film:
+both contain the 135 border. The second shot's stage4 reason2 confirms the
+late IIP crop path ran. `00004354.JPG` is a 6000x4000 Polaroid shot with a
+white lower strip but without the saved outward canvas. Its module10 returned
+6320x4640 and frozen phase Complete; JPEG owner saw 6000x4000. No stage4
+success marker was emitted, so the phase-Complete descriptor recovery rejected
+the owner-restored metadata before encoding. The next adapter reconstructs C,
+stride and auxiliary words from the already authenticated native bank and
+frozen shot when both Y addresses still match the prepared inner view; it
+records stage4 reason10/11 if that tighter provenance check still fails.
+
+The previous test package explicitly omitted the optional aspect component.
+Its menu therefore lacked XPan and 6x7. The aspect component's menu sequence
+also omitted native ID2 16:9 even though that stock identity remains present.
+The next build includes the checked aspect component for both models and lists
+3:2, 1:1, 4:3, 16:9, XPan and 6x7. This restores menu availability; real
+camera capture under all restored modes is still a test gate.
+
+The user reports size pulsing only while browsing bordered saved photos in the
+camera album. The three files contain embedded thumbnail/intermediate/main
+JPEG dimensions of 160x110 / 694x480 / 6480x4480, 120x120 / 480x480 /
+4480x4480, and 160x116 / 652x480 / 6000x4000. The Polaroid file therefore
+has a major preview/main aspect disagreement. The full-frame restoration above
+addresses that. The small film thumbnail ratio is also visibly rounded; the
+new bounded preview fitter selects a closer even ratio within its existing
+allocation. Its physical album transition still needs camera verification.

@@ -9,14 +9,14 @@ typedef unsigned char u8;
 
 /* Recognizable immutable record, rebound after the film resource range. */
 __attribute__((used)) const volatile u32 m10v_aspect_id_record[3]={0x36523741,811,785};
-const u8 m10v_aspect_values[5]={0,3,1,4,5};
+const u8 m10v_aspect_values[6]={0,3,1,2,4,5};
 const u8 m10v_aspect_classes[5]={2,1,3,4,0};
 
 u32 m10v_aspect_id(void) { return m10v_aspect_id_record[1]; }
-u32 m10v_aspect_count(void) { return 5; }
+u32 m10v_aspect_count(void) { return 6; }
 u32 m10v_aspect_next(u32 value) {
-    for(u32 i=0;i<5;i++) if(m10v_aspect_values[i]==value)
-        return m10v_aspect_values[i==4?0:i+1];
+    for(u32 i=0;i<6;i++) if(m10v_aspect_values[i]==value)
+        return m10v_aspect_values[i==5?0:i+1];
     return 0;
 }
 u32 m10v_aspect_current(void) {

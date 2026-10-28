@@ -175,6 +175,6 @@ def extend_candidate(candidate):
     result=bytearray(candidate[:128]+payload+bytes(-(128+len(payload))&3)+footer)
     struct.pack_into('<I',result,len(result)-4,-checksum(result)&0xffffffff)
     if decode_firmware(result).decoded!=bytes(target): raise ValueError('crop fresh container readback differs')
-    return bytes(result),{'schema':'m10v-gr3-aspect/v1','ratios':['3:2','1:1','4:3','XPan','6x7'],
+    return bytes(result),{'schema':'m10v-gr3-aspect/v1','ratios':['3:2','1:1','4:3','16:9','XPan','6x7'],
                           'raw_id':5,'module_range':[MODULE,END],'module_sha256':hashlib.sha256(rtos[MODULE-BASE:]).hexdigest(),
                           'camera_tested':False,'entries':entries}

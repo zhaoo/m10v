@@ -109,6 +109,10 @@ static uint32_t even_ratio(uint32_t numerator,uint32_t denominator,uint32_t boun
     }
     return 2u*low;
 }
+static uint32_t ratio_error(uint32_t w,uint32_t h,uint32_t source_w,uint32_t source_h){
+    uint32_t a=w*source_h,b=h*source_w;
+    return a>b?a-b:b-a;
+}
 
 int m10v_border_preview_fit(uint32_t width,uint32_t height,
                             uint32_t bound_width,uint32_t bound_height,
@@ -121,6 +125,29 @@ int m10v_border_preview_fit(uint32_t width,uint32_t height,
         r.height=even_ratio(bound_width*height,width,bound_height);
     else r.width=even_ratio(bound_height*width,height,bound_width);
     if(r.width<2u||r.height<2u)return -1;
+    /* The camera's gallery switches from embedded thumbnail to larger JPEG.
+     * A two-pixel ratio error at 160px is visible as a size pulse. Search only
+     * four nearby even sizes; this changes metadata and IIP resize, not pixels
+     * on the CPU or the 160x120/720x480 backing allocations. */
+    uint32_t best=ratio_error(r.width,r.height,width,height);
+    int width_bound=r.width==bound_width;
+    for(uint32_t k=1;k<=4u&&bound_width<=256u&&bound_height<=256u;++k){
+        uint32_t w=r.width,h=r.height;
+        if(width_bound){
+            if(bound_width<=2u*k+1u)break;
+            w=bound_width-2u*k;h=even_ratio(w*height,width,bound_height);
+            if(h+2u<=bound_height&&
+               ratio_error(w,h+2u,width,height)<ratio_error(w,h,width,height))h+=2u;
+        }else{
+            if(bound_height<=2u*k+1u)break;
+            h=bound_height-2u*k;w=even_ratio(h*width,height,bound_width);
+            if(w+2u<=bound_width&&
+               ratio_error(w+2u,h,width,height)<ratio_error(w,h,width,height))w+=2u;
+        }
+        if(w<2u||h<2u)continue;
+        uint32_t error=ratio_error(w,h,width,height);
+        if(error<best){best=error;r.width=w;r.height=h;}
+    }
     publish_words(out,&r,sizeof(r)/4u);
     return 0;
 }

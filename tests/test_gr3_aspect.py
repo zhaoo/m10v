@@ -119,8 +119,8 @@ class AspectTests(unittest.TestCase):
                         self.assertEqual(u.reg_read(A.UC_ARM_REG_R0),value)
 
     def test_menu_adds_six_by_seven_without_changing_existing_identities(self):
-        self.assertEqual(self.call(0x540b98c4).reg_read(UC_ARM_REG_R0), 5)
-        for current, following in [(0,3),(3,1),(1,4),(4,5),(5,0),(255,0)]:
+        self.assertEqual(self.call(0x540b98c4).reg_read(UC_ARM_REG_R0), 6)
+        for current, following in [(0,3),(3,1),(1,2),(2,4),(4,5),(5,0),(255,0)]:
             with self.subTest(current=current):
                 self.assertEqual(self.call(0x540b9300,current).reg_read(UC_ARM_REG_R0), following)
 

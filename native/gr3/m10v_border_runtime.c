@@ -244,6 +244,32 @@ int m10v_border_runtime_jpeg(uint32_t context){
     uint32_t *source=(uint32_t *)(uintptr_t)(recipe+0x70u),*main=(uint32_t *)(uintptr_t)(recipe+0xb0u);
     uint32_t w=main[4]&65535u,h=main[4]>>16;
     uint32_t fullw=half(recipe+0x256u),fullh=half(recipe+0x258u);
+    uint32_t base=shape.preview_base-2u*shape.plane_bytes;
+    m10v_border_canvas_info canvas;
+    if(phase==M10V_BORDER_PHASE_COMPLETE){
+        /* Once IIP completed, the frozen bank and exact inner Y addresses
+         * authenticate the pixels. The owner may have restored stale C,
+         * stride or auxiliary descriptor words before this JPEG handoff. */
+        if(w!=fullw||h!=fullh||(source[4]&65535u)!=fullw||(source[4]>>16)!=fullh||
+           (source[0]&255u)!=1u||(main[0]&255u)!=1u||
+           (source[7]&255u)!=2u||(main[7]&255u)!=2u||
+           source[1]!=shape.source_y||main[1]!=shape.source_y){
+            trace_prepare(recipe,4u,10u);return library;
+        }
+        uint32_t inner[8];copy8(inner,main);
+        inner[1]=shape.source_y;inner[2]=shape.source_c;
+        inner[3]=0;inner[4]=fullw|(fullh<<16);
+        inner[5]=shape.canvas.stride|(fullh<<16);inner[6]=0;
+        if(m10v_border_canvas_plan(style,orientation,inner,base,
+              base+shape.plane_bytes,shape.plane_bytes,&canvas)||
+           canvas.canvas[4]!=(shape.canvas.outer.width|(shape.canvas.outer.height<<16))){
+            trace_prepare(recipe,4u,11u);return library;
+        }
+        copy8(source,canvas.canvas);copy8(main,canvas.canvas);
+        copy8((uint32_t *)(uintptr_t)(recipe+0x110u),canvas.canvas);
+        trace_prepare(recipe,4u,1u);
+        return library;
+    }
     if(!same8(source,main)||!w||!h||w>fullw||h>fullh||((w|h)&1u)||
        (source[0]&255u)!=1u||source[3]||source[6]||(source[7]&255u)!=2u||
        main[2]-main[1]!=shape.plane_bytes||main[1]<shape.source_y)return library;
@@ -255,18 +281,8 @@ int m10v_border_runtime_jpeg(uint32_t context){
        main[2]!=shape.source_c+displacement)return library;
     uint32_t inner[8];copy8(inner,main);
     inner[5]=shape.canvas.stride|(h<<16);
-    m10v_border_canvas_info canvas;
-    uint32_t base=shape.preview_base-2u*shape.plane_bytes;
     if(m10v_border_canvas_plan(style,orientation,inner,base,
           base+shape.plane_bytes,shape.plane_bytes,&canvas))return library;
-    if(phase==M10V_BORDER_PHASE_COMPLETE){
-        if(w!=fullw||h!=fullh||displacement||
-           canvas.canvas[4]!=(shape.canvas.outer.width|(shape.canvas.outer.height<<16)))return library;
-        copy8(source,canvas.canvas);copy8(main,canvas.canvas);
-        copy8((uint32_t *)(uintptr_t)(recipe+0x110u),canvas.canvas);
-        trace_prepare(recipe,4u,1u);
-        return library;
-    }
     /* Only a native crop of the prepared full frame may enter this late path.
      * No fallback bank allocation or CPU frame draw is permitted. */
     if((w==fullw&&h==fullh)||(library&&library!=-4)||!ready())return library;

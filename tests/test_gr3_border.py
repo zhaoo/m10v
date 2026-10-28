@@ -209,9 +209,13 @@ class BorderGeometryTests(unittest.TestCase):
                         # the scaler receives the WHOLE canvas, no crop ROI.
                         error=abs(r.width*canvas.height-r.height*canvas.width)
                         self.assertLess(error,2*max(canvas.width,canvas.height))
-                        self.assertTrue(r.width==bw or r.height==bh)
+                        self.assertTrue(r.width>=bw-8 or r.height>=bh-8)
         r=Rect();self.assertEqual(fit(6320,4640,720,480,C.byref(r)),0)
         self.assertEqual((r.width,r.height),(652,480))
+        self.assertEqual(fit(6320,4640,160,120,C.byref(r)),0)
+        self.assertEqual((r.width,r.height),(158,116))
+        self.assertEqual(fit(6480,4480,160,120,C.byref(r)),0)
+        self.assertEqual((r.width,r.height),(156,108))
 
     def test_preview_rejects_impossible_chroma_box_without_mutating_output(self):
         fit=self.lib.m10v_border_preview_fit

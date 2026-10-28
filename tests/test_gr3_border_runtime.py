@@ -255,6 +255,17 @@ class BorderRuntimeArmTests(unittest.TestCase):
   self.assertEqual(bytes(self.u.mem_read(RECIPE+0xb0,32)),outer)
   self.assertEqual(bytes(self.u.mem_read(RECIPE+0x110,32)),outer)
   self.assertEqual(self.events[0],'library');self.assertNotIn('alloc',self.events)
+ def test_jpeg_handoff_restores_polaroid_after_owner_resets_chroma_pitch(self):
+  self.put(RECIPE+0x510c,0x42524401);self.post_fixture()
+  inner=bytes(self.u.mem_read(RECIPE+0xb0,32))
+  self.finish_post();outer=bytes(self.u.mem_read(RECIPE+0xb0,32))
+  for at in (RECIPE+0x70,RECIPE+0xb0):
+   self.u.mem_write(at,inner)
+   self.put(at+8,self.word(at+8)+64)
+   self.put(at+20,6000|(4000<<16))
+  self.assertEqual(self.call('m10v_border_runtime_jpeg',RECIPE+0x9b8),0)
+  self.assertEqual(bytes(self.u.mem_read(RECIPE+0xb0,32)),outer)
+  self.assertEqual(bytes(self.u.mem_read(RECIPE+0x110,32)),outer)
  def test_jpeg_handoff_late_xpan_crop_uses_same_bank_and_hardware(self):
   self.put(RECIPE+0x510c,0x42524402);self.post_fixture()
   original=self.word(RECIPE+0xb0+4);chroma=self.word(RECIPE+0xb0+8)
