@@ -45,13 +45,18 @@ int m10v_border_prepare(uint32_t module,uint32_t config){
     uint32_t write_height=crop_enabled?half(status+0xd8u):height;
     uint32_t roi_y=crop_enabled?half(status+0xd4u):0u;
     uint32_t y=word(config+0x18u),c=word(config+0x1cu);
-    if(!crop_enabled||byte(channel+10u)!=crop_enabled||y!=images[0][1]||c!=images[0][2]||
-       (output[0]&255u)!=1u||output[3]||
-       (output[4]>>16)!=write_height||(output[5]>>16)!=height||
-       (output[6]>>16)!=roi_y||!write_height||write_height>height+144u||
-       output[1]<y||output[2]<c)return -7;
+    if(!crop_enabled)return -19;
+    if(byte(channel+10u)!=crop_enabled)return -20;
+    if(y!=images[0][1]||c!=images[0][2])return -21;
+    if((output[0]&255u)!=1u)return -22;
+    if(output[3])return -23;
+    if((output[4]>>16)!=write_height)return -24;
+    if((output[5]>>16)!=height)return -25;
+    if((output[6]>>16)!=roi_y)return -26;
+    if(!write_height||write_height>height+144u)return -27;
+    if(output[1]<y||output[2]<c)return -28;
     uint32_t column=output[1]-y;
-    if(output[2]-c!=column)return -7;
+    if(output[2]-c!=column)return -29;
     uint32_t columns[3],widths[3],rois[3],selected=3u;
     for(uint32_t i=0;i<3u;++i){
         columns[i]=half(status+0x102u+2u*i);

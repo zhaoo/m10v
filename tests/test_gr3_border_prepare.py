@@ -145,6 +145,18 @@ int main(void){
             self.assertLess(self.prepare(MODULE,CONFIG),0,hex(address))
             self.assertEqual(self.snapshot(),before)
 
+    def test_output_rejection_codes_identify_the_real_field(self):
+        cases=((RECIPE+0x278,b'\0',-19),
+               (MODULE+0x9958,struct.pack('<I',1),-23),
+               (MODULE+0x995e,struct.pack('<H',1),-24),
+               (MODULE+0x9966,struct.pack('<H',1),-26))
+        for address,data,reason in cases:
+            self.memory[:]=bytes(len(self.memory));fixture(self.write)
+            self.write(address,data)
+            before=self.snapshot()
+            self.assertEqual(self.prepare(MODULE,CONFIG),reason)
+            self.assertEqual(self.snapshot(),before)
+
     def test_off_does_not_access_module_or_image_descriptors(self):
         self.put(CONFIG+0x30,0);self.put(RECIPE+0x304,0)
         for phase in (0,6):
