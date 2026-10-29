@@ -578,9 +578,9 @@ export function buildNativeLibrary(source,runtime,manifest) {
   const report=inspectOfficial(source);need(report.model==='GR III','native detail requires exact GR III 2.10 official source');checkRuntime(runtime,manifest);
   const {decoded}=decodeFrameMap(source),rows=sectionMap(decoded,report),rtos=rows.find(row=>row.name==='RTOS');
   const programOffset=BASE-LOAD,newPayload=programOffset+runtime.length;
-  // The bounded allowance includes all immutable LUT/icon banks and native profiles.
-  // Mapping/readback/section preservation checks below still cover the whole extent.
-  const growth=newPayload-(rtos.size-16);need(growth>0&&growth<=MAX_NATIVE_RTOS_GROWTH,`native RTOS growth invalid: ${growth} bytes exceeds budget ${MAX_NATIVE_RTOS_GROWTH}`);
+  // The source-bound container limit is independent of the selected feature mix.
+  // The full appended range is checked against the official MMU table in auditNativeLibrary.
+  const growth=newPayload-(rtos.size-16);need(growth>0&&growth<=MAX_NATIVE_RTOS_GROWTH,`native RTOS growth invalid: ${growth} bytes exceeds decoded container limit ${MAX_NATIVE_RTOS_GROWTH}`);
   const insertion=rtos.offset+rtos.size;
   const target=Buffer.concat([decoded.subarray(0,insertion),Buffer.alloc(growth),decoded.subarray(insertion)]);
   target.writeUInt32LE(newPayload,rtos.offset+12);
