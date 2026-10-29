@@ -155,7 +155,7 @@ class AspectDngTests(unittest.TestCase):
         self.assertEqual(observed, [(OUT, 0, 5)])
 
     def test_makernote_read_and_binary_class_retain_identity(self):
-        for raw in [4, 5]:
+        for raw in [4, 5, 6]:
             with self.subTest(raw=raw):
                 u = self.overlay_machine()
                 target = RAM + 0x82000
@@ -170,8 +170,9 @@ class AspectDngTests(unittest.TestCase):
                 u.hook_add(UC_HOOK_CODE, reader)
                 self.call(u, self.overlay_entries['m10v_aspect_extract'])
                 self.assertEqual(bytes(u.mem_read(target + 0x7b6, 1)), bytes([raw]))
-        u = self.overlay_machine()
-        self.assertEqual(self.call(u, self.overlay_entries['m10v_aspect_binary_class'], image=5), 0)
+        for raw in (5,6):
+            u = self.overlay_machine()
+            self.assertEqual(self.call(u, self.overlay_entries['m10v_aspect_binary_class'], image=raw), 0)
 
     def test_active_geometry_is_written_before_one_notification_even_on_zero(self):
         fixtures = [(0x2000, (2296381, 1966080, 326369, 0)),
@@ -217,7 +218,7 @@ class AspectDngTests(unittest.TestCase):
                 self.assertEqual(self.call(u, self.overlay_entries['m10v_aspect_filter'], image=mag, out=crop_enabled), expected)
 
     def test_merge_restores_extended_identities_after_native_copy(self):
-        for raw in [0, 1, 2, 3, 4, 5, 255]:
+        for raw in [0, 1, 2, 3, 4, 5, 6, 255]:
             with self.subTest(raw=raw):
                 u = self.overlay_machine()
                 u.mem_write(OUT + 0x4c2, bytes([raw]))
@@ -233,12 +234,12 @@ class AspectDngTests(unittest.TestCase):
 
                 u.hook_add(UC_HOOK_CODE, native)
                 self.assertEqual(self.call(u, self.overlay_entries['m10v_aspect_merge']), 0x55)
-                self.assertEqual(bytes(u.mem_read(OUT + 0x4c2, 1)), bytes([raw if raw in [1, 4, 5] else 0]))
+                self.assertEqual(bytes(u.mem_read(OUT + 0x4c2, 1)), bytes([raw if raw in [1, 4, 5, 6] else 0]))
                 self.assertEqual(calls, [0x540b9498])
 
     def test_ubox_restores_extended_identities_only_for_slots_one_to_six(self):
         for slot in [0, 1, 2, 3, 4, 5, 6, 7, 255]:
-            for raw in [0, 1, 2, 3, 4, 5, 255]:
+            for raw in [0, 1, 2, 3, 4, 5, 6, 255]:
                 with self.subTest(slot=slot, raw=raw):
                     u = self.overlay_machine()
                     source, target = RAM + 0x83000, RAM + 0x84000
@@ -258,7 +259,7 @@ class AspectDngTests(unittest.TestCase):
 
                     u.hook_add(UC_HOOK_CODE, native)
                     self.assertEqual(self.call(u, self.overlay_entries['m10v_aspect_ubox'], out=slot), 0x66)
-                    expected = raw if 1 <= slot <= 6 and raw in [1, 4, 5] else 0
+                    expected = raw if 1 <= slot <= 6 and raw in [1, 4, 5, 6] else 0
                     self.assertEqual(bytes(u.mem_read(target + 0x4c2, 1)), bytes([expected]))
                     self.assertEqual(bytes(u.mem_read(source + 0x4c2, 1)), bytes([raw]))
                     self.assertEqual(calls, [0x540b9248])

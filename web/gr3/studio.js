@@ -260,7 +260,7 @@ function renderFeatures() {
     const heading = document.createElement('div');
     heading.className = 'feature-title';
     heading.append(textNode('span', String(index + (chosenModel==='gr4'?1:2)).padStart(2, '0'), 'feature-num'), textNode('h3', name));
-    copy.append(heading, textNode('p',gr4Workbench&&id==='timestamp'?'在 JPEG 中写入拍摄日期与时间，样式可在机内调整。':gr4Workbench&&id==='aspect'?'增加 65:24 画幅与宽幅取景蒙版。':description), textNode('span', gr4Workbench&&id==='aspect'?'65:24':tag, 'feature-tag'));
+    copy.append(heading, textNode('p',gr4Workbench&&id==='timestamp'?'在 JPEG 中写入拍摄日期与时间，样式可在机内调整。':gr4Workbench&&id==='aspect'?'增加 65:24 画幅与宽幅取景蒙版。':chosenModel==='gr3'&&id==='aspect'?'增加 4:3、6x7、XPan 与竖向半格画幅，取景显示对应蒙版。':description), textNode('span', gr4Workbench&&id==='aspect'?'65:24':chosenModel==='gr3'&&id==='aspect'?'4:3 / 6x7 / XPan / 半格':tag, 'feature-tag'));
     const button = textNode('button', active ? '关闭' : '开启', 'feature-toggle' + (active ? ' selected' : ''));
     button.type = 'button';
     button.setAttribute('aria-pressed',String(active));
@@ -307,7 +307,7 @@ function renderFeatures() {
         detail.append(points);
       } else if (id === 'aspect') {
         const points = document.createElement('div'); points.className = 'feature-points';
-        for (const value of (gr4Workbench?['＋ 全宽 65:24 画幅','＋ 实时半透明取景蒙版']:['＋ 4:3 画幅','＋ 6x7 画幅','＋ 全宽 XPan 画幅','＋ 实时半透明取景蒙版'])) points.append(textNode('span', value));
+        for (const value of (gr4Workbench?['＋ 全宽 65:24 画幅','＋ 实时半透明取景蒙版']:['＋ 4:3 画幅','＋ 6x7 画幅','＋ 全宽 XPan 画幅',...(chosenModel==='gr3'?['＋ 半格 3:4 · 单次快门独立成片']:[]),'＋ 实时半透明取景蒙版'])) points.append(textNode('span', value));
         detail.append(points);
       } else {
         detail.append(textNode('p', '底部横轨显示左右倾斜；右侧竖轨显示前后俯仰。圆点移入中间圆环并变绿时表示水平。'));

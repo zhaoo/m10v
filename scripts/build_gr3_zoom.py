@@ -164,6 +164,7 @@ def build(base, stock, aspect=False, seed=None, debug_log=None, camera_model='gr
     flags=[] if seed is None else [f'-DM10V_ZOOM_SEED_LO=0x{seed["id"][:8]}u',f'-DM10V_ZOOM_SEED_HI=0x{seed["id"][8:]}u',f'-DM10V_ZOOM_SEED_FIRST={seed["slots"][0]}u',f'-DM10V_ZOOM_SEED_SECOND={seed["slots"][1]}u']
     max_bits=0x3fe49249  # Shared stock enum6, nominal50 (III) /71 (IIIx).
     flags+=[f'-DM10V_DEBUG_MODE={int(debug_log is not None)}',f'-DM10V_CAMERA_GR3X={int(camera_model=="gr3x")}',f'-DM10V_ZOOM_MAX_BITS_LO={max_bits&65535}',f'-DM10V_ZOOM_MAX_BITS_HI={max_bits>>16}']
+    flags+=[f'-DM10V_HALF_FRAME={int(camera_model=="gr3" and aspect)}']
     extra_hooks=[] if debug_log is None else [{'address':0x536b93d0,'preimage':0xe1a0c00d,'symbol':'m10v_zoom_assert_trace','link':False}]
     from scripts.build_gr3_m10v_library import FLAGS,link_object
     from scripts.build_gr3_menu_patches import branch
@@ -226,7 +227,7 @@ def build(base, stock, aspect=False, seed=None, debug_log=None, camera_model='gr
             replacement=branch(address,symbols[hook['symbol']],hook.get('link',False)),name=hook['symbol']))
     sources=['native/gr3/'+name for name in SOURCES]
     sources+=['native/gr3/m10v_zoom.h','native/gr3/m10v_zoom_camera.h',
-              'native/gr3/m10v_zoom_menu.h','native/gr3/m10v_zoom_capture.h','scripts/build_gr3_zoom.py','node/gr3-zoom.mjs']
+              'native/gr3/m10v_zoom_menu.h','native/gr3/m10v_zoom_capture.h','native/gr3/m10v_aspect_config.h','scripts/build_gr3_zoom.py','node/gr3-zoom.mjs']
     return bytes(image),dict(schema='m10v-gr3-zoom/v1',base=base,bytes=len(image),
         symbols=symbols,bindings=bindings,patches=patches,aspect=aspect,
         camera_model=camera_model,lens_base_mm=lens_base,defaults=defaults,slots=2,min_mm=lens_base,max_mm=max_mm,title_id=1024,focal_first_id=1031,

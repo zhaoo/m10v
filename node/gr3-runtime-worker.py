@@ -6,6 +6,7 @@ firmware bytes are sent to grlife.app by this adapter.
 
 import datetime
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -33,7 +34,7 @@ def main():
     if any(item['id'] == 'aspect' for item in json.loads(plan)['features']):
         sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
         from gr3_aspect_overlay import extend_candidate
-        candidate, receipt['m10v_aspect'] = extend_candidate(candidate)
+        candidate, receipt['m10v_aspect'] = extend_candidate(candidate,half_frame=os.environ.get('M10V_HALF_FRAME','1')=='1')
         import hashlib
         receipt['candidate_sha256'] = hashlib.sha256(candidate).hexdigest()
         receipt['candidate_bytes'] = len(candidate)

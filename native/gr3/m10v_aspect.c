@@ -1,5 +1,6 @@
 /* GR III 2.10 crop extension. Identity 5 is private to 6x7; old photos
  * retain their identities and geometry. No RAW pixel data is accessed. */
+#include "m10v_aspect_config.h"
 typedef unsigned int u32;
 typedef unsigned short u16;
 typedef unsigned char u8;
@@ -9,14 +10,22 @@ typedef unsigned char u8;
 
 /* Recognizable immutable record, rebound after the film resource range. */
 __attribute__((used)) const volatile u32 m10v_aspect_id_record[3]={0x36523741,811,785};
-const u8 m10v_aspect_values[5]={0,3,1,4,5};
-const u8 m10v_aspect_classes[5]={2,1,3,4,0};
+const u8 m10v_aspect_values[]={0,3,1,4,5,
+#if M10V_HALF_FRAME
+6,
+#endif
+};
+const u8 m10v_aspect_classes[]={2,1,3,4,0,
+#if M10V_HALF_FRAME
+0,
+#endif
+};
 
 u32 m10v_aspect_id(void) { return m10v_aspect_id_record[1]; }
-u32 m10v_aspect_count(void) { return 5; }
+u32 m10v_aspect_count(void) { return sizeof(m10v_aspect_values); }
 u32 m10v_aspect_next(u32 value) {
-    for(u32 i=0;i<5;i++) if(m10v_aspect_values[i]==value)
-        return m10v_aspect_values[i==4?0:i+1];
+    for(u32 i=0;i<sizeof(m10v_aspect_values);i++) if(m10v_aspect_values[i]==value)
+        return m10v_aspect_values[i+1==sizeof(m10v_aspect_values)?0:i+1];
     return 0;
 }
 u32 m10v_aspect_current(void) {
@@ -25,7 +34,7 @@ u32 m10v_aspect_current(void) {
 }
 u32 m10v_aspect_mask_active(void) {
     u32 ratio=m10v_aspect_current();
-    if(ratio!=4 && ratio!=5) return 0;
+    if(ratio!=4 && ratio!=5 && !(M10V_HALF_FRAME && ratio==6)) return 0;
     u32 root=CALL(0x53525d5c,u32 (*)(void))();
     if(!root || !WORD(root,0) || CALL(0x53549958,u32 (*)(u32))(WORD(root,0))==1) return 0;
     u32 manager=CALL(0x53654150,u32 (*)(void))();
@@ -49,8 +58,7 @@ static u32 stock_q13(u32 q) {
     return q==0x2000 || q==0x2800 || q==0x38f6 || q==0x3925;
 }
 
-void m10v_aspect_resolution(u32 mag,u32 quality,u16 *width,u16 *height) {
-    static const u16 sizes[4][2]={{4672,4000},{3728,3200},{2608,2240},{1488,1280}};
+static void aspect_resolution(u32 mag,u32 quality,u16 *width,u16 *height,const u16 sizes[4][2]) {
     if(quality>3 || !width || !height) return;
     u32 index=quality;
     if(mag==0x3fa00000 && index<1) index=1;
@@ -58,12 +66,43 @@ void m10v_aspect_resolution(u32 mag,u32 quality,u16 *width,u16 *height) {
     else if(mag!=0x3f800000 && mag!=0x3fa00000 && mag!=0x3fe3d70a && mag!=0x3fe49249) {
         u32 mm=m10v_aspect_mm(mag);
         if(!mm) return;
-        u32 w=(4672*28/mm/16)*16,h=(4000*28/mm/16)*16;
+        u32 w=(sizes[0][0]*28/mm/16)*16,h=(4000*28/mm/16)*16;
         *width=w<sizes[index][0]?w:sizes[index][0];
         *height=h<sizes[index][1]?h:sizes[index][1];
         return;
     }
     *width=sizes[index][0]; *height=sizes[index][1];
+}
+void m10v_aspect_resolution(u32 mag,u32 quality,u16 *width,u16 *height) {
+    static const u16 sizes[4][2]={{4672,4000},{3728,3200},{2608,2240},{1488,1280}};
+    aspect_resolution(mag,quality,width,height,sizes);
+}
+#if M10V_HALF_FRAME
+void m10v_aspect_half_resolution(u32 mag,u32 quality,u16 *width,u16 *height) {
+    static const u16 sizes[4][2]={{2992,4000},{2400,3200},{1680,2240},{960,1280}};
+    aspect_resolution(mag,quality,width,height,sizes);
+}
+/* Independent immutable binding; existing text/icon IDs retain their ABI. */
+__attribute__((used)) const volatile u32 m10v_aspect_half_record[3]={0x48463741,812,0};
+u32 m10v_aspect_half_id(void) { return m10v_aspect_half_record[1]; }
+u32 m10v_aspect_half_filter(u32 mag,u32 crop_enabled) {
+    if(crop_enabled || mag==0x3f800000) return 0x3f315574;
+    if(mag==0x3fa00000) return 0x3f0e00d5;
+    if(mag==0x3fe3d70a || mag==0x3fe49249) return 0x3ec6cdf7;
+    return 0x3f315574;
+}
+#endif
+extern const u8 m10v_aspect_caption[];
+#if M10V_HALF_FRAME
+extern const u8 m10v_aspect_half_caption[];
+#endif
+const u8 *m10v_aspect_caption_for(u32 id,u32 language) {
+    if(language>20) return 0;
+    if(id==m10v_aspect_id()) return m10v_aspect_caption;
+#if M10V_HALF_FRAME
+    if(id==m10v_aspect_half_id()) return m10v_aspect_half_caption;
+#endif
+    return 0;
 }
 /* Native filter radius follows the diagonal of the output, normalized by
  * the uncropped 6000x4000 frame, as in the existing wide crop adapter. */
@@ -75,7 +114,11 @@ u32 m10v_aspect_filter(u32 mag,u32 crop_enabled) {
 }
 u32 m10v_aspect_live_width(u32 a,u32 b,u32 c,u32 d,u32 ratio) {
     u32 width=CALL(0x540b8678,u32 (*)(u32,u32,u32,u32,u32))(a,b,c,d,0);
-    return ratio==5 && !m10v_aspect_mask_active()?2*((width*7+9)/18):width;
+    if(!m10v_aspect_mask_active()) {
+        if(ratio==5) return 2*((width*7+9)/18);
+        if(M10V_HALF_FRAME && ratio==6) return 2*((width*2992+6000)/12000);
+    }
+    return width;
 }
 u32 m10v_aspect_live_height(u32 a,u32 b,u32 c,u32 d,u32 ratio) {
     u32 height=CALL(0x540b8680,u32 (*)(u32,u32,u32,u32,u32))(a,b,c,d,0);
@@ -112,6 +155,24 @@ u32 m10v_aspect_write_active(u32 context,u32 unused,u32 mag) {
 }
 
 u32 m10v_aspect_private_active(u32 context,u32 ratio,u32 mag) {
+#if M10V_HALF_FRAME
+    if(ratio==6) {
+        static const u32 rects[3][4]={{1470628,1966080,739246,0},
+            {1179648,1572864,884736,196608},{825754,1101005,1061683,432538}};
+        CALL(0x53665c2c,void (*)(u32))(context);
+        if(!stock_q13(mag) && mag>=8192 && mag<=29257) {
+            u32 w=WORD(context,0x24)*2992/6000,h=WORD(context,0x28);
+            WORD(context,0x64)=w;WORD(context,0x68)=h;
+            WORD(context,0x6c)=(2949120-w+1)/2;
+            WORD(context,0x70)=WORD(context,0x30);
+        } else {
+            u32 index=CALL(0x540b62f8,u32 (*)(u32))(mag);
+            if(index>2) index=0;
+            for(u32 i=0;i<4;i++) WORD(context,0x64+4*i)=rects[index][i];
+        }
+        return CALL(0x536ae870,u32 (*)(u32))(context+0x24bc);
+    }
+#endif
     if(!stock_q13(mag) && mag>=8192 && mag<=29257 && (ratio==2 || ratio==4)) {
         CALL(0x53665c2c,void (*)(u32))(context);
         u32 w=WORD(context,0x24),h=WORD(context,0x28);
@@ -132,6 +193,7 @@ u32 m10v_aspect_live_region(u32 context,u32 mode,u32 ratio,u32 mag) {
     if(m10v_aspect_mask_active())
         return CALL(0x53666770,u32 (*)(u32,u32))(context,mag==0x2000?0:1);
     if(ratio==5) return m10v_aspect_write_active(context,mode,mag);
+    if(M10V_HALF_FRAME && ratio==6) return m10v_aspect_private_active(context,ratio,mag);
     if(!stock_q13(mag) && mag>=8192 && mag<=29257) {
         CALL(0x53665c2c,void (*)(u32))(context);
         u32 w=WORD(context,0x24),h=WORD(context,0x28)*69/250;
@@ -145,7 +207,7 @@ u32 m10v_aspect_live_region(u32 context,u32 mode,u32 ratio,u32 mag) {
 
 u32 m10v_aspect_live_icon(u32 owner,u32 ratio);
 static void aspect_label(u32 view,u32 surface,u32 ratio) {
-    if((ratio!=4 && ratio!=5) || !view || !surface || !BYTE(view,0x9e) || !m10v_aspect_mask_active()) return;
+    if((ratio!=4 && ratio!=5 && !(M10V_HALF_FRAME && ratio==6)) || !view || !surface || !BYTE(view,0x9e) || !m10v_aspect_mask_active()) return;
     u32 *canvas=(u32 *)(view+0x30),*clip=(u32 *)(view+0x64);
     if(canvas[0] || canvas[1] || !((canvas[2]==720&&canvas[3]==480)||(canvas[2]==360&&canvas[3]==240))) return;
     u32 id=m10v_aspect_live_icon(0,ratio);
@@ -167,7 +229,7 @@ static void aspect_label(u32 view,u32 surface,u32 ratio) {
 }
 void m10v_aspect_draw(u32 view,u32 surface) {
     u32 ratio=m10v_aspect_current();
-    if(ratio!=4 && ratio!=5) {
+    if(ratio!=4 && ratio!=5 && !(M10V_HALF_FRAME && ratio==6)) {
         CALL(0x540b8000,void (*)(u32,u32))(view,surface);
         aspect_label(view,surface,ratio);
         return;
@@ -183,7 +245,8 @@ void m10v_aspect_draw(u32 view,u32 surface) {
     typedef void (*Draw)(u32,u32,u32 *,u32 *,u32,u32,u32,u32,u32);
     Draw draw=CALL(0x540b88b4,Draw);
     /* Keep the aspect mask; the native view already owns its edge frame. */
-    if(ratio==5){
+    if(M10V_HALF_FRAME && ratio==6) mask=(canvas[2]-canvas[3]*2992/4000+1)/2;
+    if(ratio==5 || (M10V_HALF_FRAME && ratio==6)){
         draw(graphics,surface,canvas,clip,0,0,mask,canvas[3],16);
         draw(graphics,surface,canvas,clip,canvas[2]-mask,0,mask,canvas[3],16);
     }else{
@@ -195,6 +258,21 @@ void m10v_aspect_draw(u32 view,u32 surface) {
 
 /* AF retains the native safety inset and follows all three crop magnifications. */
 u32 m10v_aspect_af_bounds(u32 ratio,u32 crop,u32 *out) {
+#if M10V_HALF_FRAME
+    if(ratio==6) {
+        if(!out) return 0;
+        u32 owner=CALL(0x5320ad88,u32 (*)(void))();
+        owner=owner?CALL(0x5320b31c,u32 (*)(u32))(owner):0;
+        u32 props=owner?WORD(owner,4):0,bits=props?WORD(props,0x4c4):0;
+        /* Project aligned still dimensions, rounded inward, into 720x480. */
+        u16 w=0,h=0;m10v_aspect_half_resolution(bits?bits:0x3f800000,0,&w,&h);
+        if(!w || !h) { w=crop==1?2400:crop==2?1680:2992;h=crop==1?3200:crop==2?2240:4000; }
+        u32 left=(720-(w*720/6000/2)*2)/2,top=(480-(h*480/4000/2)*2)/2;
+        if(top<60) top=60;
+        out[0]=left;out[1]=top;out[2]=720-left;out[3]=480-top;
+        return 1;
+    }
+#endif
     if(out && (ratio==1 || ratio==4 || ratio==5)) {
         u32 owner=CALL(0x5320ad88,u32 (*)(void))();
         owner=owner?CALL(0x5320b31c,u32 (*)(u32))(owner):0;
@@ -237,6 +315,9 @@ u32 m10v_aspect_live_icon(u32 owner,u32 ratio) {
     case 1: return 339;
     case 4: return m10v_aspect_icon_record[1];
     case 5: return m10v_aspect_icon_record[2];
+#if M10V_HALF_FRAME
+    case 6: return m10v_aspect_half_record[2];
+#endif
     default: return 0;
     }
 }

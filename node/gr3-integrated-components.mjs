@@ -28,7 +28,7 @@ const resourceAdaptations=[
  [0x540b8c14,0xe3003311,0xe30033a8],
 ];
 export function integrationFingerprint(){
- return sha(JSON.stringify(['gr3-native-budget.mjs','gr3-integrated-components.mjs','gr3-raw-nr.mjs','gr3-stock-presets.mjs','gr3-native-library.mjs','gr3x-native-port.mjs','gr3-candidate-audit.mjs','gr3-version-unlock.mjs','gr3-m10v-native-build.mjs','gr3-runtime.mjs','gr3-runtime-worker.py','gr3-store-plan.mjs','../scripts/gr3_aspect_overlay.py','../native/gr3/m10v_aspect.c','../native/gr3/m10v_aspect_hooks.S','../native/gr3/m10v_aspect_dng.c','../web/gr3/native-library-state.mjs','../web/gr3/model-capabilities.mjs'].map(n=>[n,sha(readFileSync(new URL(n,import.meta.url)))])));
+ return sha(JSON.stringify(['gr3-native-budget.mjs','gr3-integrated-components.mjs','gr3-raw-nr.mjs','gr3-stock-presets.mjs','gr3-native-library.mjs','gr3x-native-port.mjs','gr3-candidate-audit.mjs','gr3-version-unlock.mjs','gr3-m10v-native-build.mjs','gr3-runtime.mjs','gr3-runtime-worker.py','gr3-store-plan.mjs','../scripts/gr3_aspect_overlay.py','../native/gr3/m10v_aspect.c','../native/gr3/m10v_aspect_config.h','../native/gr3/m10v_aspect_hooks.S','../native/gr3/m10v_aspect_dng.c','../web/gr3/native-library-state.mjs','../web/gr3/model-capabilities.mjs'].map(n=>[n,sha(readFileSync(new URL(n,import.meta.url)))])));
 }
 function parts(source,candidate){
  const report=inspectOfficial(source),decoded=decodeFrameMap(candidate,candidate.readUInt32LE(candidate.length-8)).decoded;
@@ -43,12 +43,13 @@ function parts(source,candidate){
  const r=sections.RTOS;return {decoded,sections,rtos:decoded.subarray(r.offset,r.offset+r.size)};
 }
 const variant=e=>[e.aspect?'aspect':null,e.level?'level':null].filter(Boolean).join('-');
-export async function buildCameraComponents(source,requested,{signal}={}){
+export async function buildCameraComponents(source,requested,{signal,halfFrame=true}={}){
  const e=normalizeExtensions(requested),key=variant(e);if(!key)return null;
  need(inspectOfficial(source).model==='GR III','组合扩展当前仅支持 GR III');
- const {candidate,receipt}=await runGr3Runtime(source,createStorePlan({variant:'street',features:key.split('-')}),'build',undefined,{signal});
+ const {candidate,receipt}=await runGr3Runtime(source,createStorePlan({variant:'street',features:key.split('-')}),'build',undefined,{signal,halfFrame});
  if(e.aspect){
   need(receipt.m10v_aspect?.schema==='m10v-gr3-aspect/v1'&&receipt.m10v_aspect.raw_id===5,'crop extension build receipt missing');
+  need(receipt.m10v_aspect.half_frame?.enabled===halfFrame,'half-frame model gate differs');
   const p=parts(source,candidate);
   need(p.rtos.length===ASPECT_END-LOAD&&receipt.m10v_aspect.module_range?.[0]===0x540bc000&&sha(p.rtos.subarray(0x540bc000-LOAD))===receipt.m10v_aspect.module_sha256,'crop module readback differs');
   verifiedComponents.set(candidate,sha(p.rtos));
@@ -100,6 +101,12 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
    need(rtos.readUInt32LE(0x540b97e8-LOAD)===2,'component must disable its timestamp renderer');
    for(const [address,before,after] of resourceAdaptations){const off=address-LOAD;need(rtos.readUInt32LE(off)===before,'aspect resource preimage differs');const id=manifest.resources.last_id+(after===0xe30033a8?0:1);rtos.writeUInt32LE(((after&0xfffff000)|id)>>>0,off);}
    if(componentEnd===ASPECT_END){
+    const halfMarker=Buffer.from('413746482c03000000000000','hex'),halfAt=rtos.indexOf(halfMarker,COMPONENT_END-LOAD);
+    if(manifest.camera_model==='gr3'){
+     need(halfAt>=0x540bc000-LOAD&&halfAt+12<=ASPECT_END-LOAD&&rtos.indexOf(halfMarker,halfAt+1)===-1,'half-frame model/resource binding differs');
+     rtos.writeUInt32LE(manifest.resources.last_id+3,halfAt+4);
+     if(manifest.film_library_enabled!==false){need(manifest.half_frame_icon?.id===875,'half-frame icon missing');rtos.writeUInt32LE(875,halfAt+8);}
+    }else need(halfAt===-1,'half-frame must be disabled for this model');
     const marker=Buffer.from('413752362b03000011030000','hex');
     const at=rtos.indexOf(marker,COMPONENT_END-LOAD);
     need(at>=COMPONENT_END-LOAD&&at+marker.length<=ASPECT_END-LOAD&&rtos.indexOf(marker,at+1)===-1,'6x7 resource binding differs');
@@ -132,6 +139,9 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
   shared_resource_routes:e.aspect?2:0,adapted_resource_words:e.aspect?6:0,component_stock_words:stockWords,
   aspect_indicator:e.aspect&&componentEnd===ASPECT_END&&manifest.film_library_enabled!==false?{render_path:'native-grid-overlay/icon-blitter',first_id:manifest.aspect_icons.first_id,last_id:manifest.aspect_icons.last_id,width:60,height:40}:null,
   six_by_seven_resource_id:e.aspect&&componentEnd===ASPECT_END?manifest.resources.last_id+2:null,
+  half_frame:{enabled:!!(e.aspect&&componentEnd===ASPECT_END&&manifest.camera_model==='gr3'),raw_id:6,
+   resource_id:e.aspect&&manifest.camera_model==='gr3'?manifest.resources.last_id+3:null,
+   icon_id:e.aspect&&manifest.camera_model==='gr3'&&manifest.film_library_enabled!==false?875:null},
   negative_grain_sites:e.negativeGrain?[0x53b348c0,0x53b3501e]:[],
   raw_nr:{configuration:e.rawNr,...rawNrEvidence(source,e.rawNr),patch_count:rawEdits.length,
    patched_bytes:rawEdits.reduce((n,p)=>n+p.replacementHex.length/2,0),

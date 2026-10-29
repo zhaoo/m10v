@@ -68,7 +68,7 @@ def elf_image(data):
     return bytes(image[:(last+3)&~3]),symbols
 
 
-def build_module():
+def build_module(half_frame=True):
     clang=os.environ.get('M10V_LLVM_CLANG') or shutil.which('clang')
     lld=os.environ.get('M10V_LLVM_LD') or shutil.which('ld.lld')
     if not lld:
@@ -78,7 +78,7 @@ def build_module():
         directory=Path(directory);objects=[]
         for name in SOURCES:
             obj=directory/(name+'.o')
-            subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr3'/name),'-o',str(obj)],check=True,capture_output=True)
+            subprocess.run([clang,*FLAGS,f'-DM10V_HALF_FRAME={int(half_frame)}','-c',str(ROOT/'native/gr3'/name),'-o',str(obj)],check=True,capture_output=True)
             objects.append(str(obj))
         script=directory/'layout.ld'
         script.write_text(f'SECTIONS {{ . = {MODULE}; .text : {{ *(.text*) }} .rodata : {{ *(.rodata*) }} /DISCARD/ : {{ *(.ARM.exidx*) *(.comment*) *(.ARM.attributes*) }} }}')
@@ -87,11 +87,11 @@ def build_module():
         return elf_image(elf.read_bytes())
 
 
-def apply_overlay(rtos):
+def apply_overlay(rtos,half_frame=True):
     template=json.loads((ROOT/'.runtime/grlife-current/reconstruction/firmware_store/templates/urban160-native.json').read_text())
     old=bytes.fromhex(template['program_hex']);old_base=template['base_va']
     if hashlib.sha256(old).hexdigest()!=TEMPLATE_SHA: raise ValueError('crop template digest differs')
-    code,symbols=build_module();rtos=bytearray(rtos)
+    code,symbols=build_module(half_frame);rtos=bytearray(rtos)
     if len(rtos)>MODULE-BASE and any(rtos[MODULE-BASE:]): raise ValueError('crop extension allocation overlaps existing module')
     rtos.extend(bytes(max(0,END-BASE-len(rtos))))
 
@@ -122,10 +122,10 @@ def apply_overlay(rtos):
         mov(address,3,table,expected=(0xe30938cc,0xe30a3520))
         mov(address+4,3,table,True,expected=(0xe345340b,0xe34533b5))
     classes=symbols['m10v_aspect_classes']
-    word(0x534371d4,0xe3530004,(0xe3530002,0xe3530003))
+    word(0x534371d4,0xe3530005 if half_frame else 0xe3530004,(0xe3530002,0xe3530003))
     mov(0x534371dc,2,classes,expected=(0xe30c2dcc,0xe30928d0))
     mov(0x534371e4,2,classes,True,expected=(0xe34523c1,0xe345240b))
-    word(0x5366944c,0xe3500004,(0xe3500002,0xe3500003))
+    word(0x5366944c,0xe3500005 if half_frame else 0xe3500004,(0xe3500002,0xe3500003))
     mov(0x53669450,3,classes,condition=9,expected=0x930533c8)
     mov(0x53669458,3,classes,True,condition=9,expected=0x934533d5)
     # XPan remains raw4 and preserves all its original output dimensions.
@@ -140,7 +140,7 @@ def apply_overlay(rtos):
     return bytes(rtos),symbols
 
 
-def extend_candidate(candidate):
+def extend_candidate(candidate,half_frame=True):
     from reconstruction.gr3x_container import decode_firmware
     image=decode_firmware(candidate);original=image.decoded
     # All supported GR III/IIIx inputs have the same section layout here.
@@ -148,7 +148,7 @@ def extend_candidate(candidate):
     while original[offset:offset+4]!=b'RTOS':
         offset+=16+struct.unpack_from('<I',original,offset+12)[0]
     size=struct.unpack_from('<I',original,offset+12)[0]
-    rtos,entries=apply_overlay(original[offset+16:offset+16+size])
+    rtos,entries=apply_overlay(original[offset+16:offset+16+size],half_frame)
     target=bytearray(original[:offset+16]+rtos+original[offset+16+size:])
     struct.pack_into('<I',target,offset+12,len(rtos))
     struct.pack_into('<I',target,len(target)-4,0)
@@ -175,6 +175,7 @@ def extend_candidate(candidate):
     result=bytearray(candidate[:128]+payload+bytes(-(128+len(payload))&3)+footer)
     struct.pack_into('<I',result,len(result)-4,-checksum(result)&0xffffffff)
     if decode_firmware(result).decoded!=bytes(target): raise ValueError('crop fresh container readback differs')
-    return bytes(result),{'schema':'m10v-gr3-aspect/v1','ratios':['3:2','1:1','4:3','XPan','6x7'],
+    return bytes(result),{'schema':'m10v-gr3-aspect/v1','ratios':['3:2','1:1','4:3','XPan','6x7']+(['Half 3:4'] if half_frame else []),
+                          'half_frame':{'enabled':half_frame,'raw_id':6 if half_frame else None},
                           'raw_id':5,'module_range':[MODULE,END],'module_sha256':hashlib.sha256(rtos[MODULE-BASE:]).hexdigest(),
                           'camera_tested':False,'entries':entries}

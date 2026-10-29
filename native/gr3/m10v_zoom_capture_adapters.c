@@ -1,6 +1,7 @@
 /* GR III 2.10 firmware boundaries. Uninstalled until preimage-checked linker
  * integration supplies the original trampolines. No shared mutable scratch. */
 #include "m10v_zoom_capture.h"
+#include "m10v_aspect_config.h"
 extern uint32_t m10v_zoom_mm(uint32_t bits);
 extern uint32_t m10v_zoom_bits(uint32_t mm);
 extern void m10v_zoom_original_marker_write(uint32_t, uint32_t);
@@ -63,7 +64,7 @@ int m10v_zoom_capture_resolution(uint32_t bits,uint32_t quality,uint32_t ratio,
     uint32_t mm=m10v_zoom_mm(bits);
     uint16_t sw=0,sh=0,qw=0,qh=0;
     m10v_zoom_capture_rect rect;
-    if (!m10v_zoom_capture_quality_count(mm) || quality>3 || ratio>5 ||
+    if (!m10v_zoom_capture_quality_count(mm) || quality>3 || ratio>(M10V_HALF_FRAME?6u:5u) ||
         !width || !height) return 0;
     m10v_zoom_capture_native_resolution(0x3f800000,0,ratio,&sw,&sh);
     m10v_zoom_capture_native_resolution(0x3f800000,quality,ratio,&qw,&qh);
@@ -93,7 +94,7 @@ void m10v_zoom_capture_replay_rect(uint32_t context) {
     uint16_t w=0,h=0;
     m10v_zoom_capture_rect rect;
     uint32_t qw,qh;
-    if (!m10v_zoom_capture_quality_count(mm) || ratio>5) {
+    if (!m10v_zoom_capture_quality_count(mm) || ratio>(M10V_HALF_FRAME?6u:5u)) {
         m10v_zoom_original_replay_rect(context);return;
     }
     m10v_zoom_capture_native_resolution(0x3f800000,0,ratio,&w,&h);

@@ -12,7 +12,7 @@ class FinalAspectIndicator(unittest.TestCase):
         from scripts.gr3_aspect_overlay import build_module
         _,cls.entries=build_module()
     def test_real_native_blitter_consumes_each_installed_aspect_tile(self):
-        for ratio in (4,5):
+        for ratio in (4,5,6):
             with self.subTest(ratio=ratio):
                 u=Uc(UC_ARCH_ARM,UC_MODE_ARM);extent=(len(self.code)+4095)&~4095
                 u.mem_map(BASE,extent);u.mem_write(BASE,self.code);u.mem_protect(BASE,extent,UC_PROT_READ|UC_PROT_EXEC)
@@ -37,7 +37,7 @@ class FinalAspectIndicator(unittest.TestCase):
                 self.assertEqual(u.reg_read(A.UC_ARM_REG_PC),STOP)
                 self.assertEqual(u.reg_read(A.UC_ARM_REG_SP),RAM+0xd0000)
                 self.assertEqual(allocs,[]);self.assertTrue(all(row[1]=='0x1' for row in asserts),asserts);self.assertTrue(blits)
-                art=(Path(__file__).resolve().parents[1]/'native/gr3/m10v_aspect_icons.rgba').read_bytes()[(ratio-4)*9600:(ratio-3)*9600]
+                art=(Path(__file__).resolve().parents[1]/'native/gr3/m10v_half_frame_icon.rgba').read_bytes() if ratio==6 else (Path(__file__).resolve().parents[1]/'native/gr3/m10v_aspect_icons.rgba').read_bytes()[(ratio-4)*9600:(ratio-3)*9600]
                 for y in range(40):
                     actual=bytes(u.mem_read(fb+((48+y)*720+652)*4,240))
                     # Native blend preserves framebuffer under transparent edge pixels.

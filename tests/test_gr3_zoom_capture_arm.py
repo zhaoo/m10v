@@ -33,7 +33,7 @@ def verify_final_runtime():
     caption_base=zoom['focal_first_id']-28
     bits=lambda mm:struct.unpack('<I',struct.pack('<f',mm/28))[0]
     results=[]
-    ratios=[0,3,1,4,5] if zoom['aspect'] else [0,3,1]
+    ratios=([0,3,1,4,5]+([6] if manifest['camera_model']=='gr3' else [])) if zoom['aspect'] else [0,3,1]
     def machine(mm=41):
      u=Uc(UC_ARCH_ARM,UC_MODE_ARM);u.mem_map(BASE,(len(ROM)+4095)&~4095);u.mem_write(BASE,ROM);u.mem_map(RAM,0x100000)
      u.reg_write(A.UC_ARM_REG_C1_C0_2,0xf00000);u.reg_write(A.UC_ARM_REG_FPEXC,0x40000000);u.reg_write(A.UC_ARM_REG_SP,RAM+0xd0000);u.reg_write(A.UC_ARM_REG_LR,STOP)

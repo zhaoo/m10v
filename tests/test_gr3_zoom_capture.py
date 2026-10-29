@@ -17,8 +17,11 @@ class ZoomCaptureTests(unittest.TestCase):
         stub.write_text('''#include <stdint.h>
 uint32_t m10v_zoom_mm(uint32_t b) { for(unsigned mm=28;mm<=100;mm++){union {float f;uint32_t u;} v;v.f=(float)mm/28.0f;if(v.u==b)return mm;}return 0; }
 uint32_t m10v_zoom_caption(uint32_t b) {return 900+m10v_zoom_mm(b);}
+void m10v_zoom_capture_native_resolution(uint32_t b,uint32_t q,uint32_t r,uint16_t *w,uint16_t *h) {
+ (void)b;(void)q;*w=r==6?2992:6000;*h=4000;
+}
 '''+'\n'.join('uint32_t '+n+'(void){return 0;}' for n in [
-'m10v_zoom_bits','m10v_zoom_original_marker_write','m10v_zoom_original_marker_read','m10v_zoom_original_marker_summary','m10v_zoom_original_raw_count','m10v_zoom_original_raw_value','m10v_zoom_capture_raw_bits','m10v_zoom_capture_native_resolution','m10v_zoom_native_ifd_byte','m10v_zoom_native_ifd_write_byte','m10v_zoom_native_summary_write','m10v_zoom_original_replay_rect']))
+'m10v_zoom_bits','m10v_zoom_original_marker_write','m10v_zoom_original_marker_read','m10v_zoom_original_marker_summary','m10v_zoom_original_raw_count','m10v_zoom_original_raw_value','m10v_zoom_capture_raw_bits','m10v_zoom_native_ifd_byte','m10v_zoom_native_ifd_write_byte','m10v_zoom_native_summary_write','m10v_zoom_original_replay_rect']))
         subprocess.run(['cc','-shared','-fPIC','-Wall','-Wextra','-Werror','-std=c99',str(ROOT/'native/gr3/m10v_zoom_capture.c'),str(ROOT/'native/gr3/m10v_zoom_capture_adapters.c'),str(stub),'-o',str(lib)],check=True,capture_output=True)
         cls.lib=C.CDLL(str(lib))
     @classmethod
@@ -53,6 +56,13 @@ uint32_t m10v_zoom_caption(uint32_t b) {return 900+m10v_zoom_mm(b);}
         self.assertEqual((g.width,g.height),(5600,3728))
         self.assertEqual((g.x,g.y),(200,136))
         self.assertEqual((g.output_width,g.output_height),(1920,1280))
+    def test_half_frame_custom_crop_accepts_identity_six_and_rejects_unknown(self):
+        bits=struct.unpack('<I',struct.pack('<f',41/28))[0]
+        w,h=C.c_uint16(0xa5a5),C.c_uint16(0xa5a5)
+        self.assertEqual(self.lib.m10v_zoom_capture_resolution(bits,0,6,C.byref(w),C.byref(h)),1)
+        self.assertEqual((w.value,h.value),(2032,2720))
+        self.assertEqual(self.lib.m10v_zoom_capture_resolution(bits,0,7,C.byref(w),C.byref(h)),0)
+        self.assertEqual((w.value,h.value),(2032,2720))
     def test_all_custom_focals_and_supported_aspect_baselines_stay_centered_and_bounded(self):
         for mm in range(29,101):
             if mm in (35,50):continue

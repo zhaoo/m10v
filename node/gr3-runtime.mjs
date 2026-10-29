@@ -36,9 +36,10 @@ export async function runtimeAvailable(runtimeDir = currentRuntime) {
   } catch { return false; }
 }
 
-export async function runGr3Runtime(source, plan, action, runtimeDir, { signal, timeoutMs = 180_000, buildTimeoutMs = 300_000 } = {}) {
+export async function runGr3Runtime(source, plan, action, runtimeDir, { signal, timeoutMs = 180_000, buildTimeoutMs = 300_000, halfFrame=true } = {}) {
   if(signal?.aborted) throw new Error("操作已取消");
   inspectOfficial(source);
+  if(typeof halfFrame!=='boolean')throw new Error('invalid half-frame model gate');
   if (!['prepare', 'build'].includes(action)) throw new Error('invalid runtime action');
   // Low-memory deployment throttles CPU and swaps: a valid IIIx feature build
   // can exceed three minutes. Keep both operations bounded, without changing
@@ -59,7 +60,7 @@ export async function runGr3Runtime(source, plan, action, runtimeDir, { signal, 
     try {
       ({ stdout } = await execFileAsync(process.env.M10V_PYTHON || '/opt/homebrew/bin/python3.12',
         [worker, action, sourcePath, planPath, outputPath], {
-          signal, env: { ...process.env, PYTHONPATH: runtimeDir }, timeout: deadlineMs, maxBuffer: 1024 * 1024,
+          signal, env: { ...process.env, PYTHONPATH: runtimeDir, M10V_HALF_FRAME:halfFrame?'1':'0' }, timeout: deadlineMs, maxBuffer: 1024 * 1024,
         }));
     } catch (error) {
       if(signal?.aborted) throw new Error('操作已取消');
