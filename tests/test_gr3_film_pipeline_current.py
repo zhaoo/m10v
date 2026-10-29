@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import unittest
 import zlib
+import io,zipfile
 from unicorn import UC_HOOK_CODE
 from unicorn import arm_const as A
 from tests.test_gr3_isp_base import StockISP, ROOT
@@ -73,6 +74,7 @@ class CurrentFilmPipelineTests(unittest.TestCase):
         for index in range(slot + 1):
             struct.pack_into('<H6B', state, 12 + 8 * index,
                 film if index == slot else 34 + index, 0, 0, 0, 3, 5, 2)
+        if 79<=film<=288:state[96+slot*8+6]=21
         struct.pack_into('<I', state, 180, zlib.crc32(state[:180]))
         data = e.alloc(184)
         e.u.mem_write(data, bytes(state))
@@ -80,13 +82,73 @@ class CurrentFilmPipelineTests(unittest.TestCase):
         return e, recipe, obj, frame, si, request, data
 
     def publish_owner(self, e, data):
-        owner = e.alloc(0x223c)
+        owner = e.alloc(self.manifest['settings_menu']['owner_bytes'])
         e.w32(0x55063910, 1)
         e.w32(0x55063914 + 0x74, owner)
         e.w32(owner + 0x213c, 0x3856504d)
         e.w32(owner + 0x2140, 2)
         e.u.mem_write(owner + 0x2144, bytes(e.u.mem_read(data, 184)))
         return owner
+
+    def test_owner_query_matches_inline_custom_cache_allocation(self):
+        e=StockISP(self.image)
+        self.assertEqual(self.call(e,'m10v_settings_controller_owner_size'),self.manifest['settings_menu']['owner_bytes'])
+
+    def test_custom_isp_ui_cache_real_producer_freezes_target_and_native_only_capture(self):
+        for stage in (0,1):
+            e,recipe,obj,frame,si,request,data=self.fixture(79,stage=stage)
+            owner=self.publish_owner(e,data)
+            record=bytearray(12288)
+            struct.pack_into('<4I',record,6688,0x5053494d,1,1572,0)
+            struct.pack_into('<18h',record,6704,8192,0,0,0,8192,0,0,0,8192,512,0,0,0,512,0,0,0,512)
+            struct.pack_into('<768H',record,6740,*([round(i*16383/255) for i in range(256)]*3))
+            reads=[]
+            def storage(u,at,n,d):
+                if at!=self.manifest['symbols']['m10v_sd_camera_custom_record']:return
+                reads.append(at);u.mem_write(u.reg_read(A.UC_ARM_REG_R2),bytes(record))
+                u.reg_write(A.UC_ARM_REG_R0,1);u.reg_write(A.UC_ARM_REG_PC,u.reg_read(A.UC_ARM_REG_LR))
+            h=e.u.hook_add(UC_HOOK_CODE,storage)
+            self.assertEqual(self.call(e,'m10v_camera_library_mutation_begin'),1)
+            self.call(e,'m10v_camera_library_mutation_end',data)
+            e.u.hook_del(h);self.assertEqual(len(reads),1)
+            e.u.mem_write(recipe+0x4a08,bytes(1796))
+            self.enqueue(e,recipe,19)
+            # The owner is now a newer UI selection. This shot must own a copy.
+            e.u.mem_write(owner+0x2144,bytes(184));e.w32(owner+0x2140,8)
+            self.make(e,recipe,obj,frame)
+            self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),1)
+            self.assertEqual(self.capture(e,recipe,si,request),0)
+
+    def test_custom_offline_fit_actual_live_callback_and_still_fields_match_report(self):
+        js="""import{exportSdFilms}from'./node/gr3-sd-film-export.mjs';
+const lines=['LUT_3D_SIZE 2'];for(let b=0;b<2;b++)for(let g=0;g<2;g++)for(let r=0;r<2;r++)lines.push([.98*r+.02*g,.97*g+.03*r,.94*b+.06*g].join(' '));
+const v=await exportSdFilms({ids:[],customFilms:[{name:'Warm',filename:'warm.cube',base64:Buffer.from(lines.join('\\n')).toString('base64')}]});process.stdout.write(v.zip);"""
+        blob=subprocess.check_output(['node','--input-type=module','-e',js],cwd=ROOT)
+        with zipfile.ZipFile(io.BytesIO(blob)) as z:
+            record=z.read('SD/M10V/FILMS.M10')[4096:16384]
+            report=json.loads(z.read('manifest.json'))['custom_lut_assessment']['profiles'][0]['quality']['provenance']['native_frame']
+        e,recipe,obj,frame,si,request,data=self.fixture(79,stage=0)
+        self.publish_owner(e,data)
+        def storage(u,at,n,d):
+            if at!=self.manifest['symbols']['m10v_sd_camera_custom_record']:return
+            u.mem_write(u.reg_read(A.UC_ARM_REG_R2),record);u.reg_write(A.UC_ARM_REG_R0,1);u.reg_write(A.UC_ARM_REG_PC,u.reg_read(A.UC_ARM_REG_LR))
+        h=e.u.hook_add(UC_HOOK_CODE,storage)
+        self.call(e,'m10v_camera_library_mutation_begin');self.call(e,'m10v_camera_library_mutation_end',data);e.u.hook_del(h)
+        e.u.mem_write(recipe+0x4a08,bytes(1796));self.enqueue(e,recipe,19);self.make(e,recipe,obj,frame)
+        def fields(at):
+            def signed(v,bits):return ((v&((1<<bits)-1))^(1<<(bits-1)))-(1<<(bits-1))
+            return [[signed(v,bits) for v in struct.unpack('<9H',e.u.mem_read(at+offset,18))] for offset,bits in ((0x140,12),(0x12a0,9))]
+        expected=[report['cca_signed12'],report['csp_signed9']]
+        self.assertEqual(fields(frame),expected)
+        # Stage1-shaped metadata exercises original Live Make without the
+        # sensor-specific stage0 AWB/black-level calibration boundary.
+        live_obj=e.cursor;e.make(25,stage=1,live=True,actual_live=True);live_frame=live_obj+0x1400
+        callback=int.from_bytes(e.u.mem_read(0x53dbd954,4),'little')
+        e.call(callback,live_obj,live_frame)
+        self.assertEqual(fields(live_frame),expected)
+        self.assertEqual(bytes(e.u.mem_read(live_frame+0x4888,2048)),bytes(e.u.mem_read(frame+0x4888,2048)))
+        self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),1)
+        self.assertEqual(self.capture(e,recipe,si,request),0)
 
     def enqueue(self, e, recipe, kind):
         # Original task producer constructs both the packet and its recipe
@@ -241,7 +303,7 @@ class CurrentFilmPipelineTests(unittest.TestCase):
                     self.assertEqual(self.capture(e,recipe,si,request),0)
 
     def test_extra_films_real_task_producer_to_unmapped_24mp_encoder(self):
-        for film in (314,315,316):
+        for film in (314,315,316,317):
             for stage in (0,1):
                 with self.subTest(film=film,stage=stage):
                     e,recipe,obj,frame,si,request,data=self.fixture(film,stage=stage)
@@ -285,7 +347,7 @@ class CurrentFilmPipelineTests(unittest.TestCase):
     def test_durable_ui_load_publishes_owner_used_by_actual_task_submission(self):
         e, recipe, obj, frame, si, request, data = self.fixture(62)
         e.u.mem_write(recipe + 0x4a08, bytes(1796))
-        owner = e.alloc(0x223c)
+        owner = e.alloc(self.manifest['settings_menu']['owner_bytes'])
         e.w32(0x55063910, 1)
         e.w32(0x55063988, owner)
         self.call(e, 'm10v_camera_library_preview_init', owner)
@@ -387,7 +449,7 @@ writeFileSync(process.argv[1]+'/manifest.json',JSON.stringify(r.manifest));
             self.manifest = json.loads((Path(d) / 'manifest.json').read_text())
             self.image = (Path(d) / 'rtos.bin').read_bytes()
             self.assertFalse(self.manifest['capture_lifecycle']['snapshot']['live_color'])
-            self.assertEqual(self.manifest['settings_menu']['owner_bytes'], 0x223c)
+            self.assertEqual(self.manifest['settings_menu']['owner_bytes'], 0x613c)
             self.test_durable_ui_load_publishes_owner_used_by_actual_task_submission()
 
     def test_ordinary_builtin_profiles_complete_under_native_parameter_changes(self):

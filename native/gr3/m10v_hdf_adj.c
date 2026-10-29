@@ -27,7 +27,11 @@ void m10v_hdf_adj_set(uint32_t c,uint32_t i){
  m10v_hdf_ui *p=m10v_hdf_ui_owner();if(p&&p->controller==c&&i<4)p->pending=i;
 }
 uint32_t m10v_hdf_adj_count(uint32_t c){(void)c;return 4;}
-uint32_t m10v_hdf_adj_available(uint32_t c){(void)c;return m10v_hdf_ui_owner()!=0;}
+/* Despite this legacy export name, stock record +0x3c is an exclusion
+ * predicate: the icon loop (531a428c) hides nonzero, and slot navigation
+ * (531a475c) skips nonzero. A cold cache is still usable: enter bootstraps
+ * it. Only a missing owner must exclude HDF from the native five slots. */
+uint32_t m10v_hdf_adj_available(uint32_t c){(void)c;return m10v_hdf_ui_owner()==0;}
 uint32_t m10v_hdf_adj_event(uint32_t c,uint32_t event){
  uint32_t key=*(const uint16_t *)(uintptr_t)event;m10v_hdf_ui *p=m10v_hdf_ui_owner();
  /* These keys enter native capture/power/return services. Relinquish only

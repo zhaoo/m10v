@@ -15,7 +15,7 @@ def build_hooks(base,symbols,settings,film_library=True,live_color=False,custom_
     exports.update({'m10v_hdf_menu_parent_'+name:a for name,a in parents.items()})
     hdfrow=stub(f'push {{r4,lr}};mov r4,r1;mov r0,r4;mov r1,#0;bl 0x5339de20;mov r0,r4;movw r1,#{1140 if film_library else 970};mov r2,r1;pop {{r4,lr}};b 0x5339dc70')
     rows=settings['rows']+[hdfrow] if film_library else [hdfrow]
-    offset=(0x223c if live_color else 0x213c) if film_library else 0x13bc;owner=offset+0x1c0
+    offset=(0x613c if live_color else 0x213c) if film_library else 0x13bc;owner=offset+0x1c0
     patches=[]
     def add(a,e,r,n):patches.append(dict(address=a,expected=e,replacement=r,name=n))
     for a,e,name,link in [(0x5316f3b8,0xe300313b,'factory',False),(0x5319667c,0xe1a0c00d,'top_dtor',False),(0x5316fcf8,0xeb00ab5a,'top_ctor',True),(0x53221a4c,0xeb001c7e,'key_route',True)]:add(a,e,branch(a,symbols['m10v_hdf_menu_'+name],link),'HDF menu '+name)

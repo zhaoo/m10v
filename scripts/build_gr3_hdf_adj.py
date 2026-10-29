@@ -38,6 +38,8 @@ def build(base,symbols,rtos=None,icon_id=874,parent_event=None):
   reg=(word(lo)>>12)&15
   patch(lo,movw(reg,new&65535),'table/list pointer low',movw(reg,old&65535))
   patch(hi,movw(reg,new>>16,True),'table/list pointer high',movw(reg,old>>16,True))
+ # Legacy symbol "available" implements the stock +0x3c exclusion predicate:
+ # 0 permits display/selection, nonzero hides/skips. Keep the export ABI stable.
  handlers={n:symbols['m10v_hdf_adj_'+n] for n in ('enter','draw','current','set','count','available','event')}
  record=[0]*17
  for off,name in ((0,'enter'),(0x18,'draw'),(0x20,'current'),(0x28,'set'),(0x30,'count'),(0x3c,'available')):record[off//4]=handlers[name]

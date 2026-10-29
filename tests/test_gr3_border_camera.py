@@ -36,7 +36,7 @@ class BorderCameraTests(unittest.TestCase):
   u.mem_map(0x53000000,0x1500000);u.mem_write(self.base,bytes(self.code));u.mem_map(0x55000000,0x100000)
   self.owner=0x55010000;self.page=self.owner+0x223c;self.cache=self.owner+0x23e4
   self.files={};self.reads=[];self.writes=[];self.fail_write=False;self.fail_verify=False;self.verify_pending=False;self.fs_ready=True;self.forbid_capture_services=False;self.fail_reads=0
-  self.cursor=0x55040000;self.captions=[];self.closed=[];self.hdf=0;self.hdf_writes=[]
+  self.cursor=0x55040000;self.captions=[];self.closed=[];self.hdf=0;self.hdf_writes=[];self.live=set()
   self.put(0x55002008,0x55002100);self.put(0x55002100,0x55002200);u.mem_write(0x55002220,b'\x01')
   self.put(0x55063910,1);self.put(0x55063988,self.owner)
   self.put(0x55009028,0x55009100);self.put(0x55009034,0x55009104)
@@ -56,7 +56,11 @@ class BorderCameraTests(unittest.TestCase):
     elif not self.fail_write:self.files[name]=bytes(uc.mem_read(r[3],24));self.writes.append(name);self.verify_pending=self.fail_verify;result=1
    elif a==0x53000100:self.put(r[0],self.hdf)
    elif a==0x53000104:self.hdf=r[0];self.hdf_writes.append(r[0])
-   elif a==0x536af2a8:result=self.cursor;self.cursor+=0x200
+   elif a==0x536af2a8:result=self.cursor;self.cursor+=0x200;self.live.add(result)
+   elif a==0x536af2e4:self.assertIn(r[0],self.live);self.live.remove(r[0])
+   elif a==0x5316cde8:
+    for w in struct.unpack('<'+'I'*r[2],uc.mem_read(r[1],r[2]*4)):
+     self.assertIn(w,self.live);self.live.remove(w)
    elif a in (0x5339199c,0x53393d84,0x53396944):self.put(r[0],0x55009000);result=r[0]
    elif a==0x5316ca28:self.closed.append(r[0])
    elif a==0x53396f80:self.captions.append((r[0],r[1]))

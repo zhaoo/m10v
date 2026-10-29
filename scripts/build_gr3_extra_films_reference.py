@@ -12,6 +12,14 @@ ROOT=Path(__file__).resolve().parents[1];sys.path[:0]=[str(ROOT),str(ROOT/'third
 os.environ.setdefault('NUMBA_NUM_THREADS','4')
 SPECS=[dict(id=314,name='ACROS II 100',ascii_name='ACROS II 100',key='acros-ii-100',title='ACROS II',code='100',color='#777b72',iso=100,group='黑白',source='https://www.fujifilm.com/us/en/business/professional-photography/film/neopan-100-acros-ii/support',reference='independently authored official-description-guided tonal interpretation; not original ACROS I or Fujifilm camera simulation'),dict(id=315,name='Double-X 5222',ascii_name='Double-X 5222',key='double-x-5222',title='DOUBLE-X',code='5222',color='#6a6961',iso=250,group='黑白',source='https://www.kodak.com/content/products-brochures/Film/DOUBLEX-Technical-Data-EN.pdf',reference='MIT spectral_film_lut KODAK_5222 D96 nominal curve6 plus Kodak Polymax grade2; display sRGB adaptation is assumed'),dict(id=316,name='LomoChrome Turquoise',ascii_name='LomoChrome Turquoise',key='lomochrome-turquoise',title='TURQUOISE',code='100-400',color='#397f8c',iso=400,group='创意',source='https://shop.lomography.com/us/2021-lomochrome-turquoise-120-iso-100-400',reference='independent 2021-formula colour-swap model guided by official colour directions; numeric mixing/tone coefficients assumed')]
 PARAMETERS=dict(acros=dict(input_knots=[0,.025,.07,.18,.40,.70,1],output_knots=[.003,.015,.049,.172,.427,.760,.992],rgb_weights=[.28,.61,.11],status='authored, not digitized sensitometry'),turquoise=dict(matrix=[[.10,0,.90],[0,.78,.22],[.78,.22,0]],contrast=.065,saturation=1.04,black=[.007,.016,.014],white=[.985,.992,.987],status='authored visible-RGB colour-swap, not measured spectral layers'),double_x=dict(negative='KODAK_5222',paper='KODAK_POLYMAX_GRADE_2',exposure_kelvin=6500,projector_kelvin=6500,input='encoded display sRGB; not recovered scene radiance',colour_masking=0,source_license='MIT Jan Lohse',development='D96 nominal curve6 as digitized upstream; not D76'),spatial='no baked grain, halation, MTF or detail reconstruction; existing native user-controlled grain remains independent')
+SPECS.append(dict(id=317,name='Instax Color',ascii_name='Instax Color',key='instax-color',title='INSTAX',code='800',color='#4bafaa',iso=800,group='创意',source='https://asset.fujifilm.com/www/ph/files/2020-12/5cc03b7f067001e7045d7c6d0f3070df/instax_mini_datasheet.pdf',reference='Fujifilm AF3-076E characteristic, spectral sensitivity and dye density curves; MIT Spectral Film LUT digitization; reflected-display adaptation assumed'))
+PARAMETERS['instax']=dict(model='FUJI_INSTAX_COLOR',official_iso=800,model_iso=1000,iso_note='upstream deliberately compensates ISO 800 to 1000 for appearance; retained, not a film speed measurement',exposure_kelvin=5500,viewing_kelvin=5500,exp_comp=0,white_clip=False,white_balance=0,color_masking=0,input='encoded display sRGB; spectral upsampling cannot recover scene spectra',output='Rec.709 primaries, sRGB encoding',source_license='MIT Jan Lohse',border=False,camera_verified=False)
+PARAMETERS['instax']['official_datasheet']=dict(reference='AF3-076E',sha256='c1d4963f6e1b6c58449092754742048ec0fb55930f138ad5e892ebc0fc2c8923',retrieved='2026-10-29',physical_page=3,charts=['characteristic curves','spectral sensitivity curves','spectral dye density curves'],license='Fujifilm copyrighted reference, linked not redistributed',digitization='vendored MIT FUJI_INSTAX_COLOR; no claim of new measurement or exact chart tracing')
+@cache
+def instax_model():
+ from spectral_film_lut.film_spectral import FilmSpectral
+ from spectral_film_lut.reversal_film.fuji_instax_color import FUJI_INSTAX_COLOR
+ return FilmSpectral(FUJI_INSTAX_COLOR)
 @cache
 def spectral_models():
  from spectral_film_lut.film_spectral import FilmSpectral
@@ -33,6 +41,11 @@ def render(film,rgb):
  if film==316:
   from scripts.build_gr3_anime_e6_reference import authored
   p=PARAMETERS['turquoise'];return authored(x,dict(mix=p['matrix'],**{k:p[k] for k in ['contrast','saturation','black','white']}))
+ if film==317:
+  from spectral_film_lut.utils import film_conversion
+  out=film_conversion(x,instax_model(),input_colorspace='sRGB',output_gamut='Rec. 709',gamma_func='sRGB',mode='full',exp_kelvin=5500,projector_kelvin=5500,exp_comp=0,white_clip=False,white_balance=0,color_masking=0,upsampling_method='SFL upsampling')
+  if not np.isfinite(out).all():raise ValueError('nonfinite Instax target')
+  return np.clip(out,0,1)
  raise ValueError('unknown extra film')
 def generate():
  import numpy as np

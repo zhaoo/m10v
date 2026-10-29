@@ -54,8 +54,8 @@ int m10v_settings_view_create(m10v_settings_view *v){
  for(uint32_t i=0;i<10;i++)if(make(v,11,26+(i%5)*136,98+(i/5)*160,124,152))goto fail;
  for(uint32_t i=0;i<10;i++)if(make(v,10,28+(i%5)*136,100+(i/5)*160,120,M10V_CARD_HEIGHT))goto fail;
  /* Selection rectangles precede text in the child draw order. */
- for(uint32_t i=0;i<4;i++)if(make(v,11,24,84+i*72,672,64))goto fail;
- for(uint32_t i=0;i<4;i++)if(make(v,11,30,90+i*72,660,52))goto fail;
+ for(uint32_t i=0;i<4;i++)if(make(v,11,0,84+i*72,720,64))goto fail;
+ for(uint32_t i=0;i<4;i++)if(make(v,11,0,147+i*72,720,1))goto fail;
  for(uint32_t i=0;i<4;i++)if(make(v,17,36,90+i*72,300,52))goto fail;
  for(uint32_t i=0;i<4;i++)if(make(v,17,350,90+i*72,330,52))goto fail;
  if(make(v,0,610,18,86,32))goto fail;
@@ -116,7 +116,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   color(v->widgets[FRAME+i],i==focus?6:1);
   uint32_t enabled=0;for(uint32_t k=0;k<M10V_SLOT_COUNT;k++)if(s->saved.slots[k].film==id&&id)enabled=1;
   if(id){
-   uint32_t icon=M10V_EXTRA_FILM(id)?M10V_EXTRA_FILM_ICON_FIRST+id-314:M10V_C41(id)?M10V_C41_ICON_FIRST+id-312:M10V_ANIME_E6(id)?M10V_ANIME_E6_ICON_FIRST+id-306:M10V_D76(id)?775+id-M10V_D76_FIRST:id==M10V_5213_ID?774:M10V_STYLE(id)?762+id-M10V_STYLE_FIRST:id==M10V_PIXEL_ID?761:id==M10V_CHAR_ID?755:M10V_CUSTOM(id)?754:670+id;
+   uint32_t icon=M10V_EXTRA_FILM(id)?M10V_EXTRA_FILM_ICON(id):M10V_C41(id)?M10V_C41_ICON_FIRST+id-312:M10V_ANIME_E6(id)?M10V_ANIME_E6_ICON_FIRST+id-306:M10V_D76(id)?775+id-M10V_D76_FIRST:id==M10V_5213_ID?774:M10V_STYLE(id)?762+id-M10V_STYLE_FIRST:id==M10V_PIXEL_ID?761:id==M10V_CHAR_ID?755:M10V_CUSTOM(id)?754:670+id;
    if(v->widgets[M10V_VIEW_HEAP]){
     uint32_t *pixels=(uint32_t *)(uintptr_t)(v->widgets[M10V_VIEW_HEAP]+i*M10V_CARD_PIXELS*4);
     if(M10V_CUSTOM(id)){
@@ -152,13 +152,14 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  for(uint32_t i=0;i<4;i++){
   uint32_t w=v->widgets[ROW+i],value=v->widgets[VALUE+i];
   uint32_t selected=!films&&!name_page&&i==s->focus;
-  visible(v->widgets[ROW_FRAME+i],selected);visible(v->widgets[ROW_INNER+i],selected);
-  color(v->widgets[ROW_FRAME+i],6);color(v->widgets[ROW_INNER+i],1);
+  visible(v->widgets[ROW_FRAME+i],selected);visible(v->widgets[ROW_INNER+i],!films&&!name_page);
+  color(v->widgets[ROW_FRAME+i],6);color(v->widgets[ROW_INNER+i],2);
   visible(w,!films&&!name_page);visible(value,!films&&!name_page);
   caption(w,M10V_VIEW_MODE+i);caption(value,valueres(i,values[i]));
-  /* Text enum10 selects the yellow glyph table; enum6 falls back to WHITE. */
-  ((fn2)0x5339658cu)(w,selected&&s->screen!=M10V_SETTINGS_VALUE?10:31);
-  ((fn2)0x5339658cu)(value,selected?10:31);
+  /* Original glyph enum28 is the dark ramp at53b4dba4. The full yellow
+   * rectangle stays behind both labels; enum10 is yellow-on-dark instead. */
+  ((fn2)0x5339658cu)(w,selected?28:31);
+  ((fn2)0x5339658cu)(value,selected?28:31);
  }
  if(!films&&s->focus<5)caption(v->widgets[TITLE],s->screen==M10V_SETTINGS_VALUE?
    (s->focus==4?M10V_VIEW_EDIT_NAME:M10V_VIEW_EDIT_MODE+s->focus):M10V_VIEW_STAMP);
@@ -166,7 +167,9 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   caption(v->widgets[TITLE],M10V_VIEW_EDIT_NAME);
   visible(v->widgets[ROW],1);
   caption(v->widgets[ROW],s->value?M10V_VIEW_NAME_ON:M10V_VIEW_NAME_OFF);
-  ((fn2)0x5339658cu)(v->widgets[ROW],10);
+  visible(v->widgets[ROW_FRAME],1);color(v->widgets[ROW_FRAME],6);
+  visible(v->widgets[ROW_INNER],1);
+  ((fn2)0x5339658cu)(v->widgets[ROW],28);
  }
  if(ab_page){
   caption(v->widgets[TITLE],M10V_VIEW_AB_TITLE);caption(v->widgets[FOOTER],M10V_VIEW_AB_HELP);
@@ -189,7 +192,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   for(uint32_t i=0;i<4;i++){
    visible(v->widgets[ROW+i],i<2);visible(v->widgets[VALUE+i],0);
    visible(v->widgets[ROW_FRAME+i],i<2&&i==s->focus);
-   visible(v->widgets[ROW_INNER+i],i<2&&i==s->focus);
+   visible(v->widgets[ROW_INNER+i],i<2);
    if(i<2)caption(v->widgets[ROW+i],1138+i);
   }
  }else if(s->screen==M10V_SETTINGS_STAMP){caption(v->widgets[TITLE],1138);}
@@ -213,16 +216,16 @@ void m10v_settings_view_zoom(m10v_settings_view *v,const m10v_zoom_menu *s){
  }
  for(uint32_t i=0;i<4;i++){
   uint32_t selected=i<3&&i==s->focus;
-  visible(v->widgets[ROW_FRAME+i],selected);visible(v->widgets[ROW_INNER+i],selected);
-  color(v->widgets[ROW_FRAME+i],6);color(v->widgets[ROW_INNER+i],1);
+  visible(v->widgets[ROW_FRAME+i],selected);visible(v->widgets[ROW_INNER+i],i<3);
+  color(v->widgets[ROW_FRAME+i],6);color(v->widgets[ROW_INNER+i],2);
   visible(v->widgets[ROW+i],i<3);visible(v->widgets[VALUE+i],i>0&&i<3);
   if(i<3){
    caption(v->widgets[ROW+i],i?title+i:2);
    if(i){unsigned mm=s->editing&&selected?s->editor.value:s->saved.mm[i-1];
     caption(v->widgets[VALUE+i],m10v_zoom_caption(m10v_zoom_bits(mm)));}
 
-   ((fn2)0x5339658cu)(v->widgets[ROW+i],selected&&!s->editing?10:31);
-   ((fn2)0x5339658cu)(v->widgets[VALUE+i],selected?10:31);
+   ((fn2)0x5339658cu)(v->widgets[ROW+i],selected?28:31);
+   ((fn2)0x5339658cu)(v->widgets[VALUE+i],selected?28:31);
   }
  }
 }

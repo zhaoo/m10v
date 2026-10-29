@@ -14,7 +14,7 @@ class HdfMenuTests(unittest.TestCase):
  def setUp(self):
   self.u=u=Uc(UC_ARCH_ARM,UC_MODE_ARM)
   u.mem_map(0x53000000,0x1500000);u.mem_write(0x53000000,self.rom);u.mem_write(self.m['base'],self.b);u.mem_map(0x55000000,0x100000)
-  self.files={};self.writes=[];self.reads=[];self.fail_write=False;self.fail_verify=False;self.allocate=True;self.cursor=0x55040000;self.closed=[];self.captions=[];self.destroyed=[]
+  self.files={};self.writes=[];self.reads=[];self.fail_write=False;self.fail_verify=False;self.allocate=True;self.cursor=0x55040000;self.closed=[];self.captions=[];self.destroyed=[];self.live=set();self.freed=[]
   self.put(0x55002008,0x55002100);self.put(0x55002100,0x55002200);u.mem_write(0x55002220,b'\x01');self.owner=0x55010000;self.page=self.owner+0x13bc
   self.put(0x55009000+0x28,0x55009100);self.put(0x55009000+0x34,0x55009104)
   def service(uc,a,n,d):
@@ -31,10 +31,14 @@ class HdfMenuTests(unittest.TestCase):
      elif name in self.files:uc.mem_write(r[3],self.files[name]);result=1
     elif not self.fail_write:self.files[name]=bytes(uc.mem_read(r[3],24));self.writes.append(name);result=1
    elif a==0x536af2a8:
-    if self.allocate:result=self.cursor;self.cursor+=0x200
+    if self.allocate:result=self.cursor;self.cursor+=0x200;self.live.add(result)
    elif a in (0x5339199c,0x53393d84,0x53396944):self.put(r[0],0x55009000);result=r[0]
    elif a==0x5319aa68:result=r[0]
-   elif a==0x5316cde8:self.destroyed.append((r[1],r[2]))
+   elif a==0x5316cde8:
+    self.destroyed.append((r[1],r[2]))
+    for w in struct.unpack('<'+'I'*r[2],uc.mem_read(r[1],r[2]*4)):
+     self.assertIn(w,self.live);self.live.remove(w)
+   elif a==0x536af2e4:self.assertIn(r[0],self.live);self.live.remove(r[0]);self.freed.append(r[0])
    elif a==0x5316ca28:self.closed.append(r[0])
    elif a==0x53396f80:self.captions.append((r[0],r[1]))
    elif a in (0x5316c8d4,0x5316ce8c,0x5316c774,0x533aba64,0x53393e00,0x5339658c,0x533ad3c0,0x533ad308,0x5316d354,0x55009100,0x55009104):result=r[0]
@@ -83,5 +87,6 @@ class HdfMenuTests(unittest.TestCase):
   self.call('m10v_hdf_menu_top_ctor',self.owner);self.allocate=False
   self.assertEqual(self.call('m10v_hdf_menu_ready',self.page,0),0);self.assertEqual(self.get(self.page+0x17c),0)
  def test_destroy_cleans_only_its_owned_nine_widgets(self):
-  self.ready();self.call('m10v_hdf_menu_destroy',self.page)
-  self.assertEqual(self.destroyed,[(self.page+0x158,9)]);self.assertEqual(self.get(self.page+0x17c),0)
+  self.ready();style=self.get(self.page+0x1bc);self.call('m10v_hdf_menu_destroy',self.page)
+  self.assertEqual(self.destroyed,[(style,8),(self.page+0x158,9)]);self.assertEqual(self.get(self.page+0x17c),0)
+  self.assertEqual(self.freed,[style]);self.assertEqual(self.live,set());self.assertEqual(self.get(self.page+0x1bc),0)

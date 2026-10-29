@@ -6,13 +6,14 @@ import {defaultConfiguration,defaultExtensions} from '../web/gr3/native-library-
 const rawArgs=process.argv.slice(2),model=rawArgs.find(a=>a.startsWith('--model='))?.slice(8)||'gr3';
 const halation_enabled=rawArgs.includes('--universal-halation'),border_enabled=rawArgs.includes('--border');
 const debug_mode=rawArgs.includes('--debug'),layout=rawArgs.includes('--legacy-slots')?{appended_slots:false}:{};
-const args=rawArgs.filter(a=>!a.startsWith('--model=')&&a!=='--debug'&&a!=='--legacy-slots'&&a!=='--universal-halation'&&a!=='--border');
-if(args.length>2)throw Error('usage: node scripts/export_gr3_m10v_native.mjs [--debug] [--universal-halation] [--legacy-slots] [--border] [--model=gr3|gr3x] [output-directory] [configuration.json]');
+const hdf=rawArgs.includes('--with-hdf')?{hdf_enabled:true}:{};
+const args=rawArgs.filter(a=>!a.startsWith('--model=')&&a!=='--debug'&&a!=='--legacy-slots'&&a!=='--universal-halation'&&a!=='--border'&&a!=='--with-hdf');
+if(args.length>2)throw Error('usage: node scripts/export_gr3_m10v_native.mjs [--debug] [--universal-halation] [--legacy-slots] [--border] [--with-hdf] [--model=gr3|gr3x] [output-directory] [configuration.json]');
 const directory=path.resolve(args[0]||'builds/m10v-gr3-native-test');
 const configuration=args[1]?JSON.parse(await readFile(args[1],'utf8')):defaultConfiguration();
 const extensions=border_enabled?{...defaultExtensions(),aspect:true}:undefined;
-const original=await readNativeOfficial(model),plan=prepareNative(original,configuration,{debug_mode,halation_enabled,border_enabled,extensions,...layout});
-const {candidate,receipt,manifest,runtime}=await generateNative(original,configuration,plan.configuration_sha256,{debug_mode,halation_enabled,border_enabled,extensions,...layout});
+const original=await readNativeOfficial(model),plan=prepareNative(original,configuration,{debug_mode,halation_enabled,border_enabled,extensions,...layout,...hdf});
+const {candidate,receipt,manifest,runtime}=await generateNative(original,configuration,plan.configuration_sha256,{debug_mode,halation_enabled,border_enabled,extensions,...layout,...hdf});
 await mkdir(directory,{recursive:true});
 await writeFile(path.join(directory,plan.filename),candidate);
 await writeFile(path.join(directory,'M10V-runtime-arm.bin'),runtime);

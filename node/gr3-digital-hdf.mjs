@@ -38,7 +38,7 @@ export function hdfPatches(runtime,m){
 
 export function hdfMenuPatches(runtime,m){
  const d=m.hdf_menu;if(!d)return [];
- const full=m.film_library_enabled!==false,offset=full?(m.capture_lifecycle?.snapshot?.snapshot_ingress_installed?0x223c:0x213c):0x13bc;
+ const full=m.film_library_enabled!==false,offset=full?(m.capture_lifecycle?.snapshot?.snapshot_ingress_installed?0x613c:0x213c):0x13bc;
  need(d.schema==='m10v-gr3-hdf-menu/v1'&&d.film_library===full&&d.owner_offset===offset&&d.owner_bytes===offset+0x1c0&&d.controller_bytes===0x1c0&&d.route===0x0200f102&&typeof m.zoom?.enabled==='boolean'&&d.rows.length===(full?3:1),'independent menu ownership differs');
  const s=m.symbols,base=m.base;
  const words=(at,list)=>{need(Number.isInteger(at)&&at%4===0&&at>=base&&at+list.length*4<=base+runtime.length,'menu code bounds');list.forEach((v,i)=>need(runtime.readUInt32LE(at-base+i*4)===(v>>>0),'menu instruction differs'));};

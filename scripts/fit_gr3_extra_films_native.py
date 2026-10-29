@@ -4,7 +4,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
 def native_header(ref):
  from scripts.fit_gr3_d76_native import native_header as full_header
- return full_header(ref).replace('native_d76','native_extra_films').replace('[7]','[3]').replace('live approximation, never still completion','quantized native ISP; no CPU color LUT')
+ return full_header(ref).replace('d76-reference.json','extra-films-reference.json').replace('native_d76','native_extra_films').replace('[7]',f'[{len(ref["stocks"])}]').replace('live approximation, never still completion','quantized native ISP; no CPU color LUT')
 def generate():
  import numpy as np
  from scripts.fit_gr3_native_film_targets import fit,quantize,render_quantized,fit_gate

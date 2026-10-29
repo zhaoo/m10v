@@ -620,7 +620,7 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     uint32_t texture_work[3]={0};texture_stats=texture_work;
 #endif
     if(M10V_CUSTOM(choice->film)){
-        custom_color(image,custom_lut);
+        if(!(completed&M10V_NATIVE_COLOR))custom_color(image,custom_lut);
     }
     else if(choice->film==M10V_PIXEL_ID){
         m10v_pixel_world_render(image);
