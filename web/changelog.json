@@ -2,6 +2,281 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.29.1",
+      "date": "2026-10-29",
+      "title": "GR III / IIIx 新增拍立得与 135 胶卷边框",
+      "changes": [
+        "在「效果」菜单增加边框，可选择拍立得或 135 胶卷样式；胶卷齿孔位于画面上下。",
+        "GR III 与 GR IIIx 固件工作台增加边框开关。",
+        "边框保留原有构图并向外扩展画布，支持 3:2、1:1、4:3、6x7 与 XPan；拍摄、即时回看和相册回放使用同一边框配置。",
+        "通过 ISP/IIP 硬件路径生成边框 JPEG。"
+      ],
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "在「效果」菜单增加边框，可选择拍立得或 135 胶卷样式；胶卷齿孔位于画面上下。",
+            "GR III 与 GR IIIx 固件工作台增加边框开关。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "边框保留原有构图并向外扩展画布，支持 3:2、1:1、4:3、6x7 与 XPan；拍摄、即时回看和相册回放使用同一边框配置。",
+            "通过 ISP/IIP 硬件路径生成边框 JPEG。"
+          ]
+        }
+      ],
+      "notice": "影响 GR III / GR IIIx。需在固件工作台启用边框，再于机内「效果」菜单选择样式。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
+      "version": "2026.10.28.8",
+      "date": "2026-10-28",
+      "title": "新增 LUT 质量报告、竖拍水印与独立 HDF ADJ",
+      "changes": [
+        "新增 LUT / XMP 拟合质量工具，整合 Darkslide 范围保护与 GRMod 灰阶、肤色候选思路，提供量化后色差、来源追溯和独立近似方案。",
+        "日期与胶卷名水印根据本张拍摄方向自动旋转，适配横拍与竖拍。",
+        "ADJ 模式设定新增独立「HDF 模拟」，提供关、弱、中、强四档，并保留全部原厂 ADJ 项；与 MENU 共用设置。",
+        "LUT 工作台采用深色与金色主题，重整导入、质量报告、五胶卷配置与导出区域，适配窄屏。"
+      ],
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "新增 LUT / XMP 拟合质量工具，整合 Darkslide 范围保护与 GRMod 灰阶、肤色候选思路，提供量化后色差、来源追溯和独立近似方案。",
+            "日期与胶卷名水印根据本张拍摄方向自动旋转，适配横拍与竖拍。",
+            "ADJ 模式设定新增独立「HDF 模拟」，提供关、弱、中、强四档，并保留全部原厂 ADJ 项；与 MENU 共用设置。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "LUT 工作台采用深色与金色主题，重整导入、质量报告、五胶卷配置与导出区域，适配窄屏。"
+          ]
+        }
+      ],
+      "notice": "影响 GR III / GR IIIx。当前交付候选已获用户验收通过；LUT 误差报告是软件模型评估，不等于实拍色差标定。拟合工具沿用独立五胶卷 ISP 导出，SD 原始 LUT 路径尚未迁移。回退到不支持此功能的固件前，请先从所有 ADJ 槽与 U 配置移除 HDF 模拟。",
+      "commit": "314ccc2bbf908fb4310a37a3f5b052e99e8aac0e",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40708135785"
+    },
+    {
+      "version": "2026.10.28.7",
+      "date": "2026-10-28",
+      "title": "修复 GR III / IIIx 固件保存下载失败",
+      "changes": [
+        "修复 GR III / GR IIIx 保存固件时构建回执超出网关响应头限制、导致预检通过但下载提示操作失败的问题；完整回执随下载正文传输。",
+        "保留机型、输出版本、配置绑定与最终固件独立回读，下载后还原完整构建校验记录；兼容已有二进制下载客户端。",
+        "下载网关或构建等待失败时显示 HTTP 状态及具体说明，避免错误被统一隐藏成操作失败。"
+      ],
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 GR III / GR IIIx 保存固件时构建回执超出网关响应头限制、导致预检通过但下载提示操作失败的问题；完整回执随下载正文传输。",
+            "保留机型、输出版本、配置绑定与最终固件独立回读，下载后还原完整构建校验记录；兼容已有二进制下载客户端。",
+            "下载网关或构建等待失败时显示 HTTP 状态及具体说明，避免错误被统一隐藏成操作失败。"
+          ]
+        }
+      ],
+      "notice": "已使用 GR III 2.20 与 GR IIIx 1.70 真实文件完成完整原生构建、受限响应头 HTTP 下载及最终版本回读验证；此修复不改变相机运行代码，实机刷入与恢复仍待验证。",
+      "commit": "b3a95de8fb7d3fe8a119d8192843a1d717e81c9f",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40669443187"
+    },
+    {
+      "version": "2026.10.28.6",
+      "date": "2026-10-28",
+      "title": "GR II 支持网页配置 HDF 初始强度",
+      "changes": [
+        "GR II 网页新增 HDF 首次使用强度：关闭、弱、中、强，支持配置导入、撤销/重做，并在保存固件前展示所选初始档位。",
+        "将网页 HDF 初始值绑定到 GR II 大端运行体、独立双页存档及构建校验记录；已有有效机内设置优先，换卷与胶卷重置不改变 HDF。",
+        "首次创建非零 HDF 设置前先通过原厂内存池准入；已有损坏存档、介质错误或无法确认文件不存在时不自动覆盖。"
+      ],
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "GR II 网页新增 HDF 首次使用强度：关闭、弱、中、强，支持配置导入、撤销/重做，并在保存固件前展示所选初始档位。",
+            "将网页 HDF 初始值绑定到 GR II 大端运行体、独立双页存档及构建校验记录；已有有效机内设置优先，换卷与胶卷重置不改变 HDF。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "首次创建非零 HDF 设置前先通过原厂内存池准入；已有损坏存档、介质错误或无法确认文件不存在时不自动覆盖。"
+          ]
+        }
+      ],
+      "notice": "仅影响 GR II 实验版。相关原生、存档、构建与回读验证通过，尚无 GR II 真机验收；本次不是与 GR III 完全同步的完成声明，十槽、现行胶卷目录、ISP 成片色彩及其他工具仍待对齐。",
+      "commit": "b41a768a6829d2e89db31cf654501b938e978336",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/b41a768a6829d2e89db31cf654501b938e978336"
+    },
+    {
+      "version": "2026.10.28.5",
+      "date": "2026-10-28",
+      "title": "修复 GR III / IIIx 固件上传版本限制",
+      "changes": [
+        "解除 GR III / GR IIIx 上传时的固定文件长度及固件版本白名单，按容器结构、机型、校验和及组件版本一致性核验，兼容已验证的 GR III 2.20 与 GR IIIx 1.70。",
+        "更新兼容处理改为根据上传的完整内部版本生成包版本，并支持 GR IIIx；保留已适配运行基线、机型隔离、补丁位置及最终固件独立回读。",
+        "新版本上传的项目重读和原包备份还原同步兼容，界面区分固件结构验证与已登记来源验证，并显示实际输出功能基线。"
+      ],
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "解除 GR III / GR IIIx 上传时的固定文件长度及固件版本白名单，按容器结构、机型、校验和及组件版本一致性核验，兼容已验证的 GR III 2.20 与 GR IIIx 1.70。",
+            "更新兼容处理改为根据上传的完整内部版本生成包版本，并支持 GR IIIx；保留已适配运行基线、机型隔离、补丁位置及最终固件独立回读。",
+            "新版本上传的项目重读和原包备份还原同步兼容，界面区分固件结构验证与已登记来源验证，并显示实际输出功能基线。"
+          ]
+        }
+      ],
+      "notice": "影响 GR III / GR IIIx。输出功能仍基于已适配的 2.10 / 1.60，不包含上传新版的原厂新增功能。相关离线、ARM 和候选回读验证通过；实机刷入及恢复尚未验证，未知机内服务版本或未来格式变化仍可能影响兼容性。",
+      "commit": "84feaa97bf489b4ffde319c08b71c9750bded6f9",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40658889263"
+    },
+    {
+      "version": "2026.10.28.4",
+      "date": "2026-10-28",
+      "title": "修复 SD 自定义目录读取，更新胶卷库",
+      "changes": [
+        "修复 SD 胶卷目录首次读取失败被误当作列表结束的问题：从校验后的文件头读取自定义数量，失败显示错误并支持重试，防止目录静默截断。",
+        "补齐多机型共享构建接口声明，保持各机型原有能力边界与发布检查。",
+        "C41 新增 OptiColour 200、NC500；黑白分组新增 ACROS II 100、Double-X 5222；创意分组新增 LomoChrome Turquoise。",
+        "移除 Makoto Shinkai、Ghibli、1970s 三款漫画效果及 Fn / ADJ 漫画风格调节，迁移旧选择时保留其他胶卷与设置。"
+      ],
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 SD 胶卷目录首次读取失败被误当作列表结束的问题：从校验后的文件头读取自定义数量，失败显示错误并支持重试，防止目录静默截断。",
+            "补齐多机型共享构建接口声明，保持各机型原有能力边界与发布检查。"
+          ]
+        },
+        {
+          "type": "added",
+          "items": [
+            "C41 新增 OptiColour 200、NC500；黑白分组新增 ACROS II 100、Double-X 5222；创意分组新增 LomoChrome Turquoise。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "移除 Makoto Shinkai、Ghibli、1970s 三款漫画效果及 Fn / ADJ 漫画风格调节，迁移旧选择时保留其他胶卷与设置。"
+          ]
+        }
+      ],
+      "notice": "影响 GR III / GR IIIx。新增胶卷为来源明确的近似模拟，未完成实体胶卷及相机标定，无法保证 100% 还原。仅做定向离线测试及发布必需的机型构建检查，未做全量回归与本次实机验收。目录读取缺陷已离线复现修复，尚未确认覆盖用户现场全部成因。",
+      "commit": "8bc3dee4b412d224a122026a985cd2c63658be35",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40653598317"
+    },
+    {
+      "version": "2026.10.28.3",
+      "date": "2026-10-28",
+      "title": "修复 SD 自定义目录读取，更新胶卷库",
+      "changes": [
+        "修复 SD 胶卷目录首次读取失败被误当作列表结束的问题：从校验后的文件头读取自定义数量，失败显示错误并支持重试，防止目录静默截断。",
+        "C41 新增 OptiColour 200、NC500；黑白分组新增 ACROS II 100、Double-X 5222；创意分组新增 LomoChrome Turquoise。",
+        "移除 Makoto Shinkai、Ghibli、1970s 三款漫画效果及 Fn / ADJ 漫画风格调节，迁移旧选择时保留其他胶卷与设置。"
+      ],
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 SD 胶卷目录首次读取失败被误当作列表结束的问题：从校验后的文件头读取自定义数量，失败显示错误并支持重试，防止目录静默截断。"
+          ]
+        },
+        {
+          "type": "added",
+          "items": [
+            "C41 新增 OptiColour 200、NC500；黑白分组新增 ACROS II 100、Double-X 5222；创意分组新增 LomoChrome Turquoise。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "移除 Makoto Shinkai、Ghibli、1970s 三款漫画效果及 Fn / ADJ 漫画风格调节，迁移旧选择时保留其他胶卷与设置。"
+          ]
+        }
+      ],
+      "notice": "影响 GR III / GR IIIx。新增胶卷为来源明确的近似模拟，未完成实体胶卷及相机标定，无法保证 100% 还原。按用户要求只做定向离线测试和构建检查，不做全量回归；目录读取缺陷已离线复现修复，尚未确认覆盖用户现场全部成因。 本次部署在 GR IV 共享链接接口检查失败后回退，未作为线上版本生效。",
+      "commit": "6a4bb9c846f6cfef7d0dc26b1d4c132b9989153a",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40652219088"
+    },
+    {
+      "version": "2026.10.28.2",
+      "date": "2026-10-28",
+      "title": "新增 OptiColour 200 与 NC500",
+      "changes": [
+        "在胶卷库 C41 分组新增 OptiColour 200 与 NC500，支持 GR III / GR IIIx 的机内选择、图标、网页预览与 SD 导出。",
+        "两款胶卷采用独立离线参考及本机 ISP 拟合，保留既有胶卷编号及旧 SD 包、自定义 LUT 的兼容读取。"
+      ],
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "在胶卷库 C41 分组新增 OptiColour 200 与 NC500，支持 GR III / GR IIIx 的机内选择、图标、网页预览与 SD 导出。",
+            "两款胶卷采用独立离线参考及本机 ISP 拟合，保留既有胶卷编号及旧 SD 包、自定义 LUT 的兼容读取。"
+          ]
+        }
+      ],
+      "notice": "依据厂商公开的定性资料建立独立近似模型，非官方 LUT；未完成相机与实体胶卷标定，不承诺 100% 还原。仅完成针对性离线验证及两机型封包，未做全量回归与本次实机验收。 该提交部署因调试组合包体积超限失败并回退，未作为线上版本生效。",
+      "commit": "6b395f616a9aeb59c27179fa9575c11e8fb32558",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40646235364"
+    },
+    {
+      "version": "2026.10.28.1",
+      "date": "2026-10-28",
+      "title": "修复自定义 LUT 在机内胶卷库缺失",
+      "changes": [
+        "修复平台导出的自定义 LUT 未显示在机内「胶卷库」的问题，自定义胶卷追加在内建目录之后，支持名称显示、翻页与选用。",
+        "修复自定义胶卷被误判为已下架胶卷、可能被清理的问题。"
+      ],
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复平台导出的自定义 LUT 未显示在机内「胶卷库」的问题，自定义胶卷追加在内建目录之后，支持名称显示、翻页与选用。",
+            "修复自定义胶卷被误判为已下架胶卷、可能被清理的问题。"
+          ]
+        }
+      ],
+      "notice": "影响 GR III 2.10 与 GR IIIx 1.60 的共享胶卷库菜单。按用户要求完成代码定位与定向离线检查后直接发布，未做本次实机验收及全量回归。",
+      "commit": "213cb7f772788b57363f95bdca652bda1be10a02",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40644028289"
+    },
+    {
+      "version": "2026.10.27.7",
+      "date": "2026-10-27",
+      "title": "修复 ADJ 关机与快切退出卡死",
+      "changes": [
+        "修复 ADJ 影像控制关机及 A/B 快切退出时，迟到的按键事件重新打开选卷页、导致无法正常退出的问题。",
+        "修复漫画/E6胶卷在 A/B 选择页显示为槽位或测试文字的问题。"
+      ],
+      "sections": [
+        {
+          "type": "fixed",
+          "items": [
+            "修复 ADJ 影像控制关机及 A/B 快切退出时，迟到的按键事件重新打开选卷页、导致无法正常退出的问题。",
+            "修复漫画/E6胶卷在 A/B 选择页显示为槽位或测试文字的问题。"
+          ]
+        }
+      ],
+      "notice": "影响 GR III 2.10 与 GR IIIx 1.60 的共享菜单运行时。GR III 的 D2 测试包已由用户实机确认通过；IIIx 完成离线导出检查，未做本次实机验收。正式构建默认关闭专项退出日志。",
+      "commit": "8929bdbb43ff2fcb26dadf7eb53ca881c7219603",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40526640163"
+    },
+    {
       "version": "2026.10.27.6",
       "date": "2026-10-27",
       "title": "修复新增滤镜图标与 ADJ 快切退出",
@@ -19,9 +294,9 @@
         }
       ],
       "notice": "影响 GR III 2.10 与 GR IIIx 1.60 的共享菜单运行时；两款固件已完成离线构建，新增定向用例通过，真机表现待确认。按用户要求直接发布。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "87cc28ae876643d82566bdd2eda6b78193af8c64",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40498799324"
     },
     {
       "version": "2026.10.27.5",

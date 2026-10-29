@@ -17,6 +17,7 @@ extern uint32_t m10v_settings_factory_original(uint32_t,uint32_t);
 extern uint32_t m10v_settings_top_dtor_original(uint32_t);
 extern uint32_t m10v_settings_controller_vtable(void);
 static int load(void *ctx,m10v_library_state *s){(void)ctx;return m10v_camera_library_load(s);}
+static uint32_t extent(void *ctx){(void)ctx;return m10v_sd_camera_directory_extent();}
 static uint32_t item(void *ctx,uint32_t i){(void)ctx;return m10v_sd_camera_directory_item(i);}
 static int install(void *ctx,uint32_t i,uint32_t id,uint32_t slot){
  (void)ctx;m10v_library_state state;
@@ -52,7 +53,7 @@ static int film_name_stamp(void *ctx,uint32_t enabled){
 extern unsigned m10v_zoom_live_slot(void);
 extern int m10v_zoom_live_apply(unsigned);
 static void zoom_ops(m10v_zoom_menu_ops *o){o->load=m10v_zoom_camera_load;o->save=m10v_zoom_camera_save;o->select=m10v_zoom_live_apply;o->current=m10v_zoom_live_slot;}
-static void ops(m10v_settings_ops *o){o->context=0;o->load=load;o->item=item;o->install=install;o->remove=remove_film;o->stamp=stamp;o->film_name_stamp=film_name_stamp;}
+static void ops(m10v_settings_ops *o){o->context=0;o->load=load;o->item=item;o->install=install;o->remove=remove_film;o->stamp=stamp;o->film_name_stamp=film_name_stamp;o->extent=extent;}
 static m10v_settings_controller *page(uint32_t owner,uint32_t i){
  return (m10v_settings_controller *)(uintptr_t)(owner+M10V_SETTINGS_OWNER_BYTES+i*M10V_SETTINGS_CONTROLLER_BYTES);
 }
@@ -172,7 +173,7 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
      *(const uint32_t *)(uintptr_t)(payload+4)!=1)return 0;
   if(raw==0x1b){
    uint32_t retired=0;
-   for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)if(p->state.saved.slots[i].film&&!m10v_directory_name(p->state.saved.slots[i].film))retired=1;
+   for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)if(p->state.saved.slots[i].film&&!M10V_CUSTOM(p->state.saved.slots[i].film)&&!m10v_directory_name(p->state.saved.slots[i].film))retired=1;
    if(!retired)return 0;
   }
   p->pending_source=event;

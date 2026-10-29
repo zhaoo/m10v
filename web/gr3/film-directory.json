@@ -88,6 +88,14 @@
         {
           "id": 292,
           "name": "Lomography"
+        },
+        {
+          "id": 312,
+          "name": "OptiColour 200"
+        },
+        {
+          "id": 313,
+          "name": "NC500"
         }
       ]
     },
@@ -113,7 +121,7 @@
       ]
     },
     {
-      "name": "D76",
+      "name": "黑白",
       "films": [
         {
           "id": 75,
@@ -146,6 +154,14 @@
         {
           "id": 305,
           "name": "CatLABS X Film 80"
+        },
+        {
+          "id": 314,
+          "name": "ACROS II 100"
+        },
+        {
+          "id": 315,
+          "name": "Double-X 5222"
         }
       ]
     },
@@ -177,16 +193,8 @@
           "name": "Aerochrome"
         },
         {
-          "id": 306,
-          "name": "Makoto Shinkai"
-        },
-        {
-          "id": 307,
-          "name": "Ghibli"
-        },
-        {
-          "id": 308,
-          "name": "1970s"
+          "id": 316,
+          "name": "LomoChrome Turquoise"
         }
       ]
     },

@@ -143,17 +143,32 @@ export function applyVersionUnlock(candidate,input){
 }
 
 // GRMod's raised-package + recoverable-updater mechanism, independently
-// implemented for the exact GR III 2.20 import and audited 2.10 build layout.
-// This is a package version, not a claim that the 2.20 runtime has been ported.
+// applied to ABI-pinned III/IIIx builds using the uploaded component version.
+// This changes package versions, not the runtime's feature baseline.
 const GR3_220_IMPORT='5c53760b3b564c87239dbf7f5c94d0f6fd91accd156ec4ba672ebfd6b861793e';
-const UPDATE_220_VERSION=0x0214151c; // 2.20.21.28 > official 2.20.20.28
 const UPDATE_GATE=0x6285dc;
+export function updateCompatibilityPlan(buildSource={}) {
+ // Retain the original internal 2.20 call contract; all new imports carry the
+ // complete version metadata and do not need a release/hash registry.
+ const legacy=buildSource.imported_sha256===GR3_220_IMPORT;
+ if(!buildSource.normalized&&!legacy)return null;
+ const model=buildSource.model||(legacy?'GR III':null);
+ const key=model==='GR III'?'gr3':model==='GR IIIx'?'gr3x':null;
+ need(key&&/^[0-9a-f]{64}$/.test(buildSource.imported_sha256||''),'上传来源机型或摘要无效');
+ const imported=word(buildSource.imported_internal_version||(legacy?'2.20.20.28':''));
+ const current=Math.max(imported,profiles[key].baseline);
+ // Prefer advancing the service byte, retaining the previous 2.20 contract.
+ const next=((current>>>8)&255)<255?current+256:current+1;
+ need(next<=0xffffffff,'上传版本已达到版本字段上限');
+ return {package_version:text(next),runtime_baseline:profiles[key].label,
+  recoverable_updater:true,camera_verified:false,model};
+}
 export function verifyGr3UpdateCompatibility(before,after,buildSource={}){
  need(Buffer.isBuffer(before)&&Buffer.isBuffer(after),'候选必须为 Buffer');
- if(buildSource.imported_sha256!==GR3_220_IMPORT){
-  need(before.equals(after),'无 2.20 来源时禁止修改');return {enabled:false};
- }
- const a=read(before),b=read(after);need(a.model==='gr3'&&b.model==='gr3','2.20 适配仅支持 GR III');baseline(before,a);
+ const plan=updateCompatibilityPlan(buildSource);
+ if(!plan){need(before.equals(after),'无版本兼容来源时禁止修改');return {enabled:false};}
+ const targetVersion=word(plan.package_version);
+ const a=read(before),b=read(after);need(a.model===b.model&&plan.model===(a.model==='gr3'?'GR III':'GR IIIx'),'上传来源与构建机型不一致');baseline(before,a);
  need(JSON.stringify(a.sections)===JSON.stringify(b.sections),'分区布局发生改变');
  const rtos=a.sections.RTOS.offset,cpu=a.sections.CPU.offset;
  need(a.decoded.subarray(rtos+UPDATE_GATE,rtos+UPDATE_GATE+4).equals(Buffer.from('042803e3','hex')),'更新器 preimage 不符');
@@ -161,23 +176,25 @@ export function verifyGr3UpdateCompatibility(before,after,buildSource={}){
  equalOutside(before.subarray(0,128),after.subarray(0,128),[[0x38,4],[0x50,4]],'外层非版本字段发生改变');
  equalOutside(before.subarray(-24),after.subarray(-24),[[12,4],[20,4]],'footer 非目标字段发生改变');
  equalOutside(a.decoded,b.decoded,[[rtos+0x2038,4],[rtos+UPDATE_GATE,4],[cpu+0x7c,4],[cpu+0x90,4],[a.decoded.length-4,4]],'非目标 decoded 字节发生改变');
- need(Object.values(versions(after,b)).every(v=>v===UPDATE_220_VERSION),'2.20 版本副本不一致');
- return {schema:'m10v-gr3-220-update-compatibility/v1',enabled:true,status:'offline_verified',
-  strategy:'raised_components_with_recoverable_updater',package_version:text(UPDATE_220_VERSION),
-  imported_sha256:GR3_220_IMPORT,before_sha256:hash(before),candidate_sha256:hash(after),candidate_bytes:after.length,
+ need(Object.values(versions(after,b)).every(v=>v===targetVersion),'更新版本副本不一致');
+ return {schema:'m10v-gr3-update-compatibility/v2',enabled:true,status:'offline_verified',
+  strategy:'raised_components_with_recoverable_updater',package_version:plan.package_version,
+  imported_sha256:buildSource.imported_sha256,before_sha256:hash(before),candidate_sha256:hash(after),candidate_bytes:after.length,
   updater_patch:{address:'0x536285dc',before:'042803e3',after:'e6ffffea',destination:'0x5362857c'},
   checks:{outer_sum32:0,decoded_sum32:0,cpu_sum32_be:0,non_target_unchanged:true,section_layout_unchanged:true,fresh_decode:true},
-  runtime_baseline:'2.10',camera_verified:false,
-  limitations:['not_a_2.20_runtime_port','physical_update_and_recovery_pending']};
+  runtime_baseline:plan.runtime_baseline,model:plan.model,camera_verified:false,
+  limitations:['not_an_uploaded_runtime_port','physical_update_and_recovery_pending']};
 }
 export function applyGr3UpdateCompatibility(candidate,buildSource={}){
- if(buildSource.imported_sha256!==GR3_220_IMPORT)return {candidate:Buffer.from(candidate),receipt:{enabled:false}};
- const r=read(candidate);need(r.model==='gr3','2.20 适配仅支持 GR III');baseline(candidate,r);
+ const plan=updateCompatibilityPlan(buildSource);
+ if(!plan)return {candidate:Buffer.from(candidate),receipt:{enabled:false}};
+ const targetVersion=word(plan.package_version);
+ const r=read(candidate);need(plan.model===(r.model==='gr3'?'GR III':'GR IIIx'),'上传来源与构建机型不一致');baseline(candidate,r);
  const target=Buffer.from(r.decoded),rtos=r.sections.RTOS.offset,cpu=r.sections.CPU.offset;
  need(target.subarray(rtos+UPDATE_GATE,rtos+UPDATE_GATE+4).equals(Buffer.from('042803e3','hex')),'更新器 preimage 不符');
- target.writeUInt32BE(UPDATE_220_VERSION,rtos+0x2038);target.writeUInt32BE(UPDATE_220_VERSION,cpu+0x90);
+ target.writeUInt32BE(targetVersion,rtos+0x2038);target.writeUInt32BE(targetVersion,cpu+0x90);
  Buffer.from('e6ffffea','hex').copy(target,rtos+UPDATE_GATE);
  target.writeUInt32BE(0,cpu+0x7c);target.writeUInt32BE(-cpuSum(target,cpu)>>>0,cpu+0x7c);repair(target);
- const out=pack(candidate,r,target);out.writeUInt32BE(UPDATE_220_VERSION,0x38);out.writeUInt32BE(UPDATE_220_VERSION,0x50);repair(out);
+ const out=pack(candidate,r,target);out.writeUInt32BE(targetVersion,0x38);out.writeUInt32BE(targetVersion,0x50);repair(out);
  return {candidate:out,receipt:verifyGr3UpdateCompatibility(candidate,out,buildSource)};
 }

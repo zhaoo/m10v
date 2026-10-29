@@ -13,20 +13,24 @@ export function normalizeConfiguration(value=defaultConfiguration()){
  const zoom={write:z.write,slots:[...z.slots],revision:z.revision};
  const hdf=value.hdf===undefined?0:value.hdf;if(!int(hdf,0,3))throw Error('HDF 模拟档位无效');
  const slots=value.slots.map(s=>{
-  if(!(exact(s,['film','grain','soft','halo'])||exact(s,['film','grain','soft'])||exact(s,['film','grain','soft','halo','effects']))||!(int(s.film,1,78)||int(s.film,289,311))||!int(s.grain,0,3)||!int(s.soft,0,3))throw Error('胶卷或质感档位无效');
+  if(!(exact(s,['film','grain','soft','halo'])||exact(s,['film','grain','soft'])||exact(s,['film','grain','soft','halo','effects']))||!(int(s.film,1,78)||(int(s.film,289,305)||int(s.film,309,316)))||!int(s.grain,0,3)||!int(s.soft,0,3))throw Error('胶卷或质感档位无效');
   const h=s.halo??defaultHalo();if(!exact(h,['gain','spread','threshold','profile'])||!int(h.gain,0,8)||!int(h.spread,0,8)||!int(h.threshold,0,8)||!int(h.profile,0,3))throw Error('胶卷光晕参数无效');
   const inputEffects=s.effects??defaultEffects(),oldKeys=['grainSize','leakGain','leakPosition','leakSpread','leakVariation'];
-  if(!(exact(inputEffects,oldKeys)||exact(inputEffects,[...oldKeys,'filmExposure'])||(s.film===289&&exact(inputEffects,[...oldKeys,'filmExposure','charmeraColor']))||(s.film>=306&&s.film<=308&&exact(inputEffects,[...oldKeys,'filmExposure','animeMode']))))throw Error('胶卷质感参数无效');
+  if(!(exact(inputEffects,oldKeys)||exact(inputEffects,[...oldKeys,'filmExposure'])||(s.film===289&&exact(inputEffects,[...oldKeys,'filmExposure','charmeraColor']))))throw Error('胶卷质感参数无效');
   const e={...inputEffects,filmExposure:exact(inputEffects,oldKeys)?0:inputEffects.filmExposure};if(!int(e.filmExposure,0,2)||(s.film===67?e.filmExposure>1:s.film!==68&&e.filmExposure!==0)||!int(e.grainSize,0,2)||!int(e.leakGain,0,8)||!int(e.leakPosition,0,5)||!int(e.leakSpread,0,8)||!int(e.leakVariation,0,1))throw Error('胶卷质感参数无效');
   if(s.film===289){e.charmeraColor=inputEffects.charmeraColor??0;if(!int(e.charmeraColor,0,3))throw Error('Charmera 颜色无效');}
-  if(s.film>=306&&s.film<=308){e.animeMode=inputEffects.animeMode??0;if(!int(e.animeMode,0,3))throw Error('漫画进阶模式无效');}
   return {film:s.film,grain:s.grain,soft:0,halo:{gain:h.profile===0?0:h.gain,spread:h.spread,threshold:h.threshold,profile:h.profile},effects:{...e,grainSize:0,leakGain:0,leakPosition:0,leakSpread:4,leakVariation:0}};
  });
  if(!int(value.stamp,0,2)||!int(value.format,0,3)||!int(value.corner,0,3)||!int(value.color,0,3)||(value.filmNameStamp!==undefined&&typeof value.filmNameStamp!=='boolean'))throw Error('时间戳配置无效');
  return {slots:slots.filter((s,i,list)=>list.findIndex(v=>v.film===s.film)===i),stamp:value.stamp,format:value.format,corner:value.corner,color:value.color,filmNameStamp:value.filmNameStamp??false,hdf,zoom};
 }
+// Explicit restoration migration; new exports still reject retired identities.
+export function migrateRetiredFilms(value){
+ if(!value||!Array.isArray(value.slots))return normalizeConfiguration(value);
+ return normalizeConfiguration({...value,slots:value.slots.filter(s=>!(s?.film>=306&&s.film<=308))});
+}
 export function retainCatalogFilms(value,catalog){
- const configuration=normalizeConfiguration(value),ids=new Set(catalog.map(f=>f.id));
+ const configuration=migrateRetiredFilms(value),ids=new Set(catalog.map(f=>f.id));
  configuration.slots=configuration.slots.filter(s=>ids.has(s.film));return configuration;
 }
 export function migrateSimulationSelection(ids,texture,catalog,current=defaultConfiguration()){
@@ -58,8 +62,8 @@ export function activeExtensions(value){
  const e=normalizeExtensions(value);return ['aspect','level','negativeGrain'].filter(k=>e[k]).concat(e.rawNr.mode==='stock'?[]:['rawNr']);
 }
 export function withNativeLibrary(features){
- const allowed=['film','digitalHdf','timestamp','aspect','level','negativeGrain','rawNr'];
- if(!Array.isArray(features)||features.some(id=>!allowed.includes(id)))throw Error('胶卷库可组合时间戳、画幅、水平仪、负片颗粒和 RAW 降噪；请先移除其他配方或工具');
+ const allowed=['film','digitalHdf','timestamp','aspect','border','level','negativeGrain','rawNr'];
+ if(!Array.isArray(features)||features.some(id=>!allowed.includes(id)))throw Error('胶卷库可组合边框、时间戳、画幅、水平仪、负片颗粒和 RAW 降噪；请先移除其他配方或工具');
  const selected=new Set(['film',...features]);return allowed.filter(id=>selected.has(id));
 }
 
@@ -78,13 +82,12 @@ export function selectNativeFilm(value,slot,film){
  }
  if(film!==s.film||![67,68].includes(film))s.effects.filmExposure=0;
  if(film===289){s.effects.charmeraColor=s.film===289?(s.effects.charmeraColor??0):0;if(s.film!==289)s.grain=0;}else delete s.effects.charmeraColor;
- if(film>=306&&film<=308)s.effects.animeMode=s.film===film?(s.effects.animeMode??0):0;else delete s.effects.animeMode;
  s.film=film;return normalizeConfiguration(c);
 }
 
 export function resetNativeTexture(value,slot){
  const c=normalizeConfiguration(value);if(!Number.isInteger(slot)||slot<0||slot>=c.slots.length)throw Error("槽位无效");
- const s=c.slots[slot];s.grain=0;s.halo.gain=0;s.soft=0;s.effects={...defaultEffects(),filmExposure:s.effects.filmExposure,...(s.film===289?{charmeraColor:s.effects.charmeraColor}: {}),...(s.film>=306&&s.film<=308?{animeMode:0}:{})};return c;
+ const s=c.slots[slot];s.grain=0;s.halo.gain=0;s.soft=0;s.effects={...defaultEffects(),filmExposure:s.effects.filmExposure,...(s.film===289?{charmeraColor:s.effects.charmeraColor}: {})};return c;
 }
 
 // Selection order is the camera order; removing a film retains every other recipe.

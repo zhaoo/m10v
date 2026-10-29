@@ -1,10 +1,10 @@
-import {defaultConfiguration,normalizeConfiguration,migrateSimulationSelection,normalizeRawNr} from './native-library-state.mjs';
+import {defaultConfiguration,normalizeConfiguration,migrateSimulationSelection,normalizeRawNr,migrateRetiredFilms} from './native-library-state.mjs';
 export const extensionFeatures=['halation','digitalHdf','timestamp','aspect','level','negativeGrain','rawNr'];
 // Old custom selections remain recoverable in a separate local-storage backup.
 export function normalizeWorkbenchDraft(draft={},catalog=[],current=defaultConfiguration()) {
  const hdfOnly=draft.profile==='native'&&draft.features?.includes('digitalHdf')&&!draft.features.includes('film');
  const features=[...(hdfOnly?[]:['film']),...extensionFeatures.filter(id=>draft.features?.includes(id)&&!(hdfOnly&&id==='halation'))];
- let configuration=normalizeConfiguration(draft.nativeConfiguration||current);
+ let configuration=migrateRetiredFilms(draft.nativeConfiguration||current);
  let unresolved=Array.isArray(draft.unresolvedSlots)?draft.unresolvedSlots:[];
  const legacy=draft.profile!=='native'&&draft.features?.includes('film');
  if(legacy){const migrated=migrateSimulationSelection(draft.filmIds||[],draft.filmTexture||{},catalog,configuration);configuration=migrated.configuration;unresolved=migrated.unresolved;}

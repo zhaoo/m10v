@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rename, rm, stat, lstat, open } from 'node:fs/promises';
 import path from 'node:path';
-import { inspectOfficial } from './firmware.mjs';
+import { inspectFirmwareImport } from './firmware.mjs';
 
 const hash = (data) => createHash('sha256').update(data).digest('hex');
 const checkId = (id) => {
@@ -52,12 +52,12 @@ export class Store {
     if (info.size > 128 * 1024 * 1024 || (info.mode & 0o222)) throw new Error('unsafe original file');
     const data = await readFile(file);
     if (hash(data) !== id) throw new Error('stored original identity mismatch');
-    inspectOfficial(data);
+    inspectFirmwareImport(data);
     return data;
   }
 
   async importOfficial(data) {
-    const report = inspectOfficial(data);
+    const report = inspectFirmwareImport(data);
     const record = {
       id: report.sha256, sha256: report.sha256, size: report.size,
       model: report.model, public_version: report.public_version,

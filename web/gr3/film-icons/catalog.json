@@ -855,33 +855,6 @@
     "sha256": "1cf62ec23895db519e01e5f019b023186b721ac13b987aa3fb99226bd1a9f4bb"
   },
   {
-    "id": 306,
-    "name": "Makoto Shinkai",
-    "title": "SHINKAI",
-    "code": "ANIME",
-    "color": "#64a8db",
-    "icon_url": "/gr3/film-icons/306-large.png",
-    "sha256": "37684c1a6c3bd0a33aa4035c80605af81f767f30ebbdef940d2b9e35d8e06c9c"
-  },
-  {
-    "id": 307,
-    "name": "Ghibli",
-    "title": "GHIBLI",
-    "code": "ANIME",
-    "color": "#7c9b69",
-    "icon_url": "/gr3/film-icons/307-large.png",
-    "sha256": "39b0beb8791279614182ddd111994b057c5d5b49b38b343a13cdac14bd30f2f4"
-  },
-  {
-    "id": 308,
-    "name": "1970s",
-    "title": "RETRO",
-    "code": "1970s",
-    "color": "#bd8d9b",
-    "icon_url": "/gr3/film-icons/308-large.png",
-    "sha256": "d48e9f7922c8045e80008552e418b68697422d3981e9764ad5dad6ac6c4e2b2f"
-  },
-  {
     "id": 309,
     "name": "Fuji Provia 100F",
     "title": "PROVIA",
@@ -907,5 +880,50 @@
     "color": "#b8954b",
     "icon_url": "/gr3/film-icons/311-large.png",
     "sha256": "8ffc8acc4c423d9a0b70c9be4974cef42398d6f9ca6bba12f9f2bab2a3bafe11"
+  },
+  {
+    "id": 312,
+    "name": "OptiColour 200",
+    "title": "OPTICOLOUR",
+    "code": "200",
+    "color": "#73946b",
+    "icon_url": "/gr3/film-icons/312-large.png",
+    "sha256": "cb6db60c03787e35b936f6a4b86d680781da1a1e2649f7f8dfcdc0273ff1e724"
+  },
+  {
+    "id": 313,
+    "name": "NC500",
+    "title": "WOLFEN",
+    "code": "NC500",
+    "color": "#8c7e4f",
+    "icon_url": "/gr3/film-icons/313-large.png",
+    "sha256": "2605e8fbc53e7295a08f528aea66979fc8a7710f0f1da1cdcdd4297e3593dc2d"
+  },
+  {
+    "id": 314,
+    "name": "ACROS II 100",
+    "title": "ACROS II",
+    "code": "100",
+    "color": "#777b72",
+    "icon_url": "/gr3/film-icons/314-large.png",
+    "sha256": "5fc7f3abac87d1e2c4524f4f9a9dc68f9f4ec64f433908a7bbb9d6c5ea516c88"
+  },
+  {
+    "id": 315,
+    "name": "Double-X 5222",
+    "title": "DOUBLE-X",
+    "code": "5222",
+    "color": "#6a6961",
+    "icon_url": "/gr3/film-icons/315-large.png",
+    "sha256": "a655f9c5cb091057e250e1dfa4f12e85a18d8e5a8a8e148a2d03fdd930eb3ac7"
+  },
+  {
+    "id": 316,
+    "name": "LomoChrome Turquoise",
+    "title": "TURQUOISE",
+    "code": "100-400",
+    "color": "#397f8c",
+    "icon_url": "/gr3/film-icons/316-large.png",
+    "sha256": "892b5a4a0a36075f6abe59c88ba47e11abac4b17787b5d251eb94998e7f5c2ad"
   }
 ]

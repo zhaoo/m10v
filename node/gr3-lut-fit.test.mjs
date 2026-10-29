@@ -14,6 +14,7 @@ test('locally cached GRLife fitter turns a cube into both firmware fit options',
     assert.equal(result.choices.tone.look.curves[0].length, 256);
     assert.equal(result.choices.tone.look.knots[0].length, 33);
     assert.ok(result.choices.tone.note.fitMean < 0.01);
+    assert.match(result.choices.tone.quality.provenance.fitter_sources['../.runtime/grlife/web/recipes/custom-recipe-core.js'],/^[0-9a-f]{64}$/);
   });
 
 test('cube fit rejects wrong filenames and empty inputs', async () => {

@@ -1,11 +1,11 @@
 #include "m10v_tone.h"
 #include "m10v_settings.h"
 #include "m10v_film_directory.h"
-#define CATALOG_LIMIT 256u
+#include "m10v_sd_library.h"
 static int ready(const m10v_settings_ops *o){return o&&o->load&&o->item&&o->install&&o->remove&&o->stamp&&o->film_name_stamp;}
 static uint32_t item(const m10v_settings_ops *o,uint32_t i){
- if(i>=M10V_DIRECTORY_COUNT)return 0;
- uint32_t id=o->item(o->context,i);return id==m10v_directory[i].id?id:0;
+ if(i>=M10V_SD_DIRECTORY_LIMIT)return 0;
+ uint32_t id=o->item(o->context,i);return (i<M10V_DIRECTORY_COUNT?id==m10v_directory[i].id:M10V_CUSTOM(id))?id:0;
 }
 static uint32_t value(const m10v_library_state *s,uint32_t field){
  return field==0?s->stamp:field==1?s->format:field==2?s->corner:field==3?s->color:s->reserved&1u;
@@ -19,7 +19,16 @@ int m10v_settings_open(m10v_settings *p,const m10v_settings_ops *o,uint32_t scre
  if(!m10v_library_valid(&p->saved))return -1;
  p->focus=p->slot=p->index=p->expected=p->value=p->error=p->group=0;
  p->screen=screen==M10V_SETTINGS_FILMS?M10V_SETTINGS_CATALOG:screen;
- if(p->screen==M10V_SETTINGS_CATALOG){while(p->index+1<M10V_DIRECTORY_COUNT&&!item(o,p->index))p->index++;p->expected=item(o,p->index);if(!p->expected)p->error=M10V_SETTINGS_EMPTY;}
+ if(p->screen==M10V_SETTINGS_CATALOG){
+  /* Cache the extent on open; browsing must not scan the entire card per key. */
+  p->group=o->extent?o->extent(o->context):M10V_DIRECTORY_COUNT;
+  if(!o->extent)while(p->group<M10V_SD_DIRECTORY_LIMIT&&item(o,p->group))p->group++;
+  if(p->group<M10V_DIRECTORY_COUNT||p->group>M10V_SD_DIRECTORY_LIMIT){
+   p->group=M10V_DIRECTORY_COUNT;p->error=M10V_SETTINGS_SAVE_FAILED;return 0;
+  }
+  while(p->index+1<p->group&&!item(o,p->index))p->index++;
+  p->expected=item(o,p->index);if(!p->expected)p->error=M10V_SETTINGS_EMPTY;
+ }
  if(screen==M10V_SETTINGS_AB){p->slot=1;p->index=5;}if(screen==M10V_SETTINGS_NAME)p->value=p->saved.reserved&1u;return 0;
 }
 void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key){
@@ -33,7 +42,7 @@ void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key)
     if(o->load(o->context,&fresh)<0||!m10v_library_valid(&fresh)){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
     for(uint32_t b=0;b<sizeof(fresh);b++)((uint8_t *)&p->saved)[b]=((const uint8_t *)&fresh)[b];
     uint32_t count=m10v_library_count(&fresh),slot=0;
-    while(slot<count&&m10v_directory_name(fresh.slots[slot].film))slot++;
+    while(slot<count&&(m10v_directory_name(fresh.slots[slot].film)||M10V_CUSTOM(fresh.slots[slot].film)))slot++;
     if(slot==count){p->error=0;return;}
     if(o->remove(o->context,slot)!=0){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
    }
@@ -51,9 +60,22 @@ void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key)
   if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_CLOSED;p->error=0;}
   if(key==M10V_KEY_OK&&p->focus>=2)p->value=p->focus-1;
  }else if(p->screen==M10V_SETTINGS_CATALOG){
-  uint32_t first=0,end=M10V_DIRECTORY_COUNT;
-  if(p->index<first||p->index>=end)return;
+  /* Retry a failed header read on user input, rather than freezing a truncated
+   * directory for the lifetime of the page. No storage mutations occur here. */
+  if(o->extent&&(p->error==M10V_SETTINGS_SAVE_FAILED||p->error==M10V_SETTINGS_EMPTY)&&key!=M10V_KEY_BACK){
+   uint32_t extent=o->extent(o->context);
+   if(extent<M10V_DIRECTORY_COUNT||extent>M10V_SD_DIRECTORY_LIMIT)return;
+   p->group=extent;
+   if(p->index>=extent)p->index=0;
+   while(p->index+1<extent&&!item(o,p->index))p->index++;
+   p->expected=item(o,p->index);
+   p->error=p->expected?0:M10V_SETTINGS_EMPTY;
+   return; /* Refresh only; never install a newly discovered film on this key. */
+  }
   if(key==M10V_KEY_BACK){p->screen=M10V_SETTINGS_CLOSED;p->error=0;return;}
+  uint32_t first=0,end=p->group;
+  if(end<M10V_DIRECTORY_COUNT||end>M10V_SD_DIRECTORY_LIMIT)return;
+  if(p->index<first||p->index>=end)return;
   uint32_t i=p->index;
   if(key==M10V_KEY_LEFT&&i>first)i--;
   if(key==M10V_KEY_RIGHT)i++;

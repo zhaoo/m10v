@@ -319,9 +319,9 @@
     "third_party/anime-e6/sources.json": "146168a427891498271b778bac5ac753742a2f59da0a349e4159189a1e99acc6",
     "third_party/anime-e6/Film-Luts-LICENSE": "df194a15bf69c2dc16be81eddce0b1a6ee68d9fc418f33abc29952a4d6c9e878",
     "third_party/anime-e6/fuji_provia_100f.cube": "96952f28c5f407d9978cd8dd015140bc4b1224ef87f0c49151f1105ee1740d2d",
-    "scripts/fit_gr3_anime_e6_native.py": "8fe90bdd3fedd1de3edae867522ca74c29b88f11835e2b0ce6599dce72909f91",
+    "scripts/fit_gr3_anime_e6_native.py": "9e3e74865ef19712c8bd937d3575eda6c5c1c530ef71f151c8112994f588c176",
     "scripts/verify_gr3_anime_e6_reference.py": "3f75bcedb02a257508d8db5468073a9140e7ebc5e2563fbf42e56f3ee912e05e",
-    "scripts/fit_gr3_native_film_targets.py": "5048042fd5ce76df35715179f4a3a50e523b92dbdcafc6c6abf69a01312dad0b",
+    "scripts/fit_gr3_native_film_targets.py": "d21a818bed726ec3737308da0fe83435a2cade2d546438373bdabcdca6a5fa9c",
     "native/gr3/native-film-fit-targets.json": "022ee1020221c5dd0dd06c9bfb046eb55087a10733bfe4ed5c4ba5e16c75f020",
     "web/gr3/anime-e6-luts.json": "cb638debfba7250e261e7a526bd7566824316bbb22369cd0c5a0afb1453fb44b"
   },

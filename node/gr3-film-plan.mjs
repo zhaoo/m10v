@@ -1,3 +1,4 @@
+import {validateQualityBinding} from './gr3-fit-binding.mjs';
 import { readFileSync } from 'node:fs';
 
 const catalog = JSON.parse(readFileSync(new URL('../web/gr3/film-catalog.json', import.meta.url))).looks;
@@ -37,7 +38,8 @@ function fittedFilm(entry) {
   }
   if (entry.iconPixelsBase64 && (!/^[A-Za-z0-9+/]{8534}==$/.test(entry.iconPixelsBase64) ||
     Buffer.from(entry.iconPixelsBase64, 'base64').length !== 6400)) throw new Error('invalid LUT icon');
-  return { ...entry, home: null };
+  validateQualityBinding(entry,entry.quality);
+  return { ...entry, assessment:entry.quality?'assessed':'legacy-unassessed', home: null };
 }
 
 export function assignFilmSlots(ids, library = []) {

@@ -32,6 +32,9 @@ static inline uint32_t m10v_ab_caption(uint32_t choice,uint32_t film){
  static const uint16_t stock[12]={4,268,269,270,271,272,273,274,275,276,277,278};
  if(choice>=M10V_TONE_CHOICES)return 4;
  if(m10v_ab_slot(choice)>=M10V_SLOT_COUNT)return choice<12?stock[choice]:4;
+ if(M10V_EXTRA_FILM(film))return M10V_EXTRA_FILM_NAME_FIRST+film-314;
+ if(M10V_C41(film))return M10V_C41_NAME_FIRST+film-312;
+ if(M10V_ANIME_E6(film))return 1142+film-M10V_ANIME_FIRST;
  if(M10V_D76(film))return 1130+film-M10V_D76_FIRST;
  if(film==M10V_5213_ID)return 1128;
  if(M10V_STYLE(film))return 1104+film-M10V_STYLE_FIRST;

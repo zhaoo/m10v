@@ -83,7 +83,7 @@
     {
       "id": 73,
       "key": "fuji-c200",
-      "name": "富士 C200",
+      "name": "\u5bcc\u58eb C200",
       "ascii_name": "Fuji C200",
       "iso": 200,
       "grain": 1,
@@ -233,7 +233,7 @@
     "third_party/spectral-film-lut/src/spectral_film_lut/negative_film/kodak_aerocolor.py": "921fd6115173e9ed5211af0cc394ad044169798d747afa4e3e33052fab4ecd63",
     "third_party/spectral-film-lut/src/spectral_film_lut/negative_film/kodak_5203.py": "2afd920603e8f01fe046e609b63f0bf9f84d7939d9fe834002514b4d6da50005",
     "scripts/fit_gr3_newstocks_native.py": "44158f54acc89995c3093692aafc92c81dbed8dfaacf1bc6daa629394fd209b7",
-    "scripts/fit_gr3_native_film_targets.py": "5048042fd5ce76df35715179f4a3a50e523b92dbdcafc6c6abf69a01312dad0b",
+    "scripts/fit_gr3_native_film_targets.py": "d21a818bed726ec3737308da0fe83435a2cade2d546438373bdabcdca6a5fa9c",
     "native/gr3/native-film-fit-targets.json": "022ee1020221c5dd0dd06c9bfb046eb55087a10733bfe4ed5c4ba5e16c75f020"
   },
   "limits": "Interpolation/native fit errors measure only encoding against these designed display targets. Actual film error is unknown; no scene/IR/GR3 camera calibration.",

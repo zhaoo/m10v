@@ -159,9 +159,22 @@ def generate():
  anime_pixels=bytearray()
  for spec in json.loads((ROOT/'web/gr3/anime-e6-luts.json').read_text())['stocks']:
   im=box_icon(spec['name'],spec['id'],spec=spec);raw=im.tobytes();anime_pixels+=raw
+  if spec['id']<309:continue
   im.save(out/f"{spec['id']}.png",optimize=True);box_icon(spec['name'],spec['id'],160,spec).save(out/f"{spec['id']}-large.png",optimize=True)
   meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
  (ROOT/'native/gr3/m10v_anime_e6.rgba').write_bytes(anime_pixels)
+ c41_pixels=bytearray()
+ for spec in json.loads((ROOT/'web/gr3/c41-luts.json').read_text())['stocks']:
+  im=box_icon(spec['name'],spec['id'],spec=spec);raw=im.tobytes();c41_pixels+=raw
+  im.save(out/f"{spec['id']}.png",optimize=True);box_icon(spec['name'],spec['id'],160,spec).save(out/f"{spec['id']}-large.png",optimize=True)
+  meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
+ (ROOT/'native/gr3/m10v_c41.rgba').write_bytes(c41_pixels)
+ extra_pixels=bytearray()
+ for spec in json.loads((ROOT/'web/gr3/extra-films-luts.json').read_text())['stocks']:
+  im=box_icon(spec['name'],spec['id'],spec=spec);raw=im.tobytes();extra_pixels+=raw
+  im.save(out/f"{spec['id']}.png",optimize=True);box_icon(spec['name'],spec['id'],160,spec).save(out/f"{spec['id']}-large.png",optimize=True)
+  meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
+ (ROOT/'native/gr3/m10v_extra_films.rgba').write_bytes(extra_pixels)
  (out/'catalog.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2)+'\n')
  # Include every sparse identity and custom artwork in the visual inventory.
  sheet=Image.new('RGBA',(1200,((len(meta)+10)//10)*130),'#171a18')

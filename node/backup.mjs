@@ -1,7 +1,7 @@
 // Strict four-member computer-side backup. No camera recovery is implied.
 import { createHash } from 'node:crypto';
 import { inflateRawSync } from 'node:zlib';
-import { inspectOfficial } from './firmware.mjs';
+import { inspectFirmwareImport } from './firmware.mjs';
 
 const ORIGINAL = 'original/fwdc239b.bin';
 const PROJECT = 'project.json';
@@ -145,7 +145,7 @@ function validateRows(rows) {
       entry.sha256 !== hash(rows[name]) || entry.size !== rows[name].length) fail('backup member hash or length differs');
   }
   if (!rows[NOTICE].equals(INSTRUCTIONS)) fail('backup recovery notice differs');
-  const report = inspectOfficial(rows[ORIGINAL]);
+  const report = inspectFirmwareImport(rows[ORIGINAL]);
   const record = parseCanonical(rows[PROJECT]);
   const expected = {
     id: report.sha256, sha256: report.sha256, size: report.size,
@@ -157,7 +157,7 @@ function validateRows(rows) {
 }
 
 export function createBackup(original) {
-  const report = inspectOfficial(original);
+  const report = inspectFirmwareImport(original);
   const record = {
     id: report.sha256, sha256: report.sha256, size: report.size,
     model: report.model, public_version: report.public_version,

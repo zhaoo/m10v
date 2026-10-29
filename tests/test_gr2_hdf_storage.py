@@ -62,16 +62,21 @@ class Gr2HdfStorageTests(unittest.TestCase):
             result=probe_fat_directory(code,entries=entries,read_error=error,short_read=short,native_runtime=runtime,cache_boundary=True,hdf=True)
             self.assertEqual(result['native_absent_return'],expected);self.assertTrue(result['pool_restored'])
 
-    def test_hdf_first_initialization_requires_exact_absence_and_keeps_corrupt_or_unreadable_banks(self):
+    def _assert_first_initialization(self,strength):
         from scripts.build_gr2_runtime import build_gr2_runtime
         from unicorn import UC_HOOK_CODE,arm_const as r
-        with tempfile.TemporaryDirectory() as folder:runtime=build_gr2_runtime(component('gr2','b01firm8'),{},Path(folder))
+        from scripts.build_gr2_runtime import configuration_state
+        configuration=configuration_state({})[0];configuration['hdf']=strength
+        with tempfile.TemporaryDirectory() as folder:runtime=build_gr2_runtime(component('gr2','b01firm8'),configuration,Path(folder))
+        self.assertEqual(runtime['initial_hdf_strength'],strength)
         self.assertIn('gr2_hdf_initialize_state',runtime['symbols'])
-        u=runtime_tests.Gr2RuntimeBuildTests.machine(self,runtime);files={};writes=[];absence=[];behavior={'ready':1,'absent':1,'fail':False}
+        u=runtime_tests.Gr2RuntimeBuildTests.machine(self,runtime);files={};writes=[];absence=[];behavior={'ready':1,'absent':1,'fail':False,'pool':1}
         paths=['H:/M10VHD0.BIN','H:/M10VHD1.BIN']
         def boundary(uc,address,size,unused):
             if address==runtime['symbols']['gr2_ui_storage_ready']:value=behavior['ready']
             elif address==runtime['symbols']['gr2_hdf_journals_absent']:absence.append(True);value=behavior['absent']
+            elif address==runtime['symbols']['gr2_hdf_prepare_pool']:
+                self.assertEqual(uc.reg_read(r.UC_ARM_REG_R0),strength);value=behavior['pool']
             else:
                 path=bytes(uc.mem_read(uc.reg_read(r.UC_ARM_REG_R0),24)).split(b'\0',1)[0].decode();self.assertIn(path,paths)
                 buffer=uc.reg_read(r.UC_ARM_REG_R1);count=uc.reg_read(r.UC_ARM_REG_R2)
@@ -81,7 +86,7 @@ class Gr2HdfStorageTests(unittest.TestCase):
                 else:
                     writes.append(path);files[path]=bytes(uc.mem_read(buffer,count));value=-1 if behavior['fail'] else count
             uc.reg_write(r.UC_ARM_REG_R0,value&0xffffffff);uc.reg_write(r.UC_ARM_REG_PC,uc.reg_read(r.UC_ARM_REG_LR))
-        for name in ('gr2_ui_storage_ready','gr2_hdf_journals_absent','gr2_file_read','gr2_file_write'):
+        for name in ('gr2_ui_storage_ready','gr2_hdf_journals_absent','gr2_file_read','gr2_file_write','gr2_hdf_prepare_pool'):
             u.hook_add(UC_HOOK_CODE,boundary,begin=runtime['symbols'][name],end=runtime['symbols'][name])
         call=lambda:runtime_tests.Gr2RuntimeBuildTests.call(self,u,runtime['symbols']['gr2_hdf_initialize_state'],[])
         for ready,absent,existing,expected in ((0,1,{},0),(1,0,{paths[0]:b'broken'},0),(1,-1,{},0),(1,1,{},1)):
@@ -90,8 +95,23 @@ class Gr2HdfStorageTests(unittest.TestCase):
             self.assertEqual(writes,[paths[1]] if expected else [])
             if not ready:self.assertEqual(absence,[])
             if expected:
-                raw=files[paths[1]];self.assertEqual(struct.unpack('<6I',raw),(0x31464448,1,1,0,0,zlib.crc32(raw[:20])))
+                raw=files[paths[1]];self.assertEqual(struct.unpack('<6I',raw),(0x31464448,1,1,strength,0,zlib.crc32(raw[:20])))
                 writes.clear();absence.clear();behavior['absent']=0;self.assertEqual(call(),1);self.assertEqual(writes,[]);self.assertEqual(absence,[])
+
+        if strength:
+            # A configured first-use grade must be admitted before creating a
+            # journal. A valid existing grade still wins over compiled defaults.
+            old=struct.pack('<5I',0x31464448,1,2,0,0);old+=struct.pack('<I',zlib.crc32(old))
+            files.clear();files[paths[0]]=old;writes.clear();behavior.update(absent=0,pool=0)
+            self.assertEqual(call(),1);self.assertEqual(files[paths[0]],old);self.assertEqual(writes,[])
+            files.clear();behavior['absent']=1;self.assertEqual(call(),0);self.assertEqual(writes,[])
+
+    def test_hdf_first_initialization_requires_exact_absence_and_keeps_corrupt_or_unreadable_banks(self):
+        self._assert_first_initialization(0)
+
+    def test_web_hdf_initial_strength_is_used_only_for_proven_absent_journals_after_pool_admission(self):
+        for strength in (1,2,3):
+            with self.subTest(strength=strength):self._assert_first_initialization(strength)
 
     def test_native_hdf_file_bridge_admits_only_exact_independent_root_names(self):
         from scripts.build_gr2_runtime import build_gr2_runtime

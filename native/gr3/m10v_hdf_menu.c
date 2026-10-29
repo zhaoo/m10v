@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "m10v_debug.h"
+#include "m10v_hdf_state.h"
 #ifndef M10V_BORDER_ENABLED
 #define M10V_BORDER_ENABLED 0
 #endif
@@ -34,11 +35,13 @@ typedef uint32_t (*fn2)(uint32_t,uint32_t);
 typedef uint32_t (*fn3)(uint32_t,uint32_t,uint32_t);
 typedef struct {uint8_t base[0x158];uint32_t widgets[WORDS],count,value,saved,error,root;
 #if M10V_BORDER_ENABLED
+ uint8_t hdf_cache_reserved[sizeof(m10v_hdf_ui)];
  uint32_t focus;m10v_border_cache border;uint32_t child;
 #endif
 } page;
 _Static_assert(sizeof(page)<=0x1c0,"HDF owned controller capacity");
 #if M10V_BORDER_ENABLED
+_Static_assert(offsetof(page,hdf_cache_reserved)==M10V_HDF_CACHE_OFFSET,"HDF cache placement");
 _Static_assert(offsetof(page,border)==M10V_BORDER_CACHE_PAGE_OFFSET,"border cache placement");
 _Static_assert(M10V_HDF_OWNER_OFFSET+offsetof(page,border)==M10V_BORDER_CACHE_OWNER_OFFSET,"border cache owner placement");
 #endif
@@ -59,11 +62,11 @@ static void clear(page *p){
 static void draw(page *p){
 #if M10V_BORDER_ENABLED
  uint32_t border=!p->root&&p->child;
- caption(p->widgets[2],p->root?1140:border?1150:970);caption(p->widgets[3],p->root?941:971);
+ caption(p->widgets[2],p->root?1140:border?1155:970);caption(p->widgets[3],p->root?941:971);
  for(uint32_t i=0;i<4;i++){
   uint32_t visible=p->root?i<(M10V_HDF_ENABLED?2u:1u):i<(border?3u:4u);
   ((fn2)0x533ad3c0u)(p->widgets[4+i],visible);
-  uint32_t id=p->root?(M10V_HDF_ENABLED&&i==0?1141:1150):border?(i==0?972:i==1?1151:1152):972+i;
+  uint32_t id=p->root?(M10V_HDF_ENABLED&&i==0?1141:1155):border?(i==0?972:i==1?1156:1157):972+i;
   caption(p->widgets[4+i],id);
   ((fn2)0x5339658cu)(p->widgets[4+i],(p->root?p->focus==i:p->value==i)?10:31);
  }
@@ -79,15 +82,22 @@ static void draw(page *p){
  caption(p->widgets[8],p->error?976:977);
  ((fn1)0x533ad308u)(p->widgets[0]);
 }
+void m10v_hdf_menu_cache_init(uint32_t owner){
+ m10v_hdf_ui *p=(m10v_hdf_ui *)(uintptr_t)(owner+M10V_HDF_OWNER_OFFSET+M10V_HDF_CACHE_OFFSET);
+ for(uint32_t i=0;i<sizeof(*p)/4;i++)((uint32_t *)p)[i]=0;
+ p->magic=M10V_HDF_CACHE_MAGIC;
+}
 uint32_t m10v_hdf_menu_top_ctor(uint32_t owner){
  m10v_hdf_menu_parent_ctor(owner);page *p=(page *)(uintptr_t)(owner+M10V_HDF_OWNER_OFFSET);
- for(uint32_t i=0;i<sizeof(*p);i++)((uint8_t *)p)[i]=0;
+ for(uint32_t i=0;i<0x1c0u;i++)((uint8_t *)p)[i]=0;
+ m10v_hdf_menu_cache_init(owner);
  ((fn1)0x5316c8d4u)(ptr(p));*(uint32_t *)p=m10v_hdf_menu_vtable();return owner;
 }
 uint32_t m10v_hdf_menu_destroy(page *p){
  ((fn1)0x5316ce8cu)(ptr(p));clear(p);((fn1)0x5316c774u)(ptr(p));return ptr(p);
 }
 uint32_t m10v_hdf_menu_top_dtor(uint32_t owner){
+ ((m10v_hdf_ui *)(uintptr_t)(owner+M10V_HDF_OWNER_OFFSET+M10V_HDF_CACHE_OFFSET))->magic=0;
  m10v_hdf_menu_destroy((page *)(uintptr_t)(owner+M10V_HDF_OWNER_OFFSET));return m10v_hdf_menu_parent_dtor(owner);
 }
 uint32_t m10v_hdf_menu_factory(uint32_t factory,uint32_t route){

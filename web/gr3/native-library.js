@@ -1,9 +1,10 @@
+import {unwrapFirmwareDownload} from './firmware-download.mjs';
 import {isGr3Family,modelCapabilities} from './model-capabilities.mjs';
 import {renderZoomControls,validateZoomControls} from './zoom-controls.mjs';
 import {normalizeVersionUnlock,assertVersionUnlockReceipt} from './version-unlock-state.mjs';
 import {createFilmPreview} from './preview-controller.mjs';
 import {enhanceFilmSelect} from './film-picker.mjs';
-import {defaultConfiguration,normalizeConfiguration,configurationForModel,prepareZoomConfigurationForBuild,selectNativeFilm,toggleNativeFilm,resetNativeTexture,retainCatalogFilms} from './native-library-state.mjs';
+import {defaultConfiguration,normalizeConfiguration,configurationForModel,prepareZoomConfigurationForBuild,selectNativeFilm,toggleNativeFilm,resetNativeTexture,retainCatalogFilms,migrateRetiredFilms} from './native-library-state.mjs';
 export function mountNativeLibrary(root=document,{model='gr3',showZoom=true,defaultZoomWrite=false,onInspect=()=>{},onChange=()=>{},onEditStart=()=>{},onEditCommit=()=>{}}={}) {
 const selectionLimit=()=>modelCapabilities(sourceModel).filmSlots;
 const catalogApi=model==='gr4'?'/api/gr4/native-library/catalog':'/api/gr3/native-library/catalog';
@@ -15,7 +16,7 @@ const storageKey=model==='gr4'?'m10v-gr4-native-library-v1':'m10v-native-library
 const $=s=>root.querySelector(s),levels=['关闭','弱','中','强'];
 let configuration=defaultConfiguration(model),active=0,films=[],project=null,token='',busy=false,abort=null,urls=[],unresolved=[],sourceModel=model;
 configuration.zoom.write=defaultZoomWrite&&isGr3Family(model);
-try{const saved=localStorage.getItem(storageKey);if(saved)configuration=normalizeConfiguration(JSON.parse(saved));}catch{}
+try{const saved=localStorage.getItem(storageKey);if(saved)configuration=migrateRetiredFilms(JSON.parse(saved));}catch{}
 configuration=configurationForModel(configuration,sourceModel);
 // Retired M10V sketches migrate by slot; their numeric IDs remain firmware-compatible.
 
@@ -65,7 +66,6 @@ function render(){
  if(pixelFigure){pixelFigure.hidden=film!==290;if(film===290){pixelPreview??=createFilmPreview();pixelPreview.request(pixelFigure.querySelector('canvas'),{film:290},error=>{pixelFigure.querySelector('figcaption').textContent=error;});}}
  onInspect(films.find(f=>f.id===film),true);
  const label=$('#active-slot-label');if(label)label.textContent=`已选 ${active+1} · ${films.find(f=>f.id===film)?.name||'载入中'}`;
- if($('#anime-controls')){$('#anime-controls').hidden=!(film>=306&&film<=308);$('#effect-animeMode').value=String(configuration.slots[active].effects.animeMode??0);$('#effect-animeMode').disabled=busy;}
  if($('#charmera-controls')){$('#charmera-controls').hidden=film!==289;$('#effect-charmeraColor').value=String(configuration.slots[active].effects.charmeraColor??0);$('#effect-charmeraColor').disabled=busy;}
  $('#halo-controls').hidden=halationWrite||![33,67].includes(film);
  $('#red-controls').hidden=![67,68].includes(film);
@@ -105,13 +105,12 @@ function toggleFilm(id){
  }catch(error){const status=$('#film-selection-status');if(status)status.textContent=error.message;renderFilms();}
 }
 async function jsonResponse(r){const data=await r.json();if(!r.ok)throw Error(data.error||`请求失败 ${r.status}`);return data;}
-function post(url,value,signal){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-M10V-Token':token},body:JSON.stringify(value),signal});}
+async function post(url,value,signal){const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-M10V-Token':token,...(url.endsWith('/build')?{Accept:'multipart/form-data'}:{})},body:JSON.stringify(value),signal});return unwrapFirmwareDownload(response);}
 function setBusy(value){busy=value;$('#cancel').hidden=!value||!abort;render();}
 async function importSource(file){setBusy(true);message('正在核对官方固件…');try{const result=file?await jsonResponse(await fetch('/api/import',{method:'POST',headers:{'X-M10V-Token':token},body:file})):await jsonResponse(await post('/api/gr3/native-library/import-official',{}));project=result.project_id;sourceModel=result.model==='GR IIIx'?'gr3x':'gr3';configuration=configurationForModel(configuration,sourceModel);$('#source-status').textContent=`✓ 官方包已核验 · ${sourceModel==='gr3x'?'GR IIIx 1.60':'GR III 2.10'}`;message('官方包已就绪，可生成实机测试候选。');}catch(e){project=null;$('#source-status').textContent='官方包未通过核验';message(e.message,true);}finally{setBusy(false);}}
 for(const k of ['gain','spread','threshold']){$('#halo-'+k).onpointerdown=onEditStart;$('#halo-'+k).onkeydown=onEditStart;$('#halo-'+k).onpointerup=onEditCommit;$('#halo-'+k).onkeyup=onEditCommit;$('#halo-'+k).onchange=onEditCommit;}
 for(const k of ['gain','spread','threshold'])$('#halo-'+k).oninput=()=>{configuration.slots[active].halo[k]=Number($('#halo-'+k).value);$('#halo-'+k+'-value').textContent=$('#halo-'+k).value+'/8';invalidate();};
 for(const k of ['filmExposure'])$('#effect-'+k).onchange=()=>{configuration.slots[active].effects[k]=Number($('#effect-'+k).value);invalidate();render();};
-if($('#effect-animeMode'))$('#effect-animeMode').onchange=()=>{configuration.slots[active].effects.animeMode=Number($('#effect-animeMode').value);invalidate();render();};
 if($('#effect-charmeraColor'))$('#effect-charmeraColor').onchange=()=>{configuration.slots[active].effects.charmeraColor=Number($('#effect-charmeraColor').value);invalidate();render();};
 $('#reset-texture').onclick=()=>{configuration=resetNativeTexture(configuration,active);invalidate();render();};
 $('#film-group').onchange=renderFilms;

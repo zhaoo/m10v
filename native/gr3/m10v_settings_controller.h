@@ -24,6 +24,9 @@ typedef struct {
  uint32_t pending_source;
  uint16_t zoom_mm[2];
  uint32_t zoom_flags;
+ uint32_t power_off_pending; /* UI MAIN switch latch; never persisted. */
+ uint32_t library_initialized; /* Successful boot migration/cache load, owner lifetime only. */
+ uint32_t ab_exit_source; /* Queued return to LiveView still owns this ADJ source. */
 } m10v_settings_controller;
 _Static_assert(sizeof(m10v_native_ab_host)<=sizeof(m10v_settings),"exclusive host state capacity");
 #define M10V_SETTINGS_OWNER_BYTES 0x13bcu

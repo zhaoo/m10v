@@ -14,6 +14,22 @@ EVENTS.update({85:'ab.disp.route',86:'ab.setup.navigate',87:'ab.switch.result',8
 EVENTS.update({210:'zoom.set.before',211:'zoom.set.after',212:'zoom.native.assert'})
 EVENTS.update({208:'ab.dispatch.physical-down',209:'ab.dispatch.fallback'})
 EVENTS.update({97:'ab.display.snapshot',98:'ab.display.return'})
+EVENTS.update(dict(enumerate([
+    'adj.event.before','adj.event.after','adj.restore.before',
+    'adj.restore.refresh.before','adj.restore.refresh.after',
+    'adj.restore.position.before','adj.restore.position.after',
+    'adj.exit.before','adj.exit.after','live.enter.before','live.enter.native.after',
+    'live.init.factory.before','live.init.factory.after','live.init.reconcile.before',
+    'live.init.reconcile.after','live.init.load.before','live.init.load.after',
+    'live.enter.return','ab.live.before','ab.live.navigate.before','ab.live.navigate.after',
+    'dispatch.before','dispatch.after','selector.before','selector.after',
+    'live.leave.before','live.leave.after','live.destroy.before','live.destroy.after',
+    'adj.changed.suppressed','adj.refresh.before','adj.refresh.after',
+    'live.event.before','live.event.after','adj.exit.native.before',
+    'adj.destroy.before','adj.destroy.after','adj.changed.native.before',
+    'live.pair.before','live.pair.after'],230)))
+EVENTS.update({270:'ab.entry.blocked-closing',271:'ab.a1.native-pass',
+               272:'ab.close.pending',273:'ab.close.live-entered'})
 EVENTS.update({102:'capture.rejected',121:'capture.image',125:'capture.request.identity',126:'capture.raw.lifetime',122:'capture.cpu-samples.before',
                123:'capture.cpu-samples.after',124:'capture.layout'})
 PROFILE_STAGES={1:'adapter.enter',2:'settings.before',3:'settings.after',4:'allocation.after',

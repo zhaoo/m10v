@@ -22,11 +22,13 @@ def generate():
  if len(names)!=78:raise ValueError('film catalog differs')
  styles=json.loads((ROOT/'web/gr3/style-filters-luts.json').read_text())['stocks']
  specs=[(i,name,None) for i,name in enumerate(names,1)]+[(289,'Kodak Charmera',None),(290,'方块世界',None)]+[(v['id'],v['name'],v) for v in styles]+[(298,'5213',None)]+[(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/d76-luts.json').read_text())['stocks']]
- specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/anime-e6-luts.json').read_text())['stocks']]
+ specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/anime-e6-luts.json').read_text())['stocks'] if v['id']>=309]
+ specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/c41-luts.json').read_text())['stocks']]
+ specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/extra-films-luts.json').read_text())['stocks']]
  rows=['static const struct { uint8_t brand,main,sub,header,color,ink,accent; } box_cards[]={'];palette=[];words=[]
  # Camera-only artwork identities. Stable 40px icons, renderer records and LUTs
  # retain their existing byte identities.
- identities={33:('CINESTILL','800T','TUNGSTEN'),66:('KODAK','5207','250D'),62:('KODAK','5219','500T'),78:('KODAK','5203','50D'),298:('KODAK','5213','200T'),77:('KODAK','AEROCOLOR IV','2460'),
+ identities={314:('FUJIFILM','ACROS II','100'),315:('KODAK','DOUBLE-X','5222'),316:('LOMOGRAPHY','TURQUOISE','100-400'),312:('OPTIK','OPTICOLOUR','200'),313:('ORWO','WOLFEN','NC500'),33:('CINESTILL','800T','TUNGSTEN'),66:('KODAK','5207','250D'),62:('KODAK','5219','500T'),78:('KODAK','5203','50D'),298:('KODAK','5213','200T'),77:('KODAK','AEROCOLOR IV','2460'),
  69:('KODAK','PORTRA','160'),37:('KODAK','PORTRA','400'),70:('FUJIFILM','INDUSTRIAL','100'),73:('FUJIFILM','C200','200'),56:('FUJIFILM','SUPERIA','200'),36:('FUJIFILM','PRO 400H','400'),35:('KODAK','GOLD','200'),58:('KODAK','ULTRAMAX','400'),74:('KODAK','PROIMAGE','100'),34:('KODAK','EKTAR','100'),71:('LUCKY','C200','200'),67:('HARMAN','PHOENIX II','200'),68:('HARMAN','RED','RED SCALE'),292:('LOMOGRAPHY','COLOR NEGATIVE','400'),75:('KODAK','T-MAX','100'),289:('KODAK','CHARMERA',''),72:('DIGITAL','CCD',''),293:('POLAROID','POLAROID',''),296:('CYANOTYPE','CYANOTYPE',''),290:('PIXEL','WORLDS',''),76:('KODAK','AEROCHROME',''),291:('LEICA','MONOCHROME',''),297:('GERMAN','COOL',''),65:('RICOH','GR2','')}
  for i,name,spec in specs:
   brand,title,code,header,paper,ink,accent=box_style(name,i)

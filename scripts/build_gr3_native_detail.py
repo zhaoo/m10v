@@ -6,7 +6,7 @@ import struct
 from scripts.build_gr3_menu_patches import assembly, branch, movw
 BASE=0x53000000
 FIELDS=['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Halation Mode','','','','','','RED Exposure','Charmera Color']
-DETAIL_IDS={'halo':[18,19,20,21],'common':[21],'red':[21,28],'charmera':[29],'phoenix':[18,19,20,21,28],'pixel':[],'anime':[21,30]}
+DETAIL_IDS={'halo':[18,19,20,21],'common':[21],'red':[21,28],'charmera':[29],'phoenix':[18,19,20,21,28],'pixel':[]}
 STOCK_TABLE=bytes.fromhex('2c4cb35309000000f04ab35309000000144ab3530a000000104fb353090000008c4ab353090000005050b3530a0000000c50b35309000000ac4ab35309000000ec4fb3530a000000584eb3530a000000d049b35304000000b849b3530a000000f449b3530a000000644cb3530a000000784eb3530b000000104bb3530a000000544fb3530a000000304fb3530b000000944fb3530a0000001c4eb3530a000000ec4eb3530b000000844cb3530b000000444ab35305000000b44eb3530b000000f449b3530a000000644cb3530a000000784eb3530b000000104bb3530a000000544fb3530a000000304fb3530b000000944fb3530a0000001c4eb3530a000000ec4eb3530b000000844cb3530b000000444ab35305000000b44eb3530b000000')
 STOCK_CAPTIONS=bytes.fromhex('e3011901e1011b01e2011d01da011f01db012101dc012301e5012501e9012f01e9012f0167012f01e9012f01e9013f01dd012701e4013701d9013101de013301e0013501f8000000')
 STOCK_SLIDER=bytes.fromhex('0dc0a0e1f0d82de97c5705e3055445e304b04ce268d04de2003095e50060a0e10040a0e320300be55b7701eb9f7a01eb9811d6e5305904eb0afdffeb04408de50f30a0e300308de51420a0e30c208de5233ea0e310308de54020a0e314208de5c730a0e318308de50070a0e108408de50410a0e10820a0e32d30a0e354004be248c807eb093da0e30420a0e100308de50710a0e11e30a0e354004be258c807eb54004be20410a0e15dc807eb647196e554104be20700a0e19fc807eb5c400be50c00a0e37c0814eb0030a0e1d02f00e31b2345e30700a0e1002083e5042a0ce3044083e51a2345e3086083e564104be264300be55c390ce358200be51a3345e35c300be56efb07eb5c301be5040053e10300000a64004be20320a0e30010a0e133ff2fe120201be5003095e5030052e10100001a1cd04be2f0a89de8d1cb19eb')
@@ -18,7 +18,7 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=
  if universal_halation:
   for variant in detail_ids:
    detail_ids[variant]=[22,18,19,20]+[i for i in detail_ids[variant] if i not in (18,19,20)]
- active_ids=[18,19,20]+([21] if native_grain else [])+([22] if universal_halation else [])+[28,29,30]
+ active_ids=[18,19,20]+([21] if native_grain else [])+([22] if universal_halation else [])+[28,29]
  image=bytearray();entries={};blocks=[]
  def data(raw,label):
   image.extend(bytes(-len(image)&3));a=base+len(image);image.extend(raw);blocks.append([a,a+len(raw),label]);return a
@@ -45,7 +45,7 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=
  table_address=tables['halo']
  # Existing resource extension occupies IDs786..910. Reuse its text descriptors
  # for three captions, Grain and Soft Diffusion, avoiding another global hook.
- caption_ids=[862,863,864,827,1137 if universal_halation else 828,913,913,913,913,913,933,1013 if sd_library else 948,1148]
+ caption_ids=[862,863,864,827,1137 if universal_halation else 828,913,913,913,913,913,933,1013 if sd_library else 948]
  captions=data(STOCK_CAPTIONS+b''.join(struct.pack('<HH',i,i) for i in caption_ids),'detail caption pairs')
  # Each call site has already saved LR in the genuine stock prologue.
  for name,reg,ui in [('table_ip','ip','r0'),('table_r3','r3','r0'),('table_selected','r3','r4')]:
@@ -74,7 +74,7 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=
  # Slider clones retain the stock callback closure and stock cancel/return.
  default=stub(f'mov r1,r0;mov r0,#4;mov r2,#0;b {hex(control)}','factory default')
  entries['default']=default
- def clone(maximum,color=False,anime=False):
+ def clone(maximum,color=False):
   image.extend(bytes(-len(image)&3));destination=base+len(image);start=0x531acfec;stop=0x531ad12c
   mapping={a:destination+a-start+(8 if a>=0x531ad0b4 else 0) for a in range(start,stop+4,4)}
   output=bytearray()
@@ -92,14 +92,12 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=
    # Match the stock grain slider: resource 57 and 120-pixel tick pitch.
    if a==0x531ad03c and maximum==3:w=0xe3a03039
    if a==0x531ad03c and color:w=movw(3,760 if sd_library else 754)
-   if a==0x531ad03c and anime:w=movw(3,868)
    if a==0x531ad060:w=0xe3a02000|maximum
    if a==0x531ad064:w=movw(3,360//maximum)
    output+=struct.pack('<I',w)
   return data(output,'stock slider clone '+str(maximum))
  sliders={n:clone(n) for n in (8,3,2,1)}
  color_slider=clone(3,color=True)
- anime_slider=clone(3,anime=True)
  # Private IDs keep stable meanings across the three visible lists.
  # Restore the original setup frame before dispatch; retain the selected ID
  # in ip because r0 must be the stock controller for the slider constructor.
@@ -108,10 +106,10 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=
  dispatch=''
  for id in active_ids:
   maximum=[8,8,8,3,2 if universal_halation else 3,2,8,5,8,1,2,3,3][id-18]
-  destination=anime_slider if id==30 else color_slider if id==29 else exposure_dispatch if id==28 else sliders[maximum]
+  destination=color_slider if id==29 else exposure_dispatch if id==28 else sliders[maximum]
   dispatch+=f'cmp ip,#{id};beq {hex(destination)};'
  dispatch_stub=stub(dispatch+f'b {hex(sliders[8])}','slider dispatch')
  entries['setup']=stub(gate('r0','r4',0x531b075c)+f'mov ip,r0;mov r0,r4;sub sp,fp,#0x10;ldm sp,{{r4,fp,sp,lr}};b {hex(dispatch_stub)}','setup dispatch')
  entries['callback']=stub(gate('r5','r4',0x531b0e48)+f'sub r2,r5,#18;lsl r2,r2,#8;orr r2,r2,r6;mov r1,r4;mov r0,#2;bl {hex(control)};cmp r0,#0;bne 0x531b0c6c;sub sp,fp,#0x1c;ldm sp,{{r4,r5,r6,r7,fp,sp,pc}}','immediate callback')
  entries['reset']=stub('push {r4,lr};bl 0x532c282c;mov r1,r5;mov r0,#7;mov r2,#0;'+f'bl {hex(control)};pop {{r4,pc}}','preserve stock reset')
- return bytes(image),{'schema':'m10v-gr3-native-detail/v2','tables':table_address,'captions':captions,'entries':entries,'fields':[(FIELDS+['Anime Mode'])[id-18] for id in active_ids],'ids':active_ids,'native_grain':native_grain,'universal_halation':universal_halation,'halation_modes':['off','spill','streak'] if universal_halation else None,'mode_caption':1137 if universal_halation else None,'appended_slots':appended_slots,'variant_rows':46 if appended_slots else 36,'variant_ids':detail_ids,'variant_tables':tables,'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':sliders[8],'slider3':sliders[3],'sliders':sliders,'slider_dispatch':dispatch_stub,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','row_icons':[484,473,398,478,0,0,0,0,0,0,648,648],'row_values':'numeric stock slider index; RED EI125/64/250','row_value_rect':[50,10,40,40],'red_value_rect':[50,10,60,40],'charmera_colors':{'names':['RED','YELLOW','BLUE','GRAY'],'value_icons':list(range(756 if sd_library else 750,760 if sd_library else 754)),'scale_icon':760 if sd_library else 754,'slider':color_slider},'anime_mode':{'names':['关闭','线稿','色块','手绘'],'field':12,'row_id':30,'caption':1148,'value_icons':list(range(864,868)),'scale_icon':868,'slider':anime_slider},'camera_tested':False}
+ return bytes(image),{'schema':'m10v-gr3-native-detail/v2','tables':table_address,'captions':captions,'entries':entries,'fields':[FIELDS[id-18] for id in active_ids],'ids':active_ids,'native_grain':native_grain,'universal_halation':universal_halation,'halation_modes':['off','spill','streak'] if universal_halation else None,'mode_caption':1137 if universal_halation else None,'appended_slots':appended_slots,'variant_rows':46 if appended_slots else 36,'variant_ids':detail_ids,'variant_tables':tables,'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':sliders[8],'slider3':sliders[3],'sliders':sliders,'slider_dispatch':dispatch_stub,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','row_icons':[484,473,398,478,0,0,0,0,0,0,648,648],'row_values':'numeric stock slider index; RED EI125/64/250','row_value_rect':[50,10,40,40],'red_value_rect':[50,10,60,40],'charmera_colors':{'names':['RED','YELLOW','BLUE','GRAY'],'value_icons':list(range(756 if sd_library else 750,760 if sd_library else 754)),'scale_icon':760 if sd_library else 754,'slider':color_slider},'camera_tested':False}

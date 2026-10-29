@@ -28,11 +28,10 @@ export async function gr2BuildFingerprint(){
 export async function prepareGr2Native(source,value=defaultConfiguration()){
  readUnityModelComponent(source,'gr2','b01firm8');
  const configuration=normalizeConfiguration(value);
- need(configuration.hdf===0,'GR II 第一版请在相机 HDF 菜单设置强度，网页初始值须为 0');
  const source_sha256=sha(source),runtime_source_sha256=await gr2BuildFingerprint();
  const configuration_sha256=sha(JSON.stringify({source_sha256,runtime_source_sha256,configuration}));
  return {schema:'m10v-gr2-experimental-plan/v1',ready:true,status:'experimental_offline',model:'GR II',filename:'rg2_v003.frm',source_sha256,runtime_source_sha256,configuration_sha256,configuration,hardware_verified:false,release_ready:false,
-  initial_settings_policy:'已有有效机内 M10V 存档优先；首次使用网页配置。',
+  initial_settings_policy:'已有有效机内胶卷和 HDF 存档分别优先；确证首次使用才采用网页配置。',initial_hdf_strength:configuration.hdf,
   limitations:['完整启动、缓存和拍摄链尚待真机验证','第一版仅接入已实现的五槽胶卷、细节设置、SD 胶卷、时间戳与独立 HDF 菜单；配方及其他工具继续开发']};
 }
 let building=false;
@@ -55,7 +54,7 @@ export async function generateGr2Native(source,value,accepted,{signal}={}){
   need(runtime.endianness==='big'&&runtime.be8===false&&runtime.base===0xa0798000&&runtime.memory_bytes<=0x68000,'GR II 运行体 ABI 或内存边界不一致');
   const bytes=Buffer.from(runtime.runtime_hex,'hex');
   need(bytes.length===runtime.code_bytes&&sha(bytes)===runtime.runtime_sha256&&audit.runtime_sha256===runtime.runtime_sha256,'原生运行体摘要不一致');
-  need(runtime.initial_state_wire_hex===initialState(plan.configuration).toString('hex'),'初始配置回读不一致');
+  need(runtime.initial_state_wire_hex===initialState(plan.configuration).toString('hex')&&runtime.initial_hdf_strength===plan.configuration.hdf,'初始配置回读不一致');
   need(sha(component)===audit.sha256&&audit.file_bytes===component.length,'组件摘要不一致');
   const reconstructed=Buffer.alloc(component.length);original.copy(reconstructed);
   const offset=512+Math.ceil((original.length-512)/512)*512;need(offset+bytes.length===component.length,'运行体追加边界不一致');bytes.copy(reconstructed,offset);
@@ -69,6 +68,6 @@ export async function generateGr2Native(source,value,accepted,{signal}={}){
   const nativeState=Buffer.from(runtime.initial_state_native_hex,'hex');need(nativeState.length===104&&bytes.includes(nativeState),'BE32 初始配置未写入运行体');
   need(await gr2BuildFingerprint()===plan.runtime_source_sha256,'构建中源码已变化，请重新构建');signal?.throwIfAborted();
   const packed=packGr2Candidate(source,component);
-  return {...packed,plan,runtime,audit,receipt:{...packed.receipt,configuration_sha256:plan.configuration_sha256,runtime_source_sha256:plan.runtime_source_sha256,runtime_sha256:runtime.runtime_sha256,independent_component_reconstruction:true}};
+  return {...packed,plan,runtime,audit,receipt:{...packed.receipt,configuration_sha256:plan.configuration_sha256,runtime_source_sha256:plan.runtime_source_sha256,runtime_sha256:runtime.runtime_sha256,initial_hdf_strength:runtime.initial_hdf_strength,independent_component_reconstruction:true}};
  }finally{try{if(folder)await rm(folder,{recursive:true,force:true});}finally{building=false;}}
 }

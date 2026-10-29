@@ -18,6 +18,8 @@ typedef struct {
  int (*remove)(void *,uint32_t slot);
  int (*stamp)(void *,uint32_t mode,uint32_t format,uint32_t corner,uint32_t color);
  int (*film_name_stamp)(void *,uint32_t enabled);
+ /* Validated directory extent; zero is a read failure. Optional for old adapters. */
+ uint32_t (*extent)(void *);
 } m10v_settings_ops;
 typedef struct {
  m10v_library_state saved;

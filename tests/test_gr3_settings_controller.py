@@ -31,6 +31,8 @@ class ControllerLifetimeTests(unittest.TestCase):
  debug=False
  native_host=False
  appended_slots=False
+ owner_cache=False
+ exit_trace=False
  @classmethod
  def setUpClass(cls):
   p=Path(os.environ.get('M10V_GR3_ORIGINAL_RTOS','/tmp/m10v-sd-research/rtos.bin'))
@@ -43,8 +45,9 @@ class ControllerLifetimeTests(unittest.TestCase):
          'm10v_camera_library_stamp','m10v_camera_library_film_name_stamp','m10v_debug_log','m10v_debug_batch','m10v_library_name','m10v_sd_camera_custom_name',*[f'm10v_ab_{n}_original' for n in ['selector','mapper','live_enter','live_leave','live_destroy','live_event','adj_event']]]
   names += [f'm10v_ab_adj_{n}_original' for n in ('refresh','exit','destroy','changed')]
   names += ['m10v_ab_dispatch_original','m10v_zoom_menu_open','m10v_zoom_menu_key','m10v_zoom_camera_load','m10v_zoom_camera_save','m10v_settings_view_zoom','m10v_zoom_live_apply','m10v_zoom_live_slot']
-  names += ['m10v_library_valid','m10v_library_count','m10v_sd_camera_directory_item','m10v_sd_camera_directory_install','m10v_camera_library_remove','m10v_camera_library_shooting_count']
+  names += ['m10v_library_valid','m10v_library_count','m10v_sd_camera_directory_item','m10v_sd_camera_directory_extent','m10v_sd_camera_directory_install','m10v_camera_library_remove','m10v_camera_library_shooting_count']
   names += ['m10v_camera_library_reconcile_legacy_selection','m10v_camera_library_preview_init','m10v_camera_library_preview_clear','m10v_camera_library_mutation_begin','m10v_camera_library_mutation_end']
+  names += ['m10v_camera_library_preview']
   cls.externals={n:STUB+i*4 for i,n in enumerate(names)}
   cc=os.environ.get('M10V_LLVM_CLANG') or '/opt/homebrew/opt/llvm/bin/clang'
   if not Path(cc).exists():cc=shutil.which('clang')
@@ -52,7 +55,7 @@ class ControllerLifetimeTests(unittest.TestCase):
    blobs=[]
    for file,addr in [('m10v_settings.c',STATE),('m10v_settings_controller.c',CODE)]:
     obj=Path(d)/'module.o'
-    subprocess.run([cc,*FLAGS,f'-DM10V_DEBUG_MODE={int(cls.debug)}',f'-DM10V_AB_NATIVE_HOST={int(cls.native_host)}',f'-DM10V_APPENDED_SLOTS={int(cls.appended_slots)}','-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
+    subprocess.run([cc,*FLAGS,f'-DM10V_DEBUG_MODE={int(cls.debug)}',f'-DM10V_ADJ_EXIT_TRACE={int(cls.exit_trace)}',f'-DM10V_AB_NATIVE_HOST={int(cls.native_host)}',f'-DM10V_APPENDED_SLOTS={int(cls.appended_slots)}',f'-DM10V_LIVE_COLOR={int(cls.owner_cache)}','-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
     blob,symbols=link_object(obj.read_bytes(),addr,cls.externals,prefix='m10v_settings_controller_' if 'controller' in file else 'm10v_settings_',additional_exports=AB_CONTROLLER_EXPORTS if 'controller' in file else ())
     cls.externals.update(symbols);blobs.append((addr,blob))
    cls.blobs=blobs
@@ -91,11 +94,13 @@ class ControllerLifetimeTests(unittest.TestCase):
      if self.view_fail:result=0xffffffff
      else:m.mem_write(r[0],struct.pack('<I',0x10009000));m.mem_write(r[0]+160,struct.pack('<I',37))
     elif name=='m10v_settings_view_destroy':m.mem_write(r[0],bytes(164))
-    elif name=='m10v_camera_library_load':
-     result=0xffffffff if self.load_fail else 0
-     state=bytearray(104)
+    elif name in ('m10v_camera_library_load','m10v_camera_library_preview'):
+     result=int(getattr(self,'preview_ready',False)) if name.endswith('_preview') else 0xffffffff if self.load_fail else 0
+     state=bytearray(184 if self.appended_slots else 104)
      for i in range(5):struct.pack_into('<H',state,12+8*i,getattr(self,'fresh_films',[33,34,35,36,37])[i])
      m.mem_write(r[0],bytes(state))
+    elif name=='m10v_camera_library_reconcile_legacy_selection':result=0xffffffff if getattr(self,'reconcile_fail',False) else 0
+    elif name=='m10v_sd_camera_directory_extent':result=46
     elif name=='m10v_sd_camera_item':result=33+r[0]*8+r[1]
     elif name=='m10v_sd_camera_install':result=0xffffffff if self.install_fail else 0
     elif name=='m10v_library_valid':result=1 # state decoding is exercised by real-library tests

@@ -126,6 +126,13 @@ class DebugLogArmTests(unittest.TestCase):
         self.assertEqual(record['stage'],'page.state.after')
         self.assertEqual(record['page_state'],{'key':'0xcf','screen':'value','focus':2,'value':1,'error':3})
 
+    def test_exit_checkpoints_use_ab_pages_and_decode_the_exact_boundary(self):
+        self.assertEqual(self.log(230,0x55050000,0x37,2,0),1)
+        record=self.decoded()['records'][-1]
+        self.assertEqual(record['channel'],'ab')
+        self.assertEqual(record['stage'],'adj.event.before')
+        self.assertEqual(record['arguments'],[0x55050000,0x37,2,0])
+
     def test_focus_wrapper_records_real_slot_and_preserves_original_result(self):
         self.u.mem_write(0x55068200,b'\x15')
         self.assertEqual(self.invoke('m10v_menu_focus',0x55005000,11),77)
@@ -233,3 +240,40 @@ class DebugLogArmTests(unittest.TestCase):
         self.assertEqual(self.u.mem_read(0x5506821f,1),b'\1')
 
 if __name__=='__main__':unittest.main()
+
+class ExitOnlyLogArmTests(unittest.TestCase):
+    """Explicit diagnostic build filters unrelated traffic before any SD IO."""
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.tmp.cleanup)
+        cls.manifest=build(Path(cls.tmp.name),debug_mode=True,debug_build_id=0x12345678,adj_exit_trace=True)
+        cls.code=(Path(cls.tmp.name)/'m10v-library-arm.bin').read_bytes()
+    setUp=DebugLogArmTests.setUp
+    services=DebugLogArmTests.services
+    log=DebugLogArmTests.log
+    invoke=DebugLogArmTests.invoke
+    decoded=DebugLogArmTests.decoded
+
+    def test_unrelated_menu_preview_and_capture_events_perform_no_io(self):
+        for event in (30,85,97,150,190,208):self.assertEqual(self.log(event),0)
+        self.assertEqual(self.calls,[]);self.assertEqual(self.files,{})
+
+    def test_exit_records_keep_identity_sequence_crc_and_balanced_close(self):
+        for event in (230,237,264,238,239,240,247,269,270,271,272,273):self.assertEqual(self.log(event,1,2,3,4),1)
+        rows=self.decoded()['records']
+        self.assertEqual([r['event'] for r in rows],[230,237,264,238,239,240,247,269,270,271,272,273])
+        self.assertEqual(rows[-1]['stage'],'ab.close.live-entered')
+        self.assertTrue(all(r['channel']=='ab' and r['build_id']=='12345678' for r in rows))
+        self.assertEqual(set(self.files),{'C:\\M10VAK0.BIN','C:\\M10VAK1.BIN'})
+        self.assertEqual(sum(c[0]=='close' for c in self.calls),self.successful_opens)
+        self.assertEqual(self.decoded()['rejected_pages'],0)
+
+    def test_partial_checkpoint_write_retains_previous_valid_page(self):
+        self.assertEqual(self.log(230),1)
+        self.fail_write=True;self.assertEqual(self.log(233),0)
+        rows=self.decoded()['records'];self.assertEqual([r['event'] for r in rows],[230])
+        self.assertEqual(sum(c[0]=='close' for c in self.calls),self.successful_opens)
+
+    def test_unavailable_card_returns_without_retry_or_fabricated_record(self):
+        self.available=False;self.assertEqual(self.log(230),0)
+        self.assertEqual(self.calls,[]);self.assertEqual(self.files,{})

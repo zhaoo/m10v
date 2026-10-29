@@ -253,7 +253,7 @@ int m10v_camera_library_load(m10v_library_state *state){
 }
 int m10v_camera_library_select(m10v_library_state *state, uint32_t slot, uint32_t film) {
 #if !M10V_LIVE_COLOR
-    if(film==294||M10V_ANIME_E6(film))return M10V_LIBRARY_INVALID;
+    if(film==294||(M10V_ANIME_E6(film)||M10V_C41(film)||M10V_EXTRA_FILM(film)))return M10V_LIBRARY_INVALID;
 #endif
     if (!ram(state, sizeof(*state))) return M10V_LIBRARY_INVALID;
     uint32_t fs = filesystem();
@@ -347,6 +347,29 @@ int m10v_camera_library_reconcile_legacy_selection(uint32_t model){
   if(state.sequence==0xffffffffu)return M10V_LIBRARY_INVALID;
   state.reserved&=1u;state.sequence++;state.crc=state_crc(&state,offsetof(m10v_library_state,crc));
   if(store((void *)(uintptr_t)fs,&state))return M10V_LIBRARY_STORE_FAILED;
+ }
+ /* Retire the three removed styles only at the existing safe UI migration
+  * gate. Preserve every other slot/effect and the journal ABI. Reads never
+  * write. A surviving active film follows its compacted slot using the
+  * existing restart-safe selection transaction above. */
+ uint32_t used=m10v_library_count(&state),kept=0,removed=0;
+ bank=((get_tone_fn)0x532bd6d4u)(model);tone=((get_tone_fn)0x532bd6b4u)(model);
+ uint32_t selected=bank?M10V_SLOT_COUNT:m10v_tone_slot(tone),active=selected<used?state.slots[selected].film:0;
+ for(uint32_t i=0;i<used;i++){
+  if(M10V_ANIME(state.slots[i].film)){removed=1;continue;}
+  state.slots[kept]=state.slots[i];state.effects[kept]=state.effects[i];kept++;
+ }
+ if(removed){
+  for(uint32_t i=kept;i<M10V_SLOT_COUNT;i++){m10v_slot empty={0};m10v_film_effects effects={0};state.slots[i]=empty;state.effects[i]=effects;}
+  uint32_t target=0;while(target<kept&&state.slots[target].film!=active)target++;
+  if(selected<used&&target==kept){
+   ((set_tone_fn)0x532c26c0u)(model,11u);
+   if(((get_tone_fn)0x532bd6b4u)(model)!=11u)return M10V_LIBRARY_STORE_FAILED;
+  }else if(selected<used&&target!=selected)state.reserved|=((selected+1)<<1)|((target+1)<<5);
+  if(state.sequence==0xffffffffu)return M10V_LIBRARY_INVALID;
+  state.sequence++;state.crc=state_crc(&state,offsetof(m10v_library_state,crc));
+  if(store((void *)(uintptr_t)fs,&state))return M10V_LIBRARY_STORE_FAILED;
+  if(state.reserved&510u)return m10v_camera_library_reconcile_legacy_selection(model);
  }
  return M10V_LIBRARY_OK;
 }

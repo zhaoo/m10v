@@ -169,3 +169,59 @@ export function readOfficialSection(data, name) {
   }
   throw new Error('unknown official section');
 }
+
+// Import inventory is independent of the ABI-pinned patching interface above.
+// Unknown releases are structurally checked, never authenticated as official or
+// used as executable patch input. The build resolver selects a pinned baseline.
+export function inspectFirmwareImport(data) {
+  requireValue(Buffer.isBuffer(data), 'input: firmware must be bytes');
+  requireValue(data.length >= 152 && data.length <= 128 * 1024 * 1024 && data.length % 4 === 0,
+    'container: invalid firmware size');
+  const identity = hash(data);
+  if ([SHA256, GR3_220_SHA256, '708e79f3b7b96a7e1581b4acf4c412233050a1832718ef7f06c8397db1b431c7'].includes(identity))
+    return inspectOfficial(data);
+  const project = data.readUInt32LE(48), isX = project === 609;
+  requireValue(project === 588 || isX, 'container: unsupported camera model');
+  const magic = isX ? 0x02610261 : 0x024c024c, footer = data.length - 24;
+  requireValue(data.readUInt32LE(120) === magic && data.readUInt32LE(footer) === magic,
+    'container: project mismatch');
+  requireValue(data.readUInt32LE(124) === 0xa55a5aa5 && data.readUInt32LE(footer + 4) === 0xa55a5aa5 &&
+    data.readUInt32LE(footer + 8) === 2, 'container: marker or type mismatch');
+  requireValue(sum32(data) === 0, 'identity: container additive checksum failed');
+  const payloadEnd = 128 + data.readUInt32LE(footer + 12), decodedSize = data.readUInt32LE(footer + 16);
+  requireValue(payloadEnd <= footer && ((payloadEnd + 3) & ~3) === footer && data.readUInt32LE(60) === 0 &&
+    decodedSize >= 4 && decodedSize <= 128 * 1024 * 1024 && decodedSize % 4 === 0,
+    'container: metadata or decoded length mismatch');
+  const {output, frames} = decode(data.subarray(128, payloadEnd), decodedSize);
+  requireValue(sum32(output) === 0, 'sections: decoded checksum failed');
+  const sections = [], rows = new Map();
+  let position = 0;
+  for (const [name, , flags] of rules) {
+    requireValue(position + 16 <= output.length - 4, 'sections: truncated header');
+    requireValue(output.toString('ascii', position, position + 8).split('\0', 1)[0] === name &&
+      output.readUInt32LE(position + 8) === flags, `sections: layout mismatch at ${name}`);
+    const field = output.readUInt32LE(position + 12);
+    const size = name === 'RES' ? output.length - 4 - position - 16 : field;
+    requireValue(field > 0 && size > 0 && size % 4 === 0 && position + 16 + size <= output.length - 4,
+      `sections: invalid length at ${name}`);
+    const end = position + 16 + size;
+    rows.set(name, output.subarray(position + 16, end));
+    sections.push({name, size: end - position, sha256: hash(output.subarray(position, end))});
+    position = end;
+  }
+  requireValue(position + 4 === output.length, 'sections: decoded trailer mismatch');
+  const rtos = rows.get('RTOS'), cpu = rows.get('CPU');
+  requireValue(rtos.length >= 0x203c && cpu.length >= 0x94 && cpu.readUInt32LE(0x80) === project,
+    'sections: component project or version fields invalid');
+  let cpuSum = 0;
+  for (let at = 0; at < cpu.length; at += 4) cpuSum = (cpuSum + cpu.readUInt32BE(at)) >>> 0;
+  requireValue(cpuSum === 0, 'sections: CPU checksum failed');
+  const version = data.readUInt32BE(0x38);
+  requireValue(version >>> 24 > 0 && [data.readUInt32BE(0x50), rtos.readUInt32BE(0x2038), cpu.readUInt32BE(0x90)]
+    .every(value => value === version), 'version: component copies differ');
+  const parts = [version >>> 24, (version >>> 16) & 255, (version >>> 8) & 255, version & 255];
+  return {model: isX ? 'GR IIIx' : 'GR III', public_version: parts.slice(0, 2).join('.'),
+    internal_version: parts.join('.'), sha256: identity, size: data.length, sections,
+    proof: {identity: false, container: true, decoded: true, sections: true, versions: true,
+      strict_frames: frames > 0}, source_authenticity: 'unverified', patch_source: false};
+}

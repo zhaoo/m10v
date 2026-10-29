@@ -8,7 +8,7 @@
 /* Embedded in the original TopMenu-owned Effects controller, not append RX.
  * UI-only refresh/save publish this cache; capture only reads snapshot(). */
 typedef struct {uint32_t magic,version,style,sequence;} m10v_border_cache;
-#define M10V_BORDER_CACHE_PAGE_OFFSET 0x194u
+#define M10V_BORDER_CACHE_PAGE_OFFSET 0x1a8u
 #ifndef M10V_BORDER_CACHE_OWNER_OFFSET
 #define M10V_BORDER_CACHE_OWNER_OFFSET (0x223cu+M10V_BORDER_CACHE_PAGE_OFFSET)
 #endif

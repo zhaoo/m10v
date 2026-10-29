@@ -72,15 +72,31 @@ def pack_multiaxis(q):
 def fit_gate(metric,pixel_model_validated=False):
  fidelity=metric['de00_p95']<=2 and metric['de00_max']<=6 and metric['de00_median']<=.7
  return {'eligible':bool(fidelity and pixel_model_validated),'fidelity_pass':bool(fidelity),'pixel_model_validated':pixel_model_validated,'thresholds':{'de00_median':.7,'de00_p95':2,'de00_max':6},'camera_target_validation_required':True}
-def fit(rgb,target,base,iterations=600):
+def fit(rgb,target,base,iterations=600,constrain_native=False,monochrome=False):
  x=inverse_standard(rgb,base);n=len(x);p0=identity_parameters();base_slopes=np.diff(base)*255
+ if monochrome and not constrain_native:raise ValueError('Monochrome fitting requires native CSP constraints')
+ if constrain_native:p0[9:18]=(STD_CSP/256).ravel()
+ if monochrome:p0[9:18]=np.array([[.28,.61,.11],[0,0,0],[0,0,0]]).ravel()
+ native_inverse=np.linalg.inv(STD_CSP) if constrain_native else None
+ # For neutral targets, train in the local CIEDE2000 lightness metric. RGB
+ # squared error otherwise underweights visible errors in dark neutral tones.
+ weights=np.ones((n,1))
+ if monochrome:
+  t=np.mean(target,axis=1);linear=np.where(t<=.04045,t/12.92,((t+.055)/1.055)**2.4)
+  dl=np.where(linear<=216/24389,24389/27,116/3*np.maximum(linear,1e-12)**(-2/3))
+  ds=np.where(t<=.04045,1/12.92,2.4/1.055*((t+.055)/1.055)**1.4)
+  light=np.where(linear<=216/24389,linear*24389/27,116*np.cbrt(linear)-16)
+  sl=1+.015*(light-50)**2/np.sqrt(20+(light-50)**2)
+  weights=((dl*ds/sl)**2)[:,None];weights/=weights.mean()
  def objective(params):
-  m,p,cv,h=unpack(params);z=x@m.T;g=groups(z);v=np.einsum('nij,nj->ni',h[g],z)
+  m,p,cv,h=unpack(params)
+  if constrain_native:p=native_inverse@(p*256)
+  z=x@m.T;g=groups(z);v=np.einsum('nij,nj->ni',h[g],z)
   clip=np.clip(v,0,1);b=np.interp(clip,AXIS,base);pos=b*(KNOTS-1);idx=np.minimum(pos.astype(int),KNOTS-2);frac=pos-idx
   u=np.empty_like(x);slope=np.empty_like(x)
   for c in range(3):
    lo,hi=cv[c,idx[:,c]],cv[c,idx[:,c]+1];u[:,c]=lo*(1-frac[:,c])+hi*frac[:,c];slope[:,c]=(hi-lo)*(KNOTS-1)
-  out=u@p.T;error=out-target;loss=np.sum(error**2)/n;do=2*error/n;dp=do.T@u;du=do@p
+  out=u@p.T;error=out-target;loss=np.sum(weights*error**2)/n;do=2*weights*error/n;dp=do.T@u;du=do@p
   dcv=np.zeros_like(cv)
   for c in range(3):
    np.add.at(dcv[c],idx[:,c],du[:,c]*(1-frac[:,c]));np.add.at(dcv[c],idx[:,c]+1,du[:,c]*frac[:,c])
@@ -96,9 +112,12 @@ def fit(rgb,target,base,iterations=600):
   backwards=np.minimum(np.diff(cv,axis=1),0);loss+=10*np.sum(backwards**2);dcv[:,:-1]-=20*backwards;dcv[:,1:]+=20*backwards
   # Gentle curvature penalty controls undersampled gamma knots.
   bend=np.diff(cv,n=2,axis=1);loss+=1e-5*np.sum(bend**2);dcv[:,:-2]+=2e-5*bend;dcv[:,1:-1]-=4e-5*bend;dcv[:,2:]+=2e-5*bend
+  if constrain_native:dp=256*native_inverse.T@dp
   return loss,np.r_[dm.ravel(),dp.ravel(),dcv.ravel(),grads]
- fitted=minimize(objective,p0,jac=True,method='L-BFGS-B',bounds=[(-1,2)]*18+[(0,1)]*(3*KNOTS)+[(-2,2)]*sum(ND),options={'maxiter':iterations,'ftol':1e-14,'gtol':1e-8,'maxls':40})
- return fitted.x,{'iterations':fitted.nit,'success':bool(fitted.success),'message':str(fitted.message),'objective':float(fitted.fun)}
+ fitted=minimize(objective,p0,jac=True,method='L-BFGS-B',bounds=[(-1,2)]*9+([(-250/256,250/256)]*3+([(0,0)]*6 if monochrome else [(-250/256,250/256)]*6) if constrain_native else [(-1,2)]*9)+[(0,1)]*(3*KNOTS)+[(-2,2)]*sum(ND),options={'maxiter':iterations,'ftol':1e-14,'gtol':1e-8,'maxls':40})
+ result=fitted.x.copy()
+ if constrain_native:result[9:18]=(native_inverse@(result[9:18].reshape(3,3)*256)).ravel()
+ return result,{'iterations':fitted.nit,'success':bool(fitted.success),'message':str(fitted.message),'objective':float(fitted.fun)}
 def quantize(params):
  m,p,cv,h=unpack(params);m=np.rint(m*8192).astype(int);p=np.rint(p*512).astype(int);h=np.rint(h*1024).astype(int)
  for c in range(3):h[:,c,c]=1024-sum(h[:,c,j] for j in range(3) if j!=c)

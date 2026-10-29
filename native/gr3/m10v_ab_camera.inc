@@ -8,6 +8,9 @@ extern uint32_t m10v_ab_adj_event_original(uint32_t,uint32_t);
 extern uint32_t m10v_ab_mapper_original(uint32_t,uint32_t);
 extern uint32_t m10v_ab_selector_original(uint32_t,uint32_t);
 extern uint32_t m10v_ab_live_enter_original(uint32_t,uint32_t,uint32_t);
+#if M10V_HDF_UI_CACHE
+extern void m10v_hdf_bootstrap(void);
+#endif
 extern uint32_t m10v_ab_live_leave_original(uint32_t);
 extern uint32_t m10v_ab_live_destroy_original(uint32_t);
 extern uint32_t m10v_ab_live_event_original(uint32_t,uint32_t);
@@ -19,6 +22,9 @@ static m10v_settings_controller *ab_owner(void){
  m10v_settings_controller *p=page(owner,0);
  return *(const uint32_t *)p==m10v_settings_controller_vtable()?p:0;
 }
+static __attribute__((always_inline)) inline int ab_closing(m10v_settings_controller *p,uint32_t c){
+ return p&&(p->power_off_pending||(p->ab_exit_source&&p->ab_exit_source==c));
+}
 static uint32_t ab_current(void){
  uint32_t tone=((uint32_t (*)(void))0x532bd6b4u)();
  for(uint32_t i=0;i<M10V_TONE_CHOICES;i++)if(tone==m10v_ab_tone(i))return i;return M10V_TONE_CHOICES;
@@ -26,6 +32,10 @@ static uint32_t ab_current(void){
 static uint32_t ab_route(void){
  uint32_t root=((uint32_t (*)(void))0x5320ad88u)();
  return ((fn1)0x53228c4cu)(((fn1)0x5320aefcu)(root));
+}
+static __attribute__((always_inline)) inline void ab_main_off(void){
+ if(ab_route()!=0x02000000u)return;
+ m10v_settings_controller *p=ab_owner();if(p)p->power_off_pending=1;
 }
 static int ab_apply(uint32_t slot){
  if(slot>=m10v_camera_library_shooting_count())return -1;
@@ -94,14 +104,29 @@ static uint32_t ab_event_key(uint32_t event){
 #include "m10v_ab_host.inc"
 uint32_t m10v_settings_controller_ab_setup(uint32_t controller,uint32_t event,uint32_t parent){
  uint32_t key=ab_event_key(event);
+ m10v_settings_controller *entry=ab_owner();
+ /* A physical press may have queued its logical DISP before MAIN/exit.
+  * Neither a release nor that delayed press may open a new picker while
+  * the native close is pending. Native navigation (especially A1) passes. */
+ if(ab_closing(entry,controller)){
+  if(key==0xa1||(key>=0x36&&key<=0x38))M10V_EXIT_LOG(270,controller,key,entry->power_off_pending,entry->ab_exit_source);
+  entry->pending_source=0;
+  return key>=0x36&&key<=0x38;
+ }
 #if M10V_AB_NATIVE_HOST
- if(ab_host_followup(ab_owner(),controller,key,parent))return 1;
+ if(ab_host_followup(entry,controller,key,parent))return 1;
 #endif
  /* Native A1 queues route 1. A DISP action can already have left this event
   * ahead of our queued 193 navigation. Consume it only for the exact source
   * while that navigation is pending; ready (including failure) clears it. */
  if(key==0xa1){
   m10v_settings_controller *p=ab_owner();
+#if M10V_AB_NATIVE_HOST
+  m10v_native_ab_host *h=ab_host(p);
+  if(!h||h->mode!=1||h->source!=controller){
+   M10V_EXIT_LOG(271,controller,p?p->pending_source:0,h?h->mode:0,0);return 0;
+  }
+#endif
   if(!p||!p->pending_source||p->pending_source!=controller||ab_route()!=parent)return 0;
   p->pending_source=0;M10V_LOG(89,key,9,controller,parent);return 1;
  }
@@ -137,8 +162,35 @@ uint32_t m10v_settings_controller_ab_setup(uint32_t controller,uint32_t event,ui
 #endif
  return 1;
 }
+#if M10V_DEBUG_MODE && M10V_ADJ_EXIT_TRACE
+static uint32_t ab_trace_event_impl(uint32_t controller,uint32_t event){
+#else
 uint32_t m10v_settings_controller_ab_adj_event(uint32_t controller,uint32_t event){
+#endif
  uint32_t key=ab_event_key(event);
+ if(key==1)ab_main_off();
+ if(key>=0x36&&key<=0x38){
+  m10v_settings_controller *closing=ab_owner();
+  if(ab_closing(closing,controller)){
+   M10V_EXIT_LOG(270,controller,key,closing->power_off_pending,closing->ab_exit_source);return 1;
+  }
+ }
+#if M10V_AB_NATIVE_HOST
+ /* MAIN/S1/S2 map to native ADJ close 0x35. The closing controller must
+  * relinquish the private list before native dispatch queues its exit.
+  * Restoring it in adj_exit would refresh/reposition widgets during the
+  * power/capture transition, and a late refresh could attach it again.
+  * Discard only our ownership; native exit/destroy owns the actual widgets.
+  * No refresh, navigation, setter, storage or diagnostic IO on this path. */
+ if(key==1||key==0x35){
+  m10v_settings_controller *p=ab_owner();m10v_native_ab_host *h=ab_host(p);
+  if(ab_host_owned(h,controller)||(h&&h->mode==1&&h->source==controller)){
+   h->mode=0;h->controller=0;h->source=0;h->rebuilding=0;h->back_pending=0;
+   p->pending_source=0;p->ab.down=0;
+  }
+  return m10v_ab_adj_event_original(controller,event);
+ }
+#endif
  if(key==0xa1&&m10v_settings_controller_ab_setup(controller,event,0x02000000u))return 1;
 #if M10V_AB_NATIVE_HOST
  if(ab_host_followup(ab_owner(),controller,key,0x02000000u))return 1;
@@ -163,8 +215,25 @@ uint32_t m10v_settings_controller_ab_adj_event(uint32_t controller,uint32_t even
     m10v_settings_controller_ab_setup(controller,event,0x02000000u))return 1;
  return m10v_ab_adj_event_original(controller,event);
 }
+#if M10V_DEBUG_MODE && M10V_ADJ_EXIT_TRACE
+uint32_t m10v_settings_controller_ab_adj_event(uint32_t controller,uint32_t event){
+ uint32_t raw=*(const uint16_t *)(uintptr_t)event;
+ uint32_t context=ab_ram(controller,0x280)?*(const uint8_t *)(uintptr_t)(controller+0x270)|((uint32_t)*(const uint8_t *)(uintptr_t)(controller+0x1f4)<<8)|((uint32_t)*(const uint8_t *)(uintptr_t)(controller+0x279)<<16):0xffffffffu;
+ M10V_EXIT_LOG(230,controller,raw,context,*(const volatile uint32_t *)0x55063988u);
+ uint32_t r=ab_trace_event_impl(controller,event);
+ M10V_EXIT_LOG(231,controller,raw,r,0);return r;
+}
+#endif
+
 static uint32_t ab_live_key(m10v_settings_controller *,uint32_t);
+#if M10V_DEBUG_MODE && M10V_ADJ_EXIT_TRACE
+static uint32_t ab_trace_selector_impl(uint32_t mapper,uint32_t key){
+#else
 uint32_t m10v_settings_controller_ab_selector(uint32_t mapper,uint32_t key){
+#endif
+ /* Native switch mapping can call this directly, bypassing BaseController's
+  * physical-packet hook. Record MAIN before the native ADJ close is queued. */
+ if(key==1)ab_main_off();
  if(ab_live_key(ab_owner(),key))return 1;
  /* ImageControl ignores stock DISP. Use its real controller as the navigation
   * owner, preserving the native parent/return route and all detail controls. */
@@ -176,10 +245,30 @@ uint32_t m10v_settings_controller_ab_selector(uint32_t mapper,uint32_t key){
  }
  return m10v_ab_selector_original(mapper,key);
 }
+#if M10V_DEBUG_MODE && M10V_ADJ_EXIT_TRACE
+uint32_t m10v_settings_controller_ab_selector(uint32_t mapper,uint32_t key){
+
+ if(key==1||(key>=0x35&&key<=0x38))M10V_EXIT_LOG(253,mapper,key,0,0);
+ uint32_t r=ab_trace_selector_impl(mapper,key);
+ if(key==1||(key>=0x35&&key<=0x38))M10V_EXIT_LOG(254,mapper,key,r,0);return r;
+}
+#endif
+
 static int ab_films_match(m10v_ab *s){
  uint32_t a=m10v_ab_slot(s->a),b=m10v_ab_slot(s->b);if(a>=M10V_SLOT_COUNT&&b>=M10V_SLOT_COUNT)return 1;
  m10v_library_state fresh;if(m10v_camera_library_load(&fresh)<0)return 0;
  return (a>=M10V_SLOT_COUNT||fresh.slots[a].film==s->film_a)&&(b>=M10V_SLOT_COUNT||fresh.slots[b].film==s->film_b);
+}
+static int ab_live_films_match(m10v_ab *s){
+#if M10V_LIVE_COLOR
+ uint32_t a=m10v_ab_slot(s->a),b=m10v_ab_slot(s->b);
+ if(a>=M10V_SLOT_COUNT&&b>=M10V_SLOT_COUNT)return 1;
+ m10v_library_state fresh;
+ if(!m10v_camera_library_preview(&fresh))return 0;
+ return (a>=M10V_SLOT_COUNT||fresh.slots[a].film==s->film_a)&&(b>=M10V_SLOT_COUNT||fresh.slots[b].film==s->film_b);
+#else
+ return ab_films_match(s);
+#endif
 }
 static uint32_t ab_live_key(m10v_settings_controller *p,uint32_t key){
  if(!p||!p->ab.enabled||key<0x36||key>0x38)return 0;
@@ -198,45 +287,80 @@ uint32_t m10v_settings_controller_ab_mapper(uint32_t mapper,uint32_t key){
  return ab_live_key(ab_owner(),key)?1:m10v_ab_mapper_original(mapper,key);
 }
 uint32_t m10v_settings_controller_ab_live_enter(uint32_t live,uint32_t route,uint32_t flags){
+ M10V_EXIT_LOG(239,live,route,flags,*(const volatile uint32_t *)0x55063988u);
+ m10v_settings_controller *p=ab_owner();
+ int power_off=p&&p->power_off_pending;
  uint32_t r=m10v_ab_live_enter_original(live,route,flags);
- if(route==0x08000000u){
-  /* Reconcile legacy positional selections only from the UI lifecycle. */
-  m10v_settings_factory_original(0x55063914u,0x0200004au);
-#if M10V_BORDER_ENABLED
-  /* Normal UI lifecycle after the retained TopMenu factory is published.
-   * Never load SD from the constructor or processing-task producer. */
-  uint32_t border_style;
-  if(!m10v_border_camera_snapshot(&border_style)){
-   m10v_settings_controller *border_page=ab_owner();
-   if(border_page)m10v_border_camera_refresh((uint32_t)(uintptr_t)border_page-M10V_SETTINGS_OWNER_BYTES);
-  }
-#endif
+ M10V_EXIT_LOG(240,live,route,r,power_off);
+ /* Native ADJ closes through LiveView on its way to power-off. That entry
+  * is not a new shooting session: do not allocate a TopMenu owner or perform
+  * journal migration/SD reads while native power services are shutting down.
+  * Leave the original transition and its return value entirely intact. */
+ if(power_off){M10V_EXIT_LOG(247,live,r,1,route);return r;} /* Native entry may have retired the old owner. */
+ p=ab_owner();
+ if(p&&p->power_off_pending){M10V_EXIT_LOG(247,live,r,2,route);return r;}
+ if(p&&route==0x08000000u){
+  M10V_EXIT_LOG(273,live,p->ab_exit_source,0,0);p->ab_exit_source=0;
+ }
+ if(route==0x08000000u&&(!p||!p->library_initialized)){
+  /* Initialize once for this owner. Ordinary ADJ/A-B returns must not
+   * re-enter the storage services that the native transition is using.
+   * Successful menu writes already publish the current cache themselves. */
+  M10V_EXIT_LOG(241,live,route,0,0);
+  uint32_t init_owner=m10v_settings_factory_original(0x55063914u,0x0200004au);(void)init_owner;
+  M10V_EXIT_LOG(242,live,init_owner,0,0);
   uint32_t model=((fn1)0x5320ba9cu)(((fn1)0x5320ad88u)(0));
   uint8_t *m=(uint8_t *)(uintptr_t)model;uint8_t prior=m[0x1b];m[0x1b]=0;
-  m10v_camera_library_reconcile_legacy_selection(model);m[0x1b]=prior;
+  M10V_EXIT_LOG(243,live,model,prior,0);
+  int reconciled=m10v_camera_library_reconcile_legacy_selection(model);
+  M10V_EXIT_LOG(244,live,model,(uint32_t)reconciled,0);
+  int initialized=reconciled>=0;m[0x1b]=prior;
 #if M10V_LIVE_COLOR
-  m10v_library_state preview;m10v_camera_library_load(&preview);
+  M10V_EXIT_LOG(245,live,model,0,0);
+  m10v_library_state preview;int loaded=m10v_camera_library_load(&preview);
+  M10V_EXIT_LOG(246,live,(uint32_t)loaded,loaded>=0?preview.sequence:0,0);
+  if(loaded<0)initialized=0;
 #endif
+#if M10V_HDF_UI_CACHE
+  m10v_hdf_bootstrap();
+#endif
+  p=ab_owner();if(p&&initialized)p->library_initialized=1;
  }
- m10v_settings_controller *p=ab_owner();
+#if M10V_BORDER_ENABLED
+ if(route==0x08000000u){
+  /* Refresh only from the live UI lifecycle after the owner exists. */
+  uint32_t border_style;
+  if(!m10v_border_camera_snapshot(&border_style)){
+   p=ab_owner();
+   if(p)m10v_border_camera_refresh((uint32_t)(uintptr_t)p-M10V_SETTINGS_OWNER_BYTES);
+  }
+ }
+#endif
+ p=ab_owner();
  if(p&&route==0x08000000u){
-  if(p->ab.enabled&&(ab_current()!=p->ab.selected||!ab_films_match(&p->ab)))ab_stop(&p->ab);
- }return r;
+  M10V_EXIT_LOG(268,live,p->ab.enabled,p->ab.selected,p->library_initialized);
+  if(p->ab.enabled&&(ab_current()!=p->ab.selected||!ab_live_films_match(&p->ab)))ab_stop(&p->ab);
+  M10V_EXIT_LOG(269,live,p->ab.enabled,0,0);
+ }M10V_EXIT_LOG(247,live,r,0,route);return r;
 }
 uint32_t m10v_settings_controller_ab_live_leave(uint32_t live){
+ M10V_EXIT_LOG(255,live,0,0,0);
  m10v_settings_controller *p=ab_owner();if(p)ab_clear(&p->ab);
  /* No A/B widgets or synchronous SD diagnostics on native transitions. */
- return m10v_ab_live_leave_original(live);
+ uint32_t r=m10v_ab_live_leave_original(live);M10V_EXIT_LOG(256,live,r,0,0);return r;
 }
 uint32_t m10v_settings_controller_ab_live_destroy(uint32_t live){
+ M10V_EXIT_LOG(257,live,0,0,0);
  m10v_settings_controller *p=ab_owner();if(p)ab_clear(&p->ab);
- return m10v_ab_live_destroy_original(live);
+ uint32_t r=m10v_ab_live_destroy_original(live);M10V_EXIT_LOG(258,live,r,0,0);return r;
 }
 uint32_t m10v_settings_controller_ab_live_event(uint32_t live,uint32_t event){
  m10v_settings_controller *p=ab_owner();
  uint32_t key=ab_event_key(event);
  if(ab_live_key(p,key))return 1;
+ if(key==1||key==0x35||key==0x86||key==0x87||key==0xb8)M10V_EXIT_LOG(262,live,key,0,0);
  uint32_t r=m10v_ab_live_event_original(live,event);
+ if(key==1||key==0x35||key==0x86||key==0x87||key==0xb8)M10V_EXIT_LOG(263,live,key,r,0);
  /* Native dispatch can change controller ownership. Never retain the old
   * settings pointer across it. */
  p=ab_owner();if(!p)return r;
@@ -250,11 +374,19 @@ uint32_t m10v_settings_controller_ab_live_event(uint32_t live,uint32_t event){
  * then supply the reserved action only to the unchanged native IC owner.
  * Release/hold, other ADJ slots, capture and power use the original result. */
 extern uint32_t m10v_ab_dispatch_original(uint32_t,uint32_t);
+#if M10V_DEBUG_MODE && M10V_ADJ_EXIT_TRACE
+static uint32_t ab_trace_dispatch_impl(uint32_t c,uint32_t event){
+#else
 uint32_t m10v_settings_controller_ab_dispatch(uint32_t c,uint32_t event){
+#endif
  /* The film selector owns no native list that can consume MENU/DISP.
   * Preserve original service updates, then recover only a filtered first
   * press. Reacquire ownership after native dispatch; it can destroy the page. */
  uint32_t raw=*(const uint16_t *)(uintptr_t)event;
+ if(raw==1){
+  uint32_t packet=*(const uint32_t *)(uintptr_t)(event+4);
+  if(ab_ram(packet,8)&&*(const uint8_t *)(uintptr_t)packet==2&&ab_host_word(packet,4)==0)ab_main_off();
+ }
  if(raw==4||raw==5||raw==0x1b){
   m10v_settings_controller *p=ab_owner();
   if((uint32_t)(uintptr_t)p==c&&p&&p->page==M10V_SETTINGS_FILMS&&
@@ -303,3 +435,11 @@ uint32_t m10v_settings_controller_ab_dispatch(uint32_t c,uint32_t event){
  M10V_LOG(209,c,route,handled,ab_host(p)?p->host.mode:0);
  return handled?1:r;
 }
+#if M10V_DEBUG_MODE && M10V_ADJ_EXIT_TRACE
+uint32_t m10v_settings_controller_ab_dispatch(uint32_t c,uint32_t event){
+ uint32_t raw=*(const uint16_t *)(uintptr_t)event,phase=0xffffffffu,value=0xffffffffu;uint32_t packet=*(const uint32_t *)(uintptr_t)(event+4);if(ab_ram(packet,8)){phase=*(const uint8_t *)(uintptr_t)packet;value=ab_host_word(packet,4);}
+ if(raw==1||raw==4||raw==5||raw==8)M10V_EXIT_LOG(251,c,raw,phase,value);
+ uint32_t r=ab_trace_dispatch_impl(c,event);
+ if(raw==1||raw==4||raw==5||raw==8)M10V_EXIT_LOG(252,c,raw,r,0);return r;
+}
+#endif

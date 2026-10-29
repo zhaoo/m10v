@@ -46,7 +46,7 @@ static int render(uint32_t *p,const char *main,const char *sub,uint32_t c,uint32
  return 0;
 }
 int m10v_film_card_render(uint32_t *p,uint32_t film,uint32_t slot,uint32_t selected){
- uint32_t i;if(film>=1&&film<=78)i=film-1;else if(film>=289&&film<=311)i=78+film-289;else return -1;
+ uint32_t i;if(film>=1&&film<=78)i=film-1;else if(film>=289&&film<=305)i=78+film-289;else if(film>=309&&film<=316)i=78+film-292;else return -1;
  return render(p,box_labels+box_label_offsets[box_cards[i].main],box_labels+box_label_offsets[box_cards[i].sub],box_palette[box_cards[i].color],box_palette[box_cards[i].ink],box_labels+box_label_offsets[box_cards[i].brand],box_palette[box_cards[i].header],box_palette[box_cards[i].accent],slot,selected);
 }
 int m10v_film_card_custom(uint32_t *p,const char *name,uint32_t slot,uint32_t selected){

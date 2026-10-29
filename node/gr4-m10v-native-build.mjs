@@ -14,7 +14,7 @@ const hash=b=>createHash('sha256').update(b).digest('hex');
 export function validateGr4Source(source){if(!Buffer.isBuffer(source)||hash(source)!==GR4_OFFICIAL_SHA256)throw Error('GR IV 官方固件摘要不匹配');}
 export function normalizeGr4Request(value={}){
  const configuration=normalizeConfiguration(value.configuration),extensions=normalizeExtensions(value.extensions);
- if(configuration.slots.some(s=>s.film===294||(s.film>=306&&s.film<=311)))throw Error('新滤镜需要 GR III 已接入的 ISP 成片管线');
+ if(configuration.slots.some(s=>s.film===294||(s.film>=306&&s.film<=316)))throw Error('新滤镜需要 GR III 已接入的 ISP 成片管线');
  if(configuration.zoom.write)throw Error('裁切焦距写入仅支持 GR III');
  if(configuration.slots.length>5)throw Error('GR IV 暂不支持导出超过 5 款胶卷');
  if(configuration.slots.some(s=>s.grain>0))throw Error('颗粒仅支持 GR III 原厂原生成像管线，请关闭颗粒后导出 GR IV');

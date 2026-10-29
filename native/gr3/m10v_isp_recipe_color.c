@@ -14,10 +14,15 @@
 #define M10V_ISP_RECIPE_COLOR_PRODUCER 0
 #endif
 #if M10V_ISP_SHARED_HDF
+extern void m10v_hdf_task_snapshot(uint32_t);
 extern uint32_t m10v_hdf_settings(uint32_t,uint32_t);
 extern void m10v_hdf_done(uint32_t,uint32_t,uint32_t);
 #endif
 _Static_assert(sizeof(m10v_isp_recipe_color)==M10V_SAVE_COLOR_BYTES,"recipe color extent");
+_Static_assert(sizeof(m10v_stamp_recipe)==M10V_SAVE_STAMP_BYTES,"stamp extent");
+_Static_assert(M10V_SAVE_COLOR_OFFSET+M10V_SAVE_COLOR_BYTES<=M10V_CAPTURE_RAW_TOKEN_OFFSET,"color before RAW token");
+_Static_assert(M10V_CAPTURE_RAW_TOKEN_OFFSET+M10V_CAPTURE_RAW_TOKEN_BYTES<=M10V_SAVE_STAMP_OFFSET,"RAW and HDF before stamp owner");
+_Static_assert(M10V_SAVE_STAMP_OFFSET+M10V_SAVE_STAMP_BYTES==M10V_SAVE_RECIPE_EXTENDED_BYTES,"stamp allocation extent");
 #if M10V_ISP_RECIPE_COLOR_PRODUCER || M10V_ISP_LIVE_COLOR
 static int config_ram(uintptr_t p,uint32_t bytes){return !(p&3)&&p>=0x55000000u&&p<=0x80000000u-bytes;}
 #endif
@@ -90,6 +95,7 @@ int m10v_isp_frame_recipe_snapshot(void *recipe,const m10v_library_state *state)
     if(!s||!m10v_library_valid(state))return 0;
     if(s->magic==M10V_ISP_RECIPE_COLOR_MAGIC&&s->busy)return 0;
     s->magic=0;
+    ((m10v_stamp_recipe *)((uint8_t *)recipe+M10V_SAVE_STAMP_OFFSET))->magic=0;
     for(uint32_t i=0;i<sizeof(*state);i++)((uint8_t *)&s->state)[i]=((const uint8_t *)state)[i];
     s->version=1;s->bytes=sizeof(*s);s->status=M10V_ISP_RECIPE_READY;
     s->sequence=state->sequence;s->tone=0;s->selected_tone=0;s->si=0;
@@ -99,6 +105,13 @@ int m10v_isp_frame_recipe_snapshot(void *recipe,const m10v_library_state *state)
 #endif
     s->magic=M10V_ISP_RECIPE_COLOR_MAGIC;
     return 1;
+}
+uint32_t m10v_isp_frame_recipe_direction(void *recipe,uint32_t shooting){
+    m10v_isp_recipe_color *s=owned(recipe);
+    if(!s||s->magic!=M10V_ISP_RECIPE_COLOR_MAGIC||s->version!=1||s->bytes!=sizeof(*s)||s->status==M10V_ISP_RECIPE_MUTATING)return 0;
+    const m10v_stamp_recipe *stamp=(const m10v_stamp_recipe *)((const uint8_t *)recipe+M10V_SAVE_STAMP_OFFSET);
+    if(stamp->magic!=M10V_SAVE_STAMP_MAGIC||stamp->owner!=(uint32_t)(uintptr_t)recipe||stamp->shooting!=shooting||stamp->direction>3)return 0;
+    return stamp->direction;
 }
 int m10v_isp_frame_recipe_state(void *recipe,m10v_library_state *out){
     m10v_isp_recipe_color *s=owned(recipe);
@@ -111,6 +124,9 @@ static int producer_mutating(m10v_isp_recipe_color *s){
 }
 int m10v_isp_frame_recipe_producer(void *recipe){
 #if M10V_ISP_RECIPE_COLOR_PRODUCER
+#if M10V_ISP_SHARED_HDF
+    m10v_hdf_task_snapshot((uint32_t)(uintptr_t)recipe);
+#endif
     m10v_isp_recipe_color *s=owned(recipe);
     if(!s)return 0;
 #if M10V_BORDER_SHOT
@@ -141,6 +157,16 @@ int m10v_isp_frame_recipe_producer(void *recipe){
     /* The exposed frame owns its tone. UI Property can already name a later
      * shot by task submission; never use it to recolor a queued exposure. */
     s->selected_tone=(uint16_t)producer_tone;
+    if(state.stamp||(state.reserved&1u)){
+        /* Read this recipe's ShootingInfo, precisely the byte bound by the
+         * official EXIF setter535f63d0. Never sample the live/UI singleton:
+         * its direction can belong to a later exposure at this task ingress. */
+        m10v_stamp_recipe *stamp=(m10v_stamp_recipe *)((uint8_t *)recipe+M10V_SAVE_STAMP_OFFSET);
+        uint32_t direction=((const uint8_t *)si)[0xc8];
+        stamp->owner=(uint32_t)(uintptr_t)recipe;stamp->shooting=(uint32_t)si;
+        stamp->direction=direction<=3?direction:0;
+        stamp->magic=M10V_SAVE_STAMP_MAGIC;
+    }
     return 1;
 #else
     (void)recipe;return 0;

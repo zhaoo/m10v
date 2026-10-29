@@ -10,7 +10,7 @@ def packed_frames(manifest):
  """Lossless original 256 knots, existing native_frame_packed wire shape."""
  from scripts.build_gr3_isp_native_look import encode_curve_deltas,decode_curve_deltas
  stream=bytearray();frames=[]
- for q in manifest['native_profiles_full']:
+ for q in [q for q in manifest['native_profiles_full'] if q['film_id']>=309]:
   offsets=[]
   for curve in q['curves']:
    if len(curve)!=256 or any(type(v)is not int or not 0<=v<=16383 for v in curve):raise ValueError('curve shape/range')
@@ -27,8 +27,8 @@ def native_header(manifest):
  arr=lambda x:'{'+','.join(map(str,x))+'}'
  packed,stream=packed_frames(manifest)
  frames=['{'+','.join(arr(q[key]) for key in ['matrix','post','first','offset'])+'}' for q in packed]
- hues=[arr([v for sector in q['hue_q10'] for row in sector for v in row]) for q in manifest['native_profiles_full']]
- return '/* Generated LOSSLESS native_frame_packed profiles; camera validation pending. Uses existing native_frame_packed typedef. */\nstatic const native_frame_packed native_anime_e6_frame[6]={'+','.join(frames)+'};\nstatic const uint8_t native_anime_e6_curve_stream['+str(len(stream))+']='+arr(stream)+';\nstatic const int16_t native_anime_e6_hue[6][108]={'+','.join(hues)+'};\n'
+ hues=[arr([v for sector in q['hue_q10'] for row in sector for v in row]) for q in manifest['native_profiles_full'] if q['film_id']>=309]
+ return '/* Generated LOSSLESS native_frame_packed profiles; camera validation pending. Uses existing native_frame_packed typedef. */\nstatic const native_frame_packed native_anime_e6_frame['+str(len(packed))+']={'+','.join(frames)+'};\nstatic const uint8_t native_anime_e6_curve_stream['+str(len(stream))+']='+arr(stream)+';\nstatic const int16_t native_anime_e6_hue['+str(len(packed))+'][108]={'+','.join(hues)+'};\n'
 def polish_quantization(q,train,target,base):
  """Train-only deterministic integer coordinate search; never uses holdout."""
  import copy

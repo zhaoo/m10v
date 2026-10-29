@@ -119,7 +119,7 @@
     {
       "id": 70,
       "key": "fuji-industrial-100",
-      "name": "富士业务用 100",
+      "name": "\u5bcc\u58eb\u4e1a\u52a1\u7528 100",
       "iso": 100,
       "grain": 1,
       "grain_size": 0,
@@ -136,7 +136,7 @@
     {
       "id": 71,
       "key": "lucky-c200-new",
-      "name": "乐凯 C200",
+      "name": "\u4e50\u51ef C200",
       "iso": 200,
       "grain": 2,
       "grain_size": 1,
@@ -6706,7 +6706,7 @@
     "third_party/curated-film-luts/fuji_superia_100.cube": "cf93ea0307ba96e5b204a67afb2479791dd3f74765ddda8a1c2aa582f14ab917",
     "third_party/curated-film-luts/LICENSE": "df194a15bf69c2dc16be81eddce0b1a6ee68d9fc418f33abc29952a4d6c9e878",
     "scripts/fit_gr3_curated_native.py": "e8ecf8b243787dae8f13157b9b6f0a761d745044452941b4f37b783f96c3000d",
-    "scripts/fit_gr3_native_film_targets.py": "5048042fd5ce76df35715179f4a3a50e523b92dbdcafc6c6abf69a01312dad0b",
+    "scripts/fit_gr3_native_film_targets.py": "d21a818bed726ec3737308da0fe83435a2cade2d546438373bdabcdca6a5fa9c",
     "native/gr3/native-film-fit-targets.json": "022ee1020221c5dd0dd06c9bfb046eb55087a10733bfe4ed5c4ba5e16c75f020"
   },
   "native_profiles_full": [

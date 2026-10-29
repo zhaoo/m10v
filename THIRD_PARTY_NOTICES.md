@@ -146,3 +146,35 @@ is generated from Noto Sans CJK SC Regular, Copyright 2014-2021 Adobe
 and font SHA-256 are recorded in that file. The SIL Open Font License 1.1
 is retained in `third_party/noto-cjk/OFL.txt`. Normal builds use the pinned
 coverage and do not download fonts or use host font rasterization.
+
+## Desktop GR III / IIIx fit quality controls (2026-10-28)
+
+`node/gr3-fit-quality.mjs`, `gr3-fit-envelope.mjs` and the fit workbench adapt
+ideas and scalar-range checks from the following GPL-2.0 repositories. They do
+not contain factory firmware arrays or user LUT files. The existing ignored
+GRLife fitter remains responsible for the alternating matrix/curve solver and
+CIEDE2000 implementation (its own upstream notices above remain applicable).
+The report records the SHA-256 of every numerical model/fitter module actually
+used. Validation samples and guarded selection are authored in M10V; upstream
+benchmark numbers and camera measurements are not reused.
+
+Darkslide GR, checkout `5f57f6dba7992b537344ae49025846d4c4838b47`
+(the newer remote 1.6 UI revision is not claimed as the local source):
+
+- `darkslide/film_fit.py`: `7ff90c8fd1fd0ec1ca4e2efd345619eb46780c21eb13b66b3eff617180a8ded5`
+- `darkslide/lut_ranges.py`: `505f7ff92d1a8be29e3cbd2e3861c49b818b092fcfa6b578866d667e89392f84`
+- `darkslide/factory_envelope.py`: `2a301918ac77b12132e8cf3f20ce65dc702cb746568b55b02d56fc43e0221731`
+- `darkslide/gr3x_factory_envelope.py`: `54e7adc933b6621aafca149c9ec26aec26e3795a17f9c7cc94beb53a263e6919`
+
+Ricoh GRMod, checkout `1f4216e4b80d737a3e670c0b6169398f57598b5e`:
+
+- `core/src/color/gr3x-import.ts`: `d8632de9c5be9e318ea743334d6f6b8b9f96ff1f1ac618e1efdf98c6e53a944b`
+- `core/src/color/refine.ts`: `9f58c3f23b1dba3c518b13818b109364244616fb3378a9ac1f81697ebeec6a37`
+- `core/src/color/convert.ts`: `3dffd30d6584ead838c92f95f0d356735e45ad8891f6d09866ae59ec0ecf6036`
+
+The native III/IIIx camera model is a Standard display-domain approximation.
+GRMod's GR IV 17-node model and its benchmarks are not applied to these models.
+The 33-node integer expansion used here is the existing M10V/GRLife film-slot
+contract. The factory post-matrix bounds are explicitly schema limits: the
+original output matrix has a different encoding and is not a comparable Q512
+factory post matrix.

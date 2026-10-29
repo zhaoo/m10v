@@ -9,7 +9,7 @@ test('digital HDF is independent of films and retired soft values never become H
  const c=normalizeConfiguration(old);
  assert.equal(c.hdf,0);assert.ok(c.slots.every(s=>s.soft===0));
  c.hdf=2;assert.equal(resetNativeTexture(c,0).hdf,2);
- assert.equal(initialState(c).readUInt32LE(96),0);
+ assert.deepEqual(initialState(c),initialState({...c,hdf:0}));
  for(const hdf of [-1,4,1.5,'2',null])assert.throws(()=>normalizeConfiguration({...c,hdf}));
 });
 test('exported HDF candidate independently verifies coefficients and rejects changed ARM instructions',{timeout:120000},async()=>{
@@ -48,7 +48,9 @@ test('HDF alone preserves original film entry points and has an independent menu
  assert.deepEqual(plan.features,['digitalHdf']);assert.equal(plan.film_count,0);
  assert.notEqual(plan.configuration_sha256,prepareNative(source,c).configuration_sha256);
  const result=await generateNative(source,c,plan.configuration_sha256,options);
- assert.equal(result.receipt.verified_hooks,20);assert.equal(result.receipt.film_library_enabled,false);
+ assert.ok(result.receipt.verified_hooks>20,'independent ADJ and icon routing add audited hooks');assert.equal(result.receipt.film_library_enabled,false);
+ assert.equal(result.manifest.hdf_adj.function_id,20);assert.equal(result.manifest.hdf_adj.record_count,21);
+ assert.equal(result.manifest.hdf_adj.original_table_bytes,20*0x44);
  assert.equal(result.manifest.hdf_menu.owner_offset,0x13bc);assert.equal(result.manifest.hdf_default,2);
  const {decodeFrameMap}=await import('./gr3-frames.mjs');
  const rtos=bytes=>{const d=decodeFrameMap(bytes,bytes.readUInt32LE(bytes.length-8)).decoded;for(let at=0;at<d.length;){const n=d.readUInt32LE(at+12);if(d.toString('ascii',at,at+4)==='RTOS')return d.subarray(at+16,at+16+n);at+=16+n;}throw Error('RTOS missing');};

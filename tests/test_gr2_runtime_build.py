@@ -39,7 +39,7 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
         changed=bytearray(code);changed[rows[1]['source_file_offset']]^=1
         with self.assertRaises(ValueError):module.memory_reservations(bytes(changed))
 
-    def test_page_configuration_rejects_invalid_values_and_does_not_silently_drop_unwired_hdf(self):
+    def test_page_configuration_validates_values_and_preserves_independent_hdf(self):
         import copy
         from scripts.build_gr2_runtime import configuration_state
         normalized,wire,native=configuration_state({})
@@ -49,7 +49,10 @@ class Gr2RuntimeBuildTests(unittest.TestCase):
             bad=copy.deepcopy(normalized);bad['slots'][0][field]=value
             with self.subTest(field=field),self.assertRaises(ValueError):configuration_state(bad)
         bad=copy.deepcopy(normalized);bad['hdf']=1
-        with self.assertRaisesRegex(ValueError,'under reverse engineering'):configuration_state(bad)
+        hdf_configuration,hdf_wire,hdf_native=configuration_state(bad)
+        self.assertEqual(hdf_configuration['hdf'],1);self.assertEqual(hdf_wire,wire);self.assertEqual(hdf_native,native)
+        bad['hdf']=4
+        with self.assertRaises(ValueError):configuration_state(bad)
         bad=copy.deepcopy(normalized);bad['unknown']=0
         with self.assertRaises(ValueError):configuration_state(bad)
         for bad in ([],None,False):

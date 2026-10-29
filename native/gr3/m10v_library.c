@@ -3,7 +3,6 @@
  * with their source notices; no third-party camera runtime or signed film
  * package is loaded. Camera services have separately verified ABI boundaries. */
 #include "m10v_library.h"
-#include "m10v_anime.h"
 #include "m10v_film_directory.h"
 #include "halation_core.h"
 #include "film_5207.h"
@@ -98,7 +97,7 @@ int m10v_library_valid(const m10v_library_state *state) {
         state->size != sizeof(*state) || (state->reserved & ~511u) || state->stamp > 2 ||
         state->format > 3 || state->corner > 3 || state->color > 3 || state->crc != checksum(state)) return 0;
     uint32_t migration_old=(state->reserved>>1)&15u,migration_new=(state->reserved>>5)&15u;
-    if((!migration_old)!=(!migration_new)||migration_old>5||migration_new>M10V_SLOT_COUNT)return 0;
+    if((!migration_old)!=(!migration_new)||migration_old>M10V_SLOT_COUNT||migration_new>M10V_SLOT_COUNT)return 0;
     for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i)
         if (( state->slots[i].film > M10V_CUSTOM_MAX_ID && !M10V_BUILTIN(state->slots[i].film)) ||
             state->slots[i].grain > 3 || state->slots[i].soft > 3 || state->slots[i].halo_gain>8 || state->slots[i].halo_spread>8 ||
@@ -156,7 +155,7 @@ int m10v_library_reset(m10v_library_state *state,uint32_t slot,m10v_library_stor
 }
 int m10v_library_select(m10v_library_state *state, uint32_t slot, uint32_t id,
                         m10v_library_store store, void *context) {
-    if (!m10v_library_valid(state) || slot >= (M10V_LEGACY_SETTINGS?5u:M10V_SLOT_COUNT) || (!M10V_LEGACY_SETTINGS&&slot>m10v_library_count(state)) || !M10V_BUILTIN(id))
+    if (!m10v_library_valid(state) || slot >= (M10V_LEGACY_SETTINGS?5u:M10V_SLOT_COUNT) || (!M10V_LEGACY_SETTINGS&&slot>m10v_library_count(state)) || !M10V_BUILTIN(id) || M10V_ANIME(id))
         return M10V_LIBRARY_INVALID;
     if(!M10V_LEGACY_SETTINGS)for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)if(i!=slot&&state->slots[i].film==id)return M10V_LIBRARY_INVALID;
     m10v_library_state next; copy_state(&next, state); next.slots[slot].film = (uint16_t)id;
@@ -168,7 +167,7 @@ int m10v_library_select(m10v_library_state *state, uint32_t slot, uint32_t id,
         v->halo_spread=3;v->halo_threshold=5;v->halo_profile=id==66?1:2;
         m10v_film_effects e={0};next.effects[slot]=e;
     }
-    if(id!=M10V_CHAR_ID&&!M10V_ANIME(id))next.effects[slot].reserved[1]=0;
+    if(id!=M10V_CHAR_ID)next.effects[slot].reserved[1]=0;
     if(id==M10V_CHAR_ID&&state->slots[slot].film!=id)next.slots[slot].grain=0;
     if(id!=state->slots[slot].film||(id!=67&&id!=68))next.effects[slot].film_exposure=0;
     return commit(state, &next, store, context);
@@ -222,7 +221,7 @@ int m10v_library_film_name_stamp(m10v_library_state *state,uint32_t enabled,m10v
 }
 int m10v_library_effects(m10v_library_state *state,uint32_t slot,uint32_t field,uint32_t value,m10v_library_store store,void *ctx){
     if(!m10v_library_valid(state)||slot>=M10V_SLOT_COUNT||!state->slots[slot].film||field>7)return M10V_LIBRARY_INVALID;
-    if(field==7?((state->slots[slot].film!=M10V_CHAR_ID&&!M10V_ANIME(state->slots[slot].film))||value>3):field==6?(state->slots[slot].film==67?value>1:state->slots[slot].film!=68||value>2):field<=5?value!=0:0)return M10V_LIBRARY_INVALID;
+    if(field==7?(state->slots[slot].film!=M10V_CHAR_ID||value>3):field==6?(state->slots[slot].film==67?value>1:state->slots[slot].film!=68||value>2):field<=5?value!=0:0)return M10V_LIBRARY_INVALID;
     m10v_library_state next;copy_state(&next,state);
     if(field==5){
         m10v_film_effects e={0,0,0,0,0,next.effects[slot].film_exposure,{0,0}};next.effects[slot]=e;
@@ -295,15 +294,26 @@ static uint32_t stamp_mask(char c) {
     if(c=='&')return 0x1ed9u;
     return (1u<<0)|(1u<<1)|(1u<<6)|(1u<<12);
 }
-static void stamp_pixel(m10v_library_image *image,const m10v_library_state *state,uint32_t x,uint32_t y,uint32_t pass){
+static void stamp_pixel(m10v_library_image *image,const m10v_library_state *state,uint32_t x,uint32_t y,uint32_t pass,uint32_t direction){
+    /* EXIF directions 1/2/3 display as CCW90/180/CW90. Transform only
+     * a glyph sample, never the image planes or descriptors. */
+    uint32_t sx=x,sy=y;
+    if(direction==1){sx=image->width-1-y;sy=x;}
+    else if(direction==2){sx=image->width-1-x;sy=image->height-1-y;}
+    else if(direction==3){sx=y;sy=image->height-1-x;}
+    x=sx;y=sy;
     static const uint8_t colors[4][3]={{235,128,128},{180,80,185},{82,90,240},{210,16,146}};
     if(x>=image->width||y>=image->height)return;
     image->y[y*image->stride+x]=pass?colors[state->color][0]:16;
+    /* An odd visible width has no complete final CbCr pair. Do not write
+     * its missing partner into padding, even for a rotated glyph. */
+    if((x&~1u)+1>=image->width)return;
     uint32_t at=y*image->stride+(x&~1u);
+    if(at+1>=image->chroma_bytes)return;
     image->chroma[at]=pass?colors[state->color][1]:128;
     image->chroma[at+1]=pass?colors[state->color][2]:128;
 }
-static void stamp_line(m10v_library_image *image,const m10v_library_state *state,const char *text,uint32_t count,uint32_t left,uint32_t top,uint32_t height){
+static void stamp_line_oriented(m10v_library_image *image,const m10v_library_state *state,const char *text,uint32_t count,uint32_t left,uint32_t top,uint32_t height,uint32_t direction){
     uint32_t advance=(height*76+107)/108,shadow=height/36+1;
     for(uint32_t pass=0;pass<2;++pass)for(uint32_t i=0;i<count;++i){
         char c=text[i];uint32_t mask=stamp_mask(c),offset=pass?0:shadow;
@@ -312,7 +322,7 @@ static void stamp_line(m10v_library_image *image,const m10v_library_state *state
             for(uint32_t dot=0;dot<(c==':'?2u:1u);++dot){
                 uint32_t yy=c=='\''?0:c==':'?(dot?height*2/3:height/3):height-size;
                 for(uint32_t y=0;y<size;++y)for(uint32_t x=0;x<size;++x)
-                    stamp_pixel(image,state,left+i*advance+height/4+x+offset,top+yy+y+offset,pass);
+                    stamp_pixel(image,state,left+i*advance+height/4+x+offset,top+yy+y+offset,pass,direction);
             }
             continue;
         }
@@ -331,13 +341,17 @@ static void stamp_line(m10v_library_image *image,const m10v_library_state *state
                 uint32_t inside=1;
                 for(uint32_t n=0;n<p[0];++n){uint32_t next=n+1==p[0]?0:n+1;
                     if((vx[next]-vx[n])*(2*y+1-2*vy[n])-(vy[next]-vy[n])*(2*x+1-2*vx[n])<0){inside=0;break;}}
-                if(inside)stamp_pixel(image,state,left+i*advance+(uint32_t)x+offset,top+(uint32_t)y+offset,pass);
+                if(inside)stamp_pixel(image,state,left+i*advance+(uint32_t)x+offset,top+(uint32_t)y+offset,pass,direction);
             }
         }
     }
 }
+static void stamp_line(m10v_library_image *image,const m10v_library_state *state,const char *text,uint32_t count,uint32_t left,uint32_t top,uint32_t height){stamp_line_oriented(image,state,text,count,left,top,height,0);}
 static uint32_t stamp_width(uint32_t count,uint32_t height){return count*((height*76+107)/108)+height/36+1;}
-static void stamp(m10v_library_image *image,const m10v_library_state *state,const m10v_library_date *date,const char *name){
+static void stamp_oriented(m10v_library_image *image,const m10v_library_state *state,const m10v_library_date *date,const char *name,uint32_t direction){
+    if(direction>3)direction=0;
+    uint32_t width=(direction&1)?image->height:image->width;
+    uint32_t height=(direction&1)?image->width:image->height;
     char text[24];uint32_t count=state->stamp&&date_valid(date)?date_text(text,date,state->format,state->stamp):0;
     uint32_t name_count=0;
     if((state->reserved&1u)&&name){while(name_count<24&&name[name_count]>=' '&&name[name_count]<='~')name_count++;
@@ -351,15 +365,17 @@ static void stamp(m10v_library_image *image,const m10v_library_state *state,cons
         uint32_t dw=count?stamp_width(count,dh):0,nw=name_count?stamp_width(name_count,nh):0;
         tw=dw>nw?dw:nw;gap=(count&&name_count)?dh/5+2:0;
         th=(count?dh+dh/36+1:0)+(name_count?nh+nh/36+1:0)+gap;
-        if(tw+2*margin<image->width&&th+2*margin<image->height)break;
+        if(tw+2*margin<width&&th+2*margin<height)break;
         if(dh<=3&&nh<=3)return;
         if(dh>3)--dh;if(nh>3)--nh;
     }
-    uint32_t left=(state->corner&1)?image->width-margin-tw:margin;
-    uint32_t top=(state->corner&2)?image->height-margin-th:margin;
-    if(count)stamp_line(image,state,text,count,left+((state->corner&1)?tw-stamp_width(count,dh):0),top,dh);
-    if(name_count)stamp_line(image,state,name,name_count,left+((state->corner&1)?tw-stamp_width(name_count,nh):0),top+(count?dh+dh/36+1+gap:0),nh);
+    uint32_t left=(state->corner&1)?width-margin-tw:margin;
+    uint32_t top=(state->corner&2)?height-margin-th:margin;
+    if(count&&!direction)stamp_line(image,state,text,count,left+((state->corner&1)?tw-stamp_width(count,dh):0),top,dh);
+    else if(count)stamp_line_oriented(image,state,text,count,left+((state->corner&1)?tw-stamp_width(count,dh):0),top,dh,direction);
+    if(name_count)stamp_line_oriented(image,state,name,name_count,left+((state->corner&1)?tw-stamp_width(name_count,nh):0),top+(count?dh+dh/36+1+gap:0),nh,direction);
 }
+static void stamp(m10v_library_image *image,const m10v_library_state *state,const m10v_library_date *date,const char *name){stamp_oriented(image,state,date,name,0);}
 /* Existing tables are decoded exactly; RGB evaluation is an explicitly new
  * saved-JPEG path, not a claim that it reproduces the stock ISP pixel-for-pixel. */
 int m10v_library_tables(uint32_t id,int16_t *matrix,int16_t *post,uint16_t *curves,uint16_t *knots){
@@ -512,7 +528,7 @@ static void phoenix_halation_compose(m10v_library_image *im,const m10v_slot *v,c
 }
 static int render_stages(m10v_library_image *image,const m10v_library_state *state,
                         uint32_t slot,const m10v_library_date *date,uint32_t seed,
-                        uint8_t *scratch,uint32_t scratch_bytes,uint32_t completed,const uint8_t *custom_lut,const char *custom_name
+                        uint8_t *scratch,uint32_t scratch_bytes,uint32_t completed,const uint8_t *custom_lut,const char *custom_name,uint32_t direction
 #if M10V_CAPTURE_PROFILE
                         ,m10v_capture_profile *profile
 #endif
@@ -534,7 +550,8 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
           overlap(image->chroma, bytes, date, sizeof(*date))))) return M10V_LIBRARY_INVALID;
     const m10v_slot *choice = &state->slots[slot];
     /* New looks are ISP-only color. Never map these identities to old CPU LUTs. */
-    if(M10V_ANIME_E6(choice->film)&&!(completed&M10V_NATIVE_COLOR))return M10V_LIBRARY_INVALID;
+    if(M10V_ANIME(choice->film))return M10V_LIBRARY_INVALID;
+    if((M10V_ANIME_E6(choice->film)||M10V_C41(choice->film)||M10V_EXTRA_FILM(choice->film))&&!(completed&M10V_NATIVE_COLOR))return M10V_LIBRARY_INVALID;
     if(M10V_CUSTOM(choice->film)&&!custom_lut)return M10V_LIBRARY_INVALID;
     uint32_t shift = 0, gw = image->width, gh = image->height;
     /* Power-of-two sampling must not depend on an ARM division runtime. */
@@ -554,10 +571,8 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     const uint32_t soft=0;
     (void)seed; /* Grain is exclusively owned by the native ISP. */
     m10v_film_effects effects=state->effects[slot];
-    uint32_t anime=M10V_ANIME(choice->film)?effects.reserved[1]:0;
     uint32_t needed = use_halo?((m10v_halo_workspace_planes(choice->film,choice->halo_profile) * cells + 3) & ~3u):0;
-    if(anime&&m10v_anime_workspace(image->width,anime)>needed)needed=m10v_anime_workspace(image->width,anime);
-    if ((soft || use_halo || anime) && (!scratch || ((uintptr_t)scratch & 3) || scratch_bytes < needed ||
+    if ((soft || use_halo) && (!scratch || ((uintptr_t)scratch & 3) || scratch_bytes < needed ||
         (uintptr_t)scratch > UINTPTR_MAX - needed || overlap(scratch, needed, image->y, bytes) ||
         overlap(scratch, needed, image->chroma, bytes) || overlap(scratch, needed, state, sizeof(*state)) ||
         overlap(scratch, needed, image, sizeof(*image)) ||
@@ -661,15 +676,17 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     if(use_halo&&!special_halo)m10v_universal_halation_compose(image,choice,scratch,gw,gh,shift);
 #endif
     M10V_PROFILE(9);
-    if(anime&&m10v_anime_render(image,anime,scratch,scratch_bytes))return M10V_LIBRARY_INVALID;
-    if (state->stamp||(state->reserved&1u))stamp(image,state,date,M10V_CUSTOM(choice->film)?custom_name:m10v_library_name(choice->film));
+    if (state->stamp||(state->reserved&1u)){
+        const char *name=M10V_CUSTOM(choice->film)?custom_name:m10v_library_name(choice->film);
+        if(direction)stamp_oriented(image,state,date,name,direction);else stamp(image,state,date,name);
+    }
     M10V_PROFILE(10);
     return M10V_LIBRARY_OK;
 }
 
 
 int m10v_library_render_native(m10v_library_image *image,const m10v_library_state *state,uint32_t slot,const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes,uint32_t completed){
-    return render_stages(image,state,slot,date,seed,scratch,bytes,completed,0,0
+    return render_stages(image,state,slot,date,seed,scratch,bytes,completed,0,0,0
 #if M10V_CAPTURE_PROFILE
       ,0
 #endif
@@ -677,7 +694,7 @@ int m10v_library_render_native(m10v_library_image *image,const m10v_library_stat
 }
 int m10v_library_render_custom(m10v_library_image *image,const m10v_library_state *state,uint32_t slot,const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes,uint32_t completed,const uint8_t *lut,const char *name){
  if(!lut||!state||slot>=M10V_SLOT_COUNT||!M10V_CUSTOM(state->slots[slot].film))return M10V_LIBRARY_INVALID;
- return render_stages(image,state,slot,date,seed,scratch,bytes,completed,lut,name
+ return render_stages(image,state,slot,date,seed,scratch,bytes,completed,lut,name,0
 #if M10V_CAPTURE_PROFILE
  ,0
 #endif
@@ -688,9 +705,26 @@ int m10v_library_render(m10v_library_image *image,const m10v_library_state *stat
 }
 #if M10V_CAPTURE_PROFILE
 int m10v_library_render_profiled(m10v_library_image *image,const m10v_library_state *state,uint32_t slot,const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes,m10v_capture_profile *profile){
-    return render_stages(image,state,slot,date,seed,scratch,bytes,0,0,0,profile);
+    return render_stages(image,state,slot,date,seed,scratch,bytes,0,0,0,0,profile);
 }
 int m10v_library_render_native_profiled(m10v_library_image *image,const m10v_library_state *state,uint32_t slot,const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes,uint32_t completed,m10v_capture_profile *profile){
-    return render_stages(image,state,slot,date,seed,scratch,bytes,completed,0,0,profile);
+    return render_stages(image,state,slot,date,seed,scratch,bytes,completed,0,0,0,profile);
+}
+#endif
+
+int m10v_library_render_oriented(m10v_library_image *image,const m10v_library_state *state,uint32_t slot,const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes,const m10v_library_render_context *context){
+    if(!context)return M10V_LIBRARY_INVALID;
+    if(state&&slot<M10V_SLOT_COUNT&&M10V_CUSTOM(state->slots[slot].film)&&!context->lut)return M10V_LIBRARY_INVALID;
+    return render_stages(image,state,slot,date,seed,scratch,bytes,context->completed,context->lut,context->name,context->direction
+#if M10V_CAPTURE_PROFILE
+      ,0
+#endif
+    );
+}
+#if M10V_CAPTURE_PROFILE
+int m10v_library_render_oriented_profiled(m10v_library_image *image,const m10v_library_state *state,uint32_t slot,const m10v_library_date *date,uint32_t seed,uint8_t *scratch,uint32_t bytes,const m10v_library_render_context *context,m10v_capture_profile *profile){
+    if(!context)return M10V_LIBRARY_INVALID;
+    if(state&&slot<M10V_SLOT_COUNT&&M10V_CUSTOM(state->slots[slot].film)&&!context->lut)return M10V_LIBRARY_INVALID;
+    return render_stages(image,state,slot,date,seed,scratch,bytes,context->completed,context->lut,context->name,context->direction,profile);
 }
 #endif

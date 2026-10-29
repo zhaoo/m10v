@@ -13,7 +13,7 @@ typedef int (*open_fn)(uint32_t,const char *,uint32_t,uint32_t *,uint32_t *);
 typedef int (*io_fn)(uint32_t,uint32_t,void *,uint32_t,uint32_t *);
 typedef int (*close_fn)(uint32_t,uint32_t,uint32_t *);
 static const char paths[8][16]={"C:\\M10VMN0.BIN","C:\\M10VMN1.BIN","C:\\M10VCP0.BIN","C:\\M10VCP1.BIN","C:\\M10VIO0.BIN","C:\\M10VIO1.BIN","C:\\M10VAK0.BIN","C:\\M10VAK1.BIN"};
-static uint32_t event_channel(uint32_t event){return event>=85&&event<=99?4u:event>=180&&event<=209?3u:event>=100?2u:1u;}
+static uint32_t event_channel(uint32_t event){return (event>=230&&event<=273)||(event>=85&&event<=99)?4u:event>=180&&event<=209?3u:event>=100?2u:1u;}
 static int ram(uint32_t p,uint32_t n){return !(p&3)&&p>=0x55000000u&&p<0x80000000u&&n<=0x80000000u-p;}
 static int code(uint32_t p,uint32_t n){return !(p&3)&&p>=0x53000000u&&p<0x540b6000u&&n<=0x540b6000u-p;}
 static uint32_t crc(const uint32_t *words){
@@ -42,6 +42,11 @@ static int transfer(uint32_t fs,const uint32_t *v,const char *path,uint32_t *pag
 }
 int m10v_debug_batch(const uint32_t *events,uint32_t count){
     if(!count||count>32||!ram((uint32_t)(uintptr_t)events,count*20))return 0;
+#if M10V_ADJ_EXIT_TRACE
+    /* Diagnostic candidate only: retain exit evidence, suppress unrelated
+     * preview/capture/menu traffic and its filesystem transactions. */
+    for(uint32_t i=0;i<count;i++)if(events[i*5]<230||events[i*5]>273)return 0;
+#endif
     uint32_t channel=event_channel(events[0]),mask=1;
     for(uint32_t i=0;i<count;++i)if(event_channel(events[i*5])!=channel)return 0;
     /* The stock model ends at byte0x1c; byte0x1d is private menu mode,

@@ -23,6 +23,13 @@ class SdCameraTests(unittest.TestCase):
  def n(self,a):return struct.unpack('<I',self.u.mem_read(a,4))[0]
  def string(self,a):return bytes(self.u.mem_read(a,64)).split(b'\0')[0].decode()
  def hook(self,u,pc,size,data):
+  bridge=getattr(self,'catalog_bridge',{}).get(pc)
+  if bridge:
+   target,registers=bridge
+   if target=='m10v_sd_camera_directory_item' and getattr(self,'short_catalog_items',False):self.short=True
+   values=[u.reg_read(r) for r in registers]
+   for register,value in zip((UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2),values):u.reg_write(register,value)
+   u.reg_write(UC_ARM_REG_PC,self.manifest['symbols'][target]);return
   a=[u.reg_read(r) for r in [UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3]];extra=self.n(u.reg_read(UC_ARM_REG_SP));ret=None
   if pc==0x535847d8:ret=0x55001000
   elif pc==0x536af2a8:
@@ -62,8 +69,109 @@ class SdCameraTests(unittest.TestCase):
   u=self.u;sp=0x550fe000;u.reg_write(UC_ARM_REG_SP,sp)
   for r,v in zip([UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3],args):u.reg_write(r,v)
   for i,value in enumerate(args[4:]):self.w(sp+4*i,value)
-  u.reg_write(UC_ARM_REG_LR,0x550ff000);u.emu_start(self.manifest['symbols'][name],0x550ff000,count=10000000)
+  u.reg_write(UC_ARM_REG_LR,0x550ff000);u.emu_start(self.manifest['symbols'][name],0x550ff000,count=getattr(self,'instruction_limit',10000000))
   self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x550ff000);return u.reg_read(UC_ARM_REG_R0)
+ def test_exported_cube_reaches_real_settings_after_transient_header_failure(self):
+  # Use the same export function as HTTP, and the actual linked settings/SD code.
+  cube='LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n'
+  import json
+  script="import {exportSdFilms} from './node/gr3-sd-film-export.mjs';let {zip}=exportSdFilms({model:'gr3',ids:[],customFilms:[{name:'User LUT',filename:'test.cube',base64:"+json.dumps(__import__('base64').b64encode(cube.encode()).decode())+"}]});let at=30+zip.readUInt16LE(26)+zip.readUInt16LE(28);process.stdout.write(zip.subarray(at,at+zip.readUInt32LE(18)));"
+  self.card=subprocess.check_output(['node','--input-type=module','-e',script],cwd=ROOT)
+  self.catalog_bridge={
+   0x53901000:('m10v_camera_library_load',(UC_ARM_REG_R1,)),
+   0x53901010:('m10v_sd_camera_directory_item',(UC_ARM_REG_R1,)),
+   0x53901060:('m10v_sd_camera_directory_extent',()),
+  }
+  self.u.mem_write(0x5500d000,struct.pack('<8I',0,0x53901000,0x53901010,0x53901020,0x53901030,0x53901040,0x53901050,0x53901060))
+  state=0x5500a000;ops=0x5500d000
+  self.instruction_limit=100000000
+  self.short=True
+  self.assertEqual(self.call('m10v_settings_open',state,ops,1),0)
+  self.assertEqual(self.n(state+184+24),3) # Explicit read failure, not end-of-list.
+  self.short=False
+  self.call('m10v_settings_key',state,ops,1)
+  self.assertEqual(self.n(state+184+28),47)
+  self.assertEqual(self.n(state+184+12),46)
+  self.assertEqual(self.n(state+184+16),79)
+  self.assertEqual(self.n(state+184+24),0)
+  self.assertEqual(self.call('m10v_sd_camera_catalog_name',46,79,0x5500c000,24),1)
+  self.assertEqual(self.string(0x5500c000),'User LUT')
+  # Header succeeds but the initial item reads fail: EMPTY must be retryable too.
+  self.short_catalog_items=True
+  self.assertEqual(self.call('m10v_settings_open',state,ops,1),0)
+  self.assertEqual(self.n(state+184+24),1)
+  self.short_catalog_items=False;self.short=False
+  self.call('m10v_settings_key',state,ops,4) # OK only refreshes; no accidental install.
+  self.assertEqual(self.n(state+184+16),79)
+  self.assertEqual(self.n(state+184+24),0)
+  self.assertEqual(self.calls,[])
+  self.assertEqual((self.opened,self.allocated),(0,0))
+ def test_directory_extent_distinguishes_no_custom_films_from_io_failure(self):
+  self.assertEqual(self.call('m10v_sd_camera_directory_extent'),46)
+  for failure in ['short','fail_close','fail_allocate']:
+   setattr(self,failure,True)
+   self.assertEqual(self.call('m10v_sd_camera_directory_extent'),0)
+   setattr(self,failure,False)
+  self.assertEqual(self.call('m10v_sd_camera_directory_extent'),46)
+  self.assertEqual((self.opened,self.allocated),(0,0))
+ def test_curated_catalog_appends_custom_names_and_installs_by_directory_index(self):
+  script="import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack([33,66],[{name:'User LUT',rgb:Buffer.alloc(6591),sha256:'a'},{name:'Night LUT',rgb:Buffer.alloc(6591,42),sha256:'b'}]));"
+  self.card=subprocess.check_output(['node','--input-type=module','-e',script],cwd=ROOT)
+  # Builtin order is unchanged; custom entries are compact even in sparse packs.
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',0),33)
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',1),66)
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',46),79)
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',47),80)
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',48),0)
+  self.assertEqual(self.call('m10v_sd_camera_catalog_name',47,80,0x5500c000,24),1)
+  self.assertEqual(self.string(0x5500c000),'Night LUT')
+  self.assertEqual(self.call('m10v_sd_camera_directory_install',46,80,0),0xffffffff)
+  self.assertEqual(self.calls,[])
+  self.assertEqual(self.call('m10v_sd_camera_directory_install',47,80,0),0)
+  self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),0)
+  self.assertEqual(self.call('m10v_sd_camera_custom_name',0x5500a000,0,0x5500c000,24),1)
+  self.assertEqual(self.string(0x5500c000),'Night LUT')
+  self.assertEqual((self.opened,self.allocated),(0,0))
+ def test_custom_catalog_upper_bound_and_corrupted_record_rejection(self):
+  script="import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack([],Array.from({length:210},(_,i)=>({name:'LUT '+i,rgb:Buffer.alloc(6591,i),sha256:String(i).padStart(3,'0')}))));"
+  self.card=subprocess.check_output(['node','--input-type=module','-e',script],cwd=ROOT)
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',255),288)
+  self.assertEqual(self.call('m10v_sd_camera_directory_item',256),0)
+  self.assertEqual(self.call('m10v_sd_camera_catalog_name',255,288,0x5500c000,24),1)
+  self.assertEqual(self.string(0x5500c000),'LUT 209')
+  damaged=bytearray(self.card);damaged[-20]^=1;self.card=bytes(damaged)
+  self.assertEqual(self.call('m10v_sd_camera_catalog_name',255,288,0x5500c000,24),0)
+  self.assertEqual(self.call('m10v_sd_camera_directory_install',255,288,0),0xffffffff)
+  self.assertEqual(self.calls,[])
+  self.assertEqual((self.opened,self.allocated),(0,0))
+ def test_retired_anime_migration_preserves_other_films_and_active_identity(self):
+  folder=tempfile.TemporaryDirectory();self.addCleanup(folder.cleanup)
+  self.manifest=build(Path(folder.name),sd_library=True,appended_slots=True)
+  self.code=(Path(folder.name)/'m10v-library-arm.bin').read_bytes();self.setUp()
+  from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_PC,UC_ARM_REG_LR
+  import zlib
+  for selected,bank,wanted in [(5,0,27),(1,0,11),(1,1,26)]:
+   with self.subTest(selected=selected,bank=bank):
+    state=bytearray(184);struct.pack_into('<IHHI',state,0,0x5630314d,5,184,7)
+    for i,film in enumerate([34,306,35,307,308,313]):struct.pack_into('<H6B',state,12+8*i,film,0,0,0,3,5,2)
+    state[92:96]=bytes([1,2,3,1]);state[103+8]=3;state[103+24]=2;state[30]=2;state[115]=6
+    struct.pack_into('<I',state,180,zlib.crc32(state[:180]));self.files={'M10V6A.bin':bytes(state)}
+    tone=[25+selected];sets=[]
+    def model(u,pc,size,data):
+     if pc==0x532bd6d4:u.reg_write(UC_ARM_REG_R0,bank)
+     elif pc==0x532bd6b4:u.reg_write(UC_ARM_REG_R0,tone[0])
+     elif pc==0x532c26c0:tone[0]=u.reg_read(UC_ARM_REG_R1);sets.append(tone[0]);u.reg_write(UC_ARM_REG_R0,0)
+     else:return
+     u.reg_write(UC_ARM_REG_PC,u.reg_read(UC_ARM_REG_LR))
+    hook=self.u.hook_add(UC_HOOK_CODE,model)
+    self.assertEqual(self.call('m10v_camera_library_reconcile_legacy_selection',0x5500e000),0)
+    self.assertEqual(tone[0],wanted);self.assertEqual(sets,[] if bank else [wanted])
+    self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),0)
+    actual=bytes(self.u.mem_read(0x5500a000,184))
+    self.assertEqual([struct.unpack_from('<H',actual,12+8*i)[0] for i in range(10)],[34,35,313,0,0,0,0,0,0,0])
+    self.assertEqual(actual[92:96],state[92:96]);self.assertEqual(actual[22],2);self.assertEqual(actual[107],6);self.assertEqual(struct.unpack_from('<I',actual,176)[0],0)
+    before=dict(self.files);self.assertEqual(self.call('m10v_camera_library_reconcile_legacy_selection',0x5500e000),0);self.assertEqual(self.files,before)
+    self.u.hook_del(hook)
  def test_pages_and_final_record(self):
   for page,row,expected in [(0, 0, 33), (0, 1, 66), (0, 2, 67), (0, 3, 68), (0, 4, 69), (0, 5, 70), (0, 6, 71), (0, 7, 72), (1, 0, 73), (1, 1, 74), (1, 2, 75), (1, 3, 76), (1, 4, 77), (1, 5, 78), (1, 6, 289), (1, 7, 290), (2, 0, 291), (2, 1, 292), (2, 2, 293), (2, 3, 294), (2, 4, 295), (2, 5, 296), (2, 6, 297), (2, 7, 34), (3, 0, 35), (3, 1, 36), (3, 2, 37), (3, 3, 38), (3, 4, 39), (3, 5, 40), (3, 6, 41), (3, 7, 42), (4, 0, 43), (4, 1, 44), (4, 2, 45), (4, 3, 46), (4, 4, 47), (4, 5, 48), (4, 6, 49), (4, 7, 50), (5, 0, 51), (5, 1, 52), (5, 2, 53), (5, 3, 54), (5, 4, 55), (5, 5, 56), (5, 6, 57), (5, 7, 58), (6, 0, 59), (6, 1, 60), (6, 2, 61), (6, 3, 62), (6, 4, 63), (6, 5, 64), (6, 6, 65), (32, 0, 0), (0, 8, 0)]:self.assertEqual(self.call('m10v_sd_camera_item',page,row),expected)
   self.assertEqual((self.opened,self.allocated),(0,0));self.assertEqual(self.calls,[])
@@ -106,7 +214,7 @@ class SdCameraTests(unittest.TestCase):
   self.card=subprocess.check_output(['node','--input-type=module','-e',script],cwd=ROOT)
   custom_pack=self.card
   self.assertEqual(self.call('m10v_sd_camera_item',0,0),79)
-  self.assertEqual(self.call('m10v_sd_camera_catalog_name',0,79,0x5500c000,24),1)
+  self.assertEqual(self.call('m10v_sd_camera_catalog_name',46,79,0x5500c000,24),1)
   self.assertEqual(self.string(0x5500c000),'My Film')
   self.assertEqual(self.call('m10v_sd_camera_install',0,0,79,0),0)
   self.assertIn('M10VC00.bin',self.files)

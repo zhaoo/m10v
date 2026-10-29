@@ -7,7 +7,7 @@ test('single studio orders source, settings and save with the library embedded d
  assert.ok(!nav.includes('experimental'));assert.ok(!nav.includes('native-library.html'));
  assert.ok(!html.includes('id="use-800t-plan"'));assert.ok(!html.includes('id="use-native-plan"'));assert.ok(html.includes('id="native-editor"'));
  const root=await readFile(new URL('../web/index.html',import.meta.url),'utf8');
- assert.ok(root.includes('href="/gr3/"'));assert.equal((root.match(/class="camera-card gr-family"/g)||[]).length,1);assert.ok(root.includes('href="/gr4/"'));assert.ok(root.includes('只读检查'));
+ assert.ok(root.includes('href="/gr3/"'));assert.equal((root.match(/class="camera-card gr-family"/g)||[]).length,1);assert.ok(root.includes('href="/gr4/"'));
 });
 
 test('shared import derives the model from official identity and keeps local choice separate',async()=>{

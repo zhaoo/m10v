@@ -27,14 +27,14 @@ class BorderCameraTests(unittest.TestCase):
      'm10v_hdf_menu_vtable':0x53000114})]:
    obj=Path(cls.tmp.name)/(file+'.o')
    subprocess.run(['clang',*FLAGS,'-DM10V_HDF_OWNER_OFFSET=0x223c',
-                   '-DM10V_BORDER_CACHE_OWNER_OFFSET=0x23d0',*flags,'-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
+                   '-DM10V_BORDER_CACHE_OWNER_OFFSET=0x23e4',*flags,'-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
    while len(cls.code)%16:cls.code.append(0)
    code,symbols=link_object(obj.read_bytes(),cls.base+len(cls.code),{**cls.symbols,**externals},prefix)
    cls.code.extend(code);cls.symbols.update(symbols)
  def setUp(self):
   self.u=u=Uc(UC_ARCH_ARM,UC_MODE_ARM)
   u.mem_map(0x53000000,0x1500000);u.mem_write(self.base,bytes(self.code));u.mem_map(0x55000000,0x100000)
-  self.owner=0x55010000;self.page=self.owner+0x223c;self.cache=self.owner+0x23d0
+  self.owner=0x55010000;self.page=self.owner+0x223c;self.cache=self.owner+0x23e4
   self.files={};self.reads=[];self.writes=[];self.fail_write=False;self.fail_verify=False;self.verify_pending=False;self.fs_ready=True;self.forbid_capture_services=False;self.fail_reads=0
   self.cursor=0x55040000;self.captions=[];self.closed=[];self.hdf=0;self.hdf_writes=[]
   self.put(0x55002008,0x55002100);self.put(0x55002100,0x55002200);u.mem_write(0x55002220,b'\x01')
@@ -147,7 +147,7 @@ class BorderCameraTests(unittest.TestCase):
   self.put(self.cache+4,2);self.put(0x55063910,0);self.assertEqual(self.call('m10v_border_camera_cached'),0)
  def test_border_menu_cancel_and_confirm_are_global_and_preserve_hdf(self):
   self.ready();self.key(0xd1);self.key(0xd8) # down, enter border
-  self.assertNotIn(1153,[id for _,id in self.captions],'hidden fourth choice must not resolve an unallocated resource')
+  self.assertNotIn(1158,[id for _,id in self.captions],'hidden fourth choice must not resolve an unallocated resource')
   self.key(0xcf);self.key(0xcf);self.key(0xda) # draft2 cancel
   self.assertEqual(self.writes,[]);self.assertEqual(self.call('m10v_border_camera_cached'),0)
   self.key(0xd8);self.key(0xcf);self.key(0xd8)
@@ -161,7 +161,7 @@ class BorderCameraTests(unittest.TestCase):
   self.key(0xda);self.key(0xd8);self.assertEqual(self.get(self.page+0x180),1)
  def test_border_only_menu_links_without_hdf_and_saves(self):
   obj=Path(self.tmp.name)/'border-only-menu.o'
-  subprocess.run(['clang',*FLAGS,'-DM10V_HDF_OWNER_OFFSET=0x223c','-DM10V_BORDER_CACHE_OWNER_OFFSET=0x23d0',
+  subprocess.run(['clang',*FLAGS,'-DM10V_HDF_OWNER_OFFSET=0x223c','-DM10V_BORDER_CACHE_OWNER_OFFSET=0x23e4',
                   '-DM10V_BORDER_ENABLED=1','-DM10V_HDF_ENABLED=0','-DM10V_HDF_GROUPED=1',
                   '-c',str(ROOT/'native/gr3/m10v_hdf_menu.c'),'-o',str(obj)],check=True,capture_output=True)
   # Link without HDF load/save symbols: a hidden dependency is a hard failure.

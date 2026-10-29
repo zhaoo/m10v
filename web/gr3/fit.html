@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>M10V · LUT 拟合质量</title>
+<link rel="stylesheet" href="/gr3/styles.css"><link rel="stylesheet" href="/gr3/fit.css">
+<script type="module" src="/gr3/fit-workbench.js"></script>
+</head>
+<body class="fit-page">
+<main class="fit-shell">
+<header class="fit-header"><a class="fit-brand" href="/gr3/">M10V <span>COLOR LAB</span></a><a href="/gr3/sd-library.html">返回 SD 胶卷库 ↗</a></header>
+<section class="fit-hero"><span class="fit-eyebrow">GR III / GR IIIx</span><h1>让色彩，有据可循。</h1><p>LUT / XMP 拟合与质量报告</p><div class="fit-tags"><span>独立误差验证</span><span>灰阶与肤色评估</span><span>可追溯导出</span></div></section>
+<div class="fit-layout">
+<section class="fit-card"><div class="fit-section-heading"><span class="fit-step">01</span><div><h2>导入色彩</h2><p>选择机型，上传你的 LUT 或 XMP。</p></div></div><div class="fit-fields"><label>目标机型<select id="fit-model"><option value="gr3">GR III 2.10</option><option value="gr3x">GR IIIx 1.60</option></select></label><label>色彩文件<input type="file" id="fit-file" accept=".cube,.xmp"></label></div><div class="fit-actions"><button id="fit-run" class="fit-primary">拟合原目标</button><button id="fit-cancel">取消</button></div><details class="fit-approx"><summary>需要更易表达的近似方案？</summary><p>超出表达范围或误差较大时，向中性映射收敛，保留原输入和哈希。近似方案由你主动选择。</p><label>保留源色彩比例<input id="fit-strength" type="number" min="0" max="0.99" step="0.1" value="0.7"></label><button id="fit-approximate">生成可表达近似方案</button></details><p id="fit-status" role="status" aria-live="polite"></p></section>
+<aside class="fit-card fit-note"><span class="fit-eyebrow">读懂报告</span><h2>先看误差，再做选择。</h2><p>对比全色域与灰阶／肤色优先方案，查看平均、P95 与最大 ΔE00，选择适合你作品的色彩表达。</p><p>软件模型评估 Standard 显示域的 ISP 矩阵和曲线，不代表 RAW、Lightroom 基底或实拍准确度。</p><div class="fit-note-footer">每次拟合保留来源与参数记录，便于复查。</div></aside>
+<section class="fit-card fit-wide"><div class="fit-section-heading"><span class="fit-step">02</span><div><h2>比较拟合方案</h2><p>查看量化后的误差，选择方案并保存报告。</p></div></div><div id="fit-choices"></div><div class="fit-actions"><button id="fit-save" disabled>保存所选参数与报告 JSON</button></div></section>
+<section class="fit-card fit-wide"><div class="fit-section-heading"><span class="fit-step">03</span><div><h2>配置五胶卷固件</h2><p>将本次拟合加入五胶卷方案，也可导入已有配置继续编辑。</p></div></div><label class="fit-config-label">导入已有五胶卷配置<input id="fit-config" type="file" accept=".json"></label><div id="fit-slots"></div><p class="fit-hint">五个胶卷须各不相同，至少一个位置使用本次拟合结果。槽位按名称长度与既有规则安排；本页草稿独立保存。</p><div class="fit-export"><label>原厂固件文件<input id="fit-source" type="file" accept=".bin"></label><div class="fit-actions"><button id="fit-prepare" disabled>预检方案</button><button id="fit-build" class="fit-primary" disabled>导出固件与构建记录</button></div></div></section>
+</div><footer class="fit-footer">此导出使用独立的五胶卷 ISP 方案。SD 胶卷库的原始 LUT 路径尚未迁移为 ISP 拟合，报告不适用于该路径。实际色彩仍需结合拍摄评估。</footer>
+</main></body></html>

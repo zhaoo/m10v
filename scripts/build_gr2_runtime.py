@@ -174,7 +174,6 @@ def configuration_state(configuration:dict)->tuple[dict,bytes,bytes]:
         message=next((line[6:].strip() for line in result.stderr.splitlines() if line.startswith('Error:')),'shared normalizer rejected the configuration')
         raise ValueError('invalid shared page configuration: '+message)
     decoded=json.loads(result.stdout);normalized=decoded['configuration'];wire=bytes.fromhex(decoded['wire'])
-    if normalized['hdf']!=0:raise ValueError('GR II HDF configuration binding remains under reverse engineering')
     if len(wire)!=104 or struct.unpack_from('<IHHI',wire)!=(0x5630314d,4,104,0) or zlib.crc32(wire[:100])!=struct.unpack_from('<I',wire,100)[0]:raise ValueError('shared state wire contract changed')
     native=bytearray(wire);struct.pack_into('>IHHI',native,0,*struct.unpack_from('<IHHI',wire))
     for index in range(5):struct.pack_into('>H',native,12+8*index,struct.unpack_from('<H',wire,12+8*index)[0])
@@ -208,7 +207,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     hdf_configuration=out_dir/'hdf_configuration.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_hdf_configuration.c'),'-o',str(hdf_configuration)],check=True,capture_output=True)
     hdf_storage=out_dir/'hdf_storage.o'
-    subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_hdf_storage.c'),'-o',str(hdf_storage)],check=True,capture_output=True)
+    subprocess.run([clang,*FLAGS,'-DGR2_HDF_INITIAL_STRENGTH='+str(normalized['hdf']),'-c',str(ROOT/'native/gr2/m10v_hdf_storage.c'),'-o',str(hdf_storage)],check=True,capture_output=True)
     hdf_scheduling=out_dir/'hdf_scheduling.o'
     subprocess.run([clang,*FLAGS,'-c',str(ROOT/'native/gr2/m10v_hdf_scheduling.c'),'-o',str(hdf_scheduling)],check=True,capture_output=True)
     hdf_page=out_dir/'hdf_page.o'
@@ -341,7 +340,7 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     report.update(schema='m10v-gr2-runtime-foundation/v1',official_sha256=profile['sha'],can_package=False,
                   film_detail_controller_compiled=True,film_detail_menu_compiled=True,
                   hdf_scheduling_policy_compiled=True,hdf_ui_control_compiled=True,hdf_menu_compiled=True,hdf_ui_restore_compiled=True,hdf_global_postprocess_compiled=True,hdf_graph_hooks_compiled=True,hdf_graph_preparation_compiled=True,hdf_coefficients_compiled=True,hdf_journal_compiled=True,hdf_configuration_compiled=True,hdf_capture_ready=False,hdf_coefficient_bytes=11*8192,hdf_frame_bytes=16,
-                  effect_name_contract=text_contract,configuration=normalized,initial_state_wire_hex=initial_wire.hex(),initial_state_native_hex=initial_native.hex(),
+                  effect_name_contract=text_contract,configuration=normalized,initial_hdf_strength=normalized['hdf'],initial_state_wire_hex=initial_wire.hex(),initial_state_native_hex=initial_native.hex(),
                   configuration_sha256=hashlib.sha256(json.dumps(normalized,sort_keys=True,separators=(',',':')).encode()).hexdigest(),
                   runtime_sha256=hashlib.sha256(bytes.fromhex(report['runtime_hex'])).hexdigest(),
                   limits=['GR II scalar renderer, owned capture/configuration and UI restoration have bounded CPU evidence; complete boot, physical caches and hardware capture remain researching.','Reserved C-heap window needs original literal adjustment; no firmware patch or download is emitted.','ARMv4T soft-float subset avoids assuming a newer CPU or floating-point unit.'])

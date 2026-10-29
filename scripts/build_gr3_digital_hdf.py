@@ -33,7 +33,7 @@ def official_rtos():
     script='import{readFileSync}from"node:fs";import{readOfficialSection}from"./node/firmware.mjs";process.stdout.write(readOfficialSection(readFileSync("bin/fwdc239b-gr3-official.bin"),"RTOS"));'
     return subprocess.run([node,'--input-type=module','-e',script],cwd=ROOT,check=True,capture_output=True).stdout
 
-def build(base,exports,rtos=None,shared_recipe=False):
+def build(base,exports,rtos=None,shared_recipe=False,ui_cache=False):
     rom=bytes(rtos) if rtos is not None else official_rtos()
     if hashlib.sha256(rom).hexdigest()!=SHA:raise ValueError('HDF requires exact GR III 2.10 RTOS')
     for a,w in SITES.items():
@@ -69,8 +69,9 @@ def build(base,exports,rtos=None,shared_recipe=False):
     if len(image)>1024:raise ValueError('HDF hooks exceed fixed1KiB budget')
     return bytes(image),dict(schema='m10v-gr3-digital-hdf/v1',base=base,bytes=len(image),
         patches=patches,entries=entries,rows=table,required_rtos_sha256=SHA,
-        recipe_bytes=0x4778,recipe_extra_bytes=0 if shared_recipe else 16,shared_recipe=shared_recipe,shared_offset=0x50e4 if shared_recipe else None,native_parameter_values=[5,6,7],
+        recipe_bytes=0x4778,recipe_extra_bytes=0 if shared_recipe else 16,shared_recipe=shared_recipe,shared_offset=0x5134 if shared_recipe else None,native_parameter_values=[5,6,7],
         helpers={k:exports[k] for k in (HELPERS[1:] if shared_recipe else HELPERS)},isp_filesystem_calls=0,
-        producer_load='one validated journal snapshot per post-mutex producer',
+        ui_cache=ui_cache,producer_filesystem_calls=0 if ui_cache else None,
+        producer_load='published HDF UI cache; cold/invalid fails closed' if ui_cache else 'legacy standalone journal snapshot per post-mutex producer',
         pixel_loops=0,mutable_global_bytes=0,independent_dma=False,
         stock_clarity_table=0x538f1fd4,stock_clarity_bytes=198,camera_tested=False)

@@ -254,7 +254,7 @@
     {
       "id": 297,
       "key": "german-cool",
-      "name": "德系冷调",
+      "name": "\u5fb7\u7cfb\u51b7\u8c03",
       "ascii_name": "German Cool",
       "reference": "independent restrained cool-grey artistic look with skin gate; no unique German manufacturer standard",
       "title": "COOL",
@@ -282,7 +282,7 @@
     "third_party/style-filter-luts/street-license": "f5b745ef98087f531e719ee8ca6a96809444573ecc7173c6fa68eaad39b3cc3f",
     "third_party/style-filter-luts/street-readme.md": "5ba112916781f0121606f1316ba222558350eb7aa1bc6aadd5d646ad5fdfc7c6",
     "scripts/fit_gr3_style_filters_native.py": "69a3673358981f04a1eb72c9f0150e02fdb96a35ccb4d94b6eccdab17b2c30c9",
-    "scripts/fit_gr3_native_film_targets.py": "5048042fd5ce76df35715179f4a3a50e523b92dbdcafc6c6abf69a01312dad0b",
+    "scripts/fit_gr3_native_film_targets.py": "d21a818bed726ec3737308da0fe83435a2cade2d546438373bdabcdca6a5fa9c",
     "native/gr3/native-film-fit-targets.json": "022ee1020221c5dd0dd06c9bfb046eb55087a10733bfe4ed5c4ba5e16c75f020"
   },
   "limits": "Errors compare implementation to its designed display target only. Real camera/film error unknown. No claim of 100 percent replication.",

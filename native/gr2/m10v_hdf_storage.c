@@ -1,5 +1,10 @@
 #include "m10v_hdf_storage.h"
 #include "m10v_boot.h"
+#include "m10v_hdf_layout.h"
+#ifndef GR2_HDF_INITIAL_STRENGTH
+#define GR2_HDF_INITIAL_STRENGTH 0u
+#endif
+_Static_assert(GR2_HDF_INITIAL_STRENGTH<=3u,"invalid GR II initial HDF strength");
 #include "../../compat/gr2-v1/native/gr3/m10v_sd_library.h"
 static const char names[2][16]={"H:/M10VHD0.BIN","H:/M10VHD1.BIN"};
 typedef struct {uint32_t sequence,strength,bank;} record;
@@ -56,5 +61,8 @@ int gr2_hdf_initialize_state(void){
  uint32_t strength,sequence;
  if(gr2_hdf_journal_load(&native_io,&strength,&sequence))return 1;
  if(gr2_hdf_journals_absent()!=1)return 0;
- return publish(&native_io,1,0,1);
+ /* Preserve valid camera settings. Only a proven first use may consume the
+  * compiled page default, after the original pool admits a nonzero grade. */
+ if(GR2_HDF_INITIAL_STRENGTH&&!gr2_hdf_prepare_pool(GR2_HDF_INITIAL_STRENGTH))return 0;
+ return publish(&native_io,1,GR2_HDF_INITIAL_STRENGTH,1);
 }

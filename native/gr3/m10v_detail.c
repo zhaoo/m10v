@@ -7,7 +7,7 @@
 #ifndef M10V_ISP_NATIVE_GRAIN_MODE
 #define M10V_ISP_NATIVE_GRAIN_MODE 0
 #endif
-extern const uint32_t m10v_detail_tables, m10v_detail_common_tables, m10v_detail_red_tables, m10v_detail_phoenix_tables, m10v_detail_charmera_tables, m10v_detail_pixel_tables, m10v_detail_anime_tables;
+extern const uint32_t m10v_detail_tables, m10v_detail_common_tables, m10v_detail_red_tables, m10v_detail_phoenix_tables, m10v_detail_charmera_tables, m10v_detail_pixel_tables;
 typedef uint32_t (*fn1)(uint32_t);
 typedef uint32_t (*fn2)(uint32_t,uint32_t);
 typedef void (*text_fn)(uint32_t,uint32_t,const char *);
@@ -29,12 +29,12 @@ uint32_t m10v_detail_table(uint32_t ui){
  m10v_library_state s;
  int i=load(ui,&s);if(i<0)return 0x53b3488cu;
  uint32_t film=s.slots[i].film;
- return (uint32_t)(uintptr_t)(M10V_ANIME(film)?&m10v_detail_anime_tables:film==290?&m10v_detail_pixel_tables:film==M10V_CHAR_ID?&m10v_detail_charmera_tables:film==67?&m10v_detail_phoenix_tables:film==33?&m10v_detail_tables:film==68?&m10v_detail_red_tables:&m10v_detail_common_tables);
+ return (uint32_t)(uintptr_t)(film==290?&m10v_detail_pixel_tables:film==M10V_CHAR_ID?&m10v_detail_charmera_tables:film==67?&m10v_detail_phoenix_tables:film==33?&m10v_detail_tables:film==68?&m10v_detail_red_tables:&m10v_detail_common_tables);
 }
 static uint32_t value(const m10v_library_state *s,uint32_t target,uint32_t field){
  const m10v_slot *v=&s->slots[target];
  if(field==4)return v->halo_profile==M10V_HALO_SPILL?1:v->halo_profile==M10V_HALO_STREAK?2:0;
- if(field==11||field==12)return s->effects[target].reserved[1];
+ if(field==11)return s->effects[target].reserved[1];
  if(field==0)return v->halo_gain;if(field==1)return v->halo_spread;
  if(field==2)return v->halo_threshold;if(field==3)return v->grain;
  return field==10?s->effects[target].film_exposure:0;
@@ -74,7 +74,7 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
  if(op==4)field=((fn1)0x531b01d0u)(ui)-18;
  uint32_t film=s.slots[target].film;
  if(op==9)return film==67?1:2;
- if(op!=7&&(field>12||(field==12&&!M10V_ANIME(film))||(field==11&&film!=M10V_CHAR_ID)||((field>=4&&field<=9)&&!(M10V_UNIVERSAL_HALATION&&field==4))||(field==3&&(!M10V_ISP_NATIVE_GRAIN_MODE||film==M10V_CHAR_ID||film==290))||(field<3&&!M10V_UNIVERSAL_HALATION&&film!=33&&film!=67)||(field==10&&film!=68&&film!=67)))return 0;
+ if(op!=7&&(field>11||(field==11&&film!=M10V_CHAR_ID)||((field>=4&&field<=9)&&!(M10V_UNIVERSAL_HALATION&&field==4))||(field==3&&(!M10V_ISP_NATIVE_GRAIN_MODE||film==M10V_CHAR_ID||film==290))||(field<3&&!M10V_UNIVERSAL_HALATION&&film!=33&&film!=67)||(field==10&&film!=68&&film!=67)))return 0;
  if(op==4){m10v_library_state d;defaults(&d,(uint32_t)target,film);return value(&d,(uint32_t)target,field);}
  const m10v_slot *old=&s.slots[target];
  if(op==1)return value(&s,(uint32_t)target,field);
@@ -88,7 +88,7 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
    uint32_t gain=old->halo_gain;if(v&&!gain)gain=3;
    result=m10v_camera_library_halation(&s,(uint32_t)target,gain,old->halo_spread,old->halo_threshold,profile);
   }
-  else if(op==2&&field>=5)result=m10v_camera_library_effects(&s,(uint32_t)target,(field==11||field==12)?7:field==10?6:field-5,v);
+  else if(op==2&&field>=5)result=m10v_camera_library_effects(&s,(uint32_t)target,(field==11)?7:field==10?6:field-5,v);
   else {
    uint32_t gain=old->halo_gain,spread=old->halo_spread,threshold=old->halo_threshold,grain=M10V_ISP_NATIVE_GRAIN_MODE?old->grain:0,soft=old->soft;
    if(field==0)gain=v;else if(field==1)spread=v;else if(field==2)threshold=v;else if(field==3)grain=v;else soft=v;
@@ -119,9 +119,6 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
   if(field==10&&film==67){text[0]=v?'1':'2';text[1]=v?'2':'0';text[2]='0';}
   uint32_t list=*(const uint32_t *)(uintptr_t)(ui+0x194);if(!ram(list,4))return 0;
   uint32_t row=((fn2)0x53394758u)(list,arg&65535);if(!ram(row,4))return 0;
-  if(field==12){
-   ((uint32_t (*)(uint32_t,uint32_t,uint32_t))0x5339e274u)(row,M10V_ANIME_E6_ICON_FIRST+film-306,M10V_ANIME_VALUE_FIRST+v);return 1;
-  }
   if(field==11){
    ((uint32_t (*)(uint32_t,uint32_t,uint32_t))0x5339e274u)(row,M10V_SD_LIBRARY?755:749,(M10V_SD_LIBRARY?756:750)+v);return 1;
   }

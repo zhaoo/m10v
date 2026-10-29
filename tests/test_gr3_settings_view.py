@@ -303,6 +303,22 @@ class SettingsViewTests(unittest.TestCase):
   w=self.widgets(u);self.assertEqual(struct.unpack('<H',u.mem_read(w[16]+0xea,2))[0],754)
   self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
 
+ def test_custom_directory_tail_draws_cards_and_two_digit_page_numbers(self):
+  u=self.machine(custom_names={250:'User LUT',251:'Night LUT'},catalog_ids={250:285,251:286})
+  self.call(u,'create',0x10001000)
+  state=bytearray(216);struct.pack_into('<8I',state,184,2,0,0,251,286,0,0,254)
+  u.mem_write(0x10002000,bytes(state))
+  ops=0x10003000;u.mem_write(ops,struct.pack('<7I',0,0,0x540b0010,0,0,0,0))
+  self.call(u,'draw',0x10001000,0x10002000,ops)
+  w=struct.unpack('<56I',u.mem_read(0x10001000,224))
+  self.assertEqual([u.mem_read(w[26+i]+0x9e,1)[0] for i in range(10)],[1,1,0,0,0,0,0,0,0,0])
+  self.assertEqual([u.mem_read(w[6+i]+0xea,1)[0] for i in range(2)],[1,6])
+  heap=w[55]
+  self.assertNotEqual(bytes(u.mem_read(heap,120*148*4)),bytes(u.mem_read(heap+120*148*4,120*148*4)))
+  text=struct.unpack('<I',u.mem_read(w[52]+0xf0,4))[0]
+  self.assertEqual(bytes(u.mem_read(text,12)),'26/26\0'.encode('utf-16le'))
+  self.call(u,'destroy',0x10001000);self.assertFalse(self.live)
+
  def test_custom_catalog_page_uses_each_absolute_index_and_complete_focus_name(self):
   u=self.machine(custom_names={5:'LOMO',6:'Night LUT'},catalog_ids={5:79,6:80})
   self.call(u,'create',0x10001000);self.state(u,2,0)

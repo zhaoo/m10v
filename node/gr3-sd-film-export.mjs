@@ -1,3 +1,4 @@
+import {sha256} from './gr3-fit-binding.mjs';
 import {buildSdFilmPack,auditSdFilmPack,sdCrc} from "./gr3-sd-film-pack.mjs";
 import {parseCustomCube} from './gr3-custom-lut.mjs';
 export function encodeZip(rows) {
@@ -45,14 +46,15 @@ export function exportSdFilms(input){
  if(!input||typeof input!=='object'||Array.isArray(input)||!Object.hasOwn(input,'ids')||Object.keys(input).some(k=>!['ids','model','customFilms'].includes(k))||(input.model!==undefined&&!['gr3','gr3x'].includes(input.model)))throw Error('请选择 GR III / GR IIIx 胶卷');
  const files=input.customFilms??[];
  if(!Array.isArray(files)||files.length>216)throw Error('自定义 LUT 数量超限');
- let total=0;
+ let total=0;const sourceHashes=[];
  const custom=files.map(file=>{
   if(!file||typeof file!=='object'||Object.keys(file).some(k=>!['name','filename','base64'].includes(k))||typeof file.base64!=='string'||!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(file.base64))throw Error('LUT 文件编码无效');
   const bytes=Buffer.from(file.base64,'base64');total+=bytes.length;
   if(total>16*1024*1024)throw Error('LUT 文件总量不能超过 16 MiB');
+  sourceHashes.push(sha256(bytes));
   return parseCustomCube(bytes,file.filename,file.name);
  });
- const pack=buildSdFilmPack(input.ids,custom),receipt=auditSdFilmPack(pack);
+ const pack=buildSdFilmPack(input.ids,custom),receipt={...auditSdFilmPack(pack),...(custom.length?{custom_lut_assessment:{status:'legacy-unassessed',isp_fit:false,path:'13-cubed RGB table; existing CPU colour path',source_sha256:sourceHashes,camera_verified:false}}:{})};
  const instructions='M10V SD 胶卷库 / GR III 2.10 / GR IIIx 1.60\n'+
  '需要配套的 M10V SD 胶卷库固件；旧内置胶卷库固件不读取此文件，GR III 与 GR IIIx 共用此配方包。\n'+
  '解压，将 SD/M10V 目录复制到 SD 卡根目录，与 DCIM 并列。更新时只替换 FILMS.M10，保留其他文件。\n'+

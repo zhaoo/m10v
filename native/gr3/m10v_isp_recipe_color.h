@@ -23,6 +23,7 @@ typedef struct {
 int m10v_isp_frame_recipe_snapshot(void *recipe,const m10v_library_state *);
 int m10v_isp_frame_recipe_state(void *recipe,m10v_library_state *out);
 int m10v_isp_frame_recipe_producer(void *recipe);
+uint32_t m10v_isp_frame_recipe_direction(void *recipe,uint32_t shooting);
 /* Call-site adapter only. context is original DevelopMacroProcess C; C+30
  * points to sourceRecipe+1a8, C+34 is original ShootingInfo. */
 int m10v_isp_frame_recipe_begin(const void *context,void *tuning,void *info);

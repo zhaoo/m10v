@@ -1,3 +1,4 @@
+import {sendFirmwareDownload} from './firmware-download.mjs';
 import {handleGr2NativeRequest} from './gr2-native-routes.mjs';
 import {bindPowerPreparation,applyPowerImages,previewPowerImages} from './gr3-power-images.mjs';
 import {createHash} from 'node:crypto';
@@ -115,7 +116,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
         }
         response.setHeader('X-M10V-Update-Compatibility',Buffer.from(JSON.stringify(result.receipt)).toString('base64'));
       }
-      return send(response,200,result.candidate,'application/octet-stream',filename);
+      return sendFirmwareDownload(request,response,result.candidate,filename);
     };
     const localOrigin = `http://127.0.0.1:${server.address().port}`;
     const origin=configuredOrigin||localOrigin;
@@ -255,7 +256,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }
       if(bridgeMatch) {
         const original=await readBuildOriginal(bridgeMatch[1]),input=JSON.parse(body.toString('utf8'));
-        if(buildSource.update_compatibility)return send(response,409,{error:'2.20 来源请直接导出已适配更新版本的功能固件；旧 2.10 桥接包不适用于 2.20。'});
+        if(buildSource.update_compatibility)return send(response,409,{error:'此来源已自动适配更新版本，请直接导出功能固件；不使用旧版桥接包（包括 2.20 来源）。'});
         if(bridgeMatch[2]==='prepare'){
           if(!input||Array.isArray(input)||typeof input!=='object'||Object.keys(input).length)throw Error('桥接预检不接受自定义版本或补丁');
           return send(response,200,{...prepareGr3Bridge(original),build_source:buildSource});
@@ -265,13 +266,13 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }
       if(nativeMatch) {
         const original=await readBuildOriginal(nativeMatch[1]),input=JSON.parse(body.toString('utf8'));
-        if(buildSource.update_compatibility&&input.version_unlock?.enabled)throw Error('2.20 来源已自动适配更新版本，不能叠加旧版单包版本适配');
-        const nativeOptions={debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled,halation_enabled:input.halation_enabled??false,appended_slots:input.appended_slots};
+        if(buildSource.update_compatibility&&input.version_unlock?.enabled)throw Error('此来源已自动适配更新版本，不能叠加旧版单包版本适配');
+        const nativeOptions={debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled,halation_enabled:input.halation_enabled??false,border_enabled:input.border_enabled??false,appended_slots:input.appended_slots};
         const basePreparation=prepareNative(original,input.configuration,nativeOptions),powerPreparation=bindPowerPreparation(basePreparation,original,input.power_images);
         if(nativeMatch[2]==='prepare')return send(response,200,{...powerPreparation,build_source:buildSource});
         if(input.accepted_configuration_sha256!==powerPreparation.configuration_sha256)throw Error('方案已变化，请重新核验图片与固件');
         const cancellation=new AbortController();response.once('close',()=>{if(!response.writableFinished)cancellation.abort();});
-        const nativeResult=await generateNative(original,input.configuration,basePreparation.configuration_sha256,{signal:cancellation.signal,debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled,halation_enabled:input.halation_enabled??false,appended_slots:input.appended_slots});
+        const nativeResult=await generateNative(original,input.configuration,basePreparation.configuration_sha256,{signal:cancellation.signal,debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled,halation_enabled:input.halation_enabled??false,border_enabled:input.border_enabled??false,appended_slots:input.appended_slots});
         const powerResult=applyPowerImages(original,nativeResult.candidate,input.power_images),candidate=powerResult.candidate;
         const receipt={...nativeResult.receipt,build_source:buildSource,...(powerPreparation.power_images?{power_images:powerResult.receipt,configuration_sha256:powerPreparation.configuration_sha256,candidate_sha256:createHash('sha256').update(candidate).digest('hex'),candidate_bytes:candidate.length}: {})};
         response.setHeader('X-M10V-Native-Receipt',Buffer.from(JSON.stringify(receipt)).toString('base64'));
@@ -283,7 +284,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
       if (pathname === '/api/gr3/film/fit') {
         const cancellation=new AbortController();response.once('close',()=>{if(!response.writableFinished)cancellation.abort();});
         const filename=decodeURIComponent(request.headers['x-m10v-filename']||'Imported LUT.cube');
-        return send(response,200,await (/\.xmp$/i.test(filename)?fitXmp:fitCube)(body,filename,{signal:cancellation.signal}));
+        return send(response,200,await (/\.xmp$/i.test(filename)?fitXmp:fitCube)(body,filename,{signal:cancellation.signal,model:request.headers['x-m10v-fit-model']||'gr3',...(request.headers['x-m10v-approximation-strength']!==undefined?{approximationStrength:Number(request.headers['x-m10v-approximation-strength'])}:{})}));
       }
       if (haloMatch) {
         const original = await readBuildOriginal(haloMatch[1]);
@@ -316,7 +317,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
         if (input.accepted_configuration_sha256 !== prepared.configuration_sha256 || !prepared.ready)
           return send(response, 409, { error: '方案已变化或预检未通过，请重新预检并确认风险。' });
         const { candidate, receipt } = await buildCustomization(original, input.selection, input.accepted_configuration_sha256, options);
-        response.setHeader('X-M10V-Build-Receipt', Buffer.from(JSON.stringify({schema:receipt.schema,source_sha256:receipt.source_sha256,configuration_sha256:receipt.configuration_sha256,candidate_sha256:receipt.candidate_sha256,camera_tested:false,audit:receipt.audit,build_source:buildSource})).toString('base64'));
+        response.setHeader('X-M10V-Build-Receipt', Buffer.from(JSON.stringify({schema:receipt.schema,source_sha256:receipt.source_sha256,configuration_sha256:receipt.configuration_sha256,candidate_sha256:receipt.candidate_sha256,camera_tested:false,fit_reports:receipt.fit_reports?.map(({id,assessment,report,encoded_curve_form})=>({id,assessment,encoded_curve_form,report_sha256:report?.report_sha256,parameter_sha256:report?.parameter_sha256,source_sha256:report?.source_sha256,model:report?.model})),audit:receipt.audit,build_source:buildSource})).toString('base64'));
         return sendBuild(candidate,receipt.filename);
       }
       if (versionMatch) {

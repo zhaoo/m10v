@@ -5,6 +5,7 @@
  * and its explicitly reserved per-shot words. */
 #include "m10v_tone.h"
 #include <stdint.h>
+#include "m10v_hdf_state.h"
 #ifndef M10V_HDF_DEFAULT
 #define M10V_HDF_DEFAULT 0u
 #endif
@@ -56,10 +57,28 @@ static int latest(uint32_t fs,hdf_record *out){
  uint32_t i=!good[0]||(good[1]&&records[1].sequence>records[0].sequence);
  for(uint32_t n=0;n<6;n++)((uint32_t *)out)[n]=((const uint32_t *)&records[i])[n];return 1;
 }
+int m10v_hdf_load(uint32_t *strength);
+static void publish(uint32_t strength){
+#if M10V_HDF_UI_CACHE
+ m10v_hdf_ui *p=m10v_hdf_ui_owner();
+ if(p&&strength<4)__atomic_store_n(&p->published,0x100u|strength,__ATOMIC_RELEASE);
+#else
+ (void)strength;
+#endif
+}
+int m10v_hdf_cached(uint32_t *strength){
+#if M10V_HDF_UI_CACHE
+ m10v_hdf_ui *p=m10v_hdf_ui_owner();if(!p)return -1;
+ uint32_t v=__atomic_load_n(&p->published,__ATOMIC_ACQUIRE);
+ if((v&~3u)!=0x100u)return -1;*strength=v&3u;return 0;
+#else
+ return m10v_hdf_load(strength);
+#endif
+}
 int m10v_hdf_load(uint32_t *strength){
  if(!ram((uintptr_t)strength,4))return -1;
  uint32_t fs=filesystem();if(!fs)return -1;
- hdf_record r;*strength=latest(fs,&r)?r.strength:M10V_HDF_DEFAULT;return 0;
+ hdf_record r;*strength=latest(fs,&r)?r.strength:M10V_HDF_DEFAULT;publish(*strength);return 0;
 }
 int m10v_hdf_save(uint32_t strength){
  if(strength>3)return -1;uint32_t fs=filesystem();if(!fs)return -1;
@@ -68,7 +87,12 @@ int m10v_hdf_save(uint32_t strength){
  for(uint32_t i=0;i<6;i++)((uint32_t *)&back)[i]=0;
  if(!((int (*)(uint32_t,const char *,uint32_t,const void *))0x53825fa8u)(fs,names[r.sequence&1],24,&r)||
     !((int (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,names[r.sequence&1],24,&back)||!valid(&back))return -1;
- for(uint32_t i=0;i<6;i++)if(((const uint32_t *)&r)[i]!=((const uint32_t *)&back)[i])return -1;return 0;
+ for(uint32_t i=0;i<6;i++)if(((const uint32_t *)&r)[i]!=((const uint32_t *)&back)[i])return -1;publish(strength);return 0;
+}
+void m10v_hdf_bootstrap(void){
+#if M10V_HDF_UI_CACHE
+ uint32_t strength;if(m10v_hdf_cached(&strength)<0)m10v_hdf_load(&strength);
+#endif
 }
 #if !M10V_HDF_SHARED_RECIPE
 uint32_t m10v_hdf_alloc(uint32_t bytes){
@@ -86,8 +110,22 @@ void m10v_hdf_producer(uint32_t recipe){
      * BEFORE queueing. Refresh on reuse; never load FS in ISP callbacks. */
     s->ready=0;s->si=0;s->strength=0;
     uint32_t strength;
-    if(m10v_hdf_load(&strength)<0){s->ready=128;return;}
+    if(m10v_hdf_cached(&strength)<0){s->ready=128;return;}
     s->strength=strength;s->ready=1;
+}
+void m10v_hdf_reserve(uint32_t recipe){
+    hdf_shot *s=owner(recipe);if(!s)return;
+    /* Original post-mutex reservation sites delimit a new exposure even
+     * when the native allocator reuses the same recipe/ShootingInfo. They
+     * reset ownership only; settings freeze later at actual task ingress. */
+    s->ready=0;s->strength=0;s->si=0;
+}
+void m10v_hdf_task_snapshot(uint32_t recipe){
+    hdf_shot *s=owner(recipe);if(!s||s->ready)return;
+    /* Original task ingress5351ea9c freezes this shot once, independently
+     * of color-cache admission. Later task kinds/UI changes cannot retarget
+     * it. Both successful and unavailable-cache decisions stay frozen. */
+    m10v_hdf_producer(recipe);
 }
 void m10v_hdf_gate(uint32_t recipe,uint32_t request,uint32_t si){
     hdf_shot *s=owner(recipe);

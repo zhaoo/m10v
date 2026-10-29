@@ -51,7 +51,7 @@ class CurrentFilmPipelineTests(unittest.TestCase):
 
     def fixture(self, film=66, slot=0, stage=1):
         e = StockISP(self.image)
-        recipe = e.alloc(0x5140)
+        recipe = e.alloc(self.manifest['capture_lifecycle']['owner']['storage']['extended_recipe_bytes'])
         e.w32(recipe, 0x53d0fc90)
         e.w32(recipe + 0x4778, 0x31545653)
         obj = e.cursor
@@ -213,7 +213,7 @@ class CurrentFilmPipelineTests(unittest.TestCase):
                     self.assertEqual(self.capture(e, recipe, si, request), 0)
 
     def test_seven_new_looks_real_task_producer_to_unmapped_24mp_encoder(self):
-        for film in (294,306,307,308,309,310,311):
+        for film in (294,309,310,311):
             for stage in (0,1):
                 with self.subTest(film=film,stage=stage):
                     e,recipe,obj,frame,si,request,data=self.fixture(film,stage=stage)
@@ -226,55 +226,33 @@ class CurrentFilmPipelineTests(unittest.TestCase):
                     self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),1)
                     self.assertEqual(self.capture(e,recipe,si,request),0)
 
-    def test_advanced_mode_is_frozen_by_real_submission_despite_later_ui_change(self):
-        for mode in (1,2,3):
-            e,recipe,obj,frame,si,request,data=self.fixture(306)
-            e.u.mem_write(recipe+0x4a08,bytes(1796))
-            raw=bytearray(e.u.mem_read(data,184));raw[103]=mode
-            struct.pack_into('<I',raw,180,zlib.crc32(raw[:180]));e.u.mem_write(data,bytes(raw))
-            owner=self.publish_owner(e,data);self.enqueue(e,recipe,19)
-            # UI can switch the mode off after exposure; this recipe retains
-            # the explicit opt-in that will authorize its spatial residual.
-            raw[103]=0;struct.pack_into('<I',raw,8,8)
-            struct.pack_into('<I',raw,180,zlib.crc32(raw[:180]))
-            e.u.mem_write(owner+0x2144,bytes(raw));e.w32(owner+0x2140,4)
-            self.assertEqual(self.call(e,'m10v_isp_frame_recipe_state',recipe,data),1)
-            self.assertEqual(bytes(e.u.mem_read(data,184))[103],mode)
-            self.make(e,recipe,obj,frame)
-            self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),1)
+    def test_c41_looks_real_task_producer_to_unmapped_24mp_encoder(self):
+        for film in (312,313):
+            for stage in (0,1):
+                with self.subTest(film=film,stage=stage):
+                    e,recipe,obj,frame,si,request,data=self.fixture(film,stage=stage)
+                    # Discard fixture snapshot; only the actual task producer
+                    # can publish this shot before the original Still Make.
+                    e.u.mem_write(recipe+0x4a08,bytes(1796))
+                    self.publish_owner(e,data)
+                    self.enqueue(e,recipe,19)
+                    self.make(e,recipe,obj,frame)
+                    self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),1)
+                    self.assertEqual(self.capture(e,recipe,si,request),0)
 
-    def test_advanced_real_encoder_bridge_main_thumbnail_alias_and_allocation_failure(self):
-        def expected(source,rows,mode,chroma):
-            out=bytearray(source);w,stride=4,6;step=2 if chroma else 1
-            def quant(v,bits):return min(255,((v+(1<<(bits-1)))>>bits)<<bits)
-            for y in range(rows):
-                for x in range(w):
-                    at=y*stride+x;c=source[at]
-                    if mode==1 and chroma:continue
-                    if mode==2:out[at]=quant(c,5);continue
-                    values=[source[y*stride+(x-step if x>=step else x)],source[y*stride+(x+step if x+step<w else x)],source[max(0,y-1)*stride+x],source[min(rows-1,y+1)*stride+x]]
-                    edge=abs(values[0]-values[1])+abs(values[2]-values[3])
-                    if mode==1:out[at]=(c*(256-min(96,max(0,edge-24)>>1)))>>8
-                    else:
-                        value=quant((4*c+sum(v if abs(v-c)<=24 else c for v in values)+4)>>3,4)
-                        contour=0 if chroma else min(24,max(0,edge-20)>>3)
-                        out[at]=(value*(256-contour))>>8
-            return bytes(out)
-        for mode,fmt,alias,fail in [(m,f,a,False) for m in (1,2,3) for f in (1,2) for a in (False,True)]+[(1,2,True,True)]:
-            with self.subTest(mode=mode,format=fmt,alias=alias,fail=fail):
-                e,recipe,obj,frame,si,request,data=self.fixture(306)
-                e.u.mem_write(recipe+0x4a08,bytes(1796));raw=bytearray(e.u.mem_read(data,184));raw[103]=mode
-                struct.pack_into('<I',raw,180,zlib.crc32(raw[:180]));e.u.mem_write(data,bytes(raw))
-                owner=self.publish_owner(e,data);self.enqueue(e,recipe,19)
-                changed=bytearray(raw);changed[103]=0;struct.pack_into('<I',changed,8,8);struct.pack_into('<I',changed,180,zlib.crc32(changed[:180]))
-                e.u.mem_write(owner+0x2144,bytes(changed));e.w32(owner+0x2140,4)
-                self.make(e,recipe,obj,frame)
-                advanced={'format':fmt,'alias':alias,'fail_alloc':fail}
-                result=self.capture(e,recipe,si,request,advanced)
-                self.assertEqual(result,0xfffffffa if fail else 0)
-                for yp,cp,yy,cc,ch in advanced['planes']:
-                    self.assertEqual(bytes(e.u.mem_read(yp,len(yy))),yy if fail else expected(yy,4,mode,False))
-                    self.assertEqual(bytes(e.u.mem_read(cp,len(cc))),cc if fail else expected(cc,ch,mode,True))
+    def test_extra_films_real_task_producer_to_unmapped_24mp_encoder(self):
+        for film in (314,315,316):
+            for stage in (0,1):
+                with self.subTest(film=film,stage=stage):
+                    e,recipe,obj,frame,si,request,data=self.fixture(film,stage=stage)
+                    # Discard fixture snapshot; only the actual task producer
+                    # can publish this shot before the original Still Make.
+                    e.u.mem_write(recipe+0x4a08,bytes(1796))
+                    self.publish_owner(e,data)
+                    self.enqueue(e,recipe,19)
+                    self.make(e,recipe,obj,frame)
+                    self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),1)
+                    self.assertEqual(self.capture(e,recipe,si,request),0)
 
     def test_repeated_still_make_does_not_accumulate_color_banks(self):
         for film in (62, 66):
@@ -426,7 +404,7 @@ writeFileSync(process.argv[1]+'/manifest.json',JSON.stringify(r.manifest));
     def test_fitted_builtin_films_use_isp_for_stills_without_pixel_fallback(self):
         # User-approved ISP approximation: the same profiles already used by
         # live view must also own still color, including IDs beyond 78.
-        for film in (77, 298, *range(291, 298), *range(299, 306), *range(306,312)):
+        for film in (77, 298, *range(291, 298), *range(299, 306), *range(309,317)):
             with self.subTest(film=film):
                 e, recipe, obj, frame, si, request, data = self.fixture(film)
                 self.make(e, recipe, obj, frame)

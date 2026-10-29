@@ -73,7 +73,7 @@ def build(out,base,initial_state_hex=None,*,rtos,debug_mode=False,debug_build_id
                 'm10v_camera_library_':('m10v_camera_library_preview','m10v_camera_library_preview_init',
                     'm10v_camera_library_preview_clear','m10v_camera_library_mutation_begin','m10v_camera_library_mutation_end','m10v_camera_library_mutation_busy','m10v_camera_library_remove','m10v_camera_library_shooting_count','m10v_camera_library_menu_index','m10v_camera_library_reconcile_legacy_selection','m10v_camera_library_select_custom','m10v_camera_library_film_name_stamp'),
                 'm10v_sd_camera_':('m10v_sd_camera_custom_record','m10v_sd_camera_custom_name','m10v_sd_camera_catalog_name',
-                    'm10v_sd_camera_directory_item','m10v_sd_camera_directory_install'),
+                    'm10v_sd_camera_directory_item','m10v_sd_camera_directory_install','m10v_sd_camera_directory_extent'),
             }
             blob,entries=link_object(obj,at,symbols,prefix,
                 additional_exports=('m10v_menu_rows',) if prefix=='m10v_menu_' else (),

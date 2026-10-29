@@ -9,11 +9,11 @@ class BorderBuildTests(unittest.TestCase):
    m=build(out,sd_library=True,hdf_enabled=False,border_enabled=True)
    self.assertTrue(m['border']['enabled']);self.assertFalse(m['border']['hardware_ready'])
    self.assertFalse(m['border']['pixel_pipeline_enabled']);self.assertFalse(m['hdf_enabled'])
-   self.assertEqual(m['border']['cache_owner_offset'],0x22d0)
+   self.assertEqual(m['border']['cache_owner_offset'],0x22e4)
    self.assertEqual(m['hdf_menu']['owner_offset'],0x213c)
    self.assertEqual(m['hdf_menu']['route'],0x0200f102)
    self.assertEqual(m['hdf_menu']['effects_children'],['Border'])
-   self.assertEqual(m['resources']['texts'][1150-786:1153-786],['边框','拍立得','胶卷'])
+   self.assertEqual(m['resources']['texts'][1155-786:1158-786],['边框','拍立得','胶卷'])
    for name in ('refresh','save','cached','snapshot'):
     self.assertIn('m10v_border_camera_'+name,m['symbols'])
    self.assertNotIn('m10v_hdf_load',m['symbols'])
@@ -26,7 +26,7 @@ class BorderBuildTests(unittest.TestCase):
   from unicorn import UC_HOOK_CODE
   from unicorn import arm_const as A
   e=BorderCameraTests();e.base=m['base'];e.code=(Path(out)/'m10v-library-arm.bin').read_bytes();e.symbols=m['symbols'];e.setUp()
-  e.page=e.owner+0x213c;e.cache=e.owner+0x22d0
+  e.page=e.owner+0x213c;e.cache=e.owner+0x22e4
   original=m['settings_menu']['exports']
   def ui_services(u,at,n,d):
    result=None
@@ -52,13 +52,13 @@ class BorderBuildTests(unittest.TestCase):
    m=build(out,sd_library=True)
    self.assertFalse(m['border']['enabled']);self.assertFalse(m['border']['pixel_pipeline_enabled'])
    self.assertNotIn('m10v_border_camera_snapshot',m['symbols'])
-   self.assertEqual(len(m['resources']['texts']),1150-786)
+   self.assertEqual(len(m['resources']['texts']),1155-786)
  def test_snapshot_owner_cache_moves_border_cache_without_overlap(self):
   with tempfile.TemporaryDirectory() as out:
    m=build(out,sd_library=True,hdf_enabled=False,border_enabled=True,
            recipe_snapshot=True,lifecycle_trace=True,debug_mode=True)
    self.assertEqual(m['hdf_menu']['owner_offset'],0x223c)
-   self.assertEqual(m['border']['cache_owner_offset'],0x23d0)
+   self.assertEqual(m['border']['cache_owner_offset'],0x23e4)
    self.assertEqual(m['hdf_menu']['owner_bytes'],0x23fc)
    self.assertTrue(m['capture_lifecycle']['snapshot']['snapshot_ingress_installed'])
    self.assertTrue(m['border']['snapshot_installed'])

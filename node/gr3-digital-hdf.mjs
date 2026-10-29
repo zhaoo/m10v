@@ -1,6 +1,6 @@
 // Independent ARM byte/readback contract. Never trust the builder patch list.
 import {borderPatches} from './gr3-border.mjs';
-export const hdfSources=['native/gr3/m10v_digital_hdf.c','scripts/build_gr3_digital_hdf.py','native/gr3/m10v_hdf_menu.c','scripts/build_gr3_hdf_menu.py'];
+export const hdfSources=['native/gr3/m10v_digital_hdf.c','scripts/build_gr3_digital_hdf.py','native/gr3/m10v_hdf_menu.c','scripts/build_gr3_hdf_menu.py','native/gr3/m10v_hdf_state.h','native/gr3/m10v_hdf_adj.c','native/gr3/m10v_hdf_adj.rgba','scripts/build_gr3_hdf_adj.py'];
 const need=(v,m)=>{if(!v)throw Error('digital HDF: '+m);};
 const branch=(a,b,link=false)=>{const d=b-a-8;need(Number.isInteger(b)&&d%4===0&&d>=-(2**25)&&d<2**25,'branch range');return((link?0xeb000000:0xea000000)|((d>>2)&0xffffff))>>>0;};
 const mov=(r,v,top=false)=>((top?0xe3400000:0xe3000000)|((v&0xf000)<<4)|(r<<12)|(v&0xfff))>>>0;
@@ -13,7 +13,8 @@ export function hdfPatches(runtime,m){
   return [];
  }
  const shared=!!m.capture_lifecycle;
- need((!shared||h.shared_recipe===true&&h.shared_offset===0x50e4&&m.capture_lifecycle.snapshot?.shared_hdf===true)&&h.schema==='m10v-gr3-digital-hdf/v1'&&h.recipe_bytes===0x4778&&h.recipe_extra_bytes===(shared?0:16)&&h.isp_filesystem_calls===0&&h.pixel_loops===0&&h.mutable_global_bytes===0&&h.independent_dma===false,'owner/performance contract differs');
+ if(m.hdf_menu)need(h.ui_cache===true&&h.producer_filesystem_calls===0,'capture must use UI-published HDF cache');
+ need((!shared||h.shared_recipe===true&&h.shared_offset===0x5134&&m.capture_lifecycle.snapshot?.shared_hdf===true)&&h.schema==='m10v-gr3-digital-hdf/v1'&&h.recipe_bytes===0x4778&&h.recipe_extra_bytes===(shared?0:16)&&h.isp_filesystem_calls===0&&h.pixel_loops===0&&h.mutable_global_bytes===0&&h.independent_dma===false,'owner/performance contract differs');
  const inside=(a,n=4)=>Number.isInteger(a)&&a%4===0&&a>=m.base&&a+n<=m.base+runtime.length;
  need(inside(h.base,h.bytes)&&h.bytes<=1024&&h.patches?.length===(shared?3:8),'hook extent/inventory differs');
  for(const name of (shared?['producer','gate','settings']:['alloc','producer','gate','settings']))need(inside(m.symbols['m10v_hdf_'+name])&&h.helpers?.['m10v_hdf_'+name]===m.symbols['m10v_hdf_'+name],'helper outside runtime');
