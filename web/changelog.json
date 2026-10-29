@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.29.5",
+      "date": "2026-10-29",
+      "title": "修复 RTOS 导出限制与发布构建超时",
+      "changes": [
+        "GR III / GR IIIx 固件保存移除人为 1120 KiB 增量阈值，保留容器、内存映射及完整读回校验。",
+        "延长 GR IV 完整固件构建的子进程和发布任务时限，保留 GR IV 构建检查与内存上限。"
+      ],
+      "notice": "上一轮发布在 GR IV 固件构建达到 300 秒子进程时限后自动回滚。本轮仅调整构建时限，不改变 GR IV 固件功能。GR III / IIIx 新组合的实机结果仍需以用户测试为准。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.29.4",
       "date": "2026-10-29",
       "title": "修复 GR III / IIIx 固件保存时的 RTOS 体积误拦截",
@@ -10,9 +23,9 @@
         "保留固件容器容量、原厂内存映射、补丁预映像和完整读回校验；GR III 与 GR IIIx 共用相同限制。"
       ],
       "notice": "本次修复只调整固件构建检查，不改变相机运行时功能。组合构建已通过离线审计，实机接受范围以用户测试结果为准。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "1c1eb8be004402609d13d51cfc3d02d312ed48fc",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/1c1eb8be004402609d13d51cfc3d02d312ed48fc"
     },
     {
       "version": "2026.10.29.3",

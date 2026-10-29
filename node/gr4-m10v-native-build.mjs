@@ -31,7 +31,7 @@ async function invoke(source,input,{check=false,signal}={}){
   const firmware=path.join(folder,'official.bin'),output=path.join(folder,'fwdc248b.bin'),reportFile=path.join(folder,'receipt.json'),configuration=path.join(folder,'configuration.json');
   await writeFile(firmware,source,{mode:0o400});await writeFile(configuration,JSON.stringify(config));
   const bundled=path.join(root,'.venv/bin/python'),python=process.env.M10V_PYTHON||(existsSync(bundled)?bundled:'python3');
-  await run(python,['scripts/build_gr4_m10v_firmware.py','--input',firmware,'--config',configuration,'--report',reportFile,...(check?['--check']:['--output',output])],{cwd:root,signal,timeout:300000,maxBuffer:2*1024*1024,env:{...process.env,M10V_NODE:process.execPath}});
+  await run(python,['scripts/build_gr4_m10v_firmware.py','--input',firmware,'--config',configuration,'--report',reportFile,...(check?['--check']:['--output',output])],{cwd:root,signal,timeout:600000,maxBuffer:2*1024*1024,env:{...process.env,M10V_NODE:process.execPath}});
   const report=JSON.parse(await readFile(reportFile,'utf8'));
   if(report.source_sha256!==GR4_OFFICIAL_SHA256||report.camera_tested!==false||!/^[0-9a-f]{64}$/.test(report.runtime_source_sha256||''))throw Error('GR IV 构建身份回读不一致');
   if(check){if(report.ready!==true)throw Error('GR IV 原生组件尚未通过构建核验');return {report,config};}
