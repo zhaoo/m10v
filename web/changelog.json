@@ -2,6 +2,26 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.29.2",
+      "date": "2026-10-29",
+      "title": "优化原生菜单，新增 Instax 并修复回放和实时色彩",
+      "changes": [
+        "新增设置页采用整行黄色选中底、深色文字和分隔线；移除 HDF 菜单底部说明，保留读取和保存错误提示。",
+        "胶卷库「创意」新增 Instax 彩色，基于富士官方资料和社区光谱模型拟合，保留原有胶卷编号。",
+        "修复照片回放时 m10v 胶卷图标缺失，以及分配 HDF 模拟后 ADJ 不显示的问题。",
+        "自定义 LUT 新增离线 ISP 拟合与误差报告，取景和 JPEG 共用配方；旧自定义胶卷需重新导出并装入。"
+      ],
+      "sections": [
+        {"type": "improved", "items": ["新增设置页采用整行黄色选中底、深色文字和分隔线；移除 HDF 菜单底部说明，保留读取和保存错误提示。"]},
+        {"type": "added", "items": ["胶卷库「创意」新增 Instax 彩色，基于富士官方资料和社区光谱模型拟合，保留原有胶卷编号。"]},
+        {"type": "fixed", "items": ["修复照片回放时 m10v 胶卷图标缺失，以及分配 HDF 模拟后 ADJ 不显示的问题。", "自定义 LUT 新增离线 ISP 拟合与误差报告，取景和 JPEG 共用配方；旧自定义胶卷需重新导出并装入。"]}
+      ],
+      "notice": "影响 GR III / GR IIIx。用户已确认本轮 r4 候选其余功能正常，并要求删除 HDF 单句说明后直接发布。Instax 与自定义 LUT 均为可表达的近似；软件误差不是实拍色差。旧自定义胶卷需重新导出并装入，原有存档不会自动重写。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.29.1",
       "date": "2026-10-29",
       "title": "GR III / IIIx 新增拍立得与 135 胶卷边框",
@@ -28,9 +48,9 @@
         }
       ],
       "notice": "影响 GR III / GR IIIx。需在固件工作台启用边框，再于机内「效果」菜单选择样式。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "38a847b5871e2441a7934fafd38dcee50d4faef4",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40809962899"
     },
     {
       "version": "2026.10.28.8",

@@ -108,8 +108,8 @@ static void draw(page *p){
   style_row(p,i,!p->root||i==0,p->root?i==0:p->value==i);
  }
 #endif
- ((fn2)0x533ad3c0u)(p->widgets[8],!p->root);
- caption(p->widgets[8],p->error?976:977);
+ ((fn2)0x533ad3c0u)(p->widgets[8],!p->root&&p->error);
+ caption(p->widgets[8],976);
  ((fn1)0x533ad308u)(p->widgets[0]);
 }
 void m10v_hdf_menu_cache_init(uint32_t owner){

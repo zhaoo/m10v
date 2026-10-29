@@ -2,6 +2,8 @@
 
 状态：**WAITING_FOR_USER_VALIDATION**。2026-10-29 基于 GitHub main `38a847b5871e2441a7934fafd38dcee50d4faef4` 开发；本轮只读核对宝塔提交同为此 SHA。开发分支 `daily/gr3-menu-instax-playback-adj-live-20261029`；未合并、推送或部署。正式交付为 **r4**，早期构建均不作为当前候选。
 
+后续状态（2026-10-29）：**USER_VALIDATED / RELEASE_AUTHORIZED**。用户反馈“别的没问题了”，明确要求删去 HDF 底部单句说明后合并 main 并发布 GitHub/宝塔。接受的 r4 身份及授权边界见 `gr3-menu-instax-adj-live-user-acceptance-20261029.json`；下文保留原候选交付记录。最终只移除正常状态说明和对应资源文字，保留错误提示及资源编号；用户明确授权此项调整后直接发布，无额外实机计时或机型测量结论。
+
 ## 改动和源码证据
 
 - 菜单：时间/名称水印、A/B、焦距设置和效果/HDF/边框页使用整行黄色选中底、原厂 enum28 深色字和分隔线。保持胶卷卡片、控件顺序及返回/确认/取消。HDF 样式资源独立归属，缓存尾部不重叠；覆盖分配失败、重入和销毁。

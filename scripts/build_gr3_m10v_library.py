@@ -577,7 +577,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             texts=[translations.get(t,t) for t in texts]
         if sd_library:
             texts += ['胶卷库','水印','方向键选择 OK启停 MENU返回 DISP拍摄','方向键选择 OK启停 MENU返回 DISP拍摄','上下选择 OK设置 MENU返回','左右调整 OK保存 MENU取消','存储卡中没有可用胶卷','胶卷库已变化，请重新选择','保存失败，请检查存储卡','水印模式','日期格式','显示位置','文字颜色','关闭','仅日期','日期和时间','YYYY.MM.DD','DD.MM.YYYY','YYYY-MM-DD','YY.MM.DD','左上','右上','左下','右下','白色','橙色','红色','黄色','编辑：水印模式','编辑：日期格式','编辑：显示位置','编辑：文字颜色','选择胶卷']
-        if sd_library:texts+=['HDF 模拟','左右选择 OK保存 MENU取消','关闭','弱','中','强','读取或保存失败','全局数字柔焦 · 独立于胶卷']
+        if sd_library:texts+=['HDF 模拟','左右选择 OK保存 MENU取消','关闭','弱','中','强','读取或保存失败','']
         texts+=['Portra 160','富士业务用 100','乐凯 C200','CCD Classic','富士 C200','ProImage 100','T-Max 100','Aerochrome','2460','5203']
         if sd_library:
             texts+=['胶卷名称：关闭','胶卷名称：开启','胶卷名称水印']

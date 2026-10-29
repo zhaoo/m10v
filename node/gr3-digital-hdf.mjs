@@ -51,7 +51,7 @@ export function hdfMenuPatches(runtime,m){
  out.push({address:0x5316fcec,expected:0xe30103bc,replacement:mov(0,d.owner_bytes),name:'HDF menu owner'},{address:0x53b36adc,expected:0x1e1d1b19,replacement:((30+d.rows.length)<<24)|0x1d1b19,name:'HDF menu row count'});
  d.rows.forEach((at,i)=>{const caption=i===d.rows.length-1?(full?1140:970):[937,938,990,1024][i];words(at,[0xe92d4010,0xe1a04001,0xe1a00004,0xe3a01000,branch(at+16,0x5339de20,true),0xe1a00004,mov(1,caption),0xe1a02001,0xe8bd4010,branch(at+36,0x5339dc70)]);out.push({address:0x53b36bd0+i*8,expected:0,replacement:at,name:'HDF menu row'},{address:0x53b36c88+i*4,expected:0x10000000,replacement:full?[0x0200f100,0x0200f101,0x0200f102][i]:0x0200f102,name:'HDF menu route'});});
  if(full&&m.zoom.enabled)out.push({address:0x53b37018,expected:0x02000074,replacement:0x0200f105,name:'Crop selection and focal editor entry'});
- need(m.resources.texts[184]==='HDF 模拟'&&m.resources.texts[191]==='全局数字柔焦 · 独立于胶卷','independent menu captions differ');
+ need(m.resources.texts[184]==='HDF 模拟'&&m.resources.texts[191]==='','independent menu captions differ');
  out.forEach((p,i)=>need(d.patches[i]?.address===p.address&&d.patches[i]?.expected===p.expected&&d.patches[i]?.replacement===p.replacement,'independent menu patch list differs'));
  return out;
 }

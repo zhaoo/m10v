@@ -77,6 +77,13 @@ class HdfStyleTests(unittest.TestCase):
   self.fixture(0);self.assertEqual(self.call('ready',self.page,0),1);self.call('enter',self.page,0,0);self.assert_rows(0,4)
   self.key(0xcf);self.assert_rows(1,4);self.key(0xda);self.assertEqual(self.closed,[self.page]);self.assertEqual(self.saved,[])
   self.call('destroy',self.page);self.assertEqual(self.live,set())
+ def test_hdf_description_is_hidden_but_save_error_remains_visible(self):
+  self.fixture(0);self.assertEqual(self.call('ready',self.page,0),1)
+  self.call('enter',self.page,0,0);message=self.get(self.page+0x158+8*4)
+  self.assertEqual(self.visible[message],0)
+  self.put(self.page+0x188,1);self.call('enter',self.page,0,0)
+  self.assertEqual(self.visible[message],1)
+  self.call('destroy',self.page);self.assertEqual(self.live,set())
  def test_every_partial_allocation_failure_releases_widgets_and_style_heap(self):
   for border,hdf in ((0,1),(1,1),(1,0)):
    for fail in range(1,19):
