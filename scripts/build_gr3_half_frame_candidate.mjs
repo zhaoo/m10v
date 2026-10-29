@@ -3,11 +3,12 @@ import {mkdir,writeFile,stat} from 'node:fs/promises';
 import path from 'node:path';
 import {readNativeOfficial,prepareNative,generateNative} from '../node/gr3-native-library.mjs';
 import {defaultConfiguration} from '../web/gr3/native-library-state.mjs';
-const folder=path.resolve(process.argv[2]||'builds/gr3-half-frame-r2-20261029');
-if(process.argv.length>3)throw Error('usage: node scripts/build_gr3_half_frame_candidate.mjs [new-output-directory]');
+const args=process.argv.slice(2),debug_mode=args.includes('--debug'),positional=args.filter(a=>a!=='--debug');
+const folder=path.resolve(positional[0]||(debug_mode?'builds/gr3-half-frame-r3-debug-20261029':'builds/gr3-half-frame-r2-20261029'));
+if(positional.length>1)throw Error('usage: node scripts/build_gr3_half_frame_candidate.mjs [--debug] [new-output-directory]');
 try{await stat(folder);throw Error('Candidate directory exists; choose a new directory');}catch(e){if(e.code!=='ENOENT')throw e;}
 const configuration=defaultConfiguration(),options={appended_slots:true,hdf_enabled:true,halation_enabled:true,
- border_enabled:true,debug_mode:false,extensions:{aspect:true,level:true,negativeGrain:true,rawNr:{mode:'stock'}}};
+ border_enabled:true,debug_mode,extensions:{aspect:true,level:true,negativeGrain:true,rawNr:{mode:'stock'}}};
 const source=await readNativeOfficial('gr3'),plan=prepareNative(source,configuration,options);
 const result=await generateNative(source,configuration,plan.configuration_sha256,options);
 if(result.receipt.composition.half_frame.enabled!==true||!result.manifest.border.pixel_pipeline_enabled)throw Error('Half-frame or border capability missing');
