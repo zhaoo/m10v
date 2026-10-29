@@ -44,7 +44,7 @@ BIN SHA-256：`f31ca47f2433d8b0cf1ab04f230c8ab0ae90af18dceef672540d3622d34aa74e`
 - 本包专项执行结果见 `evidence/half-frame-final-artifact-r3-debug.log`、`half-frame-pipeline-r3-debug.log`、`half-frame-logger-r3-debug.log` 和 `half-frame-debug-plan-r3.log`。
 - 实际诊断BIN：259个Hook，最终半格39项、当前拍摄链路/RAW归属23项、日志19项、诊断预检2项通过；超限产物拒绝检查通过。
 - 从本包runtime直接执行ARM日志器，四通道8个文件可用正确build_id及CRC解码；此检查使用文件系统/堆测试边界，不代表真实SD已写入。
-- 完整Node套件有历史配置/胶卷断言失败；本轮完整输出及失败名称在evidence中，不能报告全库通过。r2的历史功能验证记录另存于evidence，仅供对照。
+- 完整Node套件455项：403通过、37失败、15跳过。37个失败名称均已出现在r2完整结果中，属于历史配置/胶卷断言；完整输出及失败名称在evidence中，不能报告全库通过。r2的历史功能验证记录另存于evidence，仅供对照。
 - GR IIIx/IV未重建：此次为GR III诊断配置，未改变其机型入口。真实相机像素、AF、回放与SD写入仍需实测。
 
 ## 停用日志与恢复
