@@ -13,6 +13,8 @@ m10v_aspect_\name:
 .endm
 
 entry label
+    cmp r1,#2
+    beq m10v_aspect_wide_id
 #if M10V_HALF_FRAME
     cmp r1,#6
     beq m10v_aspect_half_id
@@ -59,6 +61,9 @@ entry capture_identity
     jump 0x540b9578
 entry binary_class
     uxtb r0,r0
+    cmp r0,#2
+    moveq r0,#0
+    bxeq lr
     cmp r0,#5
 #if M10V_HALF_FRAME
     cmpne r0,#6
@@ -317,6 +322,8 @@ entry text_draw
     jump 0x540b8bc8
 
 entry af_bounds_branch
+    cmp r0,#2
+    beq af_bounds_private
 #if M10V_HALF_FRAME
     cmp r0,#6
     beq af_bounds_private
@@ -326,6 +333,8 @@ entry af_bounds_branch
     cmp r0,#1
     jump 0x540b66a4
 entry af_size_branch
+    cmp r0,#2
+    beq af_size_private
 #if M10V_HALF_FRAME
     cmp r0,#6
     beq af_size_private
@@ -335,6 +344,8 @@ entry af_size_branch
     cmp r0,#1
     jump 0x540b66e8
 entry af_small_branch
+    cmp r0,#2
+    beq af_small_private
 #if M10V_HALF_FRAME
     cmp r0,#6
     beq af_small_private
@@ -360,3 +371,10 @@ m10v_aspect_half_caption:
     .word m10v_aspect_half_caption+8
     .hword 72,97,108,102,32,51,58,52,0
 #endif
+
+.align 2
+.global m10v_aspect_wide_caption
+m10v_aspect_wide_caption:
+    .byte 5,1,0,0
+    .word m10v_aspect_wide_caption+8
+    .hword 49,54,58,57,0

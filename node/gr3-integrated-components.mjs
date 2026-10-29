@@ -101,6 +101,9 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
    need(rtos.readUInt32LE(0x540b97e8-LOAD)===2,'component must disable its timestamp renderer');
    for(const [address,before,after] of resourceAdaptations){const off=address-LOAD;need(rtos.readUInt32LE(off)===before,'aspect resource preimage differs');const id=manifest.resources.last_id+(after===0xe30033a8?0:1);rtos.writeUInt32LE(((after&0xfffff000)|id)>>>0,off);}
    if(componentEnd===ASPECT_END){
+    const wideMarker=Buffer.from('413746572d030000','hex'),wideAt=rtos.indexOf(wideMarker,COMPONENT_END-LOAD);
+    need(wideAt>=0x540bc000-LOAD&&wideAt+8<=ASPECT_END-LOAD&&rtos.indexOf(wideMarker,wideAt+1)===-1,'16:9 resource binding differs');
+    rtos.writeUInt32LE(manifest.resources.last_id+4,wideAt+4);
     const halfMarker=Buffer.from('413746482c03000000000000','hex'),halfAt=rtos.indexOf(halfMarker,COMPONENT_END-LOAD);
     if(manifest.camera_model==='gr3'){
      need(halfAt>=0x540bc000-LOAD&&halfAt+12<=ASPECT_END-LOAD&&rtos.indexOf(halfMarker,halfAt+1)===-1,'half-frame model/resource binding differs');

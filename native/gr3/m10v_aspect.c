@@ -21,6 +21,8 @@ const u8 m10v_aspect_classes[]={2,1,3,4,0,
 #endif
 };
 
+__attribute__((used)) const volatile u32 m10v_aspect_wide_record[2]={0x57463741,813};
+u32 m10v_aspect_wide_id(void) { return m10v_aspect_wide_record[1]; }
 u32 m10v_aspect_id(void) { return m10v_aspect_id_record[1]; }
 u32 m10v_aspect_count(void) { return sizeof(m10v_aspect_values); }
 u32 m10v_aspect_next(u32 value) {
@@ -92,12 +94,13 @@ u32 m10v_aspect_half_filter(u32 mag,u32 crop_enabled) {
     return 0x3f315574;
 }
 #endif
-extern const u8 m10v_aspect_caption[];
+extern const u8 m10v_aspect_caption[],m10v_aspect_wide_caption[];
 #if M10V_HALF_FRAME
 extern const u8 m10v_aspect_half_caption[];
 #endif
 const u8 *m10v_aspect_caption_for(u32 id,u32 language) {
     if(language>20) return 0;
+    if(id==m10v_aspect_wide_id()) return m10v_aspect_wide_caption;
     if(id==m10v_aspect_id()) return m10v_aspect_caption;
 #if M10V_HALF_FRAME
     if(id==m10v_aspect_half_id()) return m10v_aspect_half_caption;
@@ -258,6 +261,20 @@ void m10v_aspect_draw(u32 view,u32 surface) {
 
 /* AF retains the native safety inset and follows all three crop magnifications. */
 u32 m10v_aspect_af_bounds(u32 ratio,u32 crop,u32 *out) {
+    if(ratio==2) {
+        if(!out) return 0;
+        u32 owner=CALL(0x5320ad88,u32 (*)(void))();
+        owner=owner?CALL(0x5320b31c,u32 (*)(u32))(owner):0;
+        u32 props=owner?WORD(owner,4):0;
+        u32 mm=props?m10v_aspect_mm(WORD(props,0x4c4)):0;
+        if(!mm) mm=crop==1?35:crop==2?50:28;
+        u32 w=720*28/mm,h=405*28/mm;
+        u32 l=(720-w+1)/2,t=(480-h+1)/2;
+        if(l<80)l=80;
+        if(t<60)t=60;
+        out[0]=l;out[1]=t;out[2]=720-l;out[3]=480-t;
+        return 1;
+    }
 #if M10V_HALF_FRAME
     if(ratio==6) {
         if(!out) return 0;
