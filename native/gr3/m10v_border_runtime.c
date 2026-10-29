@@ -169,8 +169,11 @@ int m10v_border_runtime_after_resize(uint32_t module,uint32_t config){
     m10v_border_canvas_info canvas;
     if(!same8(source,main)||(source[5]&65535u)!=shape.canvas.stride||
        main[2]-main[1]!=shape.plane_bytes||
-       m10v_border_canvas_plan(style,orientation,main,base,base+shape.plane_bytes,shape.plane_bytes,&canvas))
+       m10v_border_canvas_plan(style,orientation,main,base,base+shape.plane_bytes,shape.plane_bytes,&canvas)){
+        (void)m10v_save_trace_recipe_mark(recipe,197u,0x42534453u,source[4],main[4]);
+        (void)m10v_save_trace_recipe_mark(recipe,197u,0x42534459u,source[1],main[1]);
         return fail(recipe,phase,-6);
+    }
     /* A cropped native descriptor retains old cacheRows; normalize before
      * either the early or a rejected-stage later residual bridge can use it. */
     copy8(source,canvas.inner);copy8(main,canvas.inner);
@@ -250,16 +253,19 @@ int m10v_border_runtime_jpeg(uint32_t context){
         /* Once IIP completed, the frozen bank and exact inner Y addresses
          * authenticate the pixels. The owner may have restored stale C,
          * stride or auxiliary descriptor words before this JPEG handoff. */
-        if(w!=fullw||h!=fullh||(source[4]&65535u)!=fullw||(source[4]>>16)!=fullh||
-           (source[0]&255u)!=1u||(main[0]&255u)!=1u||
-           (source[7]&255u)!=2u||(main[7]&255u)!=2u||
-           source[1]!=shape.source_y||main[1]!=shape.source_y){
-            trace_prepare(recipe,4u,10u);return library;
-        }
+        uint32_t reject=0;
+        if(w!=fullw||h!=fullh||(source[4]&65535u)!=fullw||(source[4]>>16)!=fullh)reject|=1u;
+        if((source[0]&255u)!=1u||(main[0]&255u)!=1u)reject|=2u;
+        /* The owner can also restore the stock auxiliary tag. Exact Y-bank
+         * provenance and frozen dimensions identify the completed image. */
+        if(((source[7]&255u)!=2u&&(source[7]&255u)!=0u)||
+           ((main[7]&255u)!=2u&&(main[7]&255u)!=0u))reject|=4u;
+        if(source[1]!=shape.source_y||main[1]!=shape.source_y)reject|=8u;
+        if(reject){trace_prepare(recipe,4u,0x100u|reject);return library;}
         uint32_t inner[8];copy8(inner,main);
         inner[1]=shape.source_y;inner[2]=shape.source_c;
         inner[3]=0;inner[4]=fullw|(fullh<<16);
-        inner[5]=shape.canvas.stride|(fullh<<16);inner[6]=0;
+        inner[5]=shape.canvas.stride|(fullh<<16);inner[6]=0;inner[7]=(inner[7]&~255u)|2u;
         if(m10v_border_canvas_plan(style,orientation,inner,base,
               base+shape.plane_bytes,shape.plane_bytes,&canvas)||
            canvas.canvas[4]!=(shape.canvas.outer.width|(shape.canvas.outer.height<<16))){

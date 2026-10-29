@@ -91,6 +91,13 @@ def page_records(data):
             elif tag==0x504c414e:
                 record['border_diagnostic']={'recipe':hex(recipe),'kind':'jpeg.entry.planes',
                     'source_y':hex(value),'main_y':hex(detail)}
+            elif tag==0x42534453:
+                record['border_diagnostic']={'recipe':hex(recipe),'kind':'backresize.descriptors',
+                    'source_size':[value&65535,value>>16],
+                    'main_size':[detail&65535,detail>>16]}
+            elif tag==0x42534459:
+                record['border_diagnostic']={'recipe':hex(recipe),'kind':'backresize.planes',
+                    'source_y':hex(value),'main_y':hex(detail)}
         if record['event']==184:
             recipe,buffer_id,backing,result=record['arguments']
             record['pool_dispatch']={'recipe':hex(recipe),'buffer_id':buffer_id,'backing':hex(backing),
