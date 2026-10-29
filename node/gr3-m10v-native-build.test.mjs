@@ -8,13 +8,14 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { buildNativeLibrary, auditNativeLibrary } from './gr3-m10v-native-build.mjs';
 import { decodeFrameMap } from './gr3-frames.mjs';
+import {MAX_NATIVE_RTOS_GROWTH} from './gr3-native-budget.mjs';
 
-const source = readFileSync(new URL('../fwdc239b-offical.bin', import.meta.url));
+const source = readFileSync(new URL('../bin/fwdc239b-gr3-official.bin', import.meta.url));
 
 test('M10V native library builds from official bytes without a compatibility runtime and audits every patch', async () => {
   const folder = await mkdtemp(path.join(tmpdir(), 'm10v-native-build-'));
   try {
-    const manifest = JSON.parse(execFileSync(new URL('../.venv/bin/python', import.meta.url).pathname,
+    const manifest = JSON.parse(execFileSync(process.env.M10V_PYTHON || new URL('../.venv/bin/python', import.meta.url).pathname,
       ['scripts/build_gr3_m10v_library.py', '--out', folder], {cwd:new URL('..', import.meta.url).pathname}));
     const runtime = await readFile(path.join(folder, 'm10v-library-arm.bin'));
     const result = buildNativeLibrary(source, runtime, manifest);
@@ -32,7 +33,7 @@ test('M10V native library builds from official bytes without a compatibility run
 
     // Reproduce Ubuntu clang's observed full-build extent independently of
     // source compiler padding; appended ROM data still receives full audits.
-    const serverGrowth=1115104,ceiling=1104*1024;
+    const serverGrowth=1115104,ceiling=MAX_NATIVE_RTOS_GROWTH;
     const withGrowth=growth=>{
       const bytes=Buffer.concat([runtime,Buffer.alloc(growth-result.receipt.rtos_growth)]);
       return [bytes,{...manifest,code_bytes:bytes.length,code_sha256:createHash('sha256').update(bytes).digest('hex')}];

@@ -1,6 +1,9 @@
 #include "m10v_tone.h"
 #include "m10v_isp_recipe_color.h"
 #include <stddef.h>
+#if M10V_BORDER_SHOT
+#include "m10v_border_shot.h"
+#endif
 #if M10V_ISP_NATIVE_LOOK
 #include "m10v_isp_native_look.h"
 #endif
@@ -126,6 +129,11 @@ int m10v_isp_frame_recipe_producer(void *recipe){
 #endif
     m10v_isp_recipe_color *s=owned(recipe);
     if(!s)return 0;
+#if M10V_BORDER_SHOT
+    /* Independent of film carriers: stock ImageControl also gets borders.
+     * Freeze before this first processing task is enqueued. */
+    m10v_border_shot_freeze((uint32_t)(uintptr_t)recipe);
+#endif
     if(s->magic==M10V_ISP_RECIPE_COLOR_MAGIC)return 1;
     /* Original5351ea9c receives THIS recipe in r1 before constructing and
      * sending its first processing packet. 5351ae2c is buffer retirement,

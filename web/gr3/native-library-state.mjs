@@ -62,8 +62,8 @@ export function activeExtensions(value){
  const e=normalizeExtensions(value);return ['aspect','level','negativeGrain'].filter(k=>e[k]).concat(e.rawNr.mode==='stock'?[]:['rawNr']);
 }
 export function withNativeLibrary(features){
- const allowed=['film','digitalHdf','timestamp','aspect','level','negativeGrain','rawNr'];
- if(!Array.isArray(features)||features.some(id=>!allowed.includes(id)))throw Error('胶卷库可组合时间戳、画幅、水平仪、负片颗粒和 RAW 降噪；请先移除其他配方或工具');
+ const allowed=['film','digitalHdf','timestamp','aspect','border','level','negativeGrain','rawNr'];
+ if(!Array.isArray(features)||features.some(id=>!allowed.includes(id)))throw Error('胶卷库可组合边框、时间戳、画幅、水平仪、负片颗粒和 RAW 降噪；请先移除其他配方或工具');
  const selected=new Set(['film',...features]);return allowed.filter(id=>selected.has(id));
 }
 

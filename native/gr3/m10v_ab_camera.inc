@@ -1,6 +1,9 @@
 /* Included in the settings adapter: uses its explicit owner and stock ABI.
  * Only UI code accesses this state. No capture worker, mutable global or new
  * parameter bank. The separately journalled pair contains no active flag. */
+#if M10V_BORDER_ENABLED
+#include "m10v_border_camera.h"
+#endif
 extern uint32_t m10v_ab_adj_event_original(uint32_t,uint32_t);
 extern uint32_t m10v_ab_mapper_original(uint32_t,uint32_t);
 extern uint32_t m10v_ab_selector_original(uint32_t,uint32_t);
@@ -323,6 +326,16 @@ uint32_t m10v_settings_controller_ab_live_enter(uint32_t live,uint32_t route,uin
 #endif
   p=ab_owner();if(p&&initialized)p->library_initialized=1;
  }
+#if M10V_BORDER_ENABLED
+ if(route==0x08000000u){
+  /* Refresh only from the live UI lifecycle after the owner exists. */
+  uint32_t border_style;
+  if(!m10v_border_camera_snapshot(&border_style)){
+   p=ab_owner();
+   if(p)m10v_border_camera_refresh((uint32_t)(uintptr_t)p-M10V_SETTINGS_OWNER_BYTES);
+  }
+ }
+#endif
  p=ab_owner();
  if(p&&route==0x08000000u){
   M10V_EXIT_LOG(268,live,p->ab.enabled,p->ab.selected,p->library_initialized);

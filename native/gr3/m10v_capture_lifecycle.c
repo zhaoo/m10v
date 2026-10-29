@@ -1,5 +1,9 @@
 #include "m10v_save_trace.h"
 #include "m10v_debug.h"
+#if M10V_BORDER_ENABLED
+#include "m10v_border_shot.h"
+#include "m10v_border_camera.h"
+#endif
 #include <stdint.h>
 #if M10V_RECIPE_SNAPSHOT
 #include "m10v_isp_recipe_color.h"
@@ -42,4 +46,26 @@ void m10v_lifecycle_phase(uint32_t context,uint32_t event,uint32_t result){
  uint32_t records[M10V_SAVE_TRACE_CAPACITY][5];
  uint32_t count=m10v_save_trace_recipe_take(recipe,&records[0][0],M10V_SAVE_TRACE_CAPACITY);
  if(count)m10v_debug_batch(&records[0][0],count);
+#if M10V_BORDER_ENABLED && M10V_DEBUG_MODE
+ /* The bounded capture trace can fill before phase 193. Emit this one
+  * diagnostic after the existing safe flush so a full trace cannot hide it. */
+ if(event==193&&recipe<=0x80000000u-M10V_SAVE_RECIPE_EXTENDED_BYTES&&
+    *(const uint32_t *)(uintptr_t)(recipe+M10V_SAVE_RECIPE_BYTES)==M10V_SAVE_TRACE_MAGIC){
+  uint32_t style=0,available=m10v_border_camera_snapshot(&style);
+  M10V_LOG(205,0x53484f54u,
+           *(const uint32_t *)(uintptr_t)(recipe+M10V_BORDER_SHOT_OFFSET),
+           available?style:0xffffffffu,
+           *(const uint32_t *)(uintptr_t)(recipe+0xc0u));
+  M10V_LOG(197,recipe,0x53524353u,
+           *(const uint32_t *)(uintptr_t)(recipe+0x80u),
+           *(const uint32_t *)(uintptr_t)(recipe+0x120u));
+  M10V_LOG(197,recipe,0x504c414eu,
+           *(const uint32_t *)(uintptr_t)(recipe+0x74u),
+           *(const uint32_t *)(uintptr_t)(recipe+0xb4u));
+  const m10v_save_trace *trace=(const m10v_save_trace *)(uintptr_t)(recipe+M10V_SAVE_RECIPE_BYTES);
+  if(trace->events[31][0]==197u&&
+     (trace->events[31][2]==0x424f5244u||trace->events[31][2]==0x4d313030u))
+   M10V_LOG(197,recipe,trace->events[31][2],trace->events[31][3],trace->events[31][4]);
+ }
+#endif
 }

@@ -267,12 +267,12 @@ export function createServer(store = new Store(path.join(root, 'data')),
       if(nativeMatch) {
         const original=await readBuildOriginal(nativeMatch[1]),input=JSON.parse(body.toString('utf8'));
         if(buildSource.update_compatibility&&input.version_unlock?.enabled)throw Error('此来源已自动适配更新版本，不能叠加旧版单包版本适配');
-        const nativeOptions={debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled,halation_enabled:input.halation_enabled??false,appended_slots:input.appended_slots};
+        const nativeOptions={debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled,halation_enabled:input.halation_enabled??false,border_enabled:input.border_enabled??false,appended_slots:input.appended_slots};
         const basePreparation=prepareNative(original,input.configuration,nativeOptions),powerPreparation=bindPowerPreparation(basePreparation,original,input.power_images);
         if(nativeMatch[2]==='prepare')return send(response,200,{...powerPreparation,build_source:buildSource});
         if(input.accepted_configuration_sha256!==powerPreparation.configuration_sha256)throw Error('方案已变化，请重新核验图片与固件');
         const cancellation=new AbortController();response.once('close',()=>{if(!response.writableFinished)cancellation.abort();});
-        const nativeResult=await generateNative(original,input.configuration,basePreparation.configuration_sha256,{signal:cancellation.signal,debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled,halation_enabled:input.halation_enabled??false,appended_slots:input.appended_slots});
+        const nativeResult=await generateNative(original,input.configuration,basePreparation.configuration_sha256,{signal:cancellation.signal,debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled,halation_enabled:input.halation_enabled??false,border_enabled:input.border_enabled??false,appended_slots:input.appended_slots});
         const powerResult=applyPowerImages(original,nativeResult.candidate,input.power_images),candidate=powerResult.candidate;
         const receipt={...nativeResult.receipt,build_source:buildSource,...(powerPreparation.power_images?{power_images:powerResult.receipt,configuration_sha256:powerPreparation.configuration_sha256,candidate_sha256:createHash('sha256').update(candidate).digest('hex'),candidate_bytes:candidate.length}: {})};
         response.setHeader('X-M10V-Native-Receipt',Buffer.from(JSON.stringify(receipt)).toString('base64'));

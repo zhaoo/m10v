@@ -1,0 +1,98 @@
+# GR III / GR IIIx 边框：原厂 IIP 与扩展尺寸核查
+
+状态：**原厂 ARM 参数路径已离线执行；边框成像尚未接入，未生成可刷候选，硬件像素和性能未验收。**
+
+用户批准的设计为完整保留裁切后的图像、向外增加拍立得/胶卷边框，不允许新增 CPU 整图绘制路径。本轮没有因为参数验证通过而开放菜单或放宽生产尺寸检查。
+
+## 固定输入
+
+| 输入 | GR III 2.10 | GR IIIx 1.60 |
+| --- | --- | --- |
+| 官方 BIN SHA256 | d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4 | 708e79f3b7b96a7e1581b4acf4c412233050a1832718ef7f06c8397db1b431c7 |
+| 官方 RTOS SHA256 | 8a4eafcad2716e0b21e9909264e1242e534f0e39e05cba82a53546ceb4070b67 | 0f11b0d28bc67932d044c5d01bc0314844a756057c89984278c73a23449a24c6 |
+| RTOS 字节数 | 17,520,064 | 17,520,064 |
+
+通过当前 `officialResources` / `inspectOfficial` 独立读取两款本地官方 BIN，提取 ignored builds 中的 RTOS。`analyze_gr3_border_iip.py` 对型号和完整 RTOS 哈希同时锁定，不接受交叉型号或其他版本。下面选定范围逐字节指纹相同；这只证明这些原厂代码可共享研究结论，不等同于全机行为相同。
+
+## 执行证据
+
+### 原厂填色确有非 CPU 像素路径
+
+`FrameOperationPipeService.cpp` 的 `FillRectIip` 为 `0x5365900c`，通过函数名称断言引用 `0x53d51b4c` 及真实调用确认。
+
+- 接受低层图像描述符和三个 u16 常量；格式 1 被转为 IIP packet layout code 0，格式 2 转为 code 2。
+- 大图按原厂计算分成条带，在 `0x536591c8` 调用 `0x53769a78`；小图通过 `0x53659254` 调用同一入口。
+- `0x53769a78` 构造三组 GPC 常量输入，把三个值分别写入各参数对象 `+0x44`；`0x5376a294` 调用 GPC 配置服务 `0x5376b8bc`，`0x5376a328` 调用 Store 配置服务 `0x5377448c`。
+- 随后走 `0x5376e55c` 提交、原厂事件等待 `0x536a9e8c`、原厂释放 `0x5376ed74`。
+
+离线执行两机型原厂 FillRectIip，覆盖 6320×4640、4480×6640、6480×4480、160×120，格式 1/2。只在锁服务和 IIP 下层服务入口记录/返回，图像平面地址故意不映射。原厂条带宽高、平面偏移、常量、锁获取/释放和总行数均核对，原厂断言无失败。**这个范围内没有 CPU 图像访问；不表示整个成片实现已经做到零像素 CPU 工作。**
+
+另单独执行 `0x53769a78` 的参数构造，在单元配置、提交、事件和释放边界记录。GPC 三常量、Store 宽高和原点匹配输入。所有这些硬件边界都没有被模拟为实际图像输出，既没有生成假像素，也没有计算速度。
+
+### 扩展尺寸能通过原厂参数表达
+
+- 原厂 Loader 构造 `0x536789f0` 把矩形写为 `+0xa0..+0xa6`，Store 构造 `0x5368c3d8` 写为 `+0xa4..+0xaa`；每个坐标由 `bfi ... #0, #14` 写入，右/下边界使用 `origin + size - 1`。
+- 执行原厂构造器，6320×4640、横竖交换及内图偏移 (160,160,6000,4000) 均保留正确坐标；另检查端点 16383。这个 14-bit 序列化范围不是硅片最大吞吐或 buffer 容量保证。
+- 原厂 JPEG 请求函数 `0x53663a8c` 把低层图像描述符中的 stride/width/height 写入请求 `+0x0c/+0x0e/+0x10`，在 `0x53663b4c` 交给引擎 `0x53791044`。两机型原厂请求构造在 6320×4640 等扩展尺寸下保留正确值；图像及 JPEG 输出地址均未映射，编码引擎、事件与释放为明确测试边界。
+- 原厂 JPEG 寄存器 setter `0x53792128` 和 `0x53791d8c` 对尺寸执行 `uxth`，并向 `0x298c0000` 相对 `0x418/0x41c` 和 `0x1c/0x18` 写低 16 位。继续执行原厂 JPEG driver 到这些实际 setter，寄存器地址由普通模拟 RAM 承载，控制/图像启动服务被替代；6320×4640、4320×6640、6480×4480 在两组寄存器中均保持宽高，没有 6144/4096 截断。此用例证明参数序列化，不能证明硅片响应、真实解码、内存或性能。
+- 现有 M10V `thumb_load` 的 6144×4096 是当前软件接入限制，不能据此宣称原厂硬件上限，也不能只改数值来接纳更大的缓冲。
+
+## 为什么还不能启用相机边框
+
+1. **失败后的停止条件尚未闭合。** 原厂填色驱动 `0x5376a370` 等待事件，随后直接清事件并释放，没有分支校验等待返回。离线让等待返回 0/1，都会进入 release。已有真实 release ARM 用例进一步证明：原厂 idle 轮询超时会调用可返回的日志断言，之后继续释放。因而“函数返回 / 对象释放”不是 DMA idle 证明。不能直接在新回调中调用填色并马上释放画布。
+2. **原尺寸外扩的工作内存未证明。** 6000×4000 的 4% 白框得到 6320×4640；422 两平面紧密下限为 58,649,600 字节，比原图 48,000,000 多 10,649,600；若源和目标同时保留，两者至少 106,649,600 字节，尚未计 stride、RAW、编码输出、预览及其他工作内存。需要原厂工作区规划和真实可用池证据，不能在 JPEG 钩子临时申请后假定连拍无影响。
+3. **目标偏移复制及完整消费链尚未接通。** 现有 `0x53681260` 原厂 Loader→Store copy 只能作为原语参考；还需要实际验证源图保持完整、目标带偏移、格式/stride/色度正确的复制请求。JPEG 主图、独立预览、缩略图、即时回放和 EXIF 方向必须一致。边框后主图与原图尺寸不同，不能照搬只修改像素的现有编码桥。
+4. **胶卷齿孔与真机性能尚未证明。** 纯几何可以生成孔位，但多次小区域硬件填充的请求数量、调度成本和真实黑白值需要验证；不允许生成 CPU 整幅遮罩来跳过此问题。
+
+上述是具体缺口，不是宣称无法实现。当前没有安全可启用的硬件像素探针，因此没有交付试刷包来让用户替尚未闭合的所有权/停止条件冒险。
+
+## 已实现的共享部分
+
+`native/gr3/m10v_border.c/.h` 为纯布局模块，不链接到当前固件：
+
+- 关闭、拍立得 4% 白边/三倍底边、胶卷 6% 黑边与左右重复齿孔描述。
+- 消费裁切后、显示方向的实际宽高；内图宽高完全保持，孔位不侵入内图，全部按 2 像素对齐。
+- 两组齿孔各最多 64 个，仅输出首孔/pitch/count，不申请整图或动态数组；计算步骤有界。
+- 纯布局与目标硬件 admission 分开，不能据函数成功认定输出尺寸可编码。实际拍摄还必须把显示方向布局转换为本张 EXIF 对应的存储坐标。
+- 主机几何用例通过；ARM freestanding 编译/独立链接通过，无运行库除法、像素地址或硬件调用。
+
+## 检查与复现
+
+新增两个测试模块共 14 项通过：`tests.test_gr3_border`（6 项）和 `tests.test_gr3_border_iip`（8 项）。另运行现有原厂等待/释放用例 2 项通过，确认失败风险的控制流；不是修复通过。
+
+从已提供的官方 BIN 恢复 ignored RTOS fixture（在仓库根目录运行；不会下载固件）：
+
+```sh
+node --input-type=module <<'JS'
+import {readFileSync, writeFileSync, mkdirSync} from 'node:fs';
+import {officialResources} from './node/gr3-stock-presets.mjs';
+import {inspectOfficial} from './node/firmware.mjs';
+const out = 'builds/gr3-border-iip-20261027';
+mkdirSync(out, {recursive:true});
+for (const [model, name, file] of [
+  ['gr3', 'GR III', 'bin/fwdc239b-gr3-official.bin'],
+  ['gr3x', 'GR IIIx', 'bin/fwdc243b-gr3x-official.bin'],
+]) {
+  const input = readFileSync(file);
+  if (inspectOfficial(input).model !== name) throw Error('official model mismatch');
+  const {decoded, sections} = officialResources(input), section = sections.RTOS;
+  writeFileSync(`${out}/${model}-official-rtos.bin`, decoded.subarray(section.offset, section.offset + section.size));
+}
+JS
+```
+
+然后执行以下命令；分析器会再次校验完整 RTOS 哈希与型号：
+
+```sh
+/Users/zhaoo/Desktop/code/zhaoo/m10v/.venv/bin/python -m unittest tests.test_gr3_border tests.test_gr3_border_iip -v
+/Users/zhaoo/Desktop/code/zhaoo/m10v/.venv/bin/python scripts/analyze_gr3_border_iip.py --rtos builds/gr3-border-iip-20261027/gr3-official-rtos.bin --model gr3 --out builds/gr3-border-iip-20261027/gr3-report.json
+/Users/zhaoo/Desktop/code/zhaoo/m10v/.venv/bin/python scripts/analyze_gr3_border_iip.py --rtos builds/gr3-border-iip-20261027/gr3x-official-rtos.bin --model gr3x --out builds/gr3-border-iip-20261027/gr3x-report.json
+```
+
+证据 JSON、精确范围反汇编与日志位于 ignored `builds/gr3-border-iip-20261027/`；官方 BIN/RTOS 不进入 Git。Unicorn ISA 选 A15 是为了执行官方 helper 的 UDIV（A9 profile 会报 invalid instruction），不表示鉴定出物理 CPU 型号，也不是耗时模拟。
+
+未运行全库回归或固件导出：生产调用链没有修改。未运行相机、SD 安装、真实硬件像素、存储池峰值、即时回放或连拍验证。未合并 main、推送或部署。
+
+## 下一步顺序
+
+先定位并验证原厂图像服务的调度所有者、取消/停止或可证 idle 路径；同时追踪 BackResize/Store 的扩展画布预留和释放。再闭合目标偏移复制、齿孔局部填色及全部显示/编码描述符，最后接入菜单/持久化/逐张快照并分别构建两机型。无法闭合的硬件能力需保留为阻塞，不能退回 CPU 绘框或静默缩小照片。

@@ -9,7 +9,7 @@ test('digital HDF is independent of films and retired soft values never become H
  const c=normalizeConfiguration(old);
  assert.equal(c.hdf,0);assert.ok(c.slots.every(s=>s.soft===0));
  c.hdf=2;assert.equal(resetNativeTexture(c,0).hdf,2);
- assert.equal(initialState(c).readUInt32LE(96),0);
+ assert.deepEqual(initialState(c),initialState({...c,hdf:0}));
  for(const hdf of [-1,4,1.5,'2',null])assert.throws(()=>normalizeConfiguration({...c,hdf}));
 });
 test('exported HDF candidate independently verifies coefficients and rejects changed ARM instructions',{timeout:120000},async()=>{

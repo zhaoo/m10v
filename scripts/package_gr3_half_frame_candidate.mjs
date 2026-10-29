@@ -14,8 +14,8 @@ import {encodeZip} from '../node/gr3-sd-film-export.mjs';
 
 const run=promisify(execFile),sha=b=>createHash('sha256').update(b).digest('hex');
 const json=x=>Buffer.from(JSON.stringify(x,null,2)+'\n');
-const input=path.resolve(process.argv[2]||'builds/gr3-half-frame-r1-20261029');
-const name='M10V-GR3-HalfFrame-TEST-20261029-r1';
+const input=path.resolve(process.argv[2]||'builds/gr3-half-frame-r2-20261029');
+const name='M10V-GR3-HalfFrame-TEST-20261029-r2';
 const output=path.resolve(process.argv[3]||'builds/'+name);
 try{await stat(output);throw Error('Output directory exists; choose a new directory');}catch(e){if(e.code!=='ENOENT')throw e;}
 const read=async n=>JSON.parse(await readFile(path.join(input,n),'utf8'));
@@ -28,7 +28,7 @@ if(receipt.model!=='GR III'||receipt.public_version!=='2.10'||receipt.candidate_
  receipt.integration_source_sha256!==plan.integration_source_sha256||!receipt.composition?.verified||
  receipt.composition.half_frame?.enabled!==true||receipt.composition.half_frame.raw_id!==6||
  manifest.camera_model!=='gr3'||manifest.code_sha256!==sha(runtime)||manifest.debug_mode||!manifest.hdf_adj||
- !manifest.appended_slots||!manifest.universal_halation)throw Error('Candidate provenance/features differ');
+ !manifest.appended_slots||!manifest.universal_halation||!manifest.border?.pixel_pipeline_enabled)throw Error('Candidate provenance/features differ');
 const sources={};
 for(const [file,hash]of Object.entries(manifest.sources)){
  const bytes=await readFile(file);if(sha(bytes)!==hash)throw Error('Source changed since build: '+file);sources[file]=bytes;
@@ -36,7 +36,7 @@ for(const [file,hash]of Object.entries(manifest.sources)){
 for(const file of ['native/gr3/m10v_aspect.c','native/gr3/m10v_aspect_hooks.S','native/gr3/m10v_aspect_dng.c',
  'native/gr3/m10v_aspect_config.h','scripts/gr3_aspect_overlay.py','node/gr3-integrated-components.mjs',
  'node/gr3-native-library.mjs','node/gr3-runtime-worker.py','node/gr3-runtime.mjs','node/gr3-m10v-native-build.mjs',
- 'node/gr3-native-budget.mjs','scripts/package_gr3_half_frame_candidate.mjs','tests/test_gr3_half_frame.py',
+ 'node/gr3-native-budget.mjs','scripts/build_gr3_half_frame_candidate.mjs','scripts/package_gr3_half_frame_candidate.mjs','tests/test_gr3_half_frame.py',
  'tests/test_gr3_aspect.py','tests/test_gr3_aspect_dng.py','tests/test_gr3_aspect_indicator_final.py',
  'docs/superpowers/specs/2026-10-29-gr3-half-frame-design.md','docs/testing/gr3-half-frame-20261029.md'])sources[file]=await readFile(file);
 const structure=auditGr3Candidate(source,bin,{minRtosGrowth:0,maxRtosGrowth:MAX_NATIVE_RTOS_GROWTH});
@@ -49,7 +49,7 @@ if(at<0||at+12>halfRecord-0x53000000||rtos.indexOf(marker,at+1)!==-1||
  rtos.readUInt32LE(at+4)!==receipt.composition.half_frame.resource_id||rtos.readUInt32LE(at+8)!==875)throw Error('Half-frame final binding differs');
 const pack=buildSdFilmPack();auditSdFilmPack(pack);
 const provenance={candidate:name,status:'WAITING_FOR_USER_VALIDATION',model:'GR III',firmware:'2.10',camera_tested:false,
- created_at:new Date().toISOString(),base_commit:'314ccc2bbf908fb4310a37a3f5b052e99e8aac0e',
+ created_at:new Date().toISOString(),base_commit:'38a847b5871e2441a7934fafd38dcee50d4faef4',
  git_revision:(await run('git',['rev-parse','HEAD'])).stdout.trim(),
  git_status:(await run('git',['status','--short'])).stdout.trim().split('\n').filter(Boolean),
  official_sha256:sha(source),bin_sha256:sha(bin),runtime_sha256:sha(runtime),sd_sha256:sha(pack),
@@ -61,8 +61,8 @@ const files={'README.md':await readFile('docs/testing/gr3-half-frame-20261029.md
  'gr3/configuration.json':json(configuration),'gr3/options.json':json(options),
  'SD/M10V/FILMS.M10':pack,'evidence/provenance.json':json(provenance),'evidence/source-snapshot.zip':encodeZip(sources)};
 for(const p of ['LICENSE','THIRD_PARTY_NOTICES.md','third_party/curated-film-luts/LICENSE','third_party/spectral-film-lut/LICENSE'])files[p]=await readFile(p);
-for(const name of ['half-frame-final-artifact.log','half-frame-pipeline-verified.log','half-frame-source-verified.log',
- 'half-frame-node-final.log','half-frame-baseline-node-failures.txt','half-frame-gr3x-gate.log','half-frame-review.md']){
+for(const name of ['half-frame-final-artifact-r2.log','half-frame-pipeline-r2.log','half-frame-source-r2.log',
+ 'half-frame-node-r2.log','half-frame-baseline-node-failures.txt','half-frame-final-node-failures-r2.txt','half-frame-gr3x-gate-r2.log','half-frame-review.md','half-frame-border-regression-r2.log','half-frame-border-node-r2.log','half-frame-border-geometry-r2.log']){
  files['evidence/'+name]=await readFile('builds/'+name);
 }
 files.SHA256SUMS=Buffer.from(Object.entries(files).map(([p,b])=>sha(b)+'  '+p).join('\n')+'\n');

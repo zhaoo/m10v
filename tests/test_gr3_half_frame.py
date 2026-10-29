@@ -16,8 +16,8 @@ class HalfFrameTests(unittest.TestCase):
     live_machine = aspect.AspectTests.live_machine
 
     def test_menu_appends_half_frame_preserving_old_order_and_invalid_reset(self):
-        self.assertEqual(self.call(0x540b98c4).reg_read(A.UC_ARM_REG_R0), 6)
-        for current, following in [(0,3),(3,1),(1,4),(4,5),(5,6),(6,0),(255,0)]:
+        self.assertEqual(self.call(0x540b98c4).reg_read(A.UC_ARM_REG_R0), 7)
+        for current, following in [(0,3),(3,1),(1,2),(2,4),(4,5),(5,6),(6,0),(255,0)]:
             self.assertEqual(self.call(0x540b9300,current).reg_read(A.UC_ARM_REG_R0), following)
 
     def test_resolution_dispatch_uses_portrait_geometry_for_all_native_crops(self):
@@ -46,11 +46,11 @@ class HalfFrameTests(unittest.TestCase):
         for mag,want in [(0x3f800000,0x3f315574),(0x3fa00000,0x3f0e00d5),(0x3fe49249,0x3ec6cdf7)]:
             self.assertEqual(self.call(self.entries['m10v_aspect_half_filter'],mag,0).reg_read(A.UC_ARM_REG_R0),want)
 
-    def test_iiix_compile_gate_keeps_five_old_modes_and_no_half_entry(self):
+    def test_iiix_compile_gate_keeps_six_old_modes_and_no_half_entry(self):
         from scripts.gr3_aspect_overlay import build_module,MODULE
         code,symbols=build_module(half_frame=False)
         self.assertNotIn('m10v_aspect_half_resolution',symbols)
-        for name,arg,want in [('count',0,5),('next',5,0),('next',6,0)]:
+        for name,arg,want in [('count',0,6),('next',5,0),('next',6,0)]:
             u=self.machine();u.mem_protect(MODULE,8192,7);u.mem_write(MODULE,code)
             u.reg_write(A.UC_ARM_REG_R0,arg)
             u.emu_start(symbols['m10v_aspect_'+name],aspect.STOP,count=10000)

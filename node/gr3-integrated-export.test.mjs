@@ -36,17 +36,17 @@ test('final joined firmware contains all selected components and rejects repaire
  assert.deepEqual(result.receipt.extensions,{...extensions,rawNr:{mode:'stock'}});
  assert.equal(result.manifest.base,0x540be000);
  assert.ok(result.receipt.composition.verified);
- assert.equal(result.receipt.composition.aspect_resource_id,1111);
+ const resourceLast=result.manifest.resources.last_id;
+ assert.equal(result.receipt.composition.aspect_resource_id,resourceLast+1);
  assert.equal(result.receipt.composition.native_resource_range[0],786);
- assert.equal(result.receipt.composition.native_resource_range[1],1110);
+ assert.equal(result.receipt.composition.native_resource_range[1],resourceLast);
  assert.equal(sum32(result.candidate),0);
  const d=decodeFrameMap(result.candidate,result.candidate.readUInt32LE(result.candidate.length-8)).decoded;
  let at=0;while(d.toString('ascii',at,at+4)!=='RTOS')at+=16+d.readUInt32LE(at+12);
- // Independent opcode expectations: native resource bounds end at 1110;
- // aspect's caption ID follows at 1111.
- for(const address of [0x540b8a4c,0x540b8a6c,0x540b8c14])assert.equal(d.readUInt32LE(at+16+address-0x53000000),0xe3003456);
- assert.equal(d.readUInt32LE(at+16+0x540b9448-0x53000000),0xe3000457);
- for(const address of [0x540b8a18,0x540b8be4])assert.equal(d.readUInt32LE(at+16+address-0x53000000),0xe300c457);
+ // Independent opcode expectations follow the current native resource table.
+ for(const address of [0x540b8a4c,0x540b8a6c,0x540b8c14])assert.equal(d.readUInt32LE(at+16+address-0x53000000),(0xe3003000|resourceLast)>>>0);
+ assert.equal(d.readUInt32LE(at+16+0x540b9448-0x53000000),(0xe3000000|(resourceLast+1))>>>0);
+ for(const address of [0x540b8a18,0x540b8be4])assert.equal(d.readUInt32LE(at+16+address-0x53000000),(0xe300c000|(resourceLast+1))>>>0);
  assert.equal(d.readUInt32LE(at+16+0xb348c0),10);
  assert.equal(d.subarray(at+16+0xb3501e,at+16+0xb35020).toString('hex'),'020f');
  assert.deepEqual(auditIntegratedNative(source,result.candidate,result.nativeCandidate,result.runtime,result.manifest,result.component,extensions),result.receipt.composition);

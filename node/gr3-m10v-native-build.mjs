@@ -11,6 +11,7 @@ import {zoomPatches} from './gr3-zoom.mjs';
 import {hdfSources,hdfPatches,hdfMenuPatches} from './gr3-digital-hdf.mjs';
 import {hdfAdjPatches} from './gr3-hdf-adj.mjs';
 import { auditGr3Candidate } from './gr3-candidate-audit.mjs';
+import {borderSources,borderPatches} from './gr3-border.mjs';
 
 const LOAD = 0x53000000;
 const nativeBases = [0x540b6000, 0x540ba000, 0x540be000];
@@ -59,7 +60,7 @@ const viewDeferredSources=['native/gr3/m10v_view_deferred.c','native/gr3/m10v_vi
 const nativeColorSources=['native/gr3/m10v_isp_native_look.c','native/gr3/m10v_isp_native_look.h','native/gr3/m10v_isp_native_look_profiles.h','native/gr3/m10v_isp_multiaxis.c','native/gr3/m10v_isp_multiaxis.h'];
 const saveChainSources=['native/gr3/m10v_module_dispatch_trace.c','scripts/build_gr3_module_dispatch_trace.py','scripts/build_gr3_pool_release_trace.py'];
 const sdSources=[...settingsSources,'node/gr3-settings-menu.mjs','native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','node/gr3-sd-texture-prior-contract.json','node/gr3-sd-pre-styles-contract.json','node/gr3-sd-20261023-contract.json','node/gr3-sd-pre-pixel-contract.json','node/gr3-sd-prior-contract.json','node/gr3-sd-20261021-contract.json','scripts/generate_gr3_sd_contract.mjs'];
-export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
+export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
 const movw = (register, value) => (0xe3000000 | ((value & 0xf000) << 4) | (register << 12) | (value & 0xfff)) >>> 0;
 function branch(address, target, link=false) {
   const delta = target - address - 8;
@@ -76,7 +77,8 @@ function checkRuntime(runtime, manifest) {
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');
   need(manifest.film_count === 103 && manifest.slots === 10 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
-  const expectedSources=[...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[])];
+  const expectedSources=[...new Set([...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[]),...(manifest.border?.enabled?borderSources:[])])];
+  borderPatches(runtime,manifest);
   if(manifest.experimental_capture?.texture_neon)need((manifest.debug_mode===true||manifest.experimental_capture.native_color===true)&&manifest.experimental_capture.spatial_neon===true&&Number.isInteger(manifest.symbols?.m10v_texture_block8)&&Number.isInteger(manifest.symbols?.m10v_harman_texture_table),'incomplete full texture block runtime');
   need(typeof manifest.sd_library==='boolean','missing SD capability');
   need(!manifest.sd_library||(runtime.includes(Buffer.from('C:\\M10V\\FILMS.M10'))&&['m10v_sd_camera_item','m10v_sd_camera_install'].every(n=>Number.isInteger(manifest.symbols[n])&&manifest.symbols[n]>=BASE&&manifest.symbols[n]<BASE+runtime.length)),'SD runtime incomplete');
@@ -262,7 +264,7 @@ function checkRuntime(runtime, manifest) {
     }
     need(offset===art.length,'native anime artwork extent differs');
   }
-  const resourceCount=369;
+  const resourceCount=manifest.border?.enabled?372:369;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   for (let i=0;i<resourceCount;i++) {
@@ -532,7 +534,7 @@ function patchList(manifest,runtime) {
       {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound primary'},
       {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound secondary'}];
   }
-  return [...zoomPatches(runtime,manifest),...appendedSlotPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
+  return [...borderPatches(runtime,manifest),...zoomPatches(runtime,manifest),...appendedSlotPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
     replacement:branch(address,manifest.symbols[name],link),name})),
     {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum primary'},
     {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum secondary'},

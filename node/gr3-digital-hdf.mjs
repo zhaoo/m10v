@@ -1,4 +1,5 @@
 // Independent ARM byte/readback contract. Never trust the builder patch list.
+import {borderPatches} from './gr3-border.mjs';
 export const hdfSources=['native/gr3/m10v_digital_hdf.c','scripts/build_gr3_digital_hdf.py','native/gr3/m10v_hdf_menu.c','scripts/build_gr3_hdf_menu.py','native/gr3/m10v_hdf_state.h','native/gr3/m10v_hdf_adj.c','native/gr3/m10v_hdf_adj.rgba','scripts/build_gr3_hdf_adj.py'];
 const need=(v,m)=>{if(!v)throw Error('digital HDF: '+m);};
 const branch=(a,b,link=false)=>{const d=b-a-8;need(Number.isInteger(b)&&d%4===0&&d>=-(2**25)&&d<2**25,'branch range');return((link?0xeb000000:0xea000000)|((d>>2)&0xffffff))>>>0;};
@@ -6,7 +7,11 @@ const mov=(r,v,top=false)=>((top?0xe3400000:0xe3000000)|((v&0xf000)<<4)|(r<<12)|
 const save=[0xe92d5fff,0xe10f0000,0xe92d0003],restore=[0xe8bd0003,0xe12cf000,0xe8bd5fff];
 export function hdfPatches(runtime,m){
  const h=m.digital_hdf;
- if(!h){need(m.hdf_enabled===false&&m.hdf_default===0&&!m.hdf_menu,'missing native HDF owner');return [];}
+ if(!h){
+  need(m.hdf_enabled===false&&m.hdf_default===0,'missing native HDF owner');
+  if(m.hdf_menu)need(m.border?.enabled===true&&borderPatches(runtime,m).length===20,'missing native HDF owner');
+  return [];
+ }
  const shared=!!m.capture_lifecycle;
  if(m.hdf_menu)need(h.ui_cache===true&&h.producer_filesystem_calls===0,'capture must use UI-published HDF cache');
  need((!shared||h.shared_recipe===true&&h.shared_offset===0x5134&&m.capture_lifecycle.snapshot?.shared_hdf===true)&&h.schema==='m10v-gr3-digital-hdf/v1'&&h.recipe_bytes===0x4778&&h.recipe_extra_bytes===(shared?0:16)&&h.isp_filesystem_calls===0&&h.pixel_loops===0&&h.mutable_global_bytes===0&&h.independent_dma===false,'owner/performance contract differs');

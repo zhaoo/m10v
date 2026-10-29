@@ -10,7 +10,7 @@ const originalList=Buffer.from([0,1,2,3,4,16,5,6,7,8,9,18,19,10,11,12,13,17,14,2
 const tableSHA='639cda68e68cf568808d37c122d3c575c67b10da03fa60ed8cd1d7f90fe153a6';
 export function hdfAdjPatches(runtime,m){
  const h=m.hdf_adj;
- if(!h){need(!m.hdf_menu,'independent option missing');return [];}
+ if(!h){need(!m.hdf_menu||(m.border?.enabled===true&&m.hdf_enabled===false),'independent option missing');return [];}
  const inside=(a,n=4)=>Number.isInteger(a)&&a%4===0&&Number.isInteger(n)&&n>=0&&a>=m.base&&a+n<=m.base+runtime.length;
  const within=(a,n=4)=>inside(a,n)&&a>=h.base&&a+n<=h.base+h.bytes;
  need(h.schema==='m10v-gr3-hdf-adj/v1'&&h.function_id===20&&h.record_count===21&&h.record_bytes===0x44&&h.original_table===0x53b39a14&&h.original_table_bytes===0x550&&h.required_rtos_sha256==='8a4eafcad2716e0b21e9909264e1242e534f0e39e05cba82a53546ceb4070b67','identity/record contract differs');

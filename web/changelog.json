@@ -2,6 +2,37 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.29.1",
+      "date": "2026-10-29",
+      "title": "GR III / IIIx 新增拍立得与 135 胶卷边框",
+      "changes": [
+        "在「效果」菜单增加边框，可选择拍立得或 135 胶卷样式；胶卷齿孔位于画面上下。",
+        "GR III 与 GR IIIx 固件工作台增加边框开关。",
+        "边框保留原有构图并向外扩展画布，支持 3:2、1:1、4:3、6x7 与 XPan；拍摄、即时回看和相册回放使用同一边框配置。",
+        "通过 ISP/IIP 硬件路径生成边框 JPEG。"
+      ],
+      "sections": [
+        {
+          "type": "added",
+          "items": [
+            "在「效果」菜单增加边框，可选择拍立得或 135 胶卷样式；胶卷齿孔位于画面上下。",
+            "GR III 与 GR IIIx 固件工作台增加边框开关。"
+          ]
+        },
+        {
+          "type": "improved",
+          "items": [
+            "边框保留原有构图并向外扩展画布，支持 3:2、1:1、4:3、6x7 与 XPan；拍摄、即时回看和相册回放使用同一边框配置。",
+            "通过 ISP/IIP 硬件路径生成边框 JPEG。"
+          ]
+        }
+      ],
+      "notice": "影响 GR III / GR IIIx。需在固件工作台启用边框，再于机内「效果」菜单选择样式。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.28.8",
       "date": "2026-10-28",
       "title": "新增 LUT 质量报告、竖拍水印与独立 HDF ADJ",
@@ -28,9 +59,9 @@
         }
       ],
       "notice": "影响 GR III / GR IIIx。当前交付候选已获用户验收通过；LUT 误差报告是软件模型评估，不等于实拍色差标定。拟合工具沿用独立五胶卷 ISP 导出，SD 原始 LUT 路径尚未迁移。回退到不支持此功能的固件前，请先从所有 ADJ 槽与 U 配置移除 HDF 模拟。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "314ccc2bbf908fb4310a37a3f5b052e99e8aac0e",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40708135785"
     },
     {
       "version": "2026.10.28.7",

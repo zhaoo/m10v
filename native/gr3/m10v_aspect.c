@@ -10,7 +10,7 @@ typedef unsigned char u8;
 
 /* Recognizable immutable record, rebound after the film resource range. */
 __attribute__((used)) const volatile u32 m10v_aspect_id_record[3]={0x36523741,811,785};
-const u8 m10v_aspect_values[]={0,3,1,4,5,
+const u8 m10v_aspect_values[]={0,3,1,2,4,5,
 #if M10V_HALF_FRAME
 6,
 #endif
