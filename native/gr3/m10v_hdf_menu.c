@@ -204,7 +204,11 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
    result=m10v_hdf_save(p->value);
 #endif
   }
+#if M10V_BORDER_ENABLED
   M10V_LOG(205,0x53415645u,p->child?p->value:0,(uint32_t)result,p->border.sequence);
+#else
+  M10V_LOG(205,0x53415645u,0,(uint32_t)result,0);
+#endif
   if(result){
    /* A successful write followed by failed verification may already persist.
     * Reconcile with the same journal reader used by capture, rather than

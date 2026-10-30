@@ -1,3 +1,4 @@
+import {pickerArtwork} from './film-artwork.mjs';
 // Keep the underlying select as the form/change contract; render its visual picker in the top layer.
 let sequence=0;
 // Keep stable order within each category, even when new films are appended to
@@ -19,7 +20,7 @@ export function enhanceFilmSelect(select,{placeholder='搜索胶卷…',caption=
  const search=document.createElement('input');search.type='search';search.placeholder=placeholder;search.setAttribute('aria-label',placeholder);search.autocomplete='off';search.hidden=!searchable;
  const list=document.createElement('div');list.className='film-picker-list';list.setAttribute('role','listbox');list.setAttribute('aria-label',trigger.getAttribute('aria-label'));
  panel.append(head,search,list);wrap.append(trigger,panel);
- const art=option=>{const img=document.createElement('img');img.width=40;img.height=40;img.alt='';img.loading='lazy';if(option.dataset.icon)img.src=option.dataset.icon;else{const span=document.createElement('span');span.className='film-picker-reel';span.textContent='▤';span.setAttribute('aria-hidden','true');return span;}return img;};
+ const art=option=>{const img=document.createElement('img');img.width=40;img.height=40;img.alt='';img.loading='lazy';const url=pickerArtwork(option);if(url)img.src=url;else{const span=document.createElement('span');span.className='film-picker-reel';span.textContent='▤';span.setAttribute('aria-hidden','true');return span;}return img;};
  function sync(){const option=select.selectedOptions[0];trigger.replaceChildren();if(option){trigger.append(art(option));const text=document.createElement('span');text.textContent=option.textContent;trigger.append(text);}const arrow=document.createElement('i');arrow.textContent='⌄';trigger.append(arrow);trigger.disabled=select.disabled;}
  function close(focus=false){if(panel.matches(':popover-open'))panel.hidePopover();trigger.setAttribute('aria-expanded','false');if(focus&&trigger.isConnected)trigger.focus({preventScroll:true});}
  function render(){list.replaceChildren();let group=null,count=0;for(const option of groupedFilmOptions(select.options)){if(option.disabled||!`${option.textContent} ${option.dataset.group||''}`.toLowerCase().includes(search.value.toLowerCase().trim()))continue;

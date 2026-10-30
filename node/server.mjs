@@ -46,6 +46,8 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const web = path.join(root, 'web');
 const MAX_UPLOAD = 128 * 1024 * 1024;
 const staticFiles = {
+  '/support/': ['index.html', 'text/html; charset=utf-8'],
+  '/support': ['index.html', 'text/html; charset=utf-8'],
   '/test-packages/': ['test-packages.html', 'text/html; charset=utf-8'],
   '/test-packages': ['test-packages.html', 'text/html; charset=utf-8'],
   '/': ['index.html', 'text/html; charset=utf-8'],
@@ -129,7 +131,9 @@ export function createServer(store = new Store(path.join(root, 'data')),
       await handleGr4Request({ request, response, runtime: gr4, token, readBody, send, origin });
       return;
     }
-    const pathname = request.url;
+    // Only generated film artwork accepts its bounded content version query.
+    // Keep the existing strict URL contract for APIs and all other assets.
+    const pathname = request.method==='GET'&&/^\/gr3\/film-icons\/\d+(?:-large)?\.png\?v=[a-f0-9]{12}$/.test(request.url||'')?request.url.split('?')[0]:request.url;
     if (!pathname || pathname.includes('?') || pathname.includes('#') || pathname.includes('%') ||
       pathname.includes('\\') || pathname.includes('..')) return send(response, 404, { error: 'not found' });
     if(pathname==='/hooks/github'){
@@ -213,7 +217,8 @@ export function createServer(store = new Store(path.join(root, 'data')),
                 target.endsWith('.json') ? 'application/json; charset=utf-8' :
                 target.endsWith('.html') ? 'text/html; charset=utf-8' :
                   target.endsWith('.svg') ? 'image/svg+xml; charset=utf-8' :
-                  target.endsWith('.png') ? 'image/png' : 'application/octet-stream';
+                  target.endsWith('.png') ? 'image/png' :
+                    /\.jpe?g$/.test(target) ? 'image/jpeg' : 'application/octet-stream';
             return send(response, 200, await readFile(target), type);
           } catch { /* fall through */ }
         }

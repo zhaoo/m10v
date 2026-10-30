@@ -5,9 +5,9 @@ import {navigationItems,renderNavigation} from '../web/shared/navigation.js';
 import {gr4WorkbenchHtml} from './gr4-native-routes.mjs';
 import {renderChangelog} from './changelog.mjs';
 test('all public locations use one ordered navigation and at most one current page',()=>{
- for(const path of ['/','/gr3/','/gr3/index.html','/gr4/','/gr4/reference/','/gr2/','/gr3/sd-library.html','/gr4/sd-library.html','/guide/','/changelog/','/test-packages/']){
+ for(const path of ['/','/gr3/','/gr3/index.html','/gr4/','/gr4/reference/','/gr2/','/gr3/sd-library.html','/gr4/sd-library.html','/guide/','/changelog/','/test-packages/','/support/']){
   const items=navigationItems(path);
-  assert.deepEqual(items.map(i=>i.id),['gr3','gr4','gr2','sd','test-packages','guide','changelog']);
+  assert.deepEqual(items.map(i=>i.id),['gr3','gr4','gr2','sd','test-packages','guide','changelog','support']);
   assert.equal(items.filter(i=>i.active).length,path==='/'?0:1);
   assert.equal((renderNavigation(path).match(/aria-current="page"/g)||[]).length,path==='/'?0:1);
  }

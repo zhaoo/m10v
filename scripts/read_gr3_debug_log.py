@@ -11,8 +11,8 @@ EVENTS={10:'menu.enter.before',11:'menu.enter.after',20:'menu.key.before',21:'me
         70:'detail.change',71:'detail.reset',80:'page.enter.before',81:'page.enter.after',
         82:'page.key.before',83:'page.state.after',84:'page.draw.after',112:'capture.settings',113:'capture.settings.source',114:'capture.highlight.energy',130:'capture.texture',131:'capture.texture.grain',100:'capture.before',101:'capture.after',110:'capture.render.before',111:'capture.render.after',120:'capture.clock'}
 EVENTS.update({85:'ab.disp.route',86:'ab.setup.navigate',87:'ab.switch.result',88:'ab.controller.disp',89:'ab.setup.branch',90:'ab.owner',91:'ab.adj.scope',92:'ab.page.load',93:'ab.page.view',94:'ab.page.enter',95:'ab.raw.packet',96:'ab.navigation.return',99:'ab.navigation.gate'})
-EVENTS.update({218:'half-pair.result'})
-HALF_PAIR_STAGES={0:'ordinary-pass',1:'first-saved',2:'pair-composed',3:'pending-cancelled',-1:'identity',-2:'topology',-3:'image-layout',-4:'protected-memory',-5:'thumbnail-layout',-6:'filesystem',-7:'first-write',-8:'scratch-unavailable',-9:'pending-read-or-compose',-10:'owner-unavailable',-11:'busy',-12:'pending-reset'}
+EVENTS.update({218:'half-pair.result',219:'half-pair.bank',220:'half-pair.layout'})
+HALF_PAIR_STAGES={0:'entry',1:'first-saved',2:'pair-composed',3:'pending-cancelled',-1:'identity',-2:'topology',-3:'image-layout',-4:'protected-memory',-5:'thumbnail-layout',-6:'filesystem',-7:'first-write',-8:'scratch-unavailable',-9:'pending-read-or-compose',-10:'owner-unavailable',-11:'busy',-12:'pending-reset'}
 EVENTS.update({210:'zoom.set.before',211:'zoom.set.after',212:'zoom.native.assert'})
 EVENTS.update({208:'ab.dispatch.physical-down',209:'ab.dispatch.fallback'})
 EVENTS.update({97:'ab.display.snapshot',98:'ab.display.return'})
@@ -65,6 +65,10 @@ def page_records(data):
         records.append({'sequence':r[2],'event':r[3],'stage':EVENTS.get(r[3],f'unknown.{r[3]}'),
                         'arguments':list(r[4:8]),'build_id':f'{r[8]:08x}','channel':{1:'menu',2:'capture',3:'io',4:'ab'}[r[9]]})
     for record in records:
+        if record['event']==219:
+            bank,capacity,y,c=record['arguments'];record['half_pair_bank']={'bank':hex(bank),'capacity':capacity,'source_y':hex(y),'source_c':hex(c)}
+        if record['event']==220:
+            recipe,size,pitch_rows,origin=record['arguments'];record['half_pair_layout']={'recipe':hex(recipe),'width':size&65535,'height':size>>16,'pitch':pitch_rows&65535,'rows':pitch_rows>>16,'origin_x':origin&65535,'origin_y':origin>>16}
         if record['event']==218:
             recipe,stage,a,b=record['arguments'];signed=stage if stage<0x80000000 else stage-0x100000000
             record['half_pair']={'recipe':hex(recipe),'result':signed,'reason':HALF_PAIR_STAGES.get(signed,'unknown'),'detail':[a,b]}

@@ -31,7 +31,7 @@ class MenuTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    obj=Path(d)/'menu.o'
    subprocess.run([shutil.which('clang'),*FLAGS,'-c',str(ROOT/'native/gr4/m10v_library_menu.c'),'-o',str(obj)],capture_output=True,check=True)
-   cls.code,cls.symbols=link_object(obj.read_bytes(),CODE,cls.external,'m10v_menu_',additional_exports=('m10v_menu_rows',))
+   cls.code,cls.symbols=link_object(obj.read_bytes(),CODE,cls.external,'m10v_menu_',additional_exports=('m10v_menu_rows',),omitted_exports=('m10v_menu_recorded_icon',))
  def machine(self):
   u=Uc(UC_ARCH_ARM,UC_MODE_ARM)
   for a,n in [(0x53000000,0x2000000),(0x55000000,0x1000000),(0x10000000,0x200000)]:u.mem_map(a,n)

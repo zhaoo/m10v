@@ -1,9 +1,9 @@
-"""Antialiased portrait film boxes, using the bundled OFL Noto Sans Bold font."""
+"""Shared square film identities and bounded OFL Noto Sans coverage."""
 import json,re,sys,base64,hashlib,struct
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from scripts.generate_m10v_icons import box_style,FONT
+from scripts.generate_m10v_icons import artwork,FONT
 
 def canonical_raster():
  """Pinned coverage avoids FreeType/RAQM differences across build hosts."""
@@ -25,25 +25,21 @@ def generate():
  specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/anime-e6-luts.json').read_text())['stocks'] if v['id']>=309]
  specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/c41-luts.json').read_text())['stocks']]
  specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/extra-films-luts.json').read_text())['stocks']]
- rows=['static const struct { uint8_t brand,main,sub,header,color,ink,accent; } box_cards[]={'];palette=[];words=[]
- # Camera-only artwork identities. Stable 40px icons, renderer records and LUTs
- # retain their existing byte identities.
- identities={317:('FUJIFILM','INSTAX','800'),314:('FUJIFILM','ACROS II','100'),315:('KODAK','DOUBLE-X','5222'),316:('LOMOGRAPHY','TURQUOISE','100-400'),312:('OPTIK','OPTICOLOUR','200'),313:('ORWO','WOLFEN','NC500'),33:('CINESTILL','800T','TUNGSTEN'),66:('KODAK','5207','250D'),62:('KODAK','5219','500T'),78:('KODAK','5203','50D'),298:('KODAK','5213','200T'),77:('KODAK','AEROCOLOR IV','2460'),
- 69:('KODAK','PORTRA','160'),37:('KODAK','PORTRA','400'),70:('FUJIFILM','INDUSTRIAL','100'),73:('FUJIFILM','C200','200'),56:('FUJIFILM','SUPERIA','200'),36:('FUJIFILM','PRO 400H','400'),35:('KODAK','GOLD','200'),58:('KODAK','ULTRAMAX','400'),74:('KODAK','PROIMAGE','100'),34:('KODAK','EKTAR','100'),71:('LUCKY','C200','200'),67:('HARMAN','PHOENIX II','200'),68:('HARMAN','RED','RED SCALE'),292:('LOMOGRAPHY','COLOR NEGATIVE','400'),75:('KODAK','T-MAX','100'),289:('KODAK','CHARMERA',''),72:('DIGITAL','CCD',''),293:('POLAROID','POLAROID',''),296:('CYANOTYPE','CYANOTYPE',''),290:('PIXEL','WORLDS',''),76:('KODAK','AEROCHROME',''),291:('LEICA','MONOCHROME',''),297:('GERMAN','COOL',''),65:('RICOH','GR2','')}
+ # Retired catalog entries remain valid in an already configured library.
+ specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/anime-e6-luts.json').read_text())['stocks'] if v['id']<309]
+ rows=['static const struct { uint8_t brand,main,sub,header,color,ink,accent,motif; } box_cards[]={'];palette=[];words=[]
  for i,name,spec in specs:
-  brand,title,code,header,paper,ink,accent=box_style(name,i)
-  if spec:title,code,paper,ink=spec['title'],spec['code'],spec['color'],'#ffffff'
-  if i in identities:brand,title,code=identities[i]
-  if i==58:header,accent='#ffcf32','#ffcf32'
+  brand,title,code,paper,ink,accent,motif=artwork(name,i,spec)
+  header=paper
   for c in (header,paper,ink,accent):
    if c not in palette:palette.append(c)
   colors=','.join(str(palette.index(c)) for c in (header,paper,ink,accent))
   for word in (brand,title,code):
    if len(word.encode('ascii'))>=16:raise ValueError('card label exceeds bounded storage')
    if word not in words:words.append(word)
-  rows.append(' {%d,%d,%d,%s},'%(words.index(brand),words.index(title),words.index(code),colors))
+  rows.append(' {%d,%d,%d,%s,%d},'%(words.index(brand),words.index(title),words.index(code),colors,motif))
  if len(words)>256 or len(palette)>256:raise ValueError('card dictionary exceeds index capacity')
- rows=['/* Generated portrait artwork; shared labels and palette are immutable. */',
+ rows=['/* Generated square artwork; shared labels, motifs and palette. */',
   'static const uint32_t box_palette[]={'+','.join('0xff'+c[1:]+'u' for c in palette)+'};',
   'static const char box_labels[]='+''.join(json.dumps(word)+'"\\0"' for word in words)+';',
   'static const uint16_t box_label_offsets[]={'+','.join(str(sum(len(v)+1 for v in words[:i])) for i in range(len(words)))+'};']+rows
@@ -93,7 +89,14 @@ def caption_blob():
  offsets,packed=caption_data()
  return struct.pack('<'+str(len(offsets))+'I',*offsets)+packed
 
-def custom_icon():return canonical_raster()[2]
+def custom_icon():
+ """Builds verify accepted pixels, independent of host FreeType/Pillow versions."""
+ data=json.loads((ROOT/'native/gr3/m10v_square_icon_raster.json').read_text())
+ if (data['schema'],data['artwork_revision'],data['width'],data['height'],data['format'])!=('m10v-square-icon-raster/v1','classic-square-v1',40,40,'RGBA8'):raise ValueError('square icon raster extent differs')
+ if hashlib.sha256(FONT.read_bytes()).hexdigest()!=data['font_sha256']:raise ValueError('square icon font provenance differs')
+ pixels=base64.b64decode(data['custom_icon_base64'],validate=True)
+ if len(pixels)!=6400 or hashlib.sha256(pixels).hexdigest()!=data['custom_icon_sha256']:raise ValueError('square icon raster digest differs')
+ return pixels
 if __name__=='__main__':
  (ROOT/'native/gr3/m10v_film_card_data.h').write_text(generate())
  (ROOT/'native/gr3/m10v_custom_icon.rgba').write_bytes(custom_icon())

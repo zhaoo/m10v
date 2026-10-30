@@ -2,6 +2,57 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.30.4",
+      "date": "2026-10-30",
+      "title": "打赏改为工作台浮层",
+      "changes": ["导航入口更名为打赏，在当前页面打开轻量浮层，无需跳转。", "统一展示带白色留边的完整二维码，移除蓝绿海报装饰；支持支付宝与微信切换、查看和保存原图。", "支持关闭按钮、Esc 和点击遮罩关闭，适配手机屏幕。"],
+      "notice": "仅更新所有机型共用的网站交互，不改变相机固件。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
+      "version": "2026.10.30.3",
+      "date": "2026-10-30",
+      "title": "新增支持 M10V 打赏入口",
+      "changes": [
+        "各机型工作台及公共页面顶部导航新增支持 M10V 入口，展示作者提供的支付宝和微信收款码。",
+        "支持查看收款码原图、保存图片及手机相册扫码，适配桌面和手机浏览。"
+      ],
+      "notice": "打赏完全自愿，不影响固件下载与功能使用，网站不记录付款状态。本次仅更新网页，适用于所有机型后台，不改变相机固件。",
+      "commit": "342ef984132ae9f93264f516e05e70d6656810de",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/342ef984132ae9f93264f516e05e70d6656810de"
+    },
+    {
+      "version": "2026.10.30.2",
+      "date": "2026-10-30",
+      "title": "发布正方形胶卷图标，修复跨平台构建校验",
+      "changes": [
+        "构建时使用已验收的固定 Custom 图标像素与 SHA-256 校验，避免 Linux 与 macOS 字体栅格化差异阻止固件导出。",
+        "发布正方形胶卷包装图标、新照片回放身份和 MENU / ADJ 导入名称修复；保留已验收图标像素及相机运行逻辑。"
+      ],
+      "notice": "上一轮服务器构建因字体重新绘制结果与固定图标不一致而停止，已自动回滚。本轮只修复构建校验的跨平台确定性，不改变相机 C 代码或图标资源字节。",
+      "commit": "f1c8ef9bca98b93b10d20436f213bbe0b62ed06b",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/41001640454"
+    },
+    {
+      "version": "2026.10.30.1",
+      "date": "2026-10-30",
+      "title": "重设计正方形胶卷图标，修复回放身份与导入名称",
+      "changes": [
+        "后台和机内胶卷展示采用正方形包装风格，通过主色、特征图案和大型号文字区分胶卷；小图使用专门的简化版本。",
+        "GR III / IIIx 新拍照片记录拍摄时的胶卷身份，回放不再一律显示 Custom；旧照片缺少实际胶卷身份时显示中性胶卷图标。",
+        "修复导入 LUT 在 MENU / ADJ 后五个槽位显示 Custom 的名称解析，十个槽位均可显示实际导入名称。",
+        "保留旧 SD 胶卷资源的精确校验兼容，GR II 正方形卡片与 GR IV 共享图标同步更新。"
+      ],
+      "notice": "用户已反馈本次 r1 测试包验证通过并要求发布，未细分各机型的实测覆盖。GR III / IIIx 回放身份修复适用于新拍照片；旧照片不能从槽位编号可靠反推实际胶卷。导入 LUT 回放保留 Custom 类型图标及既有详情布局。",
+      "commit": "14c4ae86e8556ed189f2c8fd71241e08eb7c9303",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/14c4ae86e8556ed189f2c8fd71241e08eb7c9303"
+    },
+    {
       "version": "2026.10.29.5",
       "date": "2026-10-29",
       "title": "修复 RTOS 导出限制与发布构建超时",
@@ -10,9 +61,9 @@
         "延长 GR IV 完整固件构建的子进程和发布任务时限，保留 GR IV 构建检查与内存上限。"
       ],
       "notice": "上一轮发布在 GR IV 固件构建达到 300 秒子进程时限后自动回滚。本轮仅调整构建时限，不改变 GR IV 固件功能。GR III / IIIx 新组合的实机结果仍需以用户测试为准。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "c43b5238d2f205e0a53afdd2202a2303a1bb83e9",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/40896027652"
     },
     {
       "version": "2026.10.29.4",

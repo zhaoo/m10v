@@ -67,19 +67,19 @@ class Gr2RendererTests(unittest.TestCase):
                     self.assertEqual(host.gr2_chroma_shuffle(pointer,n,1),1)
                     self.assertEqual(bytes(pixels),b'\xa5'*4+original+b'\xa5'*4)
 
-    def test_big_endian_film_cards_emit_same_rgba_bytes_as_existing_host_artwork(self):
+    def test_big_endian_film_cards_emit_current_square_artwork_without_touching_guards(self):
         from scripts.build_gr2_runtime import build_gr2_runtime
         from tests import test_gr2_runtime_build as runtime_tests
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder);report=build_gr2_runtime(component('gr2','b01firm8'),{},path)
             self.assertTrue('gr2_film_card_rgba' in report['symbols'])
             library=path/'cards.dylib'
-            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib',str(ROOT/'compat/gr2-v1/native/gr3/m10v_film_card.c'),'-o',str(library)],check=True,capture_output=True)
+            subprocess.run([shutil.which('clang'),'-O2','-dynamiclib',str(ROOT/'native/gr3/m10v_film_card.c'),'-o',str(library)],check=True,capture_output=True)
             host=C.CDLL(str(library));host.m10v_film_card_render.argtypes=[C.POINTER(C.c_uint32),C.c_uint32,C.c_uint32,C.c_uint32]
-            u=runtime_tests.Gr2RuntimeBuildTests.machine(self,report);u.mem_map(0x60000000,0x20000);size=120*196*4;address=0x60000004
+            u=runtime_tests.Gr2RuntimeBuildTests.machine(self,report);u.mem_map(0x60000000,0x20000);size=128*128*4;address=0x60000004
             for film,slot,selected in ((1,0,0),(33,4,1),(66,2,0),(67,1,1),(68,3,1),(78,4,0)):
                 with self.subTest(film=film,slot=slot,selected=selected):
-                    expected=(C.c_uint32*(120*196))();self.assertEqual(host.m10v_film_card_render(expected,film,slot,selected),0)
+                    expected=(C.c_uint32*(128*128))();self.assertEqual(host.m10v_film_card_render(expected,film,slot,selected),0)
                     u.mem_write(address-4,b'\xa5'*(size+8));u.mem_write(0x50018000,struct.pack('>I',selected))
                     result=runtime_tests.Gr2RuntimeBuildTests.call(self,u,report['symbols']['gr2_film_card_rgba'],[address,size,film,slot])
                     self.assertEqual(result,1);self.assertEqual(bytes(u.mem_read(address,size)),bytes(expected))

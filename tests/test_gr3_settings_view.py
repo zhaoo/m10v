@@ -50,7 +50,7 @@ class SettingsViewTests(unittest.TestCase):
    if a in (0x536af2a8,0x536af31c):
     size=uc.reg_read(UC_ARM_REG_R0)
     if size in (0xf0,0xf8,0x110):self.object_count+=1
-    if (fail_object and self.object_count==fail_object and size in (0xf0,0xf8,0x110)) or (fail_cards and size==710580):p=0
+    if (fail_object and self.object_count==fail_object and size in (0xf0,0xf8,0x110)) or (fail_cards and size==655540):p=0
     else:
      p=self.heap;self.heap+=(size+15)&~15;self.live[p]=size
     uc.reg_write(UC_ARM_REG_R0,p)
@@ -76,7 +76,7 @@ class SettingsViewTests(unittest.TestCase):
  def call(self,u,name,*args):
   for reg,value in zip((UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3),args):u.reg_write(reg,value)
   u.reg_write(UC_ARM_REG_SP,0x100f0000);u.reg_write(UC_ARM_REG_LR,0x10000000)
-  u.emu_start(self.symbols['m10v_settings_view_'+name],0x10000000,count=10000000)
+  u.emu_start(self.symbols['m10v_settings_view_'+name],0x10000000,count=25000000)
   self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x10000000);self.assertEqual(u.reg_read(UC_ARM_REG_SP),0x100f0000)
   return u.reg_read(UC_ARM_REG_R0)
  def state(self,u,screen=1,focus=2):

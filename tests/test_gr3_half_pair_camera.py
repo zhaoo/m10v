@@ -17,9 +17,9 @@ class PairCameraTests(unittest.TestCase):
   cls.offset=int(subprocess.check_output([str(folder/'offset')]))
   cls.base=0x540b6000;cls.image=bytearray();cls.symbols={}
   for file,prefix,extra in [('m10v_half_pair.c','m10v_half_pair_',()),('m10v_half_pair_camera.c','m10v_half_pair_camera',('m10v_half_pair_reset','m10v_half_pair_init','m10v_half_pair_select','m10v_half_pair_destroy'))]:
-   obj=folder/(file+'.o');subprocess.run(['clang',*FLAGS,'-O2','-fno-jump-tables','-DM10V_HALF_PAIR_BUILD_ID=123','-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
+   obj=folder/(file+'.o');subprocess.run(['clang',*FLAGS,'-O2','-fno-jump-tables','-DM10V_HALF_PAIR_BUILD_ID=123','-DM10V_DEBUG_MODE=1','-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
    while len(cls.image)%16:cls.image.append(0)
-   code,symbols=link_object(obj.read_bytes(),cls.base+len(cls.image),{**cls.symbols,'m10v_save_trace_recipe_mark':0x53000100,'m10v_save_trace_recipe_raw_status':0x53000104},prefix,additional_exports=extra)
+   code,symbols=link_object(obj.read_bytes(),cls.base+len(cls.image),{**cls.symbols,'m10v_save_trace_recipe_mark':0x53000100,'m10v_save_trace_recipe_raw_status':0x53000104,'m10v_debug_log':0x53000108},prefix,additional_exports=extra)
    cls.image.extend(code);cls.symbols.update(symbols)
  def setUp(self):
   self.u=u=Uc(UC_ARCH_ARM,UC_MODE_ARM);u.mem_map(0x53000000,0x1500000);u.mem_write(self.base,bytes(self.image));u.mem_map(0x55000000,0x1000000);u.mem_map(0x60000000,0x100000)
@@ -74,6 +74,7 @@ class PairCameraTests(unittest.TestCase):
   elif pc==0x5383c8a8:pass
   elif pc==0x53000100:self.events.append(r)
   elif pc==0x53000104:ret=2
+  elif pc==0x53000108:self.events.append(r+[self.get(u.reg_read(A.UC_ARM_REG_SP))])
   else:return
   u.reg_write(A.UC_ARM_REG_R0,ret);u.reg_write(A.UC_ARM_REG_PC,u.reg_read(A.UC_ARM_REG_LR))
  def call(self,name,*args):
@@ -127,6 +128,39 @@ class PairCameraTests(unittest.TestCase):
   self.put(self.state+4,1);self.call('m10v_half_pair_destroy',self.owner);self.assertEqual(self.sleeps,[1]);self.assertEqual(self.get(self.state),0);self.assertEqual(self.get(self.state+4),2);self.fs_calls=[];self.assertEqual(self.capture(),-10);self.assertEqual(self.fs_calls,[])
  def test_failed_mode_cancel_reset_must_retry_before_pair(self):
   self.assertEqual(self.capture(),1);self.call('m10v_half_pair_select',0x55009000,0);self.fail_write=True;self.assertEqual(self.capture(),-12);self.assertEqual(self.get(self.state+8),0);self.fail_write=False;self.set_pixels(90,100,130);self.assertEqual(self.capture(),1)
+ def test_unaligned_native_bank_and_cropped_visible_footprint(self):
+  # A four-byte-aligned pool token is legal; original layout aligns its canvas.
+  # The final C visible byte fits, although C+pitch*allocated_rows does not.
+  self.put(self.recipe+0x304,self.bank+4);self.put(self.recipe+0x364,8188)
+  d=[1,self.bank+64,self.bank+8180,0,2|(2<<16),4|(2<<16),0,2]
+  for off in (0x70,0xb0,0x110):self.words(self.recipe+off,*d)
+  self.u.mem_write(self.bank+64,bytes([20,21,0,0,22,23]));self.u.mem_write(self.bank+8180,bytes([70,180,0,0,71,181]))
+  self.assertEqual(self.capture(),1);self.assertEqual(next(iter(self.files.values()))[40:],bytes([20,21,22,23,70,180,71,181]))
+  self.u.mem_write(self.bank+64,bytes([90,91,0,0,92,93]));self.u.mem_write(self.bank+8180,bytes([100,130,0,0,101,131]));self.assertEqual(self.capture(),2)
+  out=struct.unpack('<8I',self.u.mem_read(self.recipe+0xb0,32));self.assertEqual(out[1],self.bank+64);self.assertEqual(bytes(self.u.mem_read(out[1],4)),bytes([20,21,90,91]))
+ def test_original_arm_backresize_geometry_matches_reported_camera_address(self):
+  import sys
+  sys.path.insert(0,str(ROOT/'scripts'))
+  from border_backresize_contract import probe_backresize
+  from scripts.probe_gr3_border_encoded_bank import setup,RECIPE
+  rom=(ROOT/'builds/gr3-extension-validation/official-rtos.bin').read_bytes()
+  raw_bank=0x6211a928
+  p=setup(rom,0,6000,4000);p.u.mem_write(RECIPE+0x252,struct.pack('<H',6144));p.call(0x5350d7e8,RECIPE,5,raw_bank)
+  source=p.read_words(RECIPE+0x70,8)
+  result=probe_backresize(rom,(2992,4000),6144,source_planes=tuple(source[1:3]))
+  final=result['main_after'];self.assertEqual(final['planes'][0],0x621f2f20);self.assertEqual(final['geometry'],[2992,4000,6144,4000,0,0]);self.assertEqual(result['assertions'],[])
+  # Execute our adapter using ORIGINAL computed addresses; stop at unavailable
+  # FS before reading any photo bytes. Stage-6 proves topology was admitted.
+  self.u.mem_map(0x62000000,0x8000000)
+  self.put(self.recipe+0x304,raw_bank);self.put(self.recipe+0x364,73728000)
+  desc=[1,*final['planes'],2992|(4000<<16),6144|(4000<<16),0,2]
+  for off in (0x70,0xb0,0x110):self.words(self.recipe+off,*desc)
+  self.put(self.state+8,1);self.put(0x55001014,0)
+  self.assertEqual(self.capture(),-6)
+  self.assertTrue(any(e[0]==218 and e[2]==0xfffffffa for e in self.events))
+ def test_pair_status_does_not_depend_on_full_recipe_diagnostic_ring(self):
+  self.put(self.recipe+0x477c,32);self.put(self.recipe+0x4780,99)
+  self.assertEqual(self.capture(),1);self.assertTrue(any(e[:3]==[218,self.recipe,1] for e in self.events))
  def test_nonhalf_capture_cancels_pending_once_then_zero_work(self):
   self.assertEqual(self.capture(),1);self.u.mem_write(self.si+0x7b6,b'\0');self.assertEqual(self.capture(),3);self.fs_calls=[];self.assertEqual(self.capture(),0);self.assertEqual(self.fs_calls,[])
 if __name__=='__main__':unittest.main()

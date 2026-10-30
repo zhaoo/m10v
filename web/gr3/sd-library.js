@@ -1,3 +1,4 @@
+import {customFilmArtwork} from '/gr3/film-artwork.mjs';
 const model=location.pathname.startsWith('/gr4')?'gr4':'gr3';
 const $=id=>document.getElementById(id);
 if(model==='gr4')document.querySelector('.sd-custom')?.setAttribute('hidden','');
@@ -15,7 +16,8 @@ function renderCustom(){
  const host=$('custom-films');host.replaceChildren();
  for(const entry of custom){const card=document.createElement('div'),name=document.createElement('strong'),button=document.createElement('button');
   card.className='sd-film';name.textContent=entry.name;button.type='button';button.textContent='移除';button.disabled=busy;
-  button.onclick=()=>{custom.splice(custom.indexOf(entry),1);renderCustom();update();};card.append(name,button);host.append(card);
+  const icon=document.createElement('img');icon.src=customFilmArtwork(entry.name);icon.alt='';icon.width=72;icon.height=72;
+  button.onclick=()=>{custom.splice(custom.indexOf(entry),1);renderCustom();update();};card.append(icon,name,button);host.append(card);
  }
 }
 const fileBase64=file=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(Error('读取 LUT 文件失败'));reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.readAsDataURL(file);});

@@ -1,0 +1,17 @@
+dialog.support-dialog{box-sizing:border-box;width:min(380px,calc(100vw - 32px));max-height:calc(100dvh - 32px);margin:auto;padding:22px;border:1px solid #595044;border-radius:14px;background:#191b18;color:#eeeae2;box-shadow:0 24px 80px #0008;overflow-y:auto;font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+.support-dialog::backdrop{background:#0009;backdrop-filter:blur(4px)}
+.support-dialog .support-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.support-dialog h2{margin:0;font-size:21px;font-weight:600;line-height:1.4}
+.support-dialog button{font:inherit;cursor:pointer}
+.support-dialog .support-close{display:grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:6px;background:transparent;color:#bdbab3;font-size:26px}
+.support-dialog .support-thanks{margin:8px 0 18px;color:#bdbab3;font-size:13px}
+.support-dialog .support-switch{display:flex;gap:6px;padding:4px;margin-bottom:16px;border:1px solid #353531;border-radius:8px}
+.support-dialog .support-switch button{flex:1;min-height:38px;padding:6px;border:0;border-radius:5px;background:transparent;color:#bdbab3}
+.support-dialog .support-switch button[aria-pressed=true]{background:#2b261d;color:#efd09a;box-shadow:inset 0 0 0 1px #77603e}
+.support-dialog .support-image{display:block;position:relative;width:min(248px,100%);aspect-ratio:1;margin:22px auto;background:#fff;border:8px solid #fff;border-radius:8px;overflow:hidden}
+.support-dialog .support-image img{display:block;position:absolute;height:auto;max-width:none;max-height:none}
+.support-dialog .support-image[data-method=alipay] img{width:150%;left:-25%;top:-80%}
+.support-dialog .support-image[data-method=wechat] img{width:209.7973%;left:-54.7297%;top:-68.5811%}
+.support-dialog .support-download{display:flex;align-items:center;justify-content:center;min-height:44px;margin-top:12px;border:1px solid #77603e;border-radius:6px;background:#2b261d;color:#efd09a;text-decoration:none}
+.support-dialog .support-note{margin:12px 0 0;text-align:center;color:#a5a69e;font-size:12px;line-height:1.8}
+.support-dialog :is(a,button):focus-visible{outline:2px solid #e0b979;outline-offset:3px}

@@ -4,6 +4,7 @@
 #include "m10v_half_pair_camera.h"
 #include "m10v_half_pair.h"
 #include "m10v_save_trace.h"
+#include "m10v_debug.h"
 #include "m10v_settings_controller.h"
 #include <stddef.h>
 #ifndef M10V_HALF_PAIR_BUILD_ID
@@ -90,7 +91,11 @@ static void thumb_render(thumbnail *t,uint32_t bank,const m10v_half_pair_plan_in
  }
  t->d[1]=U(y);t->d[2]=U(c);
 }
-static int result(uint32_t recipe,int stage,uint32_t a,uint32_t b){(void)m10v_save_trace_recipe_mark(recipe,218u,(uint32_t)stage,a,b);return stage;}
+static int result(uint32_t recipe,int stage,uint32_t a,uint32_t b){
+ /* The recipe diagnostic ring may already be full before JPEG handoff. This
+  * consumer is filesystem-safe: persist pairing status independently. */
+ M10V_LOG(218u,recipe,(uint32_t)stage,a,b);(void)recipe;(void)a;(void)b;return stage;
+}
 static int camera_impl(uint32_t context){
  if(!ram(context,0x60)||context<0x550009b8u)return -1;
  uint32_t recipe=context-0x9b8u;if(!ram(recipe,M10V_SAVE_RECIPE_EXTENDED_BYTES)||word(recipe)!=0x53d0fc90u||word(recipe+M10V_SAVE_RECIPE_BYTES)!=M10V_SAVE_TRACE_MAGIC)return -1;
@@ -101,14 +106,28 @@ static int camera_impl(uint32_t context){
  if((mode!=0u&&mode!=5u&&mode!=6u)||ctx[0]!=0x53d0fbe0u||ctx[12]!=recipe+0x1a8u||ctx[13]!=si||ctx[14]!=req||ctx[15]!=recipe+0xb0u||ctx[16]!=recipe+0xd0u||ctx[17]!=recipe+0xf0u||ctx[18]!=recipe+0x110u||ctx[19]!=recipe+0x130u||!ram(req,0x3c)||word(req)!=0x53d0fe60u||P(req)[12]!=1u||P(req)[13]>1u||P(recipe+0x130u)[16]!=1u)return result(recipe,-2,mode,req);
  const uint32_t *d=(const uint32_t *)(uintptr_t)(recipe+0xb0u);
  uint32_t w=d[4]&65535u,h=d[4]>>16,pitch=d[5]&65535u,rows=d[5]>>16;
- uint32_t bank=word(recipe+0x304u),cap=word(recipe+0x364u),orientation=P(si)[0x71e03]?P(si)[0x71e04]:P(si)[0xc8];orientation=orientation==1u?8u:orientation==2u?3u:orientation==3u?6u:1u;
+ uint32_t backing=word(recipe+0x304u),capacity=word(recipe+0x364u),orientation=P(si)[0x71e03]?P(si)[0x71e04]:P(si)[0xc8];orientation=orientation==1u?8u:orientation==2u?3u:orientation==3u?6u:1u;
+ M10V_LOG(219u,backing,capacity,d[1],d[2]);
+ M10V_LOG(220u,recipe,d[4],d[5],d[6]);
+ /* Original id5 setter5350d984 keeps the raw allocation token. Its virtual
+  * layout5350db3c rounds that token up64 at5350dc48; a valid allocation need
+  * not itself be64 aligned. Keep both the owner interval and aligned canvas. */
+ if(!ram(backing,capacity)||capacity>73728000u)return result(recipe,-3,backing,capacity);
+ uint32_t bank=align64(backing),prefix=bank-backing;
+ if(prefix>=capacity)return result(recipe,-3,backing,capacity);
+ uint32_t cap=capacity-prefix;
  m10v_half_pair_plan_info plan;
- if((d[0]&255u)!=1u||d[3]||d[6]||(d[7]&255u)!=2u||!ram(bank,cap)||(bank&63u)||cap>73728000u||pitch<w||pitch>8192u||(pitch&1u)||rows<h||rows>4096u||!m10v_half_pair_plan(w,h,orientation,cap,&plan)||!inside(d[1],pitch*rows,bank,cap)||!inside(d[2],pitch*rows,bank,cap)||overlap(d[1],pitch*rows,d[2],pitch*rows))return result(recipe,-3,w,h);
+ if((d[0]&255u)!=1u||d[3]||d[6]||(d[7]&255u)!=2u||pitch<w||pitch>8192u||(pitch&1u)||rows<h||rows>4096u||!m10v_half_pair_plan(w,h,orientation,cap,&plan))return result(recipe,-3,w,h);
+ /* BackResize retains original pitch/allocated rows while advancing Y/C to
+  * the visible crop. CPU copies read only the visible rows, not trailing
+  * storage from that displaced origin. Validate precisely that footprint. */
+ uint32_t source_bytes=(h-1u)*pitch+w;
+ if(!inside(d[1],source_bytes,backing,capacity)||!inside(d[2],source_bytes,backing,capacity)||overlap(d[1],source_bytes,d[2],source_bytes))return result(recipe,-3,d[1],d[2]);
  /* Authenticate the complete mutation interval independently of source crop. */
  uint32_t raw=word(recipe+0x60u),raw_dims=word(recipe+0x230u),raw_bytes=0;
  if(raw){if(!ram(raw_dims,4))return result(recipe,-4,raw,raw_dims);uint32_t rw=*(const uint16_t *)(uintptr_t)raw_dims,rh=*(const uint16_t *)(uintptr_t)(raw_dims+2);if(!rw||rw>8192u||!rh||rh>8192u)return result(recipe,-4,rw,rh);raw_bytes=2u*rw*rh;if(!raw_ram(raw,raw_bytes))return result(recipe,-4,raw,raw_bytes);}
  else if(m10v_save_trace_recipe_raw_status(recipe,si,word(recipe+0x2f4u),raw)!=M10V_CAPTURE_RAW_RELEASED)return result(recipe,-4,raw,0);
- if(overlap(bank,cap,raw,raw_bytes)||overlap(bank,cap,recipe,M10V_SAVE_RECIPE_EXTENDED_BYTES)||overlap(bank,cap,si,0x74270u)||overlap(bank,cap,req,0x3cu)||overlap(bank,cap,raw_dims,raw_dims?4u:0u))return result(recipe,-4,bank,cap);
+ if(overlap(backing,capacity,raw,raw_bytes)||overlap(backing,capacity,recipe,M10V_SAVE_RECIPE_EXTENDED_BYTES)||overlap(backing,capacity,si,0x74270u)||overlap(backing,capacity,req,0x3cu)||overlap(backing,capacity,raw_dims,raw_dims?4u:0u))return result(recipe,-4,backing,capacity);
  thumbnail thumbs[2];uint32_t at=align64(plan.used_bytes);
  if(!thumb_plan(&thumbs[0],recipe+0xd0u,at,cap))return result(recipe,-5,at,cap);
  at=align64(at+thumbs[0].yn+thumbs[0].cn);if(!thumb_plan(&thumbs[1],recipe+0xf0u,at,cap))return result(recipe,-5,at,cap);
@@ -123,7 +142,7 @@ static int camera_impl(uint32_t context){
  uint32_t frame_bytes=2u*w*h,scratch_bytes=2u*frame_bytes,manager=((uint32_t(*)(void))0x536a2424u)();
  uint32_t allocation=((uint32_t(*)(uint32_t,uint32_t,uint32_t))0x536a27e8u)(manager,scratch_bytes+63u,2u);
  if(!allocation){(void)close_file(&f,handle);return result(recipe,-8,scratch_bytes,0);}
- uint32_t memory=align64(allocation);int ok=ram(allocation,scratch_bytes+63u)&&!overlap(memory,scratch_bytes,bank,cap)&&!overlap(memory,scratch_bytes,raw,raw_bytes)&&!overlap(memory,scratch_bytes,recipe,M10V_SAVE_RECIPE_EXTENDED_BYTES)&&!overlap(memory,scratch_bytes,si,0x74270u)&&!overlap(memory,scratch_bytes,req,0x3cu)&&!overlap(memory,scratch_bytes,raw_dims,raw_dims?4u:0u);
+ uint32_t memory=align64(allocation);int ok=ram(allocation,scratch_bytes+63u)&&!overlap(memory,scratch_bytes,backing,capacity)&&!overlap(memory,scratch_bytes,raw,raw_bytes)&&!overlap(memory,scratch_bytes,recipe,M10V_SAVE_RECIPE_EXTENDED_BYTES)&&!overlap(memory,scratch_bytes,si,0x74270u)&&!overlap(memory,scratch_bytes,req,0x3cu)&&!overlap(memory,scratch_bytes,raw_dims,raw_dims?4u:0u);
  if(ok)ok=exact(&f,handle,HEADER_BYTES,P(memory),frame_bytes,0)&&crc(P(memory),frame_bytes)==previous.data_crc;
  if(!close_file(&f,handle))ok=0;
  if(ok){for(uint32_t plane=0;plane<2;plane++)for(uint32_t row=0;row<h;row++)for(uint32_t x=0;x<w;x++)P(memory+frame_bytes)[(plane*h+row)*w+x]=P((plane?d[2]:d[1])+row*pitch)[x];ok=invalidate(&f);}
@@ -171,11 +190,13 @@ uint32_t m10v_half_pair_select(uint32_t model,uint32_t raw){
  return answer;
 }
 int m10v_half_pair_camera(uint32_t context){
- if(!ram(context,0x60u)||context<0x550009b8u)return -1;
+ if(!ram(context,0x60u)||context<0x550009b8u)return result(context,-1,context,0);
  uint32_t recipe=context-0x9b8u;
- if(!ram(recipe,M10V_SAVE_RECIPE_EXTENDED_BYTES)||word(recipe)!=0x53d0fc90u||word(recipe+M10V_SAVE_RECIPE_BYTES)!=M10V_SAVE_TRACE_MAGIC)return -1;
- uint32_t si=word(recipe+0x44c8u);if(!ram(si,0x74270u))return -1;
- uint32_t is_half=P(si)[0x7b6]==6u,owner=current_owner();
+ if(!ram(recipe,M10V_SAVE_RECIPE_EXTENDED_BYTES)||word(recipe)!=0x53d0fc90u||word(recipe+M10V_SAVE_RECIPE_BYTES)!=M10V_SAVE_TRACE_MAGIC)return result(recipe,-1,recipe,1);
+ uint32_t si=word(recipe+0x44c8u);if(!ram(si,0x74270u))return result(recipe,-1,si,2);
+ uint32_t is_half=P(si)[0x7b6]==6u;
+ if(is_half)(void)result(recipe,0,context,si);
+ uint32_t owner=current_owner();
  if(!owner)return is_half?result(recipe,-10,0,0):0;
  uint32_t *s=owner_state(owner);
  uint32_t flags=__atomic_load_n(s+3,__ATOMIC_ACQUIRE);

@@ -14,6 +14,7 @@ class FinalPairCameraTests(support.PairCameraTests):
  def service(self,u,pc,n,data):
   if pc==self.symbols['m10v_save_trace_recipe_mark']:pc=0x53000100
   elif pc==self.symbols['m10v_save_trace_recipe_raw_status']:pc=0x53000104
+  elif pc==self.symbols['m10v_debug_log']:pc=0x53000108
   return super().service(u,pc,n,data)
  def test_final_selected_menu_hook_and_both_encoded_policy_sites(self):
   for at,to,link in [(0x531b6be4,self.symbols['m10v_half_pair_select'],False)]:

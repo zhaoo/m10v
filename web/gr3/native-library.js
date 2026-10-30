@@ -84,7 +84,7 @@ function render(){
  renderFilms();$('#build').disabled=busy||!project||!unlockValid;$('#local-source').disabled=busy||!$('#local-source').dataset.available;$('#official-file').disabled=busy;$('#search').disabled=busy;
  if(focused)root.querySelector(`[data-focus="${focused}"]`)?.focus({preventScroll:true});
 }
-function filmIcon(f){const img=document.createElement('img');img.className='film-icon';img.width=40;img.height=40;img.alt='';img.decoding='async';if(f?.icon_url)img.src=f.icon_url;else img.hidden=true;return img;}
+function filmIcon(f){const img=document.createElement('img');img.className='film-icon';img.width=128;img.height=128;img.alt='';img.decoding='async';if(f?.icon_url)img.src=f.icon_url;else img.hidden=true;return img;}
 function renderFilms(){const q=$('#search').value.toLowerCase().trim(),selected=new Set(configuration.slots.map(s=>s.film));let count=0,lastGroup=null;
  $('#catalog').replaceChildren(...films.filter(f=>f.name.toLowerCase().includes(q)&&(!$('#film-group').value||f.group===$('#film-group').value)).flatMap(f=>{
   const prefix=[];if(f.group!==lastGroup){const title=document.createElement('h3');title.className='film-directory-group';title.style.cssText='grid-column:1/-1;margin:20px 0 0';title.textContent=f.group;prefix.push(title);lastGroup=f.group;}

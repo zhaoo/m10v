@@ -22,7 +22,7 @@ export async function gr2BuildFingerprint(){
   else if(entry.isFile()){h.update(name+'\0');h.update(await readFile(path.join(root,name)));}
  }}
  for(const dir of ['native/gr2','compat/gr2-v1','scripts','node'])await walk(dir);
- for(const file of ['web/gr2/native-library-state.mjs','web/gr3/5207-lut.json','web/gr3/harman-luts.json','web/gr3/curated-luts.json','web/gr3/newstocks-luts.json']){h.update(file+'\0');h.update(await readFile(path.join(root,file)));}
+ for(const file of ['web/gr2/native-library-state.mjs','web/gr3/5207-lut.json','web/gr3/harman-luts.json','web/gr3/curated-luts.json','web/gr3/newstocks-luts.json','native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h']){h.update(file+'\0');h.update(await readFile(path.join(root,file)));}
  return h.digest('hex');
 }
 export async function prepareGr2Native(source,value=defaultConfiguration()){

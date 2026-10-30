@@ -116,8 +116,8 @@ static int draw(page *p){
     if(films){
         for(uint32_t i=0;i<5;i++){
             uint32_t id=film(p,i);int16_t x=(int16_t)(24+136*i);
-            if(i==focus)ok=fill(1,x,102,x+127,305,0x20001)&&fill(1,x+2,104,x+125,303,0x20004)&&ok;
-            if(id)ok=gr2_card_draw(id>M10V_FILM_COUNT?33:id,i,i==focus,(106u<<16)|(uint32_t)(x+4))&&ok;
+            if(i==focus)ok=fill(1,x-2,102,x+129,233,0x20001)&&fill(1,x,104,x+127,231,0x20004)&&ok;
+            if(id)ok=gr2_card_draw(id>M10V_FILM_COUNT?33:id,i,i==focus,(104u<<16)|(uint32_t)x)&&ok;
         }
         ok=film_name(p,focus)&&ok;
     }else{

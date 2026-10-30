@@ -14,8 +14,15 @@ test('custom display resources preserve stock cards and independently reject LUT
   const runtime=await readFile(path.join(dir,'m10v-library-arm.bin'));
   const source=readFileSync(new URL('../bin/fwdc239b-gr3-official.bin',import.meta.url));
   assert.deepEqual(manifest.custom_film_display.name_resources,[1007,1011]);
+  assert.deepEqual(manifest.custom_film_display.appended_name_resources,[1111,1115]);
   assert.deepEqual(manifest.resources.texts.slice(988-786,991-786),['胶卷名称：关闭','胶卷名称：开启','胶卷名称水印']);
   assert.equal(buildNativeLibrary(source,runtime,manifest).receipt.camera_tested,false);
+  const cards=manifest.film_cards;
+  assert.equal(cards.width,128);assert.equal(cards.height,128);
+  assert.equal(cards.descriptor_offset,10*cards.width*cards.height*4);
+  assert.equal(cards.directory_offset,cards.descriptor_offset+10*8);
+  assert.equal(cards.heap_bytes,cards.directory_offset+25*4);
+  assert.throws(()=>buildNativeLibrary(source,runtime,{...manifest,film_cards:{...cards,width:120}}),/film card/);
   assert.equal(manifest.icons.payload_bytes,46*6400);
   assert.equal(manifest.icons.retired_generic_count,32);
   const original=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));

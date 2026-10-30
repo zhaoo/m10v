@@ -142,7 +142,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
             'm10v_camera_library_preview','m10v_camera_library_preview_init','m10v_camera_library_preview_clear','m10v_camera_library_custom_profile','m10v_camera_library_reset','m10v_camera_library_detail','m10v_camera_library_effects','m10v_camera_library_texture', 'm10v_camera_library_halation', 'm10v_camera_library_stamp','m10v_camera_library_film_name_stamp'},
         'm10v_menu_': {'m10v_menu_count', 'm10v_menu_max_count', 'm10v_menu_index', 'm10v_menu_name',
             'm10v_menu_value_name', 'm10v_menu_icon', 'm10v_menu_value_icon', 'm10v_menu_focus',
-            'm10v_menu_confirm', 'm10v_menu_key', 'm10v_menu_enter'} | ({'m10v_menu_custom_resource'} if 'm10v_sd_camera_custom_name' in (externals or {}) else set()),
+            'm10v_menu_confirm', 'm10v_menu_key', 'm10v_menu_enter','m10v_menu_recorded_icon'} | ({'m10v_menu_custom_resource'} if 'm10v_sd_camera_custom_name' in (externals or {}) else set()),
         'm10v_tone_menu_': {'m10v_tone_menu_'+n for n in ['index','menu_name','menu_icon','adj_name','adj_icon','menu_matches','adj_matches','adj_select']},
         'm10v_capture_': {'m10v_capture_library'},
         'm10v_half_pair_': {'m10v_half_pair_plan','m10v_half_pair_compose'},
@@ -785,8 +785,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         half_frame=bool(camera_model=='gr3' and base>=0x540be000)
         half_pixels=(ROOT/'native/gr3/m10v_half_frame_icon.rgba').read_bytes() if half_frame else b''
         if half_frame and len(half_pixels)!=9600:raise ValueError('half-frame icon extent differs')
-        icon_count = 877 if half_frame else 876
-        descriptor_count=old_descriptor_count+9+int(hdf_adj_report is not None)+int(half_frame)
+        icon_count = 878 if half_frame else 877
+        descriptor_count=old_descriptor_count+10+int(hdf_adj_report is not None)+int(half_frame)
         icon_descriptors = icon_table + icon_count*4
         icon_data = icon_descriptors + descriptor_count*8
         image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(111))
@@ -800,7 +800,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         image += b''.join(struct.pack('<I',icon_descriptors+(old_descriptor_count+5+i)*8) for i in range(3))
         image+=struct.pack('<I',icon_descriptors+(old_descriptor_count+8)*8) if hdf_adj_report else bytes(4)
         image+=struct.pack('<I',icon_descriptors+(old_descriptor_count+8+int(hdf_adj_report is not None))*8)
-        if half_frame:image+=struct.pack('<I',icon_descriptors+(old_descriptor_count+9+int(hdf_adj_report is not None))*8)
+        image+=struct.pack('<I',icon_descriptors+(old_descriptor_count+9+int(hdf_adj_report is not None))*8)
+        if half_frame:image+=struct.pack('<I',icon_descriptors+(old_descriptor_count+10+int(hdf_adj_report is not None))*8)
         image += b''.join(struct.pack('<HHI',40,40,(icon_data+(len(icon_pixels) if i<retired_icon_count else (i-retired_icon_count)*6400))//4) for i in range(78))
         if sd_library:
             image += bytes(5*8) # Reserved ROM padding; dynamic metadata is in owned RAM.
@@ -852,8 +853,12 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             hdf_adj_report['icon']={'id':874,'descriptor':icon_descriptors+(old_descriptor_count+8)*8,
                 'pixels':hdf_adj_icon_data,'bytes':6400,'width':40,'height':40,'sha256':hashlib.sha256(hdf_adj_pixels).hexdigest()}
         image+=struct.pack('<HHI',40,40,(c41_data+len(c41_pixels)+3*6400)//4)
+        unknown_pixels=(ROOT/'native/gr3/m10v_unknown_film.rgba').read_bytes()
+        if len(unknown_pixels)!=6400:raise ValueError('unknown recorded film icon extent differs')
+        unknown_data=c41_data+len(c41_pixels)+len(extra_pixels)+len(hdf_adj_pixels)
+        image+=struct.pack('<HHI',40,40,unknown_data//4)
         if half_frame:
-            half_icon_data=c41_data+len(c41_pixels)+len(extra_pixels)+len(hdf_adj_pixels)
+            half_icon_data=c41_data+len(c41_pixels)+len(extra_pixels)+len(hdf_adj_pixels)+len(unknown_pixels)
             image+=struct.pack('<HHI',60,40,half_icon_data//4)
         image += icon_pixels
         if sd_library:
@@ -862,7 +867,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if custom_pixels!=custom_icon():raise ValueError('custom LUT icon differs from source')
             image += custom_pixels
         image += (ROOT/'native/gr3/m10v_charmera.rgba').read_bytes()
-        image += color_pixels+pixel_pixels+style_pixels+spectral_icon+d76_icon_pixels+aspect_pixels+anime_pixels+c41_pixels+extra_pixels+hdf_adj_pixels+half_pixels
+        image += color_pixels+pixel_pixels+style_pixels+spectral_icon+d76_icon_pixels+aspect_pixels+anime_pixels+c41_pixels+extra_pixels+hdf_adj_pixels+unknown_pixels+half_pixels
         icon_asm=folder/'icons.S';icon_obj=folder/'icons.o'
         icon_asm.write_text("""
             .syntax unified
@@ -991,7 +996,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             'preview_offset':0x213c,'preview_bytes':0x4000,'storage':'inline TopMenu allocation',
             'recipe_offset':0x5150,'recipe_bytes':1576,'frame_filesystem_calls':0,
             'reader_veneers':{'record':base+0xf0,'u32':base+0xf4}}
-        manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h','native/gr3/m10v_film_font_raster.json','native/gr3/m10v_card_captions.json','scripts/generate_m10v_film_cards.py','scripts/generate_m10v_card_captions.py','native/gr3/m10v_custom_icon.rgba','third_party/noto-sans/NotoSans-Bold.ttf','third_party/noto-sans/OFL.txt','third_party/noto-cjk/OFL.txt']})
+        manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h','native/gr3/m10v_film_font_raster.json','native/gr3/m10v_square_icon_raster.json','native/gr3/m10v_card_captions.json','scripts/generate_m10v_film_cards.py','scripts/generate_m10v_card_captions.py','native/gr3/m10v_custom_icon.rgba','third_party/noto-sans/NotoSans-Bold.ttf','third_party/noto-sans/OFL.txt','third_party/noto-cjk/OFL.txt']})
     manifest['appended_slots']=appended_report
     manifest['sources']['native/gr3/m10v_tone.h']=sha((ROOT/'native/gr3/m10v_tone.h').read_bytes())
     if appended_slots:manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']})
@@ -1027,6 +1032,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     if texture_neon:manifest['experimental_capture']['texture_neon']=True
     extra_sources=['native/gr3/m10v_aspect_config.h','native/gr3/m10v_half_frame_icon.rgba','native/gr3/half-frame-icon.json','scripts/generate_gr3_half_frame_icon.py','native/gr3/m10v_aspect_icons.rgba','native/gr3/aspect-icons.json','scripts/generate_gr3_aspect_icons.py','native/gr3/m10v_film_color_candidates.h','native/gr3/isp-film-targets.json','scripts/build_gr3_isp_film_targets.py','native/gr3/m10v_spatial_accel.c','native/gr3/m10v_spatial_accel.h','native/gr3/m10v_save_trace.c','native/gr3/m10v_save_trace.h','native/gr3/m10v_capture_raw_lifetime.c','native/gr3/m10v_capture_raw_lifetime.h','scripts/build_gr3_save_trace.py','scripts/build_gr3_capture_lifecycle.py','native/gr3/m10v_capture_lifecycle.c','native/gr3/m10v_file_trace.c','scripts/build_gr3_file_trace.py']
     manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in extra_sources})
+    manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_film_identity.h','native/gr3/m10v_unknown_film.rgba','node/gr3-sd-pre-square-art-contract.json']})
     if texture_neon:manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_texture_accel.c','native/gr3/m10v_texture_accel.h','scripts/build_gr3_texture_accel.py']})
     if save_chain_trace:manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_module_dispatch_trace.c','scripts/build_gr3_module_dispatch_trace.py','scripts/build_gr3_pool_release_trace.py']})
     manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_custom_isp.h','native/gr3/m10v_isp_frame_color.c','native/gr3/m10v_isp_frame_color.h','native/gr3/m10v_isp_recipe_color.c','native/gr3/m10v_isp_recipe_color.h','scripts/build_gr3_isp_recipe_color.py','scripts/build_gr3_isp_color_hook.py']})
@@ -1072,7 +1078,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['film_5207']={'offset':film_offset,'bytes':len(film_payload),'sha256':sha(film_payload),'camera_calibrated':False,'film_calibrated':False}
     manifest['resources'] = {'first_id': 786, 'last_id': last_resource, 'table': resource_base,
                               'descriptors': descriptors, 'texts': texts}
-    manifest['film_cards']={'first_id':749,'last_id':773,'ids':[749,750,751,752,753,769,770,771,772,773],'width':120,'height':148,'artwork_height':148,'caption_height':0,'descriptor_storage':'view-owned-heap','descriptor_offset':710400,'directory_offset':710480,'directory_provider':symbols['m10v_settings_controller_card_directory'],'directory_hooks':{n:symbols['m10v_icon_directory_'+n] for n in ('width','height','draw')},'heap_bytes':710580} if sd_library else None
+    manifest['film_cards']={'first_id':749,'last_id':773,'ids':[749,750,751,752,753,769,770,771,772,773],'width':128,'height':128,'artwork_height':128,'caption_height':0,'descriptor_storage':'view-owned-heap','descriptor_offset':655360,'directory_offset':655440,'directory_provider':symbols['m10v_settings_controller_card_directory'],'directory_hooks':{n:symbols['m10v_icon_directory_'+n] for n in ('width','height','draw')},'heap_bytes':655540} if sd_library else None
     manifest['film_curated']=[]
     for i,payload in enumerate(curated_payloads):
         offset=bytes(image).find(payload)
@@ -1105,9 +1111,9 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['d76_icons']={'first_id':775,'last_id':781,'pixels':d76_icon_data,'sha256':sha(d76_icon_pixels)}
     manifest['style_icons']={'first_id':762,'last_id':768,'pixels':style_icon_data,'sha256':sha(style_pixels)}
     manifest['aspect_icons']={'first_id':aspect_icon_first,'last_id':aspect_icon_first+1,'width':60,'height':40,'pixels':aspect_icon_data,'sha256':sha(aspect_pixels)}
-    manifest['half_frame_icon']={'id':876,'width':60,'height':40,'pixels':half_icon_data,'descriptor':icon_descriptors+(old_descriptor_count+9+int(hdf_adj_report is not None))*8,'sha256':sha(half_pixels)} if half_frame else None
+    manifest['half_frame_icon']={'id':877,'width':60,'height':40,'pixels':half_icon_data,'descriptor':icon_descriptors+(old_descriptor_count+10+int(hdf_adj_report is not None))*8,'sha256':sha(half_pixels)} if half_frame else None
     manifest['icons']={'catalog_count':icon_count,'descriptor_count':descriptor_count,'focal':{'first_id':782,'last_id':854,'width':60,'height':20,'descriptor':icon_descriptors+111*8,'storage':'draw-owned-heap','heap_bytes':4800,'owner_fp_offset':-0x80} if focal_icons else None,'first_id':671,'last_id':748,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':icon_artwork_sha,'payload_bytes':len(icon_pixels),'retired_generic_count':retired_icon_count}
-    if sd_library:manifest['custom_film_display']={'name_resources':[1007,1011],'name_storage':'getter-stack-80-bytes','icon_id':754,'icon_sha256':sha(custom_icon()),'card_art':'name-fitted-inside-portrait-box-and-stable-palette','legacy_sd_compatible':True,'camera_tested':False}
+    if sd_library:manifest['custom_film_display']={'name_resources':[1007,1011],'appended_name_resources':[1111,1115],'name_storage':'getter-stack-80-bytes','icon_id':754,'icon_sha256':sha(custom_icon()),'card_art':'name-fitted-inside-square-box-and-stable-palette','legacy_sd_compatible':True,'camera_tested':False}
     (out / 'm10v-library-arm.bin').write_bytes(image)
     (out / 'm10v-library-arm.json').write_text(json.dumps(manifest, indent=2) + '\n')
     return manifest

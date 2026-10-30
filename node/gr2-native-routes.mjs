@@ -3,6 +3,7 @@ import {buildSdFilmPack} from '../compat/gr2-v1/node/gr3-sd-film-pack.mjs';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import path from 'node:path';
 import {nativeCatalog} from '../compat/gr2-v1/node/gr3-native-library.mjs';
+import {readFileSync} from 'node:fs';
 import {readModelOfficial} from './model-firmware.mjs';
 import {readUnityModelComponent} from './unity-firmware.mjs';
 import {prepareGr2Native,generateGr2Native} from './gr2-native-library.mjs';
@@ -11,7 +12,12 @@ export async function handleGr2NativeRequest({request,response,runtime,token,rea
  const prefix='/api/gr2/native-library/';if(!request.url?.startsWith(prefix))return false;
  const route=request.url.slice(prefix.length),file=path.join(runtime.root,'..','gr2','inputs',identity+'.frm');
  try{
-  if(request.method==='GET'&&route==='catalog'){send(response,200,{...await nativeCatalog(),local_sources:['gr2'],local_source_available:await readModelOfficial('gr2').then(()=>true,()=>false),hardware_verified:false});return true;}
+  if(request.method==='GET'&&route==='catalog'){
+   const catalog=await nativeCatalog();
+   const art=new Map(JSON.parse(readFileSync(new URL('../web/gr3/film-icons/catalog.json',import.meta.url),'utf8')).map(icon=>[icon.id,icon]));
+   catalog.films=catalog.films.map(f=>{const icon=art.get(f.id);return icon?{...f,icon_url:icon.icon_url,icon_compact_url:icon.icon_compact_url,icon_color:icon.color}:f;});
+   send(response,200,{...catalog,local_sources:['gr2'],local_source_available:await readModelOfficial('gr2').then(()=>true,()=>false),hardware_verified:false});return true;
+  }
   if(request.headers['x-m10v-token']!==token||(request.headers.origin&&request.headers.origin!==origin)){send(response,403,{error:'authorization failed'});return true;}
   if(request.method!=='POST'){send(response,405,{error:'POST required'});return true;}
   const body=await readBody(request,route==='import'?64*1024*1024:16384);

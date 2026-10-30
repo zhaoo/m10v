@@ -41,3 +41,20 @@ body.cinematic-studio .power-images{display:block;max-width:1240px}.cinematic-st
 body.cinematic-studio #native-editor .catalog-panel-head{position:sticky;top:-20px;background:#10170f;z-index:5;padding-top:6px;padding-bottom:12px}body.cinematic-studio #native-editor #film-selection-status:not(:empty){position:static;flex:0 0 100%;width:100%;padding:10px 12px;margin:6px 0 0;border-color:#b69655;background:#302414;box-sizing:border-box}.cinematic-studio .build-completion>[data-firmware-download]{margin:0 8px 12px 0}.cinematic-studio .build-completion>[data-record-download]{margin-bottom:12px}
 .cinematic-studio .review-edit-links{display:flex;flex-wrap:wrap;gap:8px 20px;margin:0 0 18px}.cinematic-studio .review-edit-links button{min-height:40px;padding:8px 0;border:0;border-bottom:1px solid #b59a6644;border-radius:0;background:none;color:#d9bc83;font-size:11px}
 body.cinematic-studio>header.site-header{position:relative;z-index:30}
+
+/* Square packaging needs enough room for the film name and its graphic motif. */
+body.cinematic-studio #native-editor .slot-item{width:128px}
+body.cinematic-studio #native-editor .slot{min-height:156px}
+body.cinematic-studio #native-editor .slot .film-icon{width:96px;height:96px;aspect-ratio:1;object-fit:contain;margin:0 auto 8px}
+body.cinematic-studio #native-editor .film-peek{min-height:174px;padding:14px 8px 12px}
+body.cinematic-studio #native-editor .film-browser-panel .film-peek .film-icon{width:112px;height:112px;aspect-ratio:1;object-fit:contain;margin:0 0 10px}
+body.cinematic-studio #native-editor .film-peek strong{font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+@media(max-width:760px){
+ body.cinematic-studio #native-editor .slots{gap:8px}
+ body.cinematic-studio #native-editor .slot-item{width:calc((100% - 16px)/3);min-width:0}
+ body.cinematic-studio #native-editor .slot{min-height:130px;padding:10px 4px}
+ body.cinematic-studio #native-editor .slot .film-icon{width:72px;height:72px;max-width:100%;margin-bottom:8px}
+ body.cinematic-studio #native-editor .slot strong{font-size:11px;overflow-wrap:anywhere}
+ body.cinematic-studio #native-editor .film-peek{min-height:160px}
+ body.cinematic-studio #native-editor .film-browser-panel .film-peek .film-icon{width:96px;height:96px;max-width:100%}
+}
