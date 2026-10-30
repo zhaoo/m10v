@@ -95,12 +95,12 @@ static int process(exposure *e,session *s,uint32_t context){
  if(s->first.token&&(!frame_valid(&s->first)||s->cookie!=cookie(s)||protected(e,s->first.token,s->first.bytes)))return result(r,-19,s->first.token,s->cookie);
  if(s->first.token&&(s->first.d[4]!=d[4]||s->orientation!=orientation)){M10V_LOG(221u,e->owner,s->generation,s->first.token,4u);clear_first(s);}
  if(!s->first.token){
-  owned_frame first;if(!allocate_frame(&first,e,w,h,0))return result(r,-8,w,h);uint32_t begin=ticks();
+  owned_frame first;if(!allocate_frame(&first,e,w,h,0))return result(r,-8,w,h);uint32_t begin __attribute__((unused))=ticks();
   if(!m10v_half_pair_iip_copy(r,d,first.d)){free_frame(&first);return result(r,-16,1,0);}
   for(uint32_t i=0;i<sizeof(first)/4u;i++)((volatile uint32_t *)&s->first)[i]=((const uint32_t *)&first)[i];s->orientation=orientation;s->generation++;s->cookie=cookie(s);
   M10V_LOG(222u,r,1u,ticks()-begin,s->first.token);return result(r,1,w,h);
  }
- owned_frame current;if(!allocate_frame(&current,e,w,h,&s->first))return result(r,-8,w,h);uint32_t begin=ticks();
+ owned_frame current;if(!allocate_frame(&current,e,w,h,&s->first))return result(r,-8,w,h);uint32_t begin __attribute__((unused))=ticks();
  if(!m10v_half_pair_iip_copy(r,d,current.d)){free_frame(&current);return result(r,-16,2,0);}
  M10V_LOG(222u,r,2u,ticks()-begin,current.token);begin=ticks();
  int ok=m10v_half_pair_iip_compose(r,s->first.d,current.d,output,(const uint32_t (*)[8])previews,orientation);
