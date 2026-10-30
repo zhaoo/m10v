@@ -46,7 +46,7 @@ for(const file of ['native/gr3/m10v_aspect.c','native/gr3/m10v_aspect_hooks.S','
  'native/gr3/m10v_half_pair_camera.c','native/gr3/m10v_half_pair_camera.h','scripts/gr3_aspect_overlay.py','node/gr3-integrated-components.mjs',
  'node/gr3-native-library.mjs','node/gr3-runtime-worker.py','node/gr3-runtime.mjs','node/gr3-m10v-native-build.mjs',
  'node/gr3-native-budget.mjs','scripts/build_gr3_half_frame_candidate.mjs','scripts/package_gr3_half_frame_candidate.mjs','scripts/gr3_half_frame_package_contract.mjs','scripts/gr3_half_frame_package_contract.test.mjs',
- 'tests/test_gr3_half_pair_final.py','tests/test_gr3_half_encoded_policy.py','tests/test_gr3_half_live_callers.py','docs/testing/gr3-half-pair-r4-20261030.md',
+ 'tests/test_gr3_half_pair_metadata.py','tests/test_gr3_half_pair_final.py','tests/test_gr3_half_encoded_policy.py','tests/test_gr3_half_live_callers.py','docs/testing/gr3-half-pair-r4-20261030.md',
  'tests/test_gr3_half_pair.py','tests/test_gr3_half_pair_camera.py','tests/test_gr3_aspect_full_callers.py','tests/test_gr3_half_frame.py',
  'tests/test_gr3_aspect.py','tests/test_gr3_aspect_dng.py','tests/test_gr3_aspect_indicator_final.py',
  'docs/superpowers/specs/2026-10-29-gr3-half-frame-design.md','docs/testing/gr3-half-frame-20261029.md',
