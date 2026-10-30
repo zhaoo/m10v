@@ -470,9 +470,9 @@ m10v_aspect_caption:
 .align 2
 .global m10v_aspect_half_caption
 m10v_aspect_half_caption:
-    .byte 9,1,0,0
+    .byte 5,1,0,0
     .word m10v_aspect_half_caption+8
-    .hword 72,97,108,102,32,51,58,52,0
+    .hword 72,97,108,102,0
 #endif
 
 .align 2

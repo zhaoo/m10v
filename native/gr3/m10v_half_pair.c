@@ -28,6 +28,7 @@ int m10v_half_pair_plan(uint32_t w, uint32_t h, uint32_t orientation,
     return 1;
 }
 
+#ifndef M10V_HALF_PAIR_PLANS_ONLY
 static int extent(const void *p, uint32_t size) {
     return p && (uintptr_t)p <= UINTPTR_MAX - size;
 }
@@ -83,3 +84,5 @@ int m10v_half_pair_compose(const m10v_half_pair_plan_info *plan,
     place(dest+p.plane_bytes,p.stride,p.second_x,p.second_y,second+pixels,w,h);
     return 1;
 }
+
+#endif /* host/reference compositor only */

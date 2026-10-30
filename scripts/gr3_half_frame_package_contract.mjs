@@ -1,15 +1,20 @@
 // Read-only acceptance gates for a local GR III half-pair test package.
 // These establish artifact identity and offline evidence, never camera acceptance.
-export const CANDIDATE_NAME='M10V-GR3-HalfFrame-TEST-20261030-r6-debug';
+export const CANDIDATE_NAME='M10V-GR3-HalfFrame-TEST-20261030-r7-debug';
 export const BASE_COMMIT='84caa3248477ecf36bc197420e4d5963ebab5693';
 export const LOG_FILES=['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN',
  'M10VIO0.BIN','M10VIO1.BIN','M10VAK0.BIN','M10VAK1.BIN'];
 export function auditHalfPair(manifest,receipt,runtime){
  const p=manifest.half_pair,r=receipt.composition?.half_pair;
- if(!p?.enabled||p.schema!=='m10v-half-pair/v1'||p.storage!=='C:\\M10V\\HALFPAIR.BIN'||
+ const fields={backend:'native-IIP',frame_filesystem_calls:0,cpu_pixel_reads:0,cpu_pixel_writes:0};
+ if(!p?.enabled||p.schema!=='m10v-half-pair/v1'||
  p.first_original_preserved!==true||p.camera_tested!==false||!r?.enabled||r.schema!==p.schema||
- r.storage!==p.storage||r.first_original_preserved!==true||r.camera_tested!==false)
-  throw Error('Actual two-shot half-pair capability/provenance missing');
+ r.first_original_preserved!==true||r.camera_tested!==false||
+ Object.entries(fields).some(([key,value])=>p[key]!==value||r[key]!==value)||
+ typeof p.storage!=='string'||!p.storage.trim()||r.storage!==p.storage||
+ /HALFPAIR\.BIN|[\\/]/i.test(p.storage))
+  throw Error('Native-IIP half-pair capability/provenance missing; CPU/SD frame path is not accepted');
+ if(runtime.includes(Buffer.from('HALFPAIR.BIN','ascii')))throw Error('Native-IIP package contains the retired CPU/SD frame backend');
  const h=p.handoff;
  if(!h||!Number.isSafeInteger(h.callsite)||!Number.isSafeInteger(h.target)||
  h.callsite!==r.handoff?.callsite||h.target!==r.handoff?.target||
@@ -20,6 +25,15 @@ export function auditHalfPair(manifest,receipt,runtime){
  const displacement=(word<<8)>>6;
  if(h.callsite+8+displacement!==h.target)throw Error('Half-pair handoff target differs');
  return p;
+}
+export function auditHalfCaption(rtos){
+ const start=0x540bc000-0x53000000,end=0x540be000-0x53000000;
+ if(!Buffer.isBuffer(rtos)||rtos.length<end)throw Error('Half caption overlay extent missing');
+ const overlay=rtos.subarray(start,end),text=Buffer.from('Half\0','utf16le'),at=overlay.indexOf(text);
+ if(at<8||overlay.indexOf(text,at+1)!==-1||overlay.readUInt32LE(at-8)!==0x00000105||
+ overlay.readUInt32LE(at-4)!==0x540bc000+at||overlay.includes(Buffer.from('Half 3:4\0','utf16le')))
+  throw Error('Native Half menu caption must be exactly Half');
+ return 0x540bc000+at-8;
 }
 export function validateChecks(validation){
  if(!Array.isArray(validation?.checks)||!validation.checks.length)throw Error('Current candidate validation evidence missing');
@@ -33,24 +47,25 @@ export function validateChecks(validation){
  return validation.checks;
 }
 export function packageReadme({buildId,binSha,officialSha,checks}){
- return `# GR III 半格双拍日志测试包 r6 · 2026-10-30
+ return `# GR III 半格双拍日志测试包 r7 · 2026-10-30
 
 状态：WAITING_FOR_USER_VALIDATION。仅适用于 GR III / 官方 2.10。
 这是新的离线验证候选，设备尚未验收；未发布至 GitHub 或生产环境。
-r6 修正实机74,907,648字节分配被拒绝的问题，按原厂4064行传感器容量校验；接入原生状态栏并明确显示Half；16:9沿用完整3:2实时缓冲，再以显示遮罩呈现宽幅。成片仍是16:9，Half拍摄几何和原生ISP保持原有合同。
-r5开机闪烁已获设备确认消失；16:9偶发闪烁和中间残影，以及双拼与标签，仍需本候选实测。
+用户已确认 r6 的取景闪烁修复；该反馈仅覆盖取景。r6 的双拼没有达到预期，回放慢，旧 SD 首帧暂存和 CPU 整图拼接方案不作为本次交付方案。
+r7 保留已确认的取景修复，比例菜单和拍摄状态栏统一显示 Half。两张照片各自在原生 ISP 完成色彩处理后，由原生 IIP 空间处理组合双画面；双拼阶段不经 CPU 读写像素，也不经 SD 图像文件暂存。诊断日志仍会写入卡内。
+离线构建门禁要求 manifest 与回执明确声明 native-IIP、图像文件调用为 0、CPU 像素读写为 0，并核验真实编码前 ARM 入口；这些检查不能替代实机性能和回放验收。
 
 ## 安装与验证
 
 1. 先备份照片、原固件和 M10V 存档，保留已验证的恢复固件。
 2. 按原有更新流程使用 gr3/fwdc239b.bin。SD/M10V/FILMS.M10 为胶卷库；保留自己的自定义胶卷和设置，避免直接覆盖。
 3. 先关闭边框，用 3:2 和 16:9 各拍一张，检查菜单文字、取景颜色、半按对焦与回放。
-4. 选择 Half 3:4，保持同一相机方向连续拍两张。第一张仍保存原始单张 JPEG；第二张应保存双画面 JPEG，并在即时回放、相册和导出照片中检查。
+4. 选择 Half，保持同一相机方向连续拍两张。第一张仍保存原始单张 JPEG；第二张应保存双画面 JPEG，并在即时回放、相册和导出照片中检查。
 5. 再检查切回其他比例、35/50mm 裁切、RAW+JPEG、已有胶卷、HDF、水印和边框。组合效果未获得设备验收，遇到不兼容布局时应保留普通 JPEG 并记日志，不应损坏照片。
 
-双拍暂存文件为卡内 M10V/HALFPAIR.BIN；不要在拍摄或保存过程中修改它。
 每次对照测试使用相同画幅、持机方向和尺寸。两张之间更改这些条件可能重新开始一组。
-此包包含日志写入及半格空间拼接开销，不能据此推导正式版保存速度。
+图像暂存仅由本次运行的原生内存所有者管理，不从旧 HALFPAIR.BIN 恢复帧；退出或重启后的组对行为以相机日志和实际结果为准。
+请对照原厂正片或负片检查保存、即时回放和相册切换速度；本包仍含诊断日志，不以未经测量的“流畅”替代性能反馈。
 
 ## 问题回传
 

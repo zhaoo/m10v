@@ -146,6 +146,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_tone_menu_': {'m10v_tone_menu_'+n for n in ['index','menu_name','menu_icon','adj_name','adj_icon','menu_matches','adj_matches','adj_select']},
         'm10v_capture_': {'m10v_capture_library'},
         'm10v_half_pair_': {'m10v_half_pair_plan','m10v_half_pair_compose'},
+        'm10v_half_pair_iip_': {'m10v_half_pair_iip_ready','m10v_half_pair_iip_copy','m10v_half_pair_iip_compose'},
         'm10v_half_pair_camera': {'m10v_half_pair_camera','m10v_half_pair_reset','m10v_half_pair_init','m10v_half_pair_select','m10v_half_pair_destroy'},
         'm10v_resource_': {'m10v_resource_primary', 'm10v_resource_secondary'},
         'm10v_chain_': {'m10v_chain_capture'},
@@ -463,11 +464,21 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 lifecycle_report['patches']+=view_report['patches']
         half_pair_report=None
         if half_pair_enabled:
-            for source,prefix in [('m10v_half_pair.c','m10v_half_pair_'),('m10v_half_pair_camera.c','m10v_half_pair_camera')]:
+            # The guard is placed later (or shared with borders). Relink this
+            # retained object against its final exports before publishing code.
+            guard_header=(ROOT/'native/gr3/m10v_border_wait_guard.h').read_text()
+            guard_asm=(ROOT/'scripts/border_recovery_wait_guard.S').read_text()
+            guard_names=set(re.findall(r'\b(m10v_border_\w+)\s*\(',guard_header))
+            guard_names.update(re.findall(r'^\.global\s+(\w+)',guard_asm,re.M))
+            forward_guard={name:base for name in guard_names}
+            for source,prefix in [('m10v_half_pair.c','m10v_half_pair_'),('m10v_half_pair_iip.c','m10v_half_pair_iip_'),('m10v_half_pair_camera.c','m10v_half_pair_camera')]:
                 pair_obj=folder/(source+'.o')
-                subprocess.run([compiler,*render_flags,*debug_flags,*pair_flags,'-fno-jump-tables','-c',str(ROOT/'native/gr3'/source),'-o',str(pair_obj)],check=True,capture_output=True)
+                plan_only=['-DM10V_HALF_PAIR_PLANS_ONLY=1'] if prefix=='m10v_half_pair_' else []
+                subprocess.run([compiler,*render_flags,*debug_flags,*pair_flags,*plan_only,'-fno-jump-tables','-c',str(ROOT/'native/gr3'/source),'-o',str(pair_obj)],check=True,capture_output=True)
                 pair_start=(base+len(image)+15)&~15
-                pair_code,pair_symbols=link_object(pair_obj.read_bytes(),pair_start,symbols,prefix,additional_exports=('m10v_half_pair_reset','m10v_half_pair_init','m10v_half_pair_select','m10v_half_pair_destroy') if prefix=='m10v_half_pair_camera' else ())
+                pair_code,pair_symbols=link_object(pair_obj.read_bytes(),pair_start,{**symbols,**forward_guard},prefix,additional_exports=('m10v_half_pair_reset','m10v_half_pair_init','m10v_half_pair_select','m10v_half_pair_destroy') if prefix=='m10v_half_pair_camera' else (),omitted_exports=('m10v_half_pair_compose',) if prefix=='m10v_half_pair_' else ())
+                if prefix=='m10v_half_pair_iip_':
+                    iip_object=pair_obj.read_bytes();iip_start=pair_start;iip_size=len(pair_code);iip_symbols=pair_symbols
                 image+=bytes(pair_start-base-len(image))+pair_code;symbols.update(pair_symbols)
         settings_report = None
         zoom_report = None
@@ -766,7 +777,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             def pair_bl(at,target):return 0xeb000000|(((target-at-8)>>2)&0xffffff)
             pair_calls=[at for at in range(chain_base,chain_base+len(chain)-3,4) if struct.unpack_from('<I',chain,at-chain_base)[0]==pair_bl(at,symbols['m10v_half_pair_camera'])]
             if len(pair_calls)!=1:raise ValueError('half-pair JPEG handoff differs')
-            half_pair_report={'enabled':True,'schema':'m10v-half-pair/v1','handoff':{'callsite':pair_calls[0],'target':symbols['m10v_half_pair_camera']},'storage':r'C:\M10V\HALFPAIR.BIN','first_original_preserved':True,'camera_tested':False}
+            half_pair_report={'enabled':True,'schema':'m10v-half-pair/v1','handoff':{'callsite':pair_calls[0],'target':symbols['m10v_half_pair_camera']},'storage':'owned-native-bank','backend':'native-IIP','frame_filesystem_calls':0,'cpu_pixel_reads':0,'cpu_pixel_writes':0,'first_original_preserved':True,'camera_tested':False}
         # All artwork stays inside the appended RTOS ROM, leaving ICONBIN and
         # its fixed flash partition unchanged. Stock directory entries remain exact.
         icon_table = base + len(image)
@@ -974,6 +985,20 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             raise ValueError('border JPEG adapter readback failed')
         border_component['jpeg_handoff']={'callsite':callsites[0],
             'target':symbols['m10v_border_runtime_jpeg'],'original_target':symbols['m10v_capture_library']}
+    if half_pair_enabled:
+        if border_component:
+            pair_guard=border_component['guard']
+        else:
+            from scripts.build_gr3_border_wait_guard import build as build_pair_guard
+            guard_base=(base+len(image)+15)&~15
+            guard_code,pair_guard=build_pair_guard(guard_base,capture_stock_rtos(camera_model),border_enabled=True,internal_guard_research=True,camera_model=camera_model)
+            image+=bytes(guard_base-base-len(image))+guard_code
+            symbols.update(pair_guard['symbols'])
+        iip_code,linked_iip_symbols=link_object(iip_object,iip_start,symbols,'m10v_half_pair_iip_')
+        if len(iip_code)!=iip_size or linked_iip_symbols!=iip_symbols:
+            raise ValueError('IIP forward-link layout changed')
+        image[iip_start-base:iip_start-base+iip_size]=iip_code
+        half_pair_report.update(iip_guard=pair_guard,iip_component={'base':iip_start,'code_bytes':len(iip_code),'code_sha256':sha(iip_code),'symbols':iip_symbols})
     manifest = {'camera_model':camera_model,'schema': 'm10v-gr3-native-film-runtime/v2', 'base': base, 'symbols': symbols,
                 'code_bytes': len(image), 'code_sha256': sha(image), 'film_count': 103, 'slots': 10,
                 'sources': {p: sha((ROOT / p).read_bytes()) for p in
@@ -990,7 +1015,10 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 'abi': 'M10V state184 + explicit semiplanar CbCr422 image + date6',
                 'dependencies': [], 'scratch_max_bytes': 589824}
     if half_pair_report:manifest['half_pair']=half_pair_report
-    if half_pair_enabled:manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_half_pair.c','native/gr3/m10v_half_pair.h','native/gr3/m10v_half_pair_camera.c','native/gr3/m10v_half_pair_camera.h']})
+    if half_pair_enabled:
+        from scripts.build_gr3_border_wait_guard import SOURCES as PAIR_GUARD_SOURCES
+        pair_sources=[*PAIR_GUARD_SOURCES,'native/gr3/m10v_border_fill_plan.h','native/gr3/m10v_border_canvas.h','native/gr3/m10v_border.h','native/gr3/m10v_half_pair_iip.c','native/gr3/m10v_half_pair_iip.h','native/gr3/m10v_half_pair.c','native/gr3/m10v_half_pair.h','native/gr3/m10v_half_pair_camera.c','native/gr3/m10v_half_pair_camera.h']
+        manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in pair_sources})
     if sd_library:
         manifest['custom_isp']={'schema':'m10v-custom-isp/v1','record_offset':6688,'payload_bytes':1572,
             'preview_offset':0x213c,'preview_bytes':0x4000,'storage':'inline TopMenu allocation',

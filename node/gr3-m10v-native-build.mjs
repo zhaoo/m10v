@@ -12,6 +12,7 @@ import {hdfSources,hdfPatches,hdfMenuPatches} from './gr3-digital-hdf.mjs';
 import {hdfAdjPatches} from './gr3-hdf-adj.mjs';
 import { auditGr3Candidate } from './gr3-candidate-audit.mjs';
 import {borderSources,borderPatches} from './gr3-border.mjs';
+import {halfPairIipSources,halfPairIipPatches} from './gr3-half-pair-iip.mjs';
 
 const LOAD = 0x53000000;
 const nativeBases = [0x540b6000, 0x540ba000, 0x540be000];
@@ -51,7 +52,7 @@ const sources = ['native/gr3/m10v_aspect_config.h','native/gr3/m10v_half_frame_i
 sources.push('native/gr3/m10v_film_color_candidates.h','native/gr3/isp-film-targets.json','scripts/build_gr3_isp_film_targets.py','native/gr3/m10v_spatial_accel.c','native/gr3/m10v_spatial_accel.h');
 sources.push('native/gr3/m10v_save_trace.c','native/gr3/m10v_save_trace.h','native/gr3/m10v_capture_raw_lifetime.c','native/gr3/m10v_capture_raw_lifetime.h','scripts/build_gr3_save_trace.py','scripts/build_gr3_capture_lifecycle.py','native/gr3/m10v_capture_lifecycle.c');
 sources.push('native/gr3/m10v_file_trace.c','scripts/build_gr3_file_trace.py');
-const halfPairSources=['native/gr3/m10v_half_pair.c','native/gr3/m10v_half_pair.h','native/gr3/m10v_half_pair_camera.c','native/gr3/m10v_half_pair_camera.h'];
+const halfPairSources=[...halfPairIipSources,'native/gr3/m10v_half_pair.c','native/gr3/m10v_half_pair.h','native/gr3/m10v_half_pair_camera.c','native/gr3/m10v_half_pair_camera.h'];
 sources.push(...hdfSources);
 sources.push('node/gr3-sd-pre-oriented-stamp-contract.json');
 sources.push('native/gr3/m10v_film_identity.h','native/gr3/m10v_unknown_film.rgba','node/gr3-sd-pre-square-art-contract.json');
@@ -82,10 +83,11 @@ function checkRuntime(runtime, manifest) {
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
   const expectedSources=[...new Set([...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[]),...(manifest.border?.enabled?borderSources:[]),...(manifest.half_pair?.enabled?halfPairSources:[])])];
   borderPatches(runtime,manifest);
+  halfPairIipPatches(runtime,manifest);
   if(manifest.half_pair?.enabled){
    const p=manifest.half_pair,h=p.handoff;
    need(manifest.camera_model==='gr3'&&BASE>=0x540be000&&p.schema==='m10v-half-pair/v1'&&p.first_original_preserved===true&&p.camera_tested===false,'half-pair model/provenance differs');
-   for(const n of ['plan','compose','camera','init','reset','select','destroy']){const a=manifest.symbols['m10v_half_pair_'+n];need(Number.isInteger(a)&&!(a&3)&&a>=BASE&&a<BASE+runtime.length,'half-pair API missing: '+n);}
+   for(const n of ['plan','camera','init','reset','select','destroy','iip_ready','iip_copy','iip_compose']){const a=manifest.symbols['m10v_half_pair_'+n];need(Number.isInteger(a)&&!(a&3)&&a>=BASE&&a<BASE+runtime.length,'half-pair API missing: '+n);}
    need(h&&h.target===manifest.symbols.m10v_half_pair_camera&&h.callsite>=manifest.symbols.m10v_chain_capture&&h.callsite+4<=manifest.icons.table&&runtime.readUInt32LE(h.callsite-BASE)===branch(h.callsite,h.target,true),'half-pair JPEG handoff differs');
   }
 
@@ -570,7 +572,7 @@ function patchList(manifest,runtime) {
       {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound primary'},
       {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound secondary'}];
   }
-  return [...(manifest.half_pair?.enabled?[{address:0x531b6be4,expected:0xea026e6e,replacement:branch(0x531b6be4,manifest.symbols.m10v_half_pair_select),name:'Half pair explicit menu cancellation'}]:[]),...borderPatches(runtime,manifest),...zoomPatches(runtime,manifest),...appendedSlotPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
+  return [...(manifest.half_pair?.enabled?[{address:0x531b6be4,expected:0xea026e6e,replacement:branch(0x531b6be4,manifest.symbols.m10v_half_pair_select),name:'Half pair explicit menu cancellation'}]:[]),...borderPatches(runtime,manifest),...halfPairIipPatches(runtime,manifest),...zoomPatches(runtime,manifest),...appendedSlotPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
     replacement:branch(address,manifest.symbols[name],link),name})),
     {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum primary'},
     {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum secondary'},

@@ -69,7 +69,7 @@ class HalfFrameTests(unittest.TestCase):
                 u.hook_add(UC_HOOK_CODE,stop);u.emu_start(entry,aspect.STOP,count=1000)
                 self.assertEqual(seen,[leaf]);ptr=u.reg_read(reg)
                 header=bytes(u.mem_read(ptr,8));text=bytes(u.mem_read(struct.unpack_from('<I',header,4)[0],header[0]*2)).decode('utf-16le').rstrip('\0')
-                self.assertEqual(text,'Half 3:4')
+                self.assertEqual(text,'Half')
 
     def test_preview_draws_vertical_mask_matching_the_aligned_photo(self):
         for width,height,mask in [(720,480,181),(360,240,91)]:

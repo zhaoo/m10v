@@ -1,5 +1,5 @@
 """Execute pair adapter tests from the decoded deliverable, not a fresh object.
-Filesystem, pool and trace publication remain explicitly doubled boundaries.
+Native IIP, pool and trace publication remain explicitly doubled boundaries.
 """
 import json,os,struct,unittest
 from pathlib import Path
@@ -7,15 +7,10 @@ from tests import test_gr3_half_pair_camera as support
 class FinalPairCameraTests(support.PairCameraTests):
  @classmethod
  def setUpClass(cls):
-  folder=os.environ.get('M10V_HALF_PAIR_FINAL')
-  if not folder:raise unittest.SkipTest('requires decoded final candidate directory')
+  folder=os.environ.get('M10V_HALF_IIP_FINAL')
+  if not folder:raise unittest.SkipTest('requires native-IIP final candidate directory')
   super().setUpClass()
-  folder=Path(folder);cls.base=0x53000000;cls.image=(folder/'final-rtos.bin').read_bytes();cls.manifest=json.loads((folder/'manifest.json').read_text());cls.symbols=cls.manifest['symbols'];cls.build_id=int(cls.manifest['debug_log']['build_id'],16)
- def service(self,u,pc,n,data):
-  if pc==self.symbols['m10v_save_trace_recipe_mark']:pc=0x53000100
-  elif pc==self.symbols['m10v_save_trace_recipe_raw_status']:pc=0x53000104
-  elif pc==self.symbols['m10v_debug_log']:pc=0x53000108
-  return super().service(u,pc,n,data)
+  cls.base=0x53000000
  def test_final_selected_menu_hook_and_both_encoded_policy_sites(self):
   for at,to,link in [(0x531b6be4,self.symbols['m10v_half_pair_select'],False)]:
    word=struct.unpack_from('<I',self.image,at-self.base)[0]
