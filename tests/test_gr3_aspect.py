@@ -23,6 +23,9 @@ class AspectTests(unittest.TestCase):
         cls.code.extend(bytes(0x10ba000-len(cls.code)))
         blob = bytes.fromhex(template['program_hex'])
         cls.code[template['base_va']-BASE:template['base_va']-BASE+len(blob)] = blob
+        # Model the retained component's native LiveView setup table patch,
+        # in addition to loading its program blob, before strict overlay checks.
+        struct.pack_into('<I',cls.code,0x53b2fa48-BASE,0x540b7bf4)
         script = ROOT/'scripts/gr3_aspect_overlay.py'
         cls.entries = {}
         if script.exists():

@@ -1,10 +1,10 @@
-"""Native 3:4 tile derived only from the stock 4:3 tile; old tiles unchanged."""
+"""Literal Half status tile inside the unchanged native GR III ratio frame."""
 import hashlib
 import json
 from pathlib import Path
 import struct
 import subprocess
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -18,12 +18,23 @@ def generate():
     icons=subprocess.check_output(['node','--input-type=module','-e',script],cwd=ROOT)
     original=Image.frombytes('RGBA',(w,h),icons[offset*4:offset*4+w*h*4])
     tile=original.copy()
-    # Equal-size digit cells; retain the native colon, border and alpha.
-    tile.paste(original.crop((32,9,45,29)),(14,9))
-    tile.paste(original.crop((14,9,27,29)),(32,9))
+    # Literal Half avoids confusing the new mode with the existing 4:3 tile.
+    # Keep every pixel outside the native label's 36x26 interior unchanged.
+    font_path=ROOT/'third_party/noto-sans/NotoSans-Bold.ttf'
+    scale=4
+    label=Image.new('RGBA',(36*scale,26*scale),(53,53,54,255))
+    draw=ImageDraw.Draw(label)
+    font=ImageFont.truetype(str(font_path),20*scale)
+    while draw.textbbox((0,0),'Half',font=font)[2]>34*scale:
+        font=ImageFont.truetype(str(font_path),font.size-1)
+    box=draw.textbbox((0,0),'Half',font=font)
+    x=(label.width-(box[2]-box[0]))//2-box[0]
+    y=(label.height-(box[3]-box[1]))//2-box[1]
+    draw.text((x,y),'Half',font=font,fill=(255,255,255,255))
+    tile.paste(label.resize((36,26),Image.Resampling.LANCZOS),(12,7))
     payload=tile.tobytes()
-    return tile,payload,{'schema':'m10v-half-frame-icon/v1','label':'3:4','width':w,'height':h,
-        'stock_frame_icon':339,'iconbin_sha256':hashlib.sha256(icons).hexdigest(),
+    return tile,payload,{'schema':'m10v-half-frame-icon/v1','label':'Half','width':w,'height':h,
+        'stock_frame_icon':339,'font':'NotoSans-Bold.ttf','font_sha256':hashlib.sha256(font_path.read_bytes()).hexdigest(),'iconbin_sha256':hashlib.sha256(icons).hexdigest(),
         'sha256':hashlib.sha256(payload).hexdigest()}
 
 if __name__=='__main__':

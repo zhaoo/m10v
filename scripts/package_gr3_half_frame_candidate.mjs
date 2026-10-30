@@ -15,13 +15,13 @@ import {CANDIDATE_NAME,BASE_COMMIT,LOG_FILES,auditHalfPair,validateChecks,packag
 
 const run=promisify(execFile),sha=b=>createHash('sha256').update(b).digest('hex');
 const json=x=>Buffer.from(JSON.stringify(x,null,2)+'\n');
-const input=path.resolve(process.argv[2]||'builds/gr3-half-frame-r5-debug-20261030');
+const input=path.resolve(process.argv[2]||'builds/gr3-half-frame-r6-debug-20261030');
 const read=async n=>JSON.parse(await readFile(path.join(input,n),'utf8'));
 const [receipt,manifest,configuration,options,bin,runtime]=await Promise.all([
  read('receipt.json'),read('manifest.json'),read('configuration.json'),read('options.json'),
  readFile(path.join(input,'fwdc239b.bin')),readFile(path.join(input,'runtime.bin'))]);
 const debug=options.debug_mode===true;
-if(!debug)throw Error('r5 candidate requires diagnostic logging');
+if(!debug)throw Error('r6 candidate requires diagnostic logging');
 const name=CANDIDATE_NAME;
 auditHalfPair(manifest,receipt,runtime);
 const validation=await read('validation.json'),checks=validateChecks(validation);
@@ -46,8 +46,10 @@ for(const file of ['native/gr3/m10v_aspect.c','native/gr3/m10v_aspect_hooks.S','
  'native/gr3/m10v_half_pair_camera.c','native/gr3/m10v_half_pair_camera.h','scripts/gr3_aspect_overlay.py','node/gr3-integrated-components.mjs',
  'node/gr3-native-library.mjs','node/gr3-runtime-worker.py','node/gr3-runtime.mjs','node/gr3-m10v-native-build.mjs',
  'node/gr3-native-budget.mjs','scripts/build_gr3_half_frame_candidate.mjs','scripts/package_gr3_half_frame_candidate.mjs','scripts/gr3_half_frame_package_contract.mjs','scripts/gr3_half_frame_package_contract.test.mjs',
+ 'tests/test_gr3_wide_live_compatibility.py','tests/test_gr3_grid_mask_transitions.py',
+ 'tests/test_gr3_half_status_widget.py','tests/test_gr3_live_display_origins.py',
  'tests/test_gr3_live_color_current.py','tests/test_gr3_live_viewport_callers.py','tests/test_gr3_face_detection_aspect.py','scripts/probe_gr3_live_recurrence.py',
- 'tests/test_gr3_half_pair_metadata.py','tests/test_gr3_half_pair_final.py','tests/test_gr3_half_encoded_policy.py','tests/test_gr3_half_live_callers.py','docs/testing/gr3-half-pair-r4-20261030.md','docs/testing/gr3-half-pair-r5-20261030.md',
+ 'tests/test_gr3_half_pair_metadata.py','tests/test_gr3_half_pair_final.py','tests/test_gr3_half_encoded_policy.py','tests/test_gr3_half_live_callers.py','docs/testing/gr3-half-pair-r4-20261030.md','docs/testing/gr3-half-pair-r5-20261030.md','docs/testing/gr3-half-pair-r6-20261030.md',
  'tests/test_gr3_half_pair.py','tests/test_gr3_half_pair_camera.py','tests/test_gr3_aspect_full_callers.py','tests/test_gr3_half_frame.py',
  'tests/test_gr3_aspect.py','tests/test_gr3_aspect_dng.py','tests/test_gr3_aspect_indicator_final.py',
  'docs/superpowers/specs/2026-10-29-gr3-half-frame-design.md','docs/testing/gr3-half-frame-20261029.md',
@@ -60,6 +62,15 @@ const halfRecord=manifest.base; // The overlay precedes this native module.
 const marker=Buffer.from('41374648','hex'),at=rtos.indexOf(marker,0x10bc000);
 if(at<0||at+12>halfRecord-0x53000000||rtos.indexOf(marker,at+1)!==-1||
  rtos.readUInt32LE(at+4)!==receipt.composition.half_frame.resource_id||rtos.readUInt32LE(at+8)!==877)throw Error('Half-frame final binding differs');
+// The ratio-panel caption and private grid alone do not prove the native
+// shooting status widget was connected. Require every new installed route.
+for(const site of [0x531f920c,0x534371e8,0x5366945c]){
+ const word=rtos.readUInt32LE(site-0x53000000),to=site+8+((word<<8)>>6);
+ if((word>>>24)!==0xea||to<0x540bc000||to>=0x540be000)throw Error('Half/wide native UI route missing at '+site.toString(16));
+}
+const gridSetup=rtos.readUInt32LE(0x53b2fa48-0x53000000);
+if(gridSetup<0x540bc000||gridSetup>=0x540be000||gridSetup%4)throw Error('Ratio canvas refresh callback missing');
+if(JSON.parse(await readFile('native/gr3/half-frame-icon.json','utf8')).label!=='Half')throw Error('Literal Half status artwork missing');
 const pack=buildSdFilmPack();auditSdFilmPack(pack);
 const provenance={candidate:name,status:'WAITING_FOR_USER_VALIDATION',model:'GR III',firmware:'2.10',camera_tested:false,
  created_at:new Date().toISOString(),base_commit:BASE_COMMIT,

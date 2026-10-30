@@ -1,6 +1,6 @@
 // Read-only acceptance gates for a local GR III half-pair test package.
 // These establish artifact identity and offline evidence, never camera acceptance.
-export const CANDIDATE_NAME='M10V-GR3-HalfFrame-TEST-20261030-r5-debug';
+export const CANDIDATE_NAME='M10V-GR3-HalfFrame-TEST-20261030-r6-debug';
 export const BASE_COMMIT='84caa3248477ecf36bc197420e4d5963ebab5693';
 export const LOG_FILES=['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN',
  'M10VIO0.BIN','M10VIO1.BIN','M10VAK0.BIN','M10VAK1.BIN'];
@@ -33,11 +33,12 @@ export function validateChecks(validation){
  return validation.checks;
 }
 export function packageReadme({buildId,binSha,officialSha,checks}){
- return `# GR III 半格双拍日志测试包 r5 · 2026-10-30
+ return `# GR III 半格双拍日志测试包 r6 · 2026-10-30
 
 状态：WAITING_FOR_USER_VALIDATION。仅适用于 GR III / 官方 2.10。
 这是新的离线验证候选，设备尚未验收；未发布至 GitHub 或生产环境。
-r5 修正原厂实时预览阶段1/2的处理遗漏、双拍原始分配指针对齐与裁切边界，并增加不依赖溢出队列的218/219/220诊断。r4已通过设备对焦和画幅检查，取景与双拼仍需本包复测。
+r6 修正实机74,907,648字节分配被拒绝的问题，按原厂4064行传感器容量校验；接入原生状态栏并明确显示Half；16:9沿用完整3:2实时缓冲，再以显示遮罩呈现宽幅。成片仍是16:9，Half拍摄几何和原生ISP保持原有合同。
+r5开机闪烁已获设备确认消失；16:9偶发闪烁和中间残影，以及双拼与标签，仍需本候选实测。
 
 ## 安装与验证
 

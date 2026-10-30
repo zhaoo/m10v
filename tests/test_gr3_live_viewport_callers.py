@@ -12,11 +12,11 @@ from unicorn import UC_PROT_ALL
 from scripts.analyze_gr3_border_iip import OriginalArm
 
 ORIGINAL=Path('builds/gr3-extension-validation/official-rtos.bin')
-CANDIDATE=Path(os.environ.get('M10V_VIEWPORT_RTOS','builds/gr3-half-frame-r4-debug-final-20261030/final-rtos.bin'))
+CANDIDATE=Path(os.environ.get('M10V_VIEWPORT_RTOS','builds/gr3-half-frame-r5-debug-final-20261030/final-rtos.bin'))
 OWNER,PROFILE,ROOT,MODEL=0x55200000,0x55210000,0x55220000,0x55230000
 
 
-def fixture(candidate=False,raw=0,scanmode=0):
+def fixture(candidate=False,raw=0,scanmode=0,kind=0,override=0):
     rom=ORIGINAL.read_bytes();p=OriginalArm(rom)
     if candidate:
         installed=CANDIDATE.read_bytes()
@@ -26,8 +26,9 @@ def fixture(candidate=False,raw=0,scanmode=0):
         p.u.mem_write(0x53000000,installed)
     p.words(OWNER+0xa0,PROFILE);p.words(ROOT,MODEL)
     p.u.mem_write(PROFILE+5,bytes([scanmode,0]))
+    p.u.mem_write(MODEL+0x6c2,b'\1')
     p.boundaries={0x53525d5c:lambda:ROOT,0x5354a778:lambda:raw,
-                  0x53549958:lambda:0,0x53654150:lambda:MODEL,0x53654220:lambda:0}
+                  0x53549958:lambda:kind,0x53654150:lambda:MODEL,0x53654220:lambda:override}
     return p
 
 
@@ -44,8 +45,8 @@ def publish(p):
 
 
 class LiveViewportCallers(unittest.TestCase):
-    def test_real_mapper_and_publisher_preserve_stock_wide_and_native_half_backing_geometry(self):
-        for raw,klass in ((0,0),(2,1),(6,0)):
+    def test_real_mapper_and_publisher_use_full_backing_for_masked_wide_and_half(self):
+        for raw,klass in ((0,0),(2,0),(6,0)):
             for scanmode in range(4):
                 with self.subTest(raw=raw,scanmode=scanmode):
                     p=fixture(True,raw,scanmode)
@@ -59,11 +60,22 @@ class LiveViewportCallers(unittest.TestCase):
                     self.assertEqual(actual,publish(reference))
                     for shape in actual:
                         self.assertTrue(all(0<value<=4096 and not(value&1) for value in shape))
-                    if raw==6:self.assertEqual(actual[0],actual[1])
+                    if raw in(2,6):self.assertEqual(actual[0],actual[1])
                     if raw==2:self.assertEqual(actual[0][0],actual[1][0])
                     self.assertFalse(p.assertions)
                     self.assertFalse(reference.assertions)
 
-    def test_normal_live_wide_publisher_uses_wide_class_instead_of_raw_two(self):
+    def test_normal_live_wide_compatibility_publisher_uses_full_native_backing(self):
         p=fixture(True,2,0);p.call(0x53669424,PROFILE,1)
-        self.assertEqual(publish(p),((640,360),(640,424)))
+        self.assertEqual(publish(p),((640,424),(640,424)))
+
+    def test_movie_and_forced_aspect_keep_native_wide_class_and_storage(self):
+        for kind,override in ((1,0),(0,1),(1,1)):
+            for scanmode in range(4):
+                with self.subTest(kind=kind,override=override,scanmode=scanmode):
+                    p=fixture(True,2,scanmode,kind,override)
+                    r=fixture(False,2,scanmode,kind,override)
+                    self.assertEqual(p.call(0x53669424,PROFILE,1),1)
+                    self.assertEqual(r.call(0x53669424,PROFILE,1),1)
+                    self.assertEqual(publish(p),publish(r))
+                    self.assertFalse(p.assertions);self.assertFalse(r.assertions)

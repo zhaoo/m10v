@@ -15,6 +15,9 @@ const u8 m10v_aspect_values[]={0,3,1,2,4,5,
 6,
 #endif
 };
+/* Keep native classes intact for movie/override consumers. The two real
+ * still-view class loads use live_class() to select full backing only when
+ * the verified still-mask policy is active. */
 const u8 m10v_aspect_classes[]={2,1,3,4,0,
 #if M10V_HALF_FRAME
 0,
@@ -36,11 +39,17 @@ u32 m10v_aspect_current(void) {
 }
 u32 m10v_aspect_mask_active(void) {
     u32 ratio=m10v_aspect_current();
-    if(ratio!=4 && ratio!=5 && !(M10V_HALF_FRAME && ratio==6)) return 0;
+    if(ratio!=4 && ratio!=5 && !(M10V_HALF_FRAME && (ratio==2 || ratio==6))) return 0;
     u32 root=CALL(0x53525d5c,u32 (*)(void))();
     if(!root || !WORD(root,0) || CALL(0x53549958,u32 (*)(u32))(WORD(root,0))==1) return 0;
     u32 manager=CALL(0x53654150,u32 (*)(void))();
     return manager && !CALL(0x53654220,u32 (*)(u32,u32))(manager,0x4a);
+}
+
+/* index is the original table index(raw_id-1), never a native CLASS. */
+u32 m10v_aspect_live_class(u32 index,u32 native_class) {
+    if(M10V_HALF_FRAME && index==1 && m10v_aspect_mask_active()) return 0;
+    return native_class;
 }
 
 /* Exact integer-mm float values only; no VFP state or writable global state. */
@@ -232,11 +241,12 @@ static void aspect_label(u32 view,u32 surface,u32 ratio) {
 }
 void m10v_aspect_draw(u32 view,u32 surface) {
     u32 ratio=m10v_aspect_current();
-    if(ratio!=4 && ratio!=5 && !(M10V_HALF_FRAME && ratio==6)) {
+    if(ratio!=4 && ratio!=5 && !(M10V_HALF_FRAME && (ratio==2 || ratio==6))) {
         CALL(0x540b8000,void (*)(u32,u32))(view,surface);
         aspect_label(view,surface,ratio);
         return;
     }
+    if(M10V_HALF_FRAME && ratio==2 && !m10v_aspect_mask_active()) return;
     if(!view || !surface || !BYTE(view,0x9e)) return;
     u32 *canvas=(u32 *)(view+0x30),*clip=(u32 *)(view+0x64);
     if(canvas[0] || canvas[1] || !((canvas[2]==720&&canvas[3]==480)||(canvas[2]==360&&canvas[3]==240))) return;
@@ -245,16 +255,18 @@ void m10v_aspect_draw(u32 view,u32 surface) {
     graphics=CALL(0x532081ec,u32 (*)(u32))(graphics);
     if(!graphics) return;
     u32 scale=canvas[2]==720?2:1, mask=(ratio==5?40:54)*scale;
+    u32 colour=M10V_HALF_FRAME && ratio==2?1:16; /* Wide framing is opaque black. */
     typedef void (*Draw)(u32,u32,u32 *,u32 *,u32,u32,u32,u32,u32);
     Draw draw=CALL(0x540b88b4,Draw);
     /* Keep the aspect mask; the native view already owns its edge frame. */
+    if(M10V_HALF_FRAME && ratio==2) mask=(canvas[3]-(canvas[3]*3376/4000/2)*2)/2;
     if(M10V_HALF_FRAME && ratio==6) mask=(canvas[2]-canvas[3]*2992/4000+1)/2;
     if(ratio==5 || (M10V_HALF_FRAME && ratio==6)){
-        draw(graphics,surface,canvas,clip,0,0,mask,canvas[3],16);
-        draw(graphics,surface,canvas,clip,canvas[2]-mask,0,mask,canvas[3],16);
+        draw(graphics,surface,canvas,clip,0,0,mask,canvas[3],colour);
+        draw(graphics,surface,canvas,clip,canvas[2]-mask,0,mask,canvas[3],colour);
     }else{
-        draw(graphics,surface,canvas,clip,0,0,canvas[2],mask,16);
-        draw(graphics,surface,canvas,clip,0,canvas[3]-mask,canvas[2],mask,16);
+        draw(graphics,surface,canvas,clip,0,0,canvas[2],mask,colour);
+        draw(graphics,surface,canvas,clip,0,canvas[3]-mask,canvas[2],mask,colour);
     }
     aspect_label(view,surface,ratio);
 }
@@ -319,6 +331,19 @@ u32 m10v_aspect_af_bounds(u32 ratio,u32 crop,u32 *out) {
     if(crop>2) crop=0;
     for(u32 i=0;i<4;i++) out[i]=rects[crop][i];
     return 1;
+}
+
+/* The shooting status widget is refreshed from the immediate UI properties.
+ * The locked capture SettingsModel may lag a menu selection until half-press;
+ * use the same InputPropertyModel getter as the native ratio menu instead. */
+u32 m10v_aspect_status_tile(void) {
+#if M10V_HALF_FRAME
+    u32 root=CALL(0x5320ad88,u32 (*)(void))();
+    u32 model=root?CALL(0x5320b31c,u32 (*)(u32))(root):0;
+    if(model && CALL(0x53245260,u32 (*)(u32))(model)==6)
+        return m10v_aspect_half_record[2];
+#endif
+    return 0;
 }
 
 /* Bound only by the verified integrated composer; zero means no private art. */

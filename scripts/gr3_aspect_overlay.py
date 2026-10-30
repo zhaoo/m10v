@@ -40,6 +40,11 @@ HOOKS = {
     0x540b672c:'af_small_branch',
 }
 
+# Genuine native table loads, separately preimage checked. Values table retains
+# the native wide class for movie and forced-aspect consumers.
+NATIVE_CLASS_HOOKS={0x534371e8:('common_class',0xe7d25003),
+                    0x5366945c:('mapper_class',0x97d34000)}
+
 
 def branch(site, target, link=False):
     delta=target-site-8
@@ -105,7 +110,17 @@ def apply_overlay(rtos,half_frame=True):
         struct.pack_into('<I',rtos,at,value)
 
     for address,name in HOOKS.items(): word(address,branch(address,symbols['m10v_aspect_'+name]))
+    # LiveView property callback table, not the grid's OnDraw vtable. The
+    # unchanged retained wrapper remains callable at540b7bf4. GR IIIx keeps
+    # its original table pointer and redraw lifecycle byte-for-byte.
     if half_frame:
+        word(0x53b2fa48,symbols['m10v_aspect_grid_setup'],0x540b7bf4)
+    if half_frame:
+        for site,(name,preimage) in NATIVE_CLASS_HOOKS.items():
+            word(site,branch(site,symbols['m10v_aspect_'+name]),preimage)
+        # GR III-only shooting-status widget. Preserve the displaced CMP and
+        # verify its exact stock instruction before installing the adapter.
+        word(0x531f920c,branch(0x531f920c,symbols['m10v_aspect_status_icon']),0xe3530003)
         for site,preimage in [(0x53664c60,0xeb00f772),(0x536649f0,0xeb00f80e)]:
             word(site,branch(site,symbols['m10v_aspect_encoded_resolution'],True),preimage)
     # Redirect internal callers, retaining the unchanged implementations for

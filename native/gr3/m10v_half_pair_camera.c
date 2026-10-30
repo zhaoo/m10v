@@ -112,7 +112,14 @@ static int camera_impl(uint32_t context){
  /* Original id5 setter5350d984 keeps the raw allocation token. Its virtual
   * layout5350db3c rounds that token up64 at5350dc48; a valid allocation need
   * not itself be64 aligned. Keep both the owner interval and aligned canvas. */
- if(!ram(backing,capacity)||capacity>73728000u)return result(recipe,-3,backing,capacity);
+ /* GR III2.10 original53510cec reads the sensor (not visible crop)
+  * height at53510d38 and computes3*sensor_stride*sensor_height at53510da8.
+  * The full sensor allocation is6144*4064*3=74,907,648 bytes. The earlier
+  * 4000-row fixture accidentally bounded this by the visible JPEG height.
+  * Capacity is the native allocation receipt frozen in owned recipe+364.
+  * Never re-read sensor/RAW metadata here: RAW may already be released. */
+ const uint32_t native_sensor_capacity=3u*6144u*4064u;
+ if(!ram(backing,capacity)||capacity>native_sensor_capacity)return result(recipe,-3,backing,capacity);
  uint32_t bank=align64(backing),prefix=bank-backing;
  if(prefix>=capacity)return result(recipe,-3,backing,capacity);
  uint32_t cap=capacity-prefix;

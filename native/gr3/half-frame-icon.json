@@ -1,9 +1,11 @@
 {
   "schema": "m10v-half-frame-icon/v1",
-  "label": "3:4",
+  "label": "Half",
   "width": 60,
   "height": 40,
   "stock_frame_icon": 339,
+  "font": "NotoSans-Bold.ttf",
+  "font_sha256": "c976e4b1b99edc88775377fcc21692ca4bfa46b6d6ca6522bfda505b28ff9d6a",
   "iconbin_sha256": "cd74fb2be1ddc975d38444b28d672bffafa4e468586b235a82a00a8b5f319972",
-  "sha256": "3b52de2e0c48978fc4116b8f86d479cb3846506017efff6ab617d05e4b01f7c8"
+  "sha256": "d79873e6cca651599798106be098c2509ef6c71378d0d576db786db1e74b83d0"
 }

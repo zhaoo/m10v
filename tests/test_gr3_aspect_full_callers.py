@@ -33,6 +33,10 @@ class FullAspectCallers(unittest.TestCase):
             struct.pack_into('<I', code, address-BASE, value)
         for site, name in overlay.HOOKS.items():
             word(site, overlay.branch(site, cls.entries['m10v_aspect_'+name]))
+        for site,(name,preimage) in overlay.NATIVE_CLASS_HOOKS.items():
+            self_word=struct.unpack_from('<I',code,site-BASE)[0]
+            if self_word!=preimage:raise AssertionError('native class-load preimage differs')
+            word(site,overlay.branch(site,cls.entries['m10v_aspect_'+name]))
         report = json.loads((ROOT/'.runtime/grlife-current/reconstruction/firmware_store/templates/urban160-link-report.json').read_text())
         redirects = {'gr_dng_default_crop_tags':'dng_tags','open_gate_mask_is_active':'mask_active',
                      'draw_overlay':'draw','gr3_sro_af_bounds_test02':'af_bounds',
@@ -137,13 +141,13 @@ class FullAspectCallers(unittest.TestCase):
                         self.assertGreater(w,0);self.assertGreater(h,0)
                         self.assertLessEqual(x+w,720);self.assertLessEqual(y+h,480)
 
-    def test_full_live_refresh_raw_two_preserves_native_wide_rectangle(self):
+    def test_full_live_refresh_raw_two_uses_same_full_backing_in_common_and_focus(self):
         # This is the actual common caller; its r5 is CLASS, not raw ratio.
-        # raw2 -> class1 branches straight to mode2 at5343725c, bypassing
-        # the existing common_dispatch hook at540b92d0 entirely.
+        # raw2 -> class0 now shares the verified nativefull backing with Half.
+        # The16:9 crop is a displaymask; no mode2 source recrop is permitted.
         for mag,q13 in ((0x3f800000,0x2000),(0x3fa00000,0x2800),(0x3fe49249,0x38f6)):
-            for path in ('common','focus'):
-                with self.subTest(mag=hex(mag),path=path):
+            for path,kind,override in __import__('itertools').product(('common','focus'),(0,1),(0,1)):
+                with self.subTest(mag=hex(mag),path=path,kind=kind,override=override):
                     u,events=self.device(2,mag)
                     u.reg_write(A.UC_ARM_REG_C1_C0_2,0xf00000)
                     u.reg_write(A.UC_ARM_REG_FPEXC,0x40000000)
@@ -159,8 +163,8 @@ class FullAspectCallers(unittest.TestCase):
                     u.mem_write(context+0x24,struct.pack('<4I',*focal))
                     u.mem_write(context+0x54,struct.pack('<4I',*wide))
                     returns={0x536659ac:owner,0x53666200:0,0x5366632c:0,
-                             0x53525d5c:root,0x5354a778:2,0x53549958:0,
-                             0x53654150:RAM+0x12000,0x53654220:0,
+                             0x53525d5c:root,0x5354a778:2,0x53549958:kind,
+                             0x53654150:RAM+0x12000,0x53654220:override,
                              0x536ae71c:0,0x536ae870:1}
                     def boundary(m,address,size,data):
                         if address==0x5354a7bc:
@@ -169,11 +173,12 @@ class FullAspectCallers(unittest.TestCase):
                         elif address in returns:
                             m.reg_write(A.UC_ARM_REG_R0,returns[address])
                             m.reg_write(A.UC_ARM_REG_PC,m.reg_read(A.UC_ARM_REG_LR))
+                    u.mem_write(RAM+0x12000+0x6c2,b'\1') # Original forcedwide class.
                     u.hook_add(UC_HOOK_CODE,boundary)
                     if path=='common':
                         self.run_entry(u,0x53437170)
                     else:
-                        u.mem_write(owner+0x751,b'\1') # raw2 native class1
+                        self.run_entry(u,0x53669424,owner+0x74d,1) # Actual source class mapper.
                         u.mem_write(owner+0x756,b'\0')
                         u.mem_write(owner+0x758,struct.pack('<I',q13))
                         u.mem_write(owner+0xa94,struct.pack('<I',context))
@@ -181,7 +186,7 @@ class FullAspectCallers(unittest.TestCase):
                         u.emu_start(0x53445054,0x53445088,count=50000)
                         self.assertEqual(u.reg_read(A.UC_ARM_REG_PC),0x53445088)
                     self.assertFalse(events)
-                    expected=wide
+                    expected=wide if kind==1 or override else native if q13==0x2000 else focal
                     self.assertEqual(struct.unpack('<4I',u.mem_read(context+0x64,16)),expected)
 
 

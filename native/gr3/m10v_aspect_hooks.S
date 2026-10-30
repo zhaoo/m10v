@@ -12,6 +12,34 @@ m10v_aspect_\name:
     ldr pc, =\address
 .endm
 
+#if M10V_HALF_FRAME
+/* Displaced native class loads. Both register/flag contracts are unchanged;
+ * only raw2 normal-still class1 becomes full-backing class0. Movie and native
+ * forced-aspect overrides retain their original class, then normal dispatch. */
+entry common_class
+    ldrb r5,[r2,r3]
+    push {r0-r4,r6,ip,lr}
+    mrs r6,apsr
+    mov r0,r3
+    mov r1,r5
+    bl m10v_aspect_live_class
+    mov r5,r0
+    msr apsr_nzcvq,r6
+    pop {r0-r4,r6,ip,lr}
+    jump 0x534371ec
+entry mapper_class
+    bhi 1f
+    ldrb r4,[r3,r0]
+    push {r0-r3,r5,r6,ip,lr}
+    mrs r6,apsr
+    mov r1,r4
+    bl m10v_aspect_live_class
+    mov r4,r0
+    msr apsr_nzcvq,r6
+    pop {r0-r3,r5,r6,ip,lr}
+1:  jump 0x53669460
+#endif
+
 entry label
     cmp r1,#2
     beq m10v_aspect_wide_id
@@ -341,6 +369,60 @@ entry text_draw
     pop {r0,r1,r2,r3,ip,lr}
     push {ip,lr}
     jump 0x540b8bc8
+
+#if M10V_HALF_FRAME
+/* The native LiveView property-setup callback, never the OnDraw callback.
+ * Every active private ratio needs a fresh parent canvas even when two ratios
+ * share the same native class, full-frame geometry and custom grid vtable.
+ * Preserve the legacy return registers, including its invalidation tail-call
+ * return, and post-call IP/flags while publishing additional invalidation. */
+entry grid_setup
+    push {r0,r1,r2,r3,r4,r5,r6,lr}
+    mov r4,r0
+    mov r5,r1
+    mov r6,r2
+    bl legacy_grid_setup
+    stm sp,{r0,r1,r2,r3}
+    mrs r3,apsr
+    push {r3,r7,ip,lr}
+    cmp r4,#0
+    beq 1f
+    cmp r5,#1
+    bne 1f
+    cmp r6,#0
+    beq 1f
+    bl m10v_aspect_mask_active
+    cmp r0,#0
+    beq 1f
+    ldr r0,[r4,#0x160]
+    cmp r0,#0
+    beq 1f
+    ldr r1,[r4,#0x15c]
+    bl invalidate_grid_canvas
+1:  pop {r3,r7,ip,lr}
+    msr apsr_nzcvq,r3
+    pop {r0,r1,r2,r3,r4,r5,r6,pc}
+legacy_grid_setup:
+    jump 0x540b7bf4
+invalidate_grid_canvas:
+    jump 0x540b9554
+#endif
+
+/* Native shooting status widget, after its unchanged mode/visibility checks.
+ * Its model+14 is a reduced native enum and cannot identify private Half.
+ * Override Half only from immediate UI properties, retaining every other
+ * native ratio mapping and the original icon setting/show code. */
+entry status_icon
+    push {r0,r1,r2,r3,ip,lr}
+    bl m10v_aspect_status_tile
+    cmp r0,#0
+    beq 1f
+    str r0,[sp,#8]
+    pop {r0,r1,r2,r3,ip,lr}
+    jump 0x531f922c
+1:  pop {r0,r1,r2,r3,ip,lr}
+    cmp r3,#3
+    jump 0x531f9210
 
 entry af_bounds_branch
     cmp r0,#2

@@ -152,12 +152,82 @@ class PairCameraTests(unittest.TestCase):
   # Execute our adapter using ORIGINAL computed addresses; stop at unavailable
   # FS before reading any photo bytes. Stage-6 proves topology was admitted.
   self.u.mem_map(0x62000000,0x8000000)
-  self.put(self.recipe+0x304,raw_bank);self.put(self.recipe+0x364,73728000)
+  self.put(self.recipe+0x304,raw_bank);self.put(self.recipe+0x364,74907648)
   desc=[1,*final['planes'],2992|(4000<<16),6144|(4000<<16),0,2]
   for off in (0x70,0xb0,0x110):self.words(self.recipe+off,*desc)
   self.put(self.state+8,1);self.put(0x55001014,0)
   self.assertEqual(self.capture(),-6)
   self.assertTrue(any(e[0]==218 and e[2]==0xfffffffa for e in self.events))
+ def test_original_arm_sensor_capacity_includes_4064_rows(self):
+  from scripts.probe_gr3_border_encoded_bank import setup,RECIPE
+  rom=(ROOT/'builds/gr3-extension-validation/official-rtos.bin').read_bytes()
+  expected={4000:73728000,4064:74907648}
+  for sensor_rows,capacity in expected.items():
+   p=setup(rom,0,6000,4000);p.u.mem_write(RECIPE+0x5004,struct.pack('<H',sensor_rows));p.u.mem_write(RECIPE+0x252,struct.pack('<H',6144));p.call(0x53510cec,RECIPE)
+   self.assertEqual(p.call(0x5350d47c,RECIPE,5),capacity);self.assertEqual(capacity,3*6144*sensor_rows);self.assertEqual(p.assertions,[])
+ def configure_actual_device_bank(self,width=2,height=2):
+  old=bytes(self.u.mem_read(self.recipe,0x7000));self.u.mem_map(0x5c000000,0x100000);self.recipe=0x5c000028;self.context=self.recipe+0x9b8;self.u.mem_write(self.recipe,old)
+  for off,value in ((0x30,self.recipe+0x1a8),(0x3c,self.recipe+0xb0),(0x40,self.recipe+0xd0),(0x44,self.recipe+0xf0),(0x48,self.recipe+0x110),(0x4c,self.recipe+0x130)):self.put(self.context+off,value)
+  self.u.mem_map(0x62000000,0x8000000);self.bank=0x6211a940;self.scratch=0x68000000
+  self.put(self.recipe+0x304,self.bank);self.put(self.recipe+0x364,74907648)
+  self.descriptor=[1,0x621f2f20,0x63a3af60,0,width|(height<<16),6144|(4000<<16),0,2]
+  for off in (0x70,0xb0,0x110):self.words(self.recipe+off,*self.descriptor)
+  self.put(self.recipe+0x60,0xa2aeca70);self.put(self.recipe+0x230,0x55005000);self.u.mem_write(0x55005000,struct.pack('<HH',6144,4064))
+  # Deliberately leave sensor-info pointer UNMAPPED; admission consumes only
+  # the native allocation receipt and never dereferences released metadata.
+  self.put(self.recipe+0x23c,0x90000000)
+ def test_actual_capacity_owner_and_cropped_addresses_complete_two_shots(self):
+  self.configure_actual_device_bank();y,c=self.descriptor[1:3]
+  self.u.mem_write(y,bytes([20,21]));self.u.mem_write(y+6144,bytes([22,23]));self.u.mem_write(c,bytes([70,180]));self.u.mem_write(c+6144,bytes([71,181]))
+  self.assertEqual(self.capture(),1);record=next(iter(self.files.values()));self.assertEqual(record[40:],bytes([20,21,22,23,70,180,71,181]))
+  self.u.mem_write(y,bytes([90,91]));self.u.mem_write(y+6144,bytes([92,93]));self.u.mem_write(c,bytes([100,130]));self.u.mem_write(c+6144,bytes([101,131]))
+  self.assertEqual(self.capture(),2);out=struct.unpack('<8I',self.u.mem_read(self.recipe+0xb0,32));self.assertEqual(out[1],0x6211a940);self.assertEqual(bytes(self.u.mem_read(out[1],4)),bytes([20,21,90,91]));self.assertEqual(self.freed,[0x68000000]);self.assertEqual(self.handles,{})
+ def test_exact_full_device_descriptor_and_released_metadata_reach_transaction(self):
+  self.configure_actual_device_bank(2992,4000);self.put(self.recipe+0x60,0);self.put(self.recipe+0x230,0x90000004);self.put(self.state+8,1);self.put(0x55001014,0)
+  self.assertEqual(self.capture(),-6)
+  self.assertTrue(any(e==[219,0x6211a940,74907648,0x621f2f20,0x63a3af60] for e in self.events))
+  self.assertTrue(any(e==[220,self.recipe,2992|(4000<<16),6144|(4000<<16),0] for e in self.events))
+ def test_oversized_unowned_capacity_is_rejected_before_pixels_or_io(self):
+  self.put(self.recipe+0x364,3*6144*4064+4);self.put(self.state+8,1);self.assertEqual(self.capture(),-3);self.assertFalse(self.allocations)
+ def test_original_native_preview_and_jpeg_setup_pass_every_admission_guard(self):
+  import sys
+  sys.path.insert(0,str(ROOT/'scripts'))
+  from border_backresize_contract import fragment,image
+  from scripts.probe_gr3_border_encoded_bank import setup,RECIPE,SI
+  rom=(ROOT/'builds/gr3-extension-validation/official-rtos.bin').read_bytes()
+  p=setup(rom,0,6000,4000)
+  # Execute the actual original constructor fragment that initializes all
+  # image formats, layout tags and reserved fields. Do not fabricate tag2.
+  fragment(p,0x5350f1d4,0x5350f3f0,{'r4':RECIPE,'r5':0})
+  p.words(RECIPE+0x5c,RECIPE+0x6000)
+  p.u.mem_write(RECIPE+0x252,struct.pack('<H',6144));p.u.mem_write(RECIPE+0x5004,struct.pack('<H',4064))
+  # Encoded sizing uses the original full-aspect policy, matching the paired
+  # candidate's separately checked encoded-only query adapter.
+  p.call(0x53510cec,RECIPE);p.call(0x5350d7e8,RECIPE,4,0x60000000);p.call(0x5350d7e8,RECIPE,5,0x6211a940)
+  module,config=0x55200000,0x55210000
+  p.words(config+0x30,RECIPE+0x1a8,SI,RECIPE+0x6000,RECIPE+0x70,RECIPE+0xb0,RECIPE+0x90,RECIPE+0xd0,RECIPE+0xf0,0x72000000,0x73000000,0)
+  p.words(module+0x8a0c,0x55250000);p.u.mem_write(SI+0xb38,struct.pack('<HH',2992,4000));p.u.mem_write(SI+0x7b6,b'\6')
+  def dims():
+   p.u.mem_write(p.u.reg_read(p.A.UC_ARM_REG_R3),struct.pack('<H',2992));p.u.mem_write(p.read_words(p.u.reg_read(p.A.UC_ARM_REG_SP),1)[0],struct.pack('<H',4000))
+  def margins():
+   for n in (2,3):p.u.mem_write(p.u.reg_read(getattr(p.A,f'UC_ARM_REG_R{n}')),b'\0\0')
+  def thumb():
+   p.u.mem_write(p.u.reg_read(p.A.UC_ARM_REG_R1),struct.pack('<H',160));p.u.mem_write(p.u.reg_read(p.A.UC_ARM_REG_R2),struct.pack('<H',120))
+  # Only private Half size/margins and RTOS transport/cache/wait leaves are
+  # doubles. Constructor, allocation layout, crop, alias and Setup6 run ARM.
+  p.boundaries={0x536a2a30:dims,0x536a2f50:margins,0x536a3008:margins,0x536a2f10:thumb,0x536abd28:lambda:0,0x536a9dd4:lambda:0,0x536a9e8c:lambda:1,0x536bbc30:lambda:0,0x536bbcc0:lambda:0}
+  p.call(0x534ff294,module,config,0);p.call(0x5350e624,RECIPE,6)
+  self.assertEqual(p.assertions,[])
+  views={hex(off):image(p,RECIPE+off) for off in (0x70,0xb0,0xd0,0xf0,0x110)}
+  self.assertEqual(views['0xd0']['geometry'],[720,480,720,480,0,0]);self.assertEqual(views['0xf0']['geometry'],[160,120,160,120,0,0])
+  for off in ('0x70','0xb0','0xd0','0xf0','0x110'):self.assertEqual((views[off]['format'],views[off]['layout']),(1,2))
+  self.assertEqual(views['0xb0']['planes'],[0x621f2f20,0x63a3af60,0])
+  self.configure_actual_device_bank(2992,4000)
+  for off in (0x70,0xb0,0xd0,0xf0,0x110):self.u.mem_write(self.recipe+off,bytes(p.u.mem_read(RECIPE+off,32)))
+  self.u.mem_write(self.recipe+0x130,bytes(p.u.mem_read(RECIPE+0x130,24)))
+  self.put(self.state+8,1);self.put(0x55001014,0)
+  self.assertEqual(self.capture(),-6)
+  self.native_report={'descriptors':views,'jpeg_control130':p.read_words(RECIPE+0x130,6),'native_assertions':p.assertions,'adapter_result':-6,'stop_boundary':'deliberately unavailable FS, after every geometry/RAW/preview/JPEG guard','original_execution':'descriptor constructor5350f1d4..5350f3f0; query53510cec; setters5350d7e8; BackResize534ff294; Setup6via5350e624','doubles':'Half resolution/margins; thumbnail size query; RTOS submit/wait/cache; FS/pool admission','hardware_executed':False}
  def test_pair_status_does_not_depend_on_full_recipe_diagnostic_ring(self):
   self.put(self.recipe+0x477c,32);self.put(self.recipe+0x4780,99)
   self.assertEqual(self.capture(),1);self.assertTrue(any(e[:3]==[218,self.recipe,1] for e in self.events))

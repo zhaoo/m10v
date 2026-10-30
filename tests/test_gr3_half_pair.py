@@ -70,6 +70,21 @@ class HalfPairTests(unittest.TestCase):
             self.assertLessEqual(p.used_bytes,73728000)
             self.assertEqual(p.plane_bytes,p.stride*p.rows)
             self.assertEqual(p.used_bytes,p.plane_bytes*2)
+    def test_full_camera_frame_copies_both_halves_without_color_change(self):
+        w,h=2992,4000;pixels=w*h
+        first=(C.c_uint8*(2*pixels))();second=(C.c_uint8*(2*pixels))()
+        C.memset(C.addressof(first),20,pixels);C.memset(C.addressof(first)+pixels,80,pixels)
+        C.memset(C.addressof(second),90,pixels);C.memset(C.addressof(second)+pixels,140,pixels)
+        p=self.plan(w,h,1,74907648);owner,dest=aligned_buffer(p.used_bytes+64)
+        self.assertEqual(self.lib.m10v_half_pair_compose(C.byref(p),first,second,dest,74907648),1)
+        for row in (0,1,1999,3999):
+            at=dest+row*p.stride
+            self.assertEqual(C.string_at(at,w),bytes([20])*w)
+            self.assertEqual(C.string_at(at+w,w),bytes([90])*w)
+            self.assertEqual(C.string_at(at+p.plane_bytes,w),bytes([80])*w)
+            self.assertEqual(C.string_at(at+p.plane_bytes+w,w),bytes([140])*w)
+            self.assertEqual(C.string_at(at+2*w,p.stride-2*w),bytes([16])*(p.stride-2*w))
+        self.assertEqual(C.string_at(dest+p.used_bytes,64),bytes([0xa5])*64)
     def test_invalid_plans_leave_output_unchanged(self):
         for w,h,o,cap in ((0,2,1,9999),(2,0,1,9999),(3,2,1,9999),(2,3,1,9999),(2994,2,1,73728000),(2,4002,1,73728000),(0xfffffffe,2,1,0xffffffff),(2,0xfffffffe,6,0xffffffff),(2,2,2,9999),(2,2,0,9999),(2,2,1,2047)):
             p=Plan(*([0x12345678]*10));before=bytes(p)
