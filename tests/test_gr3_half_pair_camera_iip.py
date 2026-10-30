@@ -50,7 +50,7 @@ int main(void){printf("%u %u %u %u %u %u",(unsigned)(M10V_SETTINGS_OWNER_BYTES+o
   cls.leave_original=cls.manifest['settings_menu']['exports']['m10v_ab_live_leave_original']
  def setUp(self):
   self.u=u=Uc(UC_ARCH_ARM,UC_MODE_ARM);u.mem_map(0x53000000,(len(self.image)+4095)&~4095);u.mem_write(0x53000000,bytes(self.image));u.mem_map(0x55000000,0x1000000)
-  self.owner=0x550d0000;self.state=self.owner+self.offset;self.manager=0x55004000;self.clock=100
+  self.owner=0x550d0000;self.state=self.owner+self.offset;self.manager=0x55004000;self.clock=100;self.fail_clock=False;self.clock_calls=[]
   self.allocations=[];self.frees=[];self.copies=[];self.compositions=[];self.events=[];self.timeline=[];self.next_token=0x70000004;self.token_step=0x1000000
   self.fail_alloc=False;self.fail_copy=False;self.fail_compose=False;self.ready=True;self.queue_cancel=False;self.sleep_action=None
   self.put(0x55063910,1);self.put(0x55063988,self.owner);self.put(self.owner+0x13bc,self.manifest['settings_menu']['vtable'])
@@ -95,7 +95,13 @@ int main(void){printf("%u %u %u %u %u %u",(unsigned)(M10V_SETTINGS_OWNER_BYTES+o
    self.assertEqual(r[0],self.manager);self.assertEqual(r[2],2);self.allocations.append((r[0],r[1],r[2]));ret=0 if self.fail_alloc else self.next_token
    if ret:self.next_token+=self.token_step;self.timeline.append(('allocate',ret))
   elif pc==0x536a248c:self.assertEqual(r[0],self.manager);self.frees.append(r[1]);self.timeline.append(('free',r[1]))
-  elif pc==0x53050b7c:self.clock+=1;ret=self.clock
+  elif pc==0x53050b7c:
+   self.assertTrue(sp<=r[0]<=0x55ffe000-8,f'operating-time getter requires an owned writable8-byte stack output, got r0={r[0]:#x}')
+   self.assertEqual(bytes(u.mem_read(r[0],8)),bytes(8),'clock output must be initialized')
+   self.clock_calls.append(r[0]);self.clock+=1
+   if self.fail_clock:ret=0xfffffffc
+   else:self.words(r[0],0x1234,self.clock);ret=0 # native order: signed high, low; status0
+
   elif pc==0x532525a4:ret=37
   elif pc==0x536b0a74:
    self.timeline.append(('sleep',r[0]));self.assertTrue(self.get(self.state+4)&1)
@@ -106,6 +112,16 @@ int main(void){printf("%u %u %u %u %u %u",(unsigned)(M10V_SETTINGS_OWNER_BYTES+o
   else:return
   u.reg_write(A.UC_ARM_REG_R0,ret);u.reg_write(A.UC_ARM_REG_PC,u.reg_read(A.UC_ARM_REG_LR))
  def capture(self,exposure):return self.call('m10v_half_pair_camera',exposure[1])
+ def test_clock_native_output_abi_and_low_word_used_without_retaining_stack(self):
+  a=self.expose();self.assertEqual(self.capture(a),1)
+  self.assertEqual(len(self.clock_calls),2)
+  timings=[e for e in self.events if e[0]==222]
+  self.assertEqual(timings[-1][1:4],(a[0],1,1))
+ def test_clock_failure_does_not_abort_first_or_second_jpeg(self):
+  self.fail_clock=True
+  self.assertEqual(self.capture(self.expose(0)),1)
+  self.assertEqual(self.capture(self.expose(1)),2)
+  self.assertEqual(len(self.compositions),1)
  def test_two_distinct_recipes_pair_without_any_mapped_image_memory(self):
   a=self.expose(0);self.assertEqual(self.capture(a),1);first=self.token();self.assertEqual(first,0x70000004);self.assertEqual(self.desc(a[0]+0xb0),a[2]);self.assertEqual(len(self.copies),1)
   b=self.expose(1);self.assertEqual(self.capture(b),2);self.assertEqual(len(self.copies),2);self.assertEqual(len(self.compositions),1)

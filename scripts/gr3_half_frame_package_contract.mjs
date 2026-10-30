@@ -1,6 +1,6 @@
 // Read-only acceptance gates for a local GR III half-pair test package.
 // These establish artifact identity and offline evidence, never camera acceptance.
-export const CANDIDATE_NAME='M10V-GR3-HalfFrame-TEST-20261030-r8-diagnostic';
+export const CANDIDATE_NAME='M10V-GR3-HalfFrame-TEST-20261031-r9-clock-fix';
 export const BASE_COMMIT='84caa3248477ecf36bc197420e4d5963ebab5693';
 export const LOG_FILES=['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN',
  'M10VIO0.BIN','M10VIO1.BIN','M10VAK0.BIN','M10VAK1.BIN'];
@@ -47,14 +47,14 @@ export function validateChecks(validation){
  return validation.checks;
 }
 export function packageReadme({buildId,binSha,officialSha,checks}){
- return `# GR III 半格双拍日志诊断包 r8 · 2026-10-30
+ return `# GR III 半格双拍首张计时接口修复测试包 r9 · 2026-10-31
 
-本包仅定位 r7 首张拍摄死机，不宣称修复完成。新增逐接口探针会增加 SD 日志开销，不能用于性能验收。
+本包修正 r7/r8 首张计时接口错误，尚待实机确认，不宣称修复完成。保留逐接口探针会增加 SD 日志开销，不能用于性能验收。
 
 状态：WAITING_FOR_USER_VALIDATION。仅适用于 GR III / 官方 2.10。
 这是新的离线验证候选，设备尚未验收；未发布至 GitHub 或生产环境。
 用户已确认 r6 的取景闪烁修复；该反馈仅覆盖取景。r6 的双拼没有达到预期，回放慢，旧 SD 首帧暂存和 CPU 整图拼接方案不作为本次交付方案。
-r8 仅增加接口日志，沿用 r7 的原生路径并保留已确认的取景修复，比例菜单和拍摄状态栏统一显示 Half。两张照片各自在原生 ISP 完成色彩处理后，由原生 IIP 空间处理组合双画面；双拼阶段不经 CPU 读写像素，也不经 SD 图像文件暂存。诊断日志仍会写入卡内。
+r9 修正计时接口并保留 r8 探针，沿用原生成像路径并保留已确认的取景修复，比例菜单和拍摄状态栏统一显示 Half。两张照片各自在原生 ISP 完成色彩处理后，由原生 IIP 空间处理组合双画面；双拼阶段不经 CPU 读写像素，也不经 SD 图像文件暂存。诊断日志仍会写入卡内。
 离线构建门禁要求 manifest 与回执明确声明 native-IIP、图像文件调用为 0、CPU 像素读写为 0，并核验真实编码前 ARM 入口；这些检查不能替代实机性能和回放验收。
 
 ## 安装与验证

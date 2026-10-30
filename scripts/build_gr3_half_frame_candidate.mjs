@@ -6,7 +6,7 @@ import {defaultConfiguration} from '../web/gr3/native-library-state.mjs';
 import {auditHalfPair} from './gr3_half_frame_package_contract.mjs';
 const args=process.argv.slice(2),debug_mode=true,positional=args.filter(a=>a!=='--debug');
 if(positional.some(a=>a.startsWith('--')))throw Error('Unknown candidate option');
-const folder=path.resolve(positional[0]||'builds/gr3-half-frame-r8-diagnostic-20261030');
+const folder=path.resolve(positional[0]||'builds/gr3-half-frame-r9-clock-fix-20261031');
 if(positional.length>1)throw Error('usage: node scripts/build_gr3_half_frame_candidate.mjs [--debug] [new-output-directory]');
 try{await stat(folder);throw Error('Candidate directory exists; choose a new directory');}catch(e){if(e.code!=='ENOENT')throw e;}
 const configuration=defaultConfiguration(),options={appended_slots:true,hdf_enabled:true,halation_enabled:true,

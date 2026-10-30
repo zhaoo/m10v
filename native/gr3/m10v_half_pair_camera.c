@@ -30,7 +30,10 @@ static uint32_t align64(uint32_t v){return(v+63u)&~63u;}
 static void copy8(uint32_t *d,const uint32_t *s){for(uint32_t i=0;i<8;i++)((volatile uint32_t *)d)[i]=s[i];}
 static void zero(void *p,uint32_t n){for(uint32_t i=0;i<n;i++)((volatile uint8_t *)p)[i]=0;}
 static int result(uint32_t r,int stage,uint32_t a,uint32_t b){M10V_LOG(218u,r,(uint32_t)stage,a,b);(void)r;(void)a;(void)b;return stage;}
-static uint32_t ticks(void){return ((uint32_t(*)(void))0x53050b7cu)();}
+/* Operating-time SVC writes {signed high, low} to caller-owned8 bytes.
+ * Its scalar result is status (0 success), never elapsed time. Match the
+ * existing capture lifecycle/profile ABI; an unavailable clock cannot fail JPEG. */
+static uint32_t ticks(void){uint32_t time[2]={0,0};int status=((int(*)(uint32_t *))0x53050b7cu)(time);return status?0u:time[1];}
 static session *state(uint32_t owner){uint32_t at=M10V_SETTINGS_OWNER_BYTES+(uint32_t)offsetof(m10v_settings_controller,half_pair);return ram(owner,at+sizeof(session))?(session *)(uintptr_t)(owner+at):0;}
 static uint32_t current_owner(void){if(!(word(0x55063910u)&1u))return 0;uint32_t owner=__atomic_load_n((const uint32_t *)0x55063988u,__ATOMIC_ACQUIRE);session *s=state(owner);return s&&__atomic_load_n(&s->magic,__ATOMIC_ACQUIRE)==MAGIC?owner:0;}
 static uint32_t cookie(const session *s){return MAGIC^s->generation^s->orientation^s->first.token^s->first.manager^s->first.bytes^s->first.d[1]^s->first.d[2]^s->first.d[4]^s->first.d[5];}
