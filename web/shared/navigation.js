@@ -6,7 +6,7 @@ export function navigationItems(pathname = '/') {
   return [
     ['gr3', '/gr3/', 'GR III / IIIx'], ['gr4', '/gr4/', 'GR IV'],
     ['gr2', '/gr2/', 'GR II'], ['sd', path.startsWith('/gr2') ? '/gr2/#sd' : `/${model}/sd-library.html`, 'SD 胶卷'],
-    ['test-packages', '/test-packages/', '测试包'], ['guide', '/guide/', '说明'], ['changelog', '/changelog/', '更新日志'], ['support', '/support/', '支持 M10V'],
+    ['test-packages', '/test-packages/', '测试包'], ['guide', '/guide/', '说明'], ['changelog', '/changelog/', '更新日志'], ['support', '/support/', '打赏'],
   ].map(([id, href, label]) => ({id, href, label, active: id === 'sd' ? sd : !sd && (id === 'gr3' ? path.startsWith('/gr3') : id === 'gr4' ? path.startsWith('/gr4') : id === 'gr2' ? path.startsWith('/gr2') : path.startsWith(`/${id}`))}));
 }
 export function renderNavigation(pathname = '/') {
@@ -31,10 +31,39 @@ export function mountNavigation() {
   header.classList.add('site-header');
   header.replaceChildren(brand);
   header.insertAdjacentHTML('beforeend', renderNavigation(location.pathname));
+  mountSupport(header.querySelector('a[href="/support/"]'));
   if (status) {status.className = 'navigation-source-status'; status.removeAttribute('aria-current'); header.append(status);}
   if (menu) header.append(menu);
   const modelMenu=header.querySelector('.model-menu');
   document.addEventListener('click',event=>{if(!modelMenu.contains(event.target))modelMenu.open=false;});
   modelMenu.addEventListener('keydown',event=>{if(event.key==='Escape'){modelMenu.open=false;modelMenu.querySelector('summary').focus();}});
+}
+function mountSupport(trigger) {
+  trigger.setAttribute('aria-haspopup','dialog');
+  const style=document.createElement('link');style.rel='stylesheet';style.href='/shared/support.css';document.head.append(style);
+  const dialog=document.createElement('dialog');dialog.className='support-dialog';dialog.setAttribute('aria-labelledby','support-title');
+  dialog.innerHTML=`<div class="support-heading"><h2 id="support-title">请我喝杯咖啡</h2><button type="button" class="support-close" aria-label="关闭打赏">×</button></div>
+    <p class="support-thanks">感谢支持 M10V 持续开发，金额随意。</p>
+    <div class="support-switch" role="group" aria-label="支付方式"><button type="button" data-method="alipay" aria-pressed="true">支付宝</button><button type="button" data-method="wechat" aria-pressed="false">微信支付</button></div>
+    <a class="support-image" target="_blank" rel="noopener noreferrer" aria-label="查看收款码原图，新窗口打开"><img alt=""></a>
+    <a class="support-download">保存收款码 ↓</a>
+    <p class="support-note">扫一扫或保存图片后从相册识别<br>自愿打赏，不影响功能使用。</p>`;
+  document.body.append(dialog);
+  const methods={alipay:{name:'支付宝',file:'alipay.jpg'},wechat:{name:'微信支付',file:'wechat.png'}};
+  const select=method=>{
+    const {name,file}=methods[method],url=`/shared/support/${file}`;
+    for(const button of dialog.querySelectorAll('[data-method]'))button.setAttribute('aria-pressed',String(button.dataset.method===method));
+    const image=dialog.querySelector('img');image.src=url;image.alt=`M10V 作者${name}收款码，收款人兆兆（**杰）`;
+    const preview=dialog.querySelector('.support-image');preview.href=url;preview.dataset.method=method;
+    const save=dialog.querySelector('.support-download');save.href=url;save.download=`m10v-${file}`;
+  };
+  let previousOverflow='';
+  const open=()=>{if(dialog.open)return;select('alipay');previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';dialog.showModal();};
+  trigger.addEventListener('click',event=>{event.preventDefault();open();});
+  dialog.querySelector('.support-close').addEventListener('click',()=>dialog.close());
+  dialog.querySelectorAll('[data-method]').forEach(button=>button.addEventListener('click',()=>select(button.dataset.method)));
+  dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();}});
+  dialog.addEventListener('close',()=>{document.body.style.overflow=previousOverflow;trigger.focus();});
+  if(/^\/support\/?$/.test(location.pathname))open();
 }
 if (typeof document !== 'undefined') mountNavigation();
