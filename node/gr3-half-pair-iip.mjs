@@ -63,6 +63,7 @@ export function halfPairIipPatches(runtime,m){
  sourceHashes(m.sources,halfPairIipSources,'central');
  const inside=(at,n=4,lo=m.base,hi=m.base+runtime.length)=>Number.isSafeInteger(at)&&Number.isSafeInteger(n)&&n>0&&at%4===0&&at>=lo&&at+n<=hi;
  const g=pair.iip_guard,c=pair.iip_component;
+ need(!g?.trace_log||(m.debug_mode===true&&g.trace_log===m.symbols.m10v_debug_log),'guard trace logger binding differs');
  need(g?.schema==='m10v-border-guard-component/v1'&&g.enabled===true&&g.internal_research===true&&g.camera_model==='gr3'&&g.original_version==='2.10'&&g.original_rtos_sha256===original&&
   g.mutable_static_bytes===0&&g.tls_bytes===0&&g.hardware_activation===false&&g.pixel_pipeline_enabled===false&&g.firmware_artifact===false&&g.camera_tested===false&&g.model_layout_verified===true&&g.physical_model_support_verified===false&&g.caller_address_ownership_required===true,'guard identity/ownership/evidence contract differs');
  const expectedContract={...JSON.parse(readFileSync(new URL('../scripts/border_recovery_wait_guard_contract.json',import.meta.url),'utf8')),abi_basis_model:'gr3',model:'gr3',firmware:'2.10',rtos_sha256:original};

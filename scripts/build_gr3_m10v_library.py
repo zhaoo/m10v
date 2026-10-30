@@ -964,7 +964,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         border_base=(base+len(image)+15)&~15
         border_code,border_component=build_border_runtime(border_base,capture_stock_rtos(camera_model),
             {name:symbols[name] for name in REUSED},camera_model=camera_model,enabled=True,
-            out_dir=out/'border-runtime')
+            out_dir=out/'border-runtime',trace_log=symbols['m10v_debug_log'] if half_pair_enabled and debug_mode else 0)
         image+=bytes(border_base-base-len(image))+border_code
         symbols.update(border_component['symbols'])
         # Redirect only the owned chain's single capture-library call. The
@@ -991,7 +991,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         else:
             from scripts.build_gr3_border_wait_guard import build as build_pair_guard
             guard_base=(base+len(image)+15)&~15
-            guard_code,pair_guard=build_pair_guard(guard_base,capture_stock_rtos(camera_model),border_enabled=True,internal_guard_research=True,camera_model=camera_model)
+            guard_code,pair_guard=build_pair_guard(guard_base,capture_stock_rtos(camera_model),border_enabled=True,internal_guard_research=True,camera_model=camera_model,trace_log=symbols['m10v_debug_log'] if debug_mode else 0)
             image+=bytes(guard_base-base-len(image))+guard_code
             symbols.update(pair_guard['symbols'])
         iip_code,linked_iip_symbols=link_object(iip_object,iip_start,symbols,'m10v_half_pair_iip_')

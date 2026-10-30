@@ -63,8 +63,8 @@ uint32_t m10v_half_pair_select(uint32_t model,uint32_t raw){uint32_t answer=((ui
 static int protected(const exposure *e,uint32_t a,uint32_t n){return overlap(a,n,e->bank,e->capacity)||overlap(a,n,e->recipe,M10V_SAVE_RECIPE_EXTENDED_BYTES)||overlap(a,n,e->si,0x74270u)||overlap(a,n,e->req,0x3cu)||overlap(a,n,e->raw,e->raw_bytes)||overlap(a,n,e->raw_dims,e->raw_dims?4u:0u)||overlap(a,n,e->owner,0x6300u);}
 static int allocate_frame(owned_frame *f,const exposure *e,uint32_t w,uint32_t h,const owned_frame *other){
  zero(f,sizeof(*f));uint32_t pitch=align64(w),rows=(h+15u)&~15u,plane=pitch*rows;
- f->bytes=2u*plane+63u;f->manager=((uint32_t(*)(void))0x536a2424u)();if(!ram(f->manager,4))return 0;
- f->token=((uint32_t(*)(uint32_t,uint32_t,uint32_t))0x536a27e8u)(f->manager,f->bytes,2u);if(!f->token)return 0;
+ f->bytes=2u*plane+63u;M10V_LOG(223u,20u,e->recipe,f->bytes,0u);f->manager=((uint32_t(*)(void))0x536a2424u)();M10V_LOG(223u,21u,e->recipe,f->manager,0u);if(!ram(f->manager,4))return 0;
+ M10V_LOG(223u,22u,e->recipe,f->manager,f->bytes);f->token=((uint32_t(*)(uint32_t,uint32_t,uint32_t))0x536a27e8u)(f->manager,f->bytes,2u);M10V_LOG(223u,23u,e->recipe,f->token,f->bytes);if(!f->token)return 0;
  if(!ram(f->token,f->bytes)||protected(e,f->token,f->bytes)||(other&&overlap(f->token,f->bytes,other->token,other->bytes))){free_frame(f);return 0;}
  f->d[0]=1;f->d[1]=align64(f->token);f->d[2]=f->d[1]+plane;f->d[4]=w|(h<<16);f->d[5]=pitch|(rows<<16);f->d[7]=2;return 1;
 }
@@ -91,7 +91,7 @@ static int process(exposure *e,session *s,uint32_t context){
  if(overlap(e->bank,e->capacity,e->raw,e->raw_bytes)||overlap(e->bank,e->capacity,r,M10V_SAVE_RECIPE_EXTENDED_BYTES)||overlap(e->bank,e->capacity,e->si,0x74270u)||overlap(e->bank,e->capacity,e->req,0x3c))return result(r,-4,e->bank,e->capacity);
  uint32_t output[8],previews[2][8],next=align64(p.used_bytes);copy8(output,d);output[1]=bank;output[2]=bank+p.plane_bytes;output[4]=p.width|(p.height<<16);output[5]=p.stride|(p.rows<<16);output[6]=0;
  if(!preview(previews[0],r+0xd0u,bank,next,cap,&next)||!preview(previews[1],r+0xf0u,bank,next,cap,&next))return result(r,-5,next,cap);
- if(!m10v_half_pair_iip_ready())return result(r,-15,0,0);
+ M10V_LOG(223u,10u,r,0u,0u);if(!m10v_half_pair_iip_ready())return result(r,-15,0,0);M10V_LOG(223u,11u,r,0u,0u);
  if(s->first.token&&(!frame_valid(&s->first)||s->cookie!=cookie(s)||protected(e,s->first.token,s->first.bytes)))return result(r,-19,s->first.token,s->cookie);
  if(s->first.token&&(s->first.d[4]!=d[4]||s->orientation!=orientation)){M10V_LOG(221u,e->owner,s->generation,s->first.token,4u);clear_first(s);}
  if(!s->first.token){

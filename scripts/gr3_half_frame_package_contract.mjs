@@ -1,6 +1,6 @@
 // Read-only acceptance gates for a local GR III half-pair test package.
 // These establish artifact identity and offline evidence, never camera acceptance.
-export const CANDIDATE_NAME='M10V-GR3-HalfFrame-TEST-20261030-r7-debug';
+export const CANDIDATE_NAME='M10V-GR3-HalfFrame-TEST-20261030-r8-diagnostic';
 export const BASE_COMMIT='84caa3248477ecf36bc197420e4d5963ebab5693';
 export const LOG_FILES=['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN',
  'M10VIO0.BIN','M10VIO1.BIN','M10VAK0.BIN','M10VAK1.BIN'];
@@ -47,25 +47,27 @@ export function validateChecks(validation){
  return validation.checks;
 }
 export function packageReadme({buildId,binSha,officialSha,checks}){
- return `# GR III 半格双拍日志测试包 r7 · 2026-10-30
+ return `# GR III 半格双拍日志诊断包 r8 · 2026-10-30
+
+本包仅定位 r7 首张拍摄死机，不宣称修复完成。新增逐接口探针会增加 SD 日志开销，不能用于性能验收。
 
 状态：WAITING_FOR_USER_VALIDATION。仅适用于 GR III / 官方 2.10。
 这是新的离线验证候选，设备尚未验收；未发布至 GitHub 或生产环境。
 用户已确认 r6 的取景闪烁修复；该反馈仅覆盖取景。r6 的双拼没有达到预期，回放慢，旧 SD 首帧暂存和 CPU 整图拼接方案不作为本次交付方案。
-r7 保留已确认的取景修复，比例菜单和拍摄状态栏统一显示 Half。两张照片各自在原生 ISP 完成色彩处理后，由原生 IIP 空间处理组合双画面；双拼阶段不经 CPU 读写像素，也不经 SD 图像文件暂存。诊断日志仍会写入卡内。
+r8 仅增加接口日志，沿用 r7 的原生路径并保留已确认的取景修复，比例菜单和拍摄状态栏统一显示 Half。两张照片各自在原生 ISP 完成色彩处理后，由原生 IIP 空间处理组合双画面；双拼阶段不经 CPU 读写像素，也不经 SD 图像文件暂存。诊断日志仍会写入卡内。
 离线构建门禁要求 manifest 与回执明确声明 native-IIP、图像文件调用为 0、CPU 像素读写为 0，并核验真实编码前 ARM 入口；这些检查不能替代实机性能和回放验收。
 
 ## 安装与验证
 
 1. 先备份照片、原固件和 M10V 存档，保留已验证的恢复固件。
 2. 按原有更新流程使用 gr3/fwdc239b.bin。SD/M10V/FILMS.M10 为胶卷库；保留自己的自定义胶卷和设置，避免直接覆盖。
-3. 先关闭边框，用 3:2 和 16:9 各拍一张，检查菜单文字、取景颜色、半按对焦与回放。
-4. 选择 Half，保持同一相机方向连续拍两张。第一张仍保存原始单张 JPEG；第二张应保存双画面 JPEG，并在即时回放、相册和导出照片中检查。
-5. 再检查切回其他比例、35/50mm 裁切、RAW+JPEG、已有胶卷、HDF、水印和边框。组合效果未获得设备验收，遇到不兼容布局时应保留普通 JPEG 并记日志，不应损坏照片。
+3. 关闭边框，准备直接测试 Half，无需先拍其他比例。
+4. 本轮只选择 Half 拍一张，随后停止操作；如果卡住，不要反复按键或连续重试，按此前可用的关机/恢复流程处理。第一张仍保存原始单张 JPEG 是实现预期，本轮用于确认它能否完成。请尽快回传全部日志。
+5. 本轮先不测试第二张、边框和组合效果，等首张阶段日志分析后再继续。
 
-每次对照测试使用相同画幅、持机方向和尺寸。两张之间更改这些条件可能重新开始一组。
+本轮只定位第一张，不进行组合效果和速度对照。
 图像暂存仅由本次运行的原生内存所有者管理，不从旧 HALFPAIR.BIN 恢复帧；退出或重启后的组对行为以相机日志和实际结果为准。
-请对照原厂正片或负片检查保存、即时回放和相册切换速度；本包仍含诊断日志，不以未经测量的“流畅”替代性能反馈。
+首张故障定位后再安排原厂速度对照；本诊断包不用于性能验收。
 
 ## 问题回传
 
@@ -73,7 +75,7 @@ r7 保留已确认的取景修复，比例菜单和拍摄状态栏统一显示 H
 
 ${LOG_FILES.map(f=>'- '+f).join('\n')}
 
-文件未生成时不用补齐。附上两次拍摄的 JPEG/RAW、操作顺序、比例、裁切、持机方向、胶卷和边框设置。
+文件未生成时不用补齐。附上本轮实际生成的 JPEG/RAW、操作顺序、比例、裁切、持机方向、胶卷和边框设置。
 日志每通道为 CRC 双页尾窗，继续操作会覆盖较早事件。请保留两页；事件缺失不等于未执行。
 工具 tools/read_gr3_debug_log.py 可离线解码，无需自行处理后再回传。
 

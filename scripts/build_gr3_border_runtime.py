@@ -150,7 +150,7 @@ def _compile_component(base,guard_code,guard_symbols,externals):
     return bytes(code),symbols,sections,subprocess.check_output([compiler,'--version'],text=True).splitlines()[0]
 
 
-def build(base=0x54160000,stock=None,externals=None,camera_model='gr3',enabled=False,out_dir=None):
+def build(base=0x54160000,stock=None,externals=None,camera_model='gr3',enabled=False,out_dir=None,trace_log=0):
     if type(enabled)is not bool:raise ValueError('runtime enabled must be an explicit boolean')
     disabled={'schema':'m10v-border-runtime-component/v1','enabled':False,'code_bytes':0,
         'symbols':{},'patches':[],'installed_software_layer':False,'hardware_activation':False,
@@ -172,7 +172,7 @@ def build(base=0x54160000,stock=None,externals=None,camera_model='gr3',enabled=F
         if struct.unpack_from('<I',stock,at-guard.RTOS_BASE)[0]!=expected:
             raise ValueError('runtime hook preimage differs at '+hex(at))
     source_hashes=_source_hashes()
-    guard_code,guard_report=guard.build(base,stock,border_enabled=True,internal_guard_research=True,camera_model=camera_model)
+    guard_code,guard_report=guard.build(base,stock,border_enabled=True,internal_guard_research=True,camera_model=camera_model,trace_log=trace_log)
     if set(guard_report['symbols'])&set(externals):raise ValueError('caller must not duplicate standalone guard exports')
     code,symbols,sections,compiler=_compile_component(base,guard_code,guard_report['symbols'],externals)
     if _source_hashes()!=source_hashes:raise ValueError('border component sources changed during compilation; rebuild a stable snapshot')

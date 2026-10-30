@@ -49,7 +49,7 @@ class HalfPairIipTests(unittest.TestCase):
      if name.startswith('m10v_half_pair_iip_') and info&15==2:symbols[name]=value
   cls.pair_code=bytes(code);cls.syms={**cls.syms,**symbols}
  def setUp(self):
-  self.copy_calls=[];self.cache_calls=[];self.fail_heap=False
+  self.copy_calls=[];self.cache_calls=[];self.fail_heap=False;self.probes=[];self.complete_wait=False
   if self.final_image is None:
    harness.BorderRuntimeArmTests.setUp(self);self.u.mem_map(PAIR_BASE,65536);self.u.mem_write(PAIR_BASE,self.pair_code)
   else:
@@ -103,6 +103,11 @@ class HalfPairIipTests(unittest.TestCase):
    self.assertEqual(self.word(self.syms['m10v_half_pair_iip_copy']),struct.unpack_from('<I',self.final_image,self.syms['m10v_half_pair_iip_copy']-0x53000000)[0])
  def descriptor(self,at,w,h,s,rows,y,c,fmt=1):self.put(at,fmt,y,c,0,w|(h<<16),s|(rows<<16),0,2)
  def hook(self,u,pc,size,data):
+  if pc==0x536a9e8c and self.complete_wait:
+   if self.reg(2):self.put(self.reg(2),self.reg(1))
+   self.ret(1);return
+  if pc==self.syms.get('m10v_debug_log'):
+   self.probes.append((self.reg(0),self.reg(1)));self.ret(1);return
   if pc in (0x534ab1a4,0x534ab60c):self.cache_calls.append((pc,bytes(u.mem_read(self.reg(1),32))));self.ret(0);return
   if pc==0x536aa34c:self.events.append('client-destroy');self.ret(1);return
   if pc==0x5369a948:
@@ -125,6 +130,9 @@ class HalfPairIipTests(unittest.TestCase):
   self.invoke('m10v_half_pair_iip_copy',0x5c000028,self.first,dst)
   self.assertEqual(self.word(self.queue[0]+12),0x010e8006);self.assertEqual(self.word(WORKERS[0]+0x54),0x5c000028);self.assertEqual(self.allocations,[])
   self.finish(1);self.assertEqual([mask for _,mask in self.signals],[0x400]);self.assertEqual(len(self.copy_calls),1);self.assertEqual(len(self.cache_calls),3)
+  if self.final_manifest and self.final_manifest['half_pair']['iip_guard'].get('trace_log'):
+   for phase in (30,33,34,35,36,37,38,39,40,41,42,44,45):self.assertIn((223,phase),self.probes)
+   for phase in (50,51,60,61,70,71,80):self.assertIn((224,phase),self.probes)
  def test_compose_native_fill_two_transfers_two_resizes_and_no_pixel_mapping(self):
   self.invoke('m10v_half_pair_iip_compose',0x5c000028,self.first,self.second,self.output,self.previews,1);self.finish(5)
   self.assertEqual([mask for _,mask in self.signals],[0x10,0x400,0x400,0x40,0x40]);self.assertEqual(self.frees,[HEAP]);self.assertEqual(len(self.copy_calls),2);self.assertEqual(len(self.resize_calls),2)
@@ -152,6 +160,16 @@ class HalfPairIipTests(unittest.TestCase):
     p.boundaries={0x5356284c:lambda:0,0x537e25fc:dma,0x536a9dd4:lambda:0,0x536a9e8c:lambda:1,0x537e29e4:lambda:0}
     p.call(0x5369a948,worker,args)
     self.assertEqual(requests,[(6,(0x60000000,0x64000000),(2992,4000,3008,pitch,0,0,x,y)),(6,(0x61000000,0x66000000),(2992,4000,3008,pitch,0,0,x,y))]);self.assertEqual(p.assertions,[])
+ def test_native_dma_wait_probe_brackets_exact_wait_without_changing_bits(self):
+  client,job,bits=0x55403000,0x55404000,0x55405000;worker=WORKERS[0]
+  self.call('m10v_border_client_construct',client)
+  self.assertEqual(self.call('m10v_border_client_prepare',client,0x03050006,0x400),1)
+  self.put(worker+0x48,client,job,1);self.put(client+60,worker,job);self.put(job+4,client)
+  self.complete_wait=True
+  self.assertEqual(self.call('m10v_border_transfer_wait',worker+0x38,0x03050001,bits,1,worker),1)
+  self.assertEqual(self.word(bits),0x03050001);self.assertEqual(self.word(client+36),1)
+  if self.final_manifest and self.final_manifest['half_pair']['iip_guard'].get('trace_log'):
+   self.assertEqual([p for p in self.probes if p[0]==224],[(224,62),(224,63)])
  def test_each_missing_guard_rejects_before_enqueue(self):
   for at,old,_,_ in HOOKS:
    installed=self.word(at);self.patch(at,old);self.assertEqual(self.call('m10v_half_pair_iip_ready'),0,hex(at));self.assertEqual(self.queue,[]);self.patch(at,installed)

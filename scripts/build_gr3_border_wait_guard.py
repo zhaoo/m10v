@@ -71,7 +71,7 @@ def arm_bl(at,target):
  delta=target-at-8
  if (at|target)&3 or not -(1<<25)<=delta<(1<<25):raise ValueError('guard ARM BL out of range')
  return 0xeb000000|((delta>>2)&0xffffff)
-def _compile(base):
+def _compile(base,trace_log=0):
  compiler,linker=shutil.which('clang'),shutil.which('ld.lld')
  if not compiler or not linker:raise RuntimeError('clang and ld.lld required for internal guard component')
  expected=set(re.findall(r'\b(m10v_border_\w+)\s*\(', (ROOT/SOURCES[1]).read_text()))
@@ -80,7 +80,7 @@ def _compile(base):
   temp=Path(folder);objects=[]
   for i,source in enumerate((SOURCES[0],SOURCES[2])):
    obj=temp/f'guard{i}.o'
-   subprocess.run([compiler,*FLAGS,'-c',str(ROOT/source),'-o',str(obj)],check=True,capture_output=True);objects.append(str(obj))
+   subprocess.run([compiler,*FLAGS,f'-DM10V_BORDER_TRACE_LOG={trace_log}u','-c',str(ROOT/source),'-o',str(obj)],check=True,capture_output=True);objects.append(str(obj))
   link=temp/'guard.ld';link.write_text(f'SECTIONS {{ . = {base}; .text : {{ *(.text*) }} .rodata : {{ *(.rodata*) }} /DISCARD/ : {{ *(.ARM.exidx*) *(.ARM.extab*) *(.comment*) *(.note*) }} }}')
   elf=temp/'guard.elf'
   subprocess.run([linker,'-T',str(link),'--entry=m10v_border_client_construct',*objects,'-o',str(elf)],check=True,capture_output=True)
@@ -108,7 +108,7 @@ def _compile(base):
       symbols[symbol]=value
   if not image or set(symbols)!=expected:raise ValueError('guard exports differ from reviewed header/assembly contract')
  return bytes(image),symbols,ranges,subprocess.check_output([compiler,'--version'],text=True).splitlines()[0]
-def build(base=0x54160000,stock=None,*,border_enabled=False,internal_guard_research=False,camera_model='gr3',out_dir=None):
+def build(base=0x54160000,stock=None,*,border_enabled=False,internal_guard_research=False,camera_model='gr3',out_dir=None,trace_log=0):
  if type(border_enabled)is not bool or type(internal_guard_research)is not bool:raise ValueError('guard and border options must be explicit booleans')
  disabled={'schema':'m10v-border-guard-component/v1','enabled':False,'internal_research':False,
   'code_bytes':0,'symbols':{},'patches':[],'firmware_artifact':False,'hardware_activation':False}
@@ -124,7 +124,8 @@ def build(base=0x54160000,stock=None,*,border_enabled=False,internal_guard_resea
   spans.append({'name':name,'start':start,'end':end,'sha256':locked})
  for at,expected,target,role in HOOKS:
   if struct.unpack_from('<I',stock,at-RTOS_BASE)[0]!=expected:raise ValueError('guard preimage differs at '+hex(at))
- code,symbols,ranges,compiler=_compile(base)
+ if type(trace_log)is not int or (trace_log and (trace_log&3 or not 0x540b6000<=trace_log<base)):raise ValueError('invalid bound trace logger')
+ code,symbols,ranges,compiler=_compile(base,trace_log)
  patches=[]
  for at,expected,target,role in HOOKS:
   replacement=arm_bl(at,symbols[target]) if isinstance(target,str) else target
@@ -137,7 +138,7 @@ def build(base=0x54160000,stock=None,*,border_enabled=False,internal_guard_resea
   'base':base,'code_bytes':len(code),'code_sha256':digest(code),'symbols':symbols,'sections':ranges,
   'patches':patches,'camera_model':camera_model,'original_version':model['version'],'original_rtos_sha256':model['rtos_sha256'],
   'verified_abi_spans':spans,'model_layout_verified':True,'physical_model_support_verified':False,
-  'compiler':compiler,'flags':FLAGS,'sources':{p:digest((ROOT/p).read_bytes()) for p in SOURCES},
+  'trace_log':trace_log,'compiler':compiler,'flags':FLAGS+[f'-DM10V_BORDER_TRACE_LOG={trace_log}u'],'sources':{p:digest((ROOT/p).read_bytes()) for p in SOURCES},
   'contract':contract,'worker_allocations':{'transfer_first':{'stock':0x44,'owned':0x58,'gate_offset':0x54},
    'fill':{'stock':0x58,'owned':0x68},'resize':{'stock':0x48,'owned':0x58},'transfer_second_preserved':0x44},
   'firmware_artifact':False,'hardware_activation':False,'pixel_pipeline_enabled':False,'camera_tested':False,

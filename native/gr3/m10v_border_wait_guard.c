@@ -2,6 +2,14 @@
 _Static_assert(sizeof(m10v_border_fill_rectangle)==12,"native Fill params size");
 _Static_assert(sizeof(m10v_border_fill_bundle)==12,"bundle header size");
 _Static_assert(sizeof(m10v_border_native_client)==76,"private client ABI size");
+#ifndef M10V_BORDER_TRACE_LOG
+#define M10V_BORDER_TRACE_LOG 0u
+#endif
+#if M10V_BORDER_TRACE_LOG
+#define TRACE(p,a,b,c) ((void)((int(*)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t))M10V_BORDER_TRACE_LOG)(224u,(p),(a),(b),(c)))
+#else
+#define TRACE(p,a,b,c) ((void)0)
+#endif
 #define TAIL_TAG 0x42575431u
 #define U(p) ((uint32_t)(uintptr_t)(p))
 typedef struct {uint32_t tag,client,job,active;} transfer_tail;
@@ -24,9 +32,9 @@ int m10v_border_client_prepare(m10v_border_native_client *c,uint32_t event,uint3
  barrier();c->pending=1;barrier();return 1;
 }
 uint32_t m10v_border_client_notify(m10v_border_native_client *c,uint32_t event,uint32_t payload){
- c->inflight++;barrier();
+ c->inflight++;barrier();TRACE(70u,U(c),event,payload);
  uint32_t result=((uint32_t(*)(void*,uint32_t,uint32_t))0x534aab0cu)(c,event,payload);
- barrier();if(owned(c)&&c->pending==1&&event==c->expected_event){c->completed++;c->pending=0;}
+ TRACE(71u,U(c),event,result);barrier();if(owned(c)&&c->pending==1&&event==c->expected_event){c->completed++;c->pending=0;}
  barrier();c->inflight--;barrier();return result;
 }
 int m10v_border_client_done(m10v_border_native_client *c){barrier();return owned(c)&&!c->pending&&!c->inflight;}
@@ -37,7 +45,7 @@ int m10v_border_client_destroy_if_done(m10v_border_native_client *c){
 uint32_t m10v_border_client_wait(void *event,uint32_t mask,uint32_t *bits,uint32_t timeout){
  m10v_border_native_client *c=(m10v_border_native_client*)((uint8_t*)event-4);
  if(!owned(c)||mask!=c->expected_mask)return native_wait(event,mask,bits,timeout);
- uint32_t result=native_wait(event,mask,bits,timeout),consumed=(result==1);
+ TRACE(50u,U(c),mask,timeout);uint32_t result=native_wait(event,mask,bits,timeout);TRACE(51u,U(c),result,c->pending);uint32_t consumed=(result==1);
  while(!m10v_border_client_done(c)){
   if(consumed||c->inflight){yield();continue;}
   c->wait_failures++;yield();
@@ -57,7 +65,7 @@ uint32_t m10v_border_transfer_body(void *w,void *parameters,uint32_t *job){
  transfer_tail *t=tail(w);m10v_border_native_client *c=(m10v_border_native_client*)(uintptr_t)job[1];
  int bind=t->tag==TAIL_TAG&&!t->active&&owned(c)&&c->pending==1&&c->expected_event==0x03050006u&&c->expected_mask==0x400u;
  if(bind){c->worker=U(w);c->job=U(job);t->client=U(c);t->job=U(job);barrier();t->active=1;barrier();}
- uint32_t result=((uint32_t(*)(void*,void*))0x5369a948u)(w,parameters);
+ if(bind)TRACE(60u,U(w),U(c),U(parameters));uint32_t result=((uint32_t(*)(void*,void*))0x5369a948u)(w,parameters);if(bind)TRACE(61u,U(w),U(c),result);
  if(bind){barrier();t->active=0;t->client=0;t->job=0;barrier();}
  return result;
 }
@@ -65,7 +73,7 @@ uint32_t m10v_border_transfer_wait(void *event,uint32_t mask,uint32_t *bits,uint
  transfer_tail *t=tail(w);m10v_border_native_client *c=(m10v_border_native_client*)(uintptr_t)t->client;
  int protect=t->tag==TAIL_TAG&&t->active&&owned(c)&&c->pending==1&&c->worker==U(w)&&c->job==t->job&&
   *(uint32_t*)(uintptr_t)(t->job+4)==U(c)&&event==(uint8_t*)w+0x38&&mask==0x03050001u;
- uint32_t result=native_wait(event,mask,bits,timeout);
+ if(protect)TRACE(62u,U(w),mask,timeout);uint32_t result=native_wait(event,mask,bits,timeout);if(protect)TRACE(63u,U(w),result,bits?*bits:0u);
  if(!protect)return result;
  while(result!=1||!bits||(*bits&mask)!=mask){c->wait_failures++;yield();result=native_wait(event,mask,bits,0xffffffffu);}
  return result;
@@ -236,7 +244,7 @@ uint32_t m10v_border_stage_enter(uint32_t token){
  void *factory=((void*(*)(void))0x5369a0e8u)();
  void *w=(void*)(uintptr_t)u32_at(factory,4);
  if(!w||tail(w)->tag!=TAIL_TAG)return 0;
- uint32_t *gate=(uint32_t*)((uint8_t*)w+0x54);
+ uint32_t *gate=(uint32_t*)((uint8_t*)w+0x54);TRACE(80u,U(w),token,*gate);
  for(;;){uint32_t expected=0;
   if(__atomic_compare_exchange_n(gate,&expected,token,0,__ATOMIC_ACQUIRE,__ATOMIC_RELAXED))return U(w);
   yield();

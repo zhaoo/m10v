@@ -11,7 +11,7 @@ EVENTS={10:'menu.enter.before',11:'menu.enter.after',20:'menu.key.before',21:'me
         70:'detail.change',71:'detail.reset',80:'page.enter.before',81:'page.enter.after',
         82:'page.key.before',83:'page.state.after',84:'page.draw.after',112:'capture.settings',113:'capture.settings.source',114:'capture.highlight.energy',130:'capture.texture',131:'capture.texture.grain',100:'capture.before',101:'capture.after',110:'capture.render.before',111:'capture.render.after',120:'capture.clock'}
 EVENTS.update({85:'ab.disp.route',86:'ab.setup.navigate',87:'ab.switch.result',88:'ab.controller.disp',89:'ab.setup.branch',90:'ab.owner',91:'ab.adj.scope',92:'ab.page.load',93:'ab.page.view',94:'ab.page.enter',95:'ab.raw.packet',96:'ab.navigation.return',99:'ab.navigation.gate'})
-EVENTS.update({218:'half-pair.result',219:'half-pair.bank',220:'half-pair.layout',221:'half-pair.session',222:'half-pair.iip.time'})
+EVENTS.update({218:'half-pair.result',219:'half-pair.bank',220:'half-pair.layout',221:'half-pair.session',222:'half-pair.iip.time',223:'half-pair.probe',224:'half-pair.native-wait.probe'})
 HALF_PAIR_STAGES={0:'entry',1:'first-ready',2:'pair-composed',3:'pending-cancelled',-1:'identity',-2:'topology',-3:'image-layout',-4:'protected-memory',-5:'thumbnail-layout',-6:'filesystem',-7:'first-write',-8:'scratch-unavailable',-9:'pending-read-or-compose',-10:'owner-unavailable',-11:'busy',-12:'pending-reset',-15:'native-iip-not-ready',-16:'native-iip-rejected',-19:'owned-frame-integrity'}
 EVENTS.update({210:'zoom.set.before',211:'zoom.set.after',212:'zoom.native.assert'})
 EVENTS.update({208:'ab.dispatch.physical-down',209:'ab.dispatch.fallback'})
@@ -65,6 +65,10 @@ def page_records(data):
         records.append({'sequence':r[2],'event':r[3],'stage':EVENTS.get(r[3],f'unknown.{r[3]}'),
                         'arguments':list(r[4:8]),'build_id':f'{r[8]:08x}','channel':{1:'menu',2:'capture',3:'io',4:'ab'}[r[9]]})
     for record in records:
+        if record['event'] in (223,224):
+            phase,a,b,c=record['arguments']
+            names={10:'ready.before',11:'ready.after',20:'pool-manager.before',21:'pool-manager.after',22:'frame-alloc.before',23:'frame-alloc.after',30:'copy.enter',33:'gate.before',34:'gate.after',35:'client-construct.before',36:'client-construct.after',37:'source-cache.before',38:'destination-cache.before',39:'cache.after',40:'transfer-prepare.before',41:'transfer-submit.before',42:'transfer-submit.after',44:'destination-cache-post.before',45:'destination-cache-post.after',50:'client-wait.before',51:'client-wait.after',60:'transfer-worker.before',61:'transfer-worker.after',62:'dma-wait.before',63:'dma-wait.after',70:'notify.enter',71:'native-notify.after',80:'gate.observe',100:'transfer-factory.before',101:'transfer-factory.after',102:'fill-factory.before',103:'fill-factory.after',104:'resize-factory.before',105:'resize-factory.after'}
+            record['half_pair_probe']={'phase_id':phase,'phase':names.get(phase,'unknown'),'details':[hex(a),hex(b),hex(c)],'diagnostic_only':True}
         if record['event']==221:
             owner,generation,token,state=record['arguments']
             record['half_pair_session']={'owner':hex(owner),'generation':generation,'owned_token':hex(token),'flags_or_transition':state}

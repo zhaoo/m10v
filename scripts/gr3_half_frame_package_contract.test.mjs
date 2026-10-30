@@ -57,6 +57,7 @@ test('readme binds candidate identity, eight log files and actual checks without
  assert.ok(text.includes('12345678'));assert.ok(text.includes('第一张仍保存原始单张 JPEG'));
  assert.ok(text.includes('设备尚未验收'));assert.ok(text.includes('Final callers：exit 0'));
  assert.ok(!text.includes('403通过'));
+ assert.ok(text.includes('本轮只选择 Half 拍一张'));assert.ok(text.includes('不宣称修复完成'));
  assert.ok(text.includes('native-IIP'));assert.ok(text.includes('旧 SD 首帧暂存和 CPU 整图拼接方案不作为本次交付方案'));
  assert.ok(!text.includes('选择 Half 3:4'));
 });
