@@ -10,7 +10,8 @@ extern void border_recovery_resize_body_hook(void),border_recovery_resize_wait_h
 extern void border_recovery_resize_dma_wait_hook(void),border_recovery_fill_release_hook(void),border_recovery_resize_release_hook(void);
 #define U(p) ((uint32_t)(uintptr_t)(p))
 typedef struct {uint32_t d[8],yn,cn,w,h,stride,rows;} image;
-typedef struct {m10v_border_fill_plan_info fills;image source[2],canvas,preview[2];uint32_t tiles[2][8],scaled[2][8];} composition;
+typedef struct {uint32_t tag,count,bytes;m10v_border_fill_rectangle rectangle;uint32_t d[8];} separator_fill;
+typedef struct {separator_fill separator;m10v_border_fill_plan_info fills;image source[2],canvas,preview[2];uint32_t tiles[2][8],scaled[2][8];} composition;
 static int ram(uint32_t p,uint32_t n){return !(p&3u)&&p>=0x55000000u&&p<0x80000000u&&n<=0x80000000u-p;}
 static uint32_t word(uint32_t p){return *(const volatile uint32_t *)(uintptr_t)p;}
 static void copy8(uint32_t *d,const uint32_t *s){for(uint32_t i=0;i<8u;i++)((volatile uint32_t *)d)[i]=s[i];}
@@ -61,6 +62,20 @@ static int fill_image(composition *p,const image *im){
  }
  p->fills.count=base;return 1;
 }
+/* A film-style center mask keeps the accepted JPEG dimensions and placement.
+ * Native Fill covers the inner edges after both Transfers and before Resize;
+ * no CPU pixels, resampling, larger frame allocation or retained stack pointer. */
+static int separator_plan(composition *p,uint32_t orientation){
+ const image *o=&p->canvas;uint32_t horizontal=orientation==1u||orientation==3u;
+ uint32_t axis=horizontal?o->w:o->h,gap=(divide(axis,25u)+7u)&~7u;
+ if(!gap||gap>=axis)return 0;
+ uint32_t width=horizontal?gap:o->w,height=horizontal?o->h:gap;
+ if(width*height>=0x100000u)return 0;
+ separator_fill *s=&p->separator;s->tag=M10V_BORDER_FILL_BUNDLE_TAG;s->count=1;s->bytes=24;
+ copy8(s->d,o->d);s->d[4]=width|(height<<16);s->d[6]=horizontal?(axis-gap)/2u:((axis-gap)/2u)<<16;
+ s->rectangle.destination=U(s->d);s->rectangle.y=16;s->rectangle.cb=s->rectangle.cr=128;s->rectangle.reserved=0;
+ return 1;
+}
 static void tile(uint32_t d[8],const image *out,uint32_t w,uint32_t h,uint32_t x,uint32_t y){copy8(d,out->d);d[4]=w|(h<<16);d[6]=x|(y<<16);}
 static void fit(uint32_t d[8],const image *source,const image *dest){
  uint32_t w=dest->w,h=divide(source->h*w,source->w);if(h>dest->h){h=dest->h;w=divide(source->w*h,source->h);}w&=~1u;h&=~1u;copy8(d,dest->d);d[4]=w|(h<<16);d[6]=(((dest->w-w)/2u)&~1u)|((((dest->h-h)/2u)&~1u)<<16);
@@ -79,6 +94,7 @@ int m10v_half_pair_iip_compose(uint32_t token,const uint32_t first[8],const uint
   const image *all[5]={&p->source[0],&p->source[1],&p->canvas,&p->preview[0],&p->preview[1]};
   for(uint32_t i=0;i<5u;i++){if(metadata_overlap(U(p),sizeof(*p),all[i])||metadata_overlap(U(first),32,all[i])||metadata_overlap(U(second),32,all[i])||metadata_overlap(U(output),32,all[i])||metadata_overlap(U(previews),64,all[i]))ok=0;for(uint32_t j=0;j<i;j++)if(images_overlap(all[i],all[j]))ok=0;}
  }
+ if(ok)ok=separator_plan(p,orientation);
  if(ok){p->fills.count=0;ok=fill_image(p,&p->canvas)&&fill_image(p,&p->preview[0])&&fill_image(p,&p->preview[1]);p->fills.tag=M10V_BORDER_FILL_BUNDLE_TAG;p->fills.bytes=12u+12u*p->fills.count;}
  if(!ok||!m10v_half_pair_iip_ready()){((void(*)(void*))0x536af2e4u)(p);return 0;}
  uint32_t gate=m10v_border_stage_enter(token);if(!gate){((void(*)(void*))0x536af2e4u)(p);return 0;}
@@ -86,6 +102,7 @@ int m10v_half_pair_iip_compose(uint32_t token,const uint32_t first[8],const uint
  cache_pre(&client,p->source[0].d);cache_pre(&client,p->source[1].d);cache_pre(&client,p->canvas.d);cache_pre(&client,p->preview[0].d);cache_pre(&client,p->preview[1].d);
  if(!m10v_border_fill_bundle_submit(&client,(const m10v_border_fill_bundle *)&p->fills))hold();
  transfer(&client,p->source[0].d,p->tiles[0]);transfer(&client,p->source[1].d,p->tiles[1]);
+ if(!m10v_border_fill_bundle_submit(&client,(const m10v_border_fill_bundle *)&p->separator))hold();
  for(uint32_t i=0;i<2u;i++){
   if(!m10v_border_client_prepare(&client,0x03020002u,0x40u))hold();
   ((void(*)(void*,const void*,const void*,uint32_t))0x534ab6b8u)(&client,p->canvas.d,p->scaled[i],1u);

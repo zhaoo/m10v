@@ -1,6 +1,6 @@
 // Read-only acceptance gates for a local GR III half-pair test package.
 // These establish artifact identity and offline evidence, never camera acceptance.
-export const CANDIDATE_NAME='M10V-GR3-HalfFrame-TEST-20261031-r9-clock-fix';
+export const CANDIDATE_NAME='M10V-GR3-HalfFrame-TEST-20261031-r10-black-separator';
 export const BASE_COMMIT='84caa3248477ecf36bc197420e4d5963ebab5693';
 export const LOG_FILES=['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN',
  'M10VIO0.BIN','M10VIO1.BIN','M10VAK0.BIN','M10VAK1.BIN'];
@@ -15,6 +15,8 @@ export function auditHalfPair(manifest,receipt,runtime){
  /HALFPAIR\.BIN|[\\/]/i.test(p.storage))
   throw Error('Native-IIP half-pair capability/provenance missing; CPU/SD frame path is not accepted');
  if(runtime.includes(Buffer.from('HALFPAIR.BIN','ascii')))throw Error('Native-IIP package contains the retired CPU/SD frame backend');
+ const separator={kind:'black-center-mask',fraction_denominator:25,alignment:8,before_preview_resize:true,canvas_size:'unchanged'};
+ if(Object.entries(separator).some(([k,v])=>p.separator?.[k]!==v||r.separator?.[k]!==v))throw Error('Native center black separator contract missing');
  const h=p.handoff;
  if(!h||!Number.isSafeInteger(h.callsite)||!Number.isSafeInteger(h.target)||
  h.callsite!==r.handoff?.callsite||h.target!==r.handoff?.target||
@@ -47,14 +49,14 @@ export function validateChecks(validation){
  return validation.checks;
 }
 export function packageReadme({buildId,binSha,officialSha,checks}){
- return `# GR III 半格双拍首张计时接口修复测试包 r9 · 2026-10-31
+ return `# GR III 半格双拍中间黑色分隔条测试包 r10 · 2026-10-31
 
-本包修正 r7/r8 首张计时接口错误，尚待实机确认，不宣称修复完成。保留逐接口探针会增加 SD 日志开销，不能用于性能验收。
+r9 首张拍摄、相册回放与双拍拼接已获用户实机确认。r10 新增参考图风格的居中黑色分隔条，约占拼接方向4%，保持输出尺寸，遮盖拼缝两侧少量边缘，不拉伸照片；原生 IIP 填色完成后才生成缩略图。新增黑条仍需本包实机确认。保留日志，会增加 SD 开销。
 
 状态：WAITING_FOR_USER_VALIDATION。仅适用于 GR III / 官方 2.10。
 这是新的离线验证候选，设备尚未验收；未发布至 GitHub 或生产环境。
 用户已确认 r6 的取景闪烁修复；该反馈仅覆盖取景。r6 的双拼没有达到预期，回放慢，旧 SD 首帧暂存和 CPU 整图拼接方案不作为本次交付方案。
-r9 修正计时接口并保留 r8 探针，沿用原生成像路径并保留已确认的取景修复，比例菜单和拍摄状态栏统一显示 Half。两张照片各自在原生 ISP 完成色彩处理后，由原生 IIP 空间处理组合双画面；双拼阶段不经 CPU 读写像素，也不经 SD 图像文件暂存。诊断日志仍会写入卡内。
+r10 保留 r9 计时修正和诊断探针，沿用原生成像路径并保留已确认的取景修复，比例菜单和拍摄状态栏统一显示 Half。两张照片各自在原生 ISP 完成色彩处理后，由原生 IIP 空间处理组合双画面；双拼阶段不经 CPU 读写像素，也不经 SD 图像文件暂存。诊断日志仍会写入卡内。
 离线构建门禁要求 manifest 与回执明确声明 native-IIP、图像文件调用为 0、CPU 像素读写为 0，并核验真实编码前 ARM 入口；这些检查不能替代实机性能和回放验收。
 
 ## 安装与验证
@@ -62,12 +64,12 @@ r9 修正计时接口并保留 r8 探针，沿用原生成像路径并保留已�
 1. 先备份照片、原固件和 M10V 存档，保留已验证的恢复固件。
 2. 按原有更新流程使用 gr3/fwdc239b.bin。SD/M10V/FILMS.M10 为胶卷库；保留自己的自定义胶卷和设置，避免直接覆盖。
 3. 关闭边框，准备直接测试 Half，无需先拍其他比例。
-4. 本轮只选择 Half 拍一张，随后停止操作；如果卡住，不要反复按键或连续重试，按此前可用的关机/恢复流程处理。第一张仍保存原始单张 JPEG 是实现预期，本轮用于确认它能否完成。请尽快回传全部日志。
-5. 本轮先不测试第二张、边框和组合效果，等首张阶段日志分析后再继续。
+4. 选择 Half，保持同方向、尺寸、胶卷连续拍两张。第一张仍保存原始单张 JPEG；第二张应为双拼，检查导出 JPEG、即时回放和相册缩略图中间都有黑条。出现卡住则停止测试，按此前恢复流程处理并回传日志。
+5. 再按需检查横竖持机和不同照片尺寸；本次先关闭边框，独立确认半格黑条。
 
-本轮只定位第一张，不进行组合效果和速度对照。
+中间黑条是 Half 的固定样式，不新增菜单开关。更改方向或照片尺寸会重新开始配对。
 图像暂存仅由本次运行的原生内存所有者管理，不从旧 HALFPAIR.BIN 恢复帧；退出或重启后的组对行为以相机日志和实际结果为准。
-首张故障定位后再安排原厂速度对照；本诊断包不用于性能验收。
+请同时反馈连续拍摄和相册速度；含日志测试包不用于最终性能验收。
 
 ## 问题回传
 

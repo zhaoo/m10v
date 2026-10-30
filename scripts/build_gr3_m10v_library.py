@@ -777,7 +777,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             def pair_bl(at,target):return 0xeb000000|(((target-at-8)>>2)&0xffffff)
             pair_calls=[at for at in range(chain_base,chain_base+len(chain)-3,4) if struct.unpack_from('<I',chain,at-chain_base)[0]==pair_bl(at,symbols['m10v_half_pair_camera'])]
             if len(pair_calls)!=1:raise ValueError('half-pair JPEG handoff differs')
-            half_pair_report={'enabled':True,'schema':'m10v-half-pair/v1','handoff':{'callsite':pair_calls[0],'target':symbols['m10v_half_pair_camera']},'storage':'owned-native-bank','backend':'native-IIP','frame_filesystem_calls':0,'cpu_pixel_reads':0,'cpu_pixel_writes':0,'first_original_preserved':True,'camera_tested':False}
+            half_pair_report={'enabled':True,'schema':'m10v-half-pair/v1','handoff':{'callsite':pair_calls[0],'target':symbols['m10v_half_pair_camera']},'separator':{'kind':'black-center-mask','fraction_denominator':25,'alignment':8,'before_preview_resize':True,'canvas_size':'unchanged'},'storage':'owned-native-bank','backend':'native-IIP','frame_filesystem_calls':0,'cpu_pixel_reads':0,'cpu_pixel_writes':0,'first_original_preserved':True,'camera_tested':False}
         # All artwork stays inside the appended RTOS ROM, leaving ICONBIN and
         # its fixed flash partition unchanged. Stock directory entries remain exact.
         icon_table = base + len(image)

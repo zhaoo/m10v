@@ -49,7 +49,7 @@ class HalfPairIipTests(unittest.TestCase):
      if name.startswith('m10v_half_pair_iip_') and info&15==2:symbols[name]=value
   cls.pair_code=bytes(code);cls.syms={**cls.syms,**symbols}
  def setUp(self):
-  self.copy_calls=[];self.cache_calls=[];self.fail_heap=False;self.probes=[];self.complete_wait=False
+  self.copy_calls=[];self.cache_calls=[];self.fail_heap=False;self.probes=[];self.complete_wait=False;self.fill_images=[]
   if self.final_image is None:
    harness.BorderRuntimeArmTests.setUp(self);self.u.mem_map(PAIR_BASE,65536);self.u.mem_write(PAIR_BASE,self.pair_code)
   else:
@@ -110,6 +110,7 @@ class HalfPairIipTests(unittest.TestCase):
    self.probes.append((self.reg(0),self.reg(1)));self.ret(1);return
   if pc in (0x534ab1a4,0x534ab60c):self.cache_calls.append((pc,bytes(u.mem_read(self.reg(1),32))));self.ret(0);return
   if pc==0x536aa34c:self.events.append('client-destroy');self.ret(1);return
+  if pc==0x5365900c:self.fill_images.append(bytes(u.mem_read(self.word(self.reg(1)),32)))
   if pc==0x5369a948:
    pair=self.reg(1);src,dst=self.word(pair),self.word(pair+4);self.copy_calls.append((bytes(u.mem_read(src,32)),bytes(u.mem_read(dst,32))));self.ret(0);return
   if pc==0x536af2a8 and self.fail_heap:self.allocations.append(self.reg(0));self.ret(0);return
@@ -134,19 +135,45 @@ class HalfPairIipTests(unittest.TestCase):
    for phase in (30,33,34,35,36,37,38,39,40,41,42,44,45):self.assertIn((223,phase),self.probes)
    for phase in (50,51,60,61,70,71,80):self.assertIn((224,phase),self.probes)
  def test_compose_native_fill_two_transfers_two_resizes_and_no_pixel_mapping(self):
-  self.invoke('m10v_half_pair_iip_compose',0x5c000028,self.first,self.second,self.output,self.previews,1);self.finish(5)
-  self.assertEqual([mask for _,mask in self.signals],[0x10,0x400,0x400,0x40,0x40]);self.assertEqual(self.frees,[HEAP]);self.assertEqual(len(self.copy_calls),2);self.assertEqual(len(self.resize_calls),2)
+  self.invoke('m10v_half_pair_iip_compose',0x5c000028,self.first,self.second,self.output,self.previews,1);self.finish(6)
+  self.assertEqual([mask for _,mask in self.signals],[0x10,0x400,0x400,0x10,0x40,0x40]);self.assertEqual(self.frees,[HEAP]);self.assertEqual(len(self.copy_calls),2);self.assertEqual(len(self.resize_calls),2)
   first=struct.unpack('<8I',self.copy_calls[0][1]);second=struct.unpack('<8I',self.copy_calls[1][1]);self.assertEqual(first[6],0);self.assertEqual(second[6],2992)
   self.assertTrue(self.allocations[0]<8192);self.assertEqual(len(self.cache_calls),8)
   fills=[raw for pc,raw in self.body_calls if pc==0x5365900c];self.assertGreater(len(fills),30)
   for raw in fills:
    d=self.word(struct.unpack_from('<I',raw)[0]+16);self.assertLess((d&65535)*(d>>16),0x100000);self.assertEqual(struct.unpack_from('<3H',raw,4),(16,128,128))
+ def test_center_black_separator_is_native_fill_before_both_thumbnail_resizes(self):
+  self.invoke('m10v_half_pair_iip_compose',0x5c000028,self.first,self.second,self.output,self.previews,1)
+  self.finish(6)
+  self.assertEqual([mask for _,mask in self.signals],[0x10,0x400,0x400,0x10,0x40,0x40])
+  fills=[raw for pc,raw in self.body_calls if pc==0x5365900c]
+  descriptor=struct.unpack('<8I',self.fill_images[-1])
+  self.assertEqual(descriptor[4],240|(4000<<16));self.assertEqual(descriptor[6],2872)
+  self.assertEqual(struct.unpack_from('<3H',fills[-1],4),(16,128,128))
+  for source,_ in self.resize_calls:self.assertEqual(struct.unpack('<8I',source)[4],5984|(4000<<16))
+  self.assertLess(self.allocations[0],8192)
+ def test_separator_all_photo_sizes_and_orientations_stays_centered_and_bounded(self):
+  for w,h,gx,gy in ((2992,4000,240,320),(2400,3200,192,256),(1680,2240,136,184),(960,1280,80,104)):
+   for orientation in (1,3,6,8):
+    with self.subTest(size=(w,h),orientation=orientation):
+     self.setUp();pitch=(w+63)&~63;rows=(h+15)&~15
+     self.descriptor(self.first,w,h,pitch,rows,0x60000000,0x61000000)
+     self.descriptor(self.second,w,h,pitch,rows,0x62000000,0x63000000)
+     ow,oh=(2*w,h)if orientation in(1,3)else(w,2*h)
+     self.descriptor(self.output,ow,oh,(ow+63)&~63,(oh+15)&~15,0x64000000,0x66000000)
+     self.invoke('m10v_half_pair_iip_compose',0x5c000028,self.first,self.second,self.output,self.previews,orientation);self.finish(6)
+     d=struct.unpack('<8I',self.fill_images[-1]);sw,sh=d[4]&65535,d[4]>>16;x,y=d[6]&65535,d[6]>>16
+     if orientation in(1,3):self.assertEqual((sw,sh,x,y),(gx,h,(ow-gx)//2,0))
+     else:self.assertEqual((sw,sh,x,y),(w,gy,0,(oh-gy)//2))
+     self.assertLess(sw*sh,0x100000);self.assertEqual((x*2+sw,y*2+sh),(ow,oh));self.assertEqual((x|y|sw|sh)&1,0)
+     for src,_ in self.resize_calls:self.assertEqual(struct.unpack('<8I',src)[4],ow|(oh<<16))
+     self.assertEqual(len(self.copy_calls),2);self.assertEqual(self.frees,[HEAP])
  def test_orientation_bindings_are_native_rectangles(self):
   for orientation,expected in ((1,(0,16)),(3,(16,0)),(6,(16<<16,0)),(8,(0,16<<16))):
    with self.subTest(orientation=orientation):
     self.setUp();self.descriptor(self.first,16,16,64,16,0x60000000,0x61000000);self.descriptor(self.second,16,16,64,16,0x62000000,0x63000000)
     self.descriptor(self.output,32 if orientation<6 else 16,16 if orientation<6 else 32,64,16 if orientation<6 else 32,0x64000000,0x66000000)
-    self.invoke('m10v_half_pair_iip_compose',0x5c000028,self.first,self.second,self.output,self.previews,orientation);self.finish(5)
+    self.invoke('m10v_half_pair_iip_compose',0x5c000028,self.first,self.second,self.output,self.previews,orientation);self.finish(6)
     self.assertEqual(tuple(struct.unpack('<8I',call[1])[6] for call in self.copy_calls),expected)
  def test_original_transfer_body_programs_both_planes_with_rectangle_offsets(self):
   for x,y,pitch,rows in ((2992,0,6016,4000),(0,4000,3008,8000)):
@@ -181,7 +208,7 @@ class HalfPairIipTests(unittest.TestCase):
   self.invoke('m10v_half_pair_iip_compose',0x5c000028,self.first,self.second,self.output,self.previews,1);client=self.active_client;paused=self.u.context_save()
   self.invoke('m10v_border_client_notify',client,0x03050006,0,stack=0x55dfe000);self.assertEqual(self.word(client+36),1);self.assertEqual(self.word(client+44),0);self.assertEqual(self.frees,[]);self.assertEqual(self.word(WORKERS[0]+0x54),0x5c000028);self.u.context_restore(paused)
  def test_every_missing_completion_retains_all_owners(self):
-  for completed in range(5):
+  for completed in range(6):
    with self.subTest(completed=completed):
     self.setUp();self.invoke('m10v_half_pair_iip_compose',0x5c000028,self.first,self.second,self.output,self.previews,1)
     for _ in range(completed):self.dispatch_one()

@@ -4,7 +4,7 @@ import {auditHalfPair,auditHalfCaption,validateChecks,packageReadme,LOG_FILES} f
 function fixture(){
  const runtime=Buffer.alloc(128),base=0x540be000,callsite=base+16,target=base+64;
  runtime.writeUInt32LE((0xeb000000|((target-callsite-8)>>2))>>>0,16);
- const p={enabled:true,schema:'m10v-half-pair/v1',storage:'owned-native-bank',backend:'native-IIP',frame_filesystem_calls:0,cpu_pixel_reads:0,cpu_pixel_writes:0,first_original_preserved:true,camera_tested:false,handoff:{callsite,target}};
+ const p={separator:{kind:'black-center-mask',fraction_denominator:25,alignment:8,before_preview_resize:true,canvas_size:'unchanged'},enabled:true,schema:'m10v-half-pair/v1',storage:'owned-native-bank',backend:'native-IIP',frame_filesystem_calls:0,cpu_pixel_reads:0,cpu_pixel_writes:0,first_original_preserved:true,camera_tested:false,handoff:{callsite,target}};
  return {manifest:{base,half_pair:p},receipt:{composition:{half_pair:structuredClone(p)}},runtime};
 }
 test('accepts pair capability with an actual bounded ARM call',()=>{
@@ -57,7 +57,9 @@ test('readme binds candidate identity, eight log files and actual checks without
  assert.ok(text.includes('12345678'));assert.ok(text.includes('第一张仍保存原始单张 JPEG'));
  assert.ok(text.includes('设备尚未验收'));assert.ok(text.includes('Final callers：exit 0'));
  assert.ok(!text.includes('403通过'));
- assert.ok(text.includes('本轮只选择 Half 拍一张'));assert.ok(text.includes('不宣称修复完成'));
+ assert.ok(text.includes('中间都有黑条'));assert.ok(text.includes('不拉伸照片'));
  assert.ok(text.includes('native-IIP'));assert.ok(text.includes('旧 SD 首帧暂存和 CPU 整图拼接方案不作为本次交付方案'));
  assert.ok(!text.includes('选择 Half 3:4'));
 });
+
+test('black separator capability must match both manifest and receipt',()=>{for(const side of ['manifest','receipt']){const f=fixture(),p=side==='manifest'?f.manifest.half_pair:f.receipt.composition.half_pair;delete p.separator;assert.throws(()=>auditHalfPair(f.manifest,f.receipt,f.runtime),/separator/);}});
