@@ -374,7 +374,7 @@ class SdCameraTests(unittest.TestCase):
   from unicorn.arm_const import UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_R6,UC_ARM_REG_R7,UC_ARM_REG_R8,UC_ARM_REG_R9,UC_ARM_REG_R10,UC_ARM_REG_R11,UC_ARM_REG_R12
   regs=[UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3,UC_ARM_REG_R4,UC_ARM_REG_R5,UC_ARM_REG_R6,UC_ARM_REG_R7,UC_ARM_REG_R8,UC_ARM_REG_R9,UC_ARM_REG_R10,UC_ARM_REG_R11,UC_ARM_REG_R12]
   for name,target,outreg in [('primary',0x53396700,UC_ARM_REG_R7),('secondary',0x5339710c,UC_ARM_REG_R3)]:
-   for resource in range(1007,1007):
+   for resource in (*range(1007,1012),*range(1111,1116)):
     u=self.u;seen=[];sp=0x550fe000
     def stop(uc,pc,size,data):
      if pc==target:seen.append(pc);uc.emu_stop()
@@ -391,3 +391,42 @@ class SdCameraTests(unittest.TestCase):
     for r in regs:
      if r not in ([UC_ARM_REG_R0,UC_ARM_REG_R3,UC_ARM_REG_R7,UC_ARM_REG_R8] if name=='primary' else [UC_ARM_REG_R3]):self.assertEqual(u.reg_read(r),before[r])
     self.assertEqual((self.opened,self.allocated),(0,0));self.assertEqual(self.calls,[])
+
+ def test_imported_names_resolve_every_slot_without_the_source_pack(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   self.manifest=build(tmp,sd_library=True,appended_slots=True)
+   self.code=(Path(tmp)/'m10v-library-arm.bin').read_bytes()
+  cube='LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n'
+  import json
+  script="import {parseCustomCube} from './node/gr3-custom-lut.mjs';import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack([], [parseCustomCube(Buffer.from("+json.dumps(cube)+"),'i.cube','Imported Name')]));"
+  pack=subprocess.check_output(['node','--input-type=module','-e',script],cwd=ROOT)
+  for slot in range(10):
+   with self.subTest(slot=slot):
+    self.setUp()
+    # Appending is sequential; create preceding enabled slots before replacing
+    # a later one. Distinct IDs preserve the library's duplicate-film guard.
+    state=0x5500a000
+    self.assertGreaterEqual(self.call('m10v_camera_library_load',state),0)
+    used={struct.unpack('<H',self.u.mem_read(state+12+8*i,2))[0] for i in range(10)}
+    candidates=iter(i for i in range(33,79) if i not in used)
+    for preceding in range(5,slot):
+     self.assertEqual(self.call('m10v_camera_library_select',state,preceding,next(candidates)),0)
+    self.card=pack
+    self.assertEqual(self.call('m10v_sd_camera_install',0,0,79,slot),0)
+    self.card=b''
+    resource=1007+slot if slot<5 else 1111+slot-5
+    def model(uc,pc,size,data):
+     if pc in (0x5320ad88,0x5320ba9c):
+      uc.reg_write(UC_ARM_REG_R0,0x55006000 if pc==0x5320ad88 else 0x55068200)
+      uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
+    self.u.hook_add(UC_HOOK_CODE,model)
+    self.u.mem_write(0x55068200,bytes([25+slot])+bytes(31))
+    self.assertEqual(self.call('m10v_menu_name',0,25+slot),resource)
+    self.assertEqual(self.call('m10v_menu_value_name',0,25+slot),resource)
+    self.assertEqual(self.call('m10v_menu_icon',0,25+slot),754)
+    self.assertEqual(self.call('m10v_menu_custom_resource',resource,0x5500c000),0x5500c000)
+    header=bytes(self.u.mem_read(0x5500c000,8));text=self.n(0x5500c004)
+    self.assertEqual(bytes(self.u.mem_read(text,header[0]*2)).decode('utf-16le'),'Imported Name\0')
+    self.assertEqual((self.opened,self.allocated),(0,0))
+  for resource in (1006,1012,1110,1116):
+   self.assertEqual(self.call('m10v_menu_custom_resource',resource,0x5500c000),0)

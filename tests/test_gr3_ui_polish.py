@@ -76,7 +76,7 @@ class UiPolishTests(unittest.TestCase):
      u.emu_start(hooks[name],0x550ff000,count=10000)
      self.assertEqual(u.reg_read(A.UC_ARM_REG_PC),0x550ff000)
      self.assertEqual(u.reg_read(A.UC_ARM_REG_SP),0x550f0000)
-     self.assertEqual(u.reg_read(A.UC_ARM_REG_R0), (native or (754 if private else 0)) if name=='icon' else int(bool(native) or private))
+     self.assertEqual(u.reg_read(A.UC_ARM_REG_R0), (native or (876 if private else 0)) if name=='icon' else int(bool(native) or private))
      self.assertEqual(bytes(u.mem_read(0x55002000,1)),b'\x0b' if name=='detail' and not native and private else b'\xa5')
 
  def test_real_stock_metadata_icon_getter_preserves_factory_and_decodes_private(self):
@@ -96,4 +96,4 @@ class UiPolishTests(unittest.TestCase):
     u.emu_start(entry,0x550ff000,count=10000)
     self.assertEqual(u.reg_read(A.UC_ARM_REG_PC),0x550ff000)
     results.append(u.reg_read(A.UC_ARM_REG_R0))
-   self.assertEqual(results[1],754 if 0x1000c<=tag<=0x10015 else results[0])
+   self.assertEqual(results[1],876 if 0x1000c<=tag<=0x10015 else results[0])

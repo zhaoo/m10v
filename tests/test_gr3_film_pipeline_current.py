@@ -94,6 +94,27 @@ class CurrentFilmPipelineTests(unittest.TestCase):
         e=StockISP(self.image)
         self.assertEqual(self.call(e,'m10v_settings_controller_owner_size'),self.manifest['settings_menu']['owner_bytes'])
 
+    def test_real_task_producer_records_pool_owned_film_without_storage_or_pixels(self):
+        e,recipe,obj,frame,old_si,request,data=self.fixture(66,stage=0)
+        # Dedicated pool allocation includes16 owned metadata bytes. Keep the
+        # stock SI contents and real setup/producer/Still/encoder entrypoints.
+        si=e.alloc(0x74280)
+        e.u.mem_write(si,bytes(e.u.mem_read(old_si,0x74270)))
+        e.w32(recipe+0x44c8,si);e.w32(frame+0x82d0,si)
+        e.u.reg_write(A.UC_ARM_REG_R0,recipe);e.u.reg_write(A.UC_ARM_REG_R4,recipe)
+        e.u.emu_start(0x5350eb10,0x5350eb38,count=100)
+        manager=e.alloc(0x218);e.w32(manager+0x20,0x74280);e.w32(manager+0x88,si);e.w32(0x55345328,manager)
+        owner=self.publish_owner(e,data)
+        e.u.mem_write(recipe+0x4a08,bytes(1796))
+        self.enqueue(e,recipe,19)
+        self.assertEqual(self.call(e,'m10v_isp_frame_identity_code',si),0x1000+66)
+        # A subsequent selection cannot retarget this queued photo.
+        e.u.mem_write(owner+0x2144,bytes(184));e.w32(owner+0x2140,8)
+        self.make(e,recipe,obj,frame)
+        self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),1)
+        self.assertEqual(self.capture(e,recipe,si,request),0)
+        self.assertEqual(self.call(e,'m10v_isp_frame_identity_code',si),0x1000+66)
+
     def test_custom_isp_ui_cache_real_producer_freezes_target_and_native_only_capture(self):
         for stage in (0,1):
             e,recipe,obj,frame,si,request,data=self.fixture(79,stage=stage)

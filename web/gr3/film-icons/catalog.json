@@ -5,8 +5,10 @@
     "title": "NEUTR",
     "code": "",
     "color": "#728d88",
-    "icon_url": "/gr3/film-icons/01-large.png",
-    "sha256": "92a8120e3d2f727348de75ac2676f995bf840acfa238b87dec3e476ad419b409"
+    "icon_url": "/gr3/film-icons/01-large.png?v=745b1f0295a1",
+    "sha256": "e7c1f941108a0d7fa142152813db6444355f65a6e29eceae7cf2aa2ece411ade",
+    "icon_compact_url": "/gr3/film-icons/01.png?v=e7c1f941108a",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 2,
@@ -14,8 +16,10 @@
     "title": "AMBER",
     "code": "DAY",
     "color": "#c78d48",
-    "icon_url": "/gr3/film-icons/02-large.png",
-    "sha256": "df6c4da47ffb2ac2dfd41850b1065489846f1430def92bc00f4a13daabdb15ed"
+    "icon_url": "/gr3/film-icons/02-large.png?v=f0c5b4ddaf8b",
+    "sha256": "d7238c37d3bce8d20391f6c9bfcfbecbdca2e0ec246142691faba4cc521200ad",
+    "icon_compact_url": "/gr3/film-icons/02.png?v=d7238c37d3bc",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 3,
@@ -23,8 +27,10 @@
     "title": "COOL",
     "code": "DUSK",
     "color": "#6a87a6",
-    "icon_url": "/gr3/film-icons/03-large.png",
-    "sha256": "0017cafb8ff28baf35679a1f31641fe222d35fe456dcc317a7a52c361f7af8f6"
+    "icon_url": "/gr3/film-icons/03-large.png?v=42e7da4df8c5",
+    "sha256": "4bc894d5ea7406bdcc69528e976bdbf97574c39fa3624e75b758de5b5445c751",
+    "icon_compact_url": "/gr3/film-icons/03.png?v=4bc894d5ea74",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 4,
@@ -32,8 +38,10 @@
     "title": "WARM",
     "code": "FADE",
     "color": "#b48373",
-    "icon_url": "/gr3/film-icons/04-large.png",
-    "sha256": "0eca5fc19313e2a532fb58aed60be7adda0a9f3ca527a7270413de670102cc73"
+    "icon_url": "/gr3/film-icons/04-large.png?v=39940fac7a12",
+    "sha256": "bce7d46e17153a196a71ef69be841f2ec7e07c26b63ff28afda1a007cbb68a4f",
+    "icon_compact_url": "/gr3/film-icons/04.png?v=bce7d46e1715",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 5,
@@ -41,8 +49,10 @@
     "title": "DEEP",
     "code": "STREE",
     "color": "#626977",
-    "icon_url": "/gr3/film-icons/05-large.png",
-    "sha256": "2d04f86713c7c189355d5813dec6d21a672a3701b6a199a34e5bd0eb66ace63f"
+    "icon_url": "/gr3/film-icons/05-large.png?v=c8f1bb6a525d",
+    "sha256": "a1a953285fa232a76a4340fb0b7949a382a0dfd6d7a0682365c91acce64e4f98",
+    "icon_compact_url": "/gr3/film-icons/05.png?v=a1a953285fa2",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 6,
@@ -50,8 +60,10 @@
     "title": "SOFT",
     "code": "PORTR",
     "color": "#b29597",
-    "icon_url": "/gr3/film-icons/06-large.png",
-    "sha256": "ea394307f32c6a48ecf4f1212f0c274a078d7d24921491da3c2e65ddad32e68f"
+    "icon_url": "/gr3/film-icons/06-large.png?v=97bcbd108d17",
+    "sha256": "d79318745dad07f29874a26a223063e5b05d26139dad2066dee921b139302dea",
+    "icon_compact_url": "/gr3/film-icons/06.png?v=d79318745dad",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 7,
@@ -59,8 +71,10 @@
     "title": "OCEAN",
     "code": "BLUE",
     "color": "#508b9d",
-    "icon_url": "/gr3/film-icons/07-large.png",
-    "sha256": "a5c0415ae526b4bee0c1ad3bac05eec2277fd0172f6e24ee12e8c37194f39fbd"
+    "icon_url": "/gr3/film-icons/07-large.png?v=320bb4e46315",
+    "sha256": "d574e782efed2910a8a2d91fa58899cc996ce1532935fabdfdefe1c2785ab806",
+    "icon_compact_url": "/gr3/film-icons/07.png?v=d574e782efed",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 8,
@@ -68,8 +82,10 @@
     "title": "AUTMN",
     "code": "COPPE",
     "color": "#ba794f",
-    "icon_url": "/gr3/film-icons/08-large.png",
-    "sha256": "fe3683f19efbf7e64890107104e73aad379e2a940e1866db99c7cdf1342b34a8"
+    "icon_url": "/gr3/film-icons/08-large.png?v=97ada6ec0131",
+    "sha256": "1ceb3931c3689524a2da04be435e9f4b924f1fc7601a13eea06e9c8fbecc9bea",
+    "icon_compact_url": "/gr3/film-icons/08.png?v=1ceb3931c368",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 9,
@@ -77,8 +93,10 @@
     "title": "MUTED",
     "code": "OLIVE",
     "color": "#858761",
-    "icon_url": "/gr3/film-icons/09-large.png",
-    "sha256": "5e1c57a00e71049e39b88a33a8481d192dad97a462218ad82d585fe359b42529"
+    "icon_url": "/gr3/film-icons/09-large.png?v=c8b33c452c80",
+    "sha256": "c2137ed23e16c848e2761209eb574bc396bf88338af13a9e8561936c2f28ec2e",
+    "icon_compact_url": "/gr3/film-icons/09.png?v=c2137ed23e16",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 10,
@@ -86,8 +104,10 @@
     "title": "CLEAR",
     "code": "MORN",
     "color": "#aebcb1",
-    "icon_url": "/gr3/film-icons/10-large.png",
-    "sha256": "65032438747fb47aafe88e3f56f48e242e806f72b4eb7d0fa8cc2e20ae54d9c5"
+    "icon_url": "/gr3/film-icons/10-large.png?v=9673ee064b61",
+    "sha256": "81385b08c0b5e675f3e52d3cebfd810ee8b43b2693d217aaaf65c832203ec7e6",
+    "icon_compact_url": "/gr3/film-icons/10.png?v=81385b08c0b5",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 11,
@@ -95,8 +115,10 @@
     "title": "NIGHT",
     "code": "CYAN",
     "color": "#498c92",
-    "icon_url": "/gr3/film-icons/11-large.png",
-    "sha256": "65e57be3947bf497643bc4304604002e9d648dc7eefb388b7d6629d78419545f"
+    "icon_url": "/gr3/film-icons/11-large.png?v=c4699a4e0f06",
+    "sha256": "be27caeb10f090544d458dc1466d4e9d61a0c4416c61279fd22534ef9b6cdced",
+    "icon_compact_url": "/gr3/film-icons/11.png?v=be27caeb10f0",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 12,
@@ -104,8 +126,10 @@
     "title": "SUNSE",
     "code": "ROSE",
     "color": "#b47787",
-    "icon_url": "/gr3/film-icons/12-large.png",
-    "sha256": "a9afa98184ba0b52f57505c6433472a13107ab68e23cd0a1f18275c33d4657bf"
+    "icon_url": "/gr3/film-icons/12-large.png?v=d4faab742a21",
+    "sha256": "dc6c040bfd7a0de48a3797d4ec26c473be21bd62f8a509ac41f7066123cb741f",
+    "icon_compact_url": "/gr3/film-icons/12.png?v=dc6c040bfd7a",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 13,
@@ -113,8 +137,10 @@
     "title": "BLEAC",
     "code": "NOON",
     "color": "#b2aa90",
-    "icon_url": "/gr3/film-icons/13-large.png",
-    "sha256": "1e4d0833379384d8fd317889a8a24730dd5e9e4a0c5c497be2972361ff93ccda"
+    "icon_url": "/gr3/film-icons/13-large.png?v=66a955e71ed8",
+    "sha256": "345fced4ec95d4c4c6d7b48bb74c1882f9748252a506a4e3dea6cd34192a6417",
+    "icon_compact_url": "/gr3/film-icons/13.png?v=345fced4ec95",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 14,
@@ -122,8 +148,10 @@
     "title": "PASTE",
     "code": "SKY",
     "color": "#9caec1",
-    "icon_url": "/gr3/film-icons/14-large.png",
-    "sha256": "9daa3ba08bc660e61a93ed9fa635a17b697c221a2705e5753879db317e4c7528"
+    "icon_url": "/gr3/film-icons/14-large.png?v=fc3f06f2d34a",
+    "sha256": "4a6d039f0caf23acdcceff842938e31d77448295b4fe8593721dae347f7c3e83",
+    "icon_compact_url": "/gr3/film-icons/14.png?v=4a6d039f0caf",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 15,
@@ -131,8 +159,10 @@
     "title": "DENSE",
     "code": "COLOR",
     "color": "#9c7a53",
-    "icon_url": "/gr3/film-icons/15-large.png",
-    "sha256": "935b3f996f011a6c3da1acfb5843c3ad3d6ed072ff5be258ec7ba3f0c6bfa468"
+    "icon_url": "/gr3/film-icons/15-large.png?v=1428e5e922c0",
+    "sha256": "5422bb6254b2160f8a006eac2ea4e3800e28b0e98ba06633dc138b2407b4ea95",
+    "icon_compact_url": "/gr3/film-icons/15.png?v=5422bb6254b2",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 16,
@@ -140,8 +170,10 @@
     "title": "EARTH",
     "code": "TONE",
     "color": "#917b61",
-    "icon_url": "/gr3/film-icons/16-large.png",
-    "sha256": "3692d129a4303c6c9aa79c324445fdafe46b3cce6385bdbb1101bf47da4677dd"
+    "icon_url": "/gr3/film-icons/16-large.png?v=f8ad3bbd2e48",
+    "sha256": "7b2500113fd838249a9808456cc6bae35f7827a73ac2cd048f16ac7142cd0a5e",
+    "icon_compact_url": "/gr3/film-icons/16.png?v=7b2500113fd8",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 17,
@@ -149,8 +181,10 @@
     "title": "SILVR",
     "code": "MONO",
     "color": "#899090",
-    "icon_url": "/gr3/film-icons/17-large.png",
-    "sha256": "01cf6306c016172280a67835522ef8b5e6028b47844e9939cdd51acd14f8d0ff"
+    "icon_url": "/gr3/film-icons/17-large.png?v=7c9fc4f5da66",
+    "sha256": "f96553a6c5d48202772d8342258e4ca14ec02797286bc29e0c0036ba3c1bc745",
+    "icon_compact_url": "/gr3/film-icons/17.png?v=f96553a6c5d4",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 18,
@@ -158,8 +192,10 @@
     "title": "SOFT",
     "code": "MONO",
     "color": "#b3b4a9",
-    "icon_url": "/gr3/film-icons/18-large.png",
-    "sha256": "7baf26581bdbdd6032f70d85d35c761503aa5cde99a9837210678d48085da9a2"
+    "icon_url": "/gr3/film-icons/18-large.png?v=3a67b58095b5",
+    "sha256": "c3a5ed32c74d942e5882c11cbc83a59e2eaf452df3fa2fcc3860358ad4a23708",
+    "icon_compact_url": "/gr3/film-icons/18.png?v=c3a5ed32c74d",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 19,
@@ -167,8 +203,10 @@
     "title": "HARD",
     "code": "MONO",
     "color": "#66696a",
-    "icon_url": "/gr3/film-icons/19-large.png",
-    "sha256": "daedd6ca8f6747ef402d0e82da71c59afd0633e44753ec685c6c01a67052d8f6"
+    "icon_url": "/gr3/film-icons/19-large.png?v=04f5f137ffe5",
+    "sha256": "3abeea85d9524031566a742a6584d0cb3ee348e098271c837e1145743c4264aa",
+    "icon_compact_url": "/gr3/film-icons/19.png?v=3abeea85d952",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 20,
@@ -176,8 +214,10 @@
     "title": "WARM",
     "code": "MONO",
     "color": "#a99988",
-    "icon_url": "/gr3/film-icons/20-large.png",
-    "sha256": "88fdc42a49986521f62abe95a831d334e84e2f86a68a9c6195b852bc5a56451b"
+    "icon_url": "/gr3/film-icons/20-large.png?v=a2a1cc4caf1c",
+    "sha256": "b3261b85f46664acb736b5757e11b1c83cf8fb8fda793b36706e140e216be479",
+    "icon_compact_url": "/gr3/film-icons/20.png?v=b3261b85f466",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 21,
@@ -185,8 +225,10 @@
     "title": "COLD",
     "code": "MONO",
     "color": "#839ba5",
-    "icon_url": "/gr3/film-icons/21-large.png",
-    "sha256": "b178132a56903cab71c0d6dbb586dc8bf960d98fec8b013f004b16443406e943"
+    "icon_url": "/gr3/film-icons/21-large.png?v=6513c44b0904",
+    "sha256": "a37bccce2b06476aa34174cb8c1eefe94571665701795d14a0aad6068daf1f00",
+    "icon_compact_url": "/gr3/film-icons/21.png?v=a37bccce2b06",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 22,
@@ -194,8 +236,10 @@
     "title": "GREEN",
     "code": "GLASS",
     "color": "#6c967c",
-    "icon_url": "/gr3/film-icons/22-large.png",
-    "sha256": "3254524af350d78ad6252f3595daabe4d9ccf75f809fb80cb0abbfb2a807df80"
+    "icon_url": "/gr3/film-icons/22-large.png?v=5b3562cdfbed",
+    "sha256": "c593e5382d3f3887fb880161cec7bfd23e44d5d63d7ca6e915ee23e3a3c3fe5b",
+    "icon_compact_url": "/gr3/film-icons/22.png?v=c593e5382d3f",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 23,
@@ -203,8 +247,10 @@
     "title": "LILAC",
     "code": "HAZE",
     "color": "#a08baa",
-    "icon_url": "/gr3/film-icons/23-large.png",
-    "sha256": "2fa94664b17d870286e920d3701802aab34b61fe16025f47ff796a5fa3f5bfae"
+    "icon_url": "/gr3/film-icons/23-large.png?v=2e0ca7cbf6d5",
+    "sha256": "a9e934833ea0fd9291e0968f0bda559e90a17da98ce1b6caf722f5661635f0f8",
+    "icon_compact_url": "/gr3/film-icons/23.png?v=a9e934833ea0",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 24,
@@ -212,8 +258,10 @@
     "title": "DESER",
     "code": "LIGHT",
     "color": "#c1a275",
-    "icon_url": "/gr3/film-icons/24-large.png",
-    "sha256": "954bdeb532834a27a78f42d6759444621dcb45ada916cb18d92aa7edd15264c6"
+    "icon_url": "/gr3/film-icons/24-large.png?v=48644dfd3964",
+    "sha256": "34307d357d2434f6a3299bb09ecd37f064ea063cfdd420fe7dd6cf478d8b2d7f",
+    "icon_compact_url": "/gr3/film-icons/24.png?v=34307d357d24",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 25,
@@ -221,8 +269,10 @@
     "title": "URBAN",
     "code": "STEEL",
     "color": "#748895",
-    "icon_url": "/gr3/film-icons/25-large.png",
-    "sha256": "e37c938ce81543697cfdaafc2ef80548a2ecafcbc8c7ce5d97e9de36292239d2"
+    "icon_url": "/gr3/film-icons/25-large.png?v=303fe37dfcb5",
+    "sha256": "eaa95a0f29736702fd48c1f1bd744aa10803bea6b27b458ee5d929ae515dbd23",
+    "icon_compact_url": "/gr3/film-icons/25.png?v=eaa95a0f2973",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 26,
@@ -230,8 +280,10 @@
     "title": "SPRIN",
     "code": "LEAF",
     "color": "#8eab6a",
-    "icon_url": "/gr3/film-icons/26-large.png",
-    "sha256": "14e886510a1c86cc391612c08daec6d86e43d8d7571e6756abaf44c114f716a6"
+    "icon_url": "/gr3/film-icons/26-large.png?v=b5794b312d34",
+    "sha256": "6a250196aa4b41b476dcca10ca7da50fb27068d5e22798dd34184e82f321f79c",
+    "icon_compact_url": "/gr3/film-icons/26.png?v=6a250196aa4b",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 27,
@@ -239,8 +291,10 @@
     "title": "RED",
     "code": "BRICK",
     "color": "#bb6655",
-    "icon_url": "/gr3/film-icons/27-large.png",
-    "sha256": "050fb94ae2c23b145ce231ced6701b48445b798b249a70dec0d8571f7f7f1d6e"
+    "icon_url": "/gr3/film-icons/27-large.png?v=0a5dab5a5e14",
+    "sha256": "0401a63fb8a25ac293b2c6f2d80dfae5db2945213a37c42de6436e597c9eebe3",
+    "icon_compact_url": "/gr3/film-icons/27.png?v=0401a63fb8a2",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 28,
@@ -248,8 +302,10 @@
     "title": "PAPER",
     "code": "WHITE",
     "color": "#c9c6b5",
-    "icon_url": "/gr3/film-icons/28-large.png",
-    "sha256": "0459e3b532f6591c104b83881f08abe4b97b7b4ace4e346b1735feffc82b71f4"
+    "icon_url": "/gr3/film-icons/28-large.png?v=46670faeaef9",
+    "sha256": "8322643563708015b22098dc4dca638f13e190f21060e5d5449c6d6cd2f4a5ed",
+    "icon_compact_url": "/gr3/film-icons/28.png?v=832264356370",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 29,
@@ -257,8 +313,10 @@
     "title": "BLUE",
     "code": "HOUR",
     "color": "#667fa7",
-    "icon_url": "/gr3/film-icons/29-large.png",
-    "sha256": "d744cabba5392baeb6ed843c3d9c833e7b27521e35110c03fb4ff472c6844859"
+    "icon_url": "/gr3/film-icons/29-large.png?v=559a259c563c",
+    "sha256": "eb9fe56ce3bd9e3495a41dc14ec5c4c685a138f6ef1fb5924bfbfac584271083",
+    "icon_compact_url": "/gr3/film-icons/29.png?v=eb9fe56ce3bd",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 30,
@@ -266,8 +324,10 @@
     "title": "GOLDN",
     "code": "SHADE",
     "color": "#bca26c",
-    "icon_url": "/gr3/film-icons/30-large.png",
-    "sha256": "7bc5c988421f099b4ce933c7bdcd6ef2f31cf87fddd7641f7b7ace8d385bb763"
+    "icon_url": "/gr3/film-icons/30-large.png?v=9c9247401061",
+    "sha256": "22e67bc2db2a194c44e531b35878eddcfe7e4d0c2a5ed2c69e8300753c98b54f",
+    "icon_compact_url": "/gr3/film-icons/30.png?v=22e67bc2db2a",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 31,
@@ -275,8 +335,10 @@
     "title": "LOW",
     "code": "KEY",
     "color": "#687469",
-    "icon_url": "/gr3/film-icons/31-large.png",
-    "sha256": "e22112c8445a6bd022be6af41277bc92fda1667b0420a16c8754dd9b0e1427a0"
+    "icon_url": "/gr3/film-icons/31-large.png?v=da16a97adc90",
+    "sha256": "721d69d22c22fdac73260dde6858a2cf52c02856c626c7c3c204e7cf2a1d6c2c",
+    "icon_compact_url": "/gr3/film-icons/31.png?v=721d69d22c22",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 32,
@@ -284,8 +346,10 @@
     "title": "HIGH",
     "code": "KEY",
     "color": "#bab7a4",
-    "icon_url": "/gr3/film-icons/32-large.png",
-    "sha256": "8a394bf31a619a6f205f4dfb14405cfee5c7aa5208a85d9f57a24ec28f573d96"
+    "icon_url": "/gr3/film-icons/32-large.png?v=1dec8e4b6373",
+    "sha256": "ffd24350acd98901dbc710e906e4365d489bbafd86d32f8428e0aefe117b0a42",
+    "icon_compact_url": "/gr3/film-icons/32.png?v=ffd24350acd9",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 33,
@@ -293,8 +357,10 @@
     "title": "CINE",
     "code": "800T",
     "color": "#c83737",
-    "icon_url": "/gr3/film-icons/33-large.png",
-    "sha256": "6917bd36a34749ad5dc761127901f7c6284802f9afe1b72ecbee9efa919bcfa0"
+    "icon_url": "/gr3/film-icons/33-large.png?v=5301f1b97814",
+    "sha256": "9b3f827ee40a796fc75d9f673e784f5b645eb39757b733c1b5191da31201787a",
+    "icon_compact_url": "/gr3/film-icons/33.png?v=9b3f827ee40a",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 34,
@@ -302,8 +368,10 @@
     "title": "EKTAR",
     "code": "100",
     "color": "#c94c47",
-    "icon_url": "/gr3/film-icons/34-large.png",
-    "sha256": "148cb49f946326ffaa8f89251e2e4540ecd28a36692909af98e4873a62ed6301"
+    "icon_url": "/gr3/film-icons/34-large.png?v=8b42bbe927a1",
+    "sha256": "1ba942f3a5e6e38509e824eb8c2f6dd7e0c3252a227c2df9ba8d210d083a1d64",
+    "icon_compact_url": "/gr3/film-icons/34.png?v=1ba942f3a5e6",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 35,
@@ -311,8 +379,10 @@
     "title": "KODA",
     "code": "200",
     "color": "#d5a844",
-    "icon_url": "/gr3/film-icons/35-large.png",
-    "sha256": "1aae29b497856891cd4463fab916d1b4de2016c2da097bb34e9fcb79f8646b6f"
+    "icon_url": "/gr3/film-icons/35-large.png?v=4ec4eee1727e",
+    "sha256": "88b51b25765fb08f22ce4a9598d5c078526848dfeb61e5bb7e03f502dea3df0f",
+    "icon_compact_url": "/gr3/film-icons/35.png?v=88b51b25765f",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 36,
@@ -320,8 +390,10 @@
     "title": "FUJI",
     "code": "400H",
     "color": "#669c7a",
-    "icon_url": "/gr3/film-icons/36-large.png",
-    "sha256": "b1d0a58864b851556c95867ded24c4be1d98287b6ec33fb5a1f2ffe24828dda4"
+    "icon_url": "/gr3/film-icons/36-large.png?v=1eb42da664eb",
+    "sha256": "85a4908c92f95d40a449608b6cc3fa6f79373c26f9a18d425657d3f15c549103",
+    "icon_compact_url": "/gr3/film-icons/36.png?v=85a4908c92f9",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 37,
@@ -329,8 +401,10 @@
     "title": "PORTR",
     "code": "400",
     "color": "#a484ad",
-    "icon_url": "/gr3/film-icons/37-large.png",
-    "sha256": "1d8fe320f04eb1dd1c2aba0e4697e9d39cd306fc2f3e02fe1b2f8cc9ad225b14"
+    "icon_url": "/gr3/film-icons/37-large.png?v=d0b14e31c6df",
+    "sha256": "573035505bd442de7a3c5ccd2203eab6ee6eb9f86066b79f6203656e747e6153",
+    "icon_compact_url": "/gr3/film-icons/37.png?v=573035505bd4",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 38,
@@ -338,8 +412,10 @@
     "title": "V3",
     "code": "250D",
     "color": "#c6a450",
-    "icon_url": "/gr3/film-icons/38-large.png",
-    "sha256": "25b51cf51be2923b9c33240a733d7c09a3ab9fe6cc669a5b5a2d5908e4578cb6"
+    "icon_url": "/gr3/film-icons/38-large.png?v=f49c5898cdae",
+    "sha256": "0df9a835f4f2eb159f36c19597dfadfe8981823579e861d3ce30f63628902b3a",
+    "icon_compact_url": "/gr3/film-icons/38.png?v=0df9a835f4f2",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 39,
@@ -347,8 +423,10 @@
     "title": "HB",
     "code": "HNCS",
     "color": "#508b9d",
-    "icon_url": "/gr3/film-icons/39-large.png",
-    "sha256": "bab5daa336d6e7dc0995f33a9c5c9626b3419770030865e3e33d3d7656e8c72f"
+    "icon_url": "/gr3/film-icons/39-large.png?v=053d544afc66",
+    "sha256": "45b5e9b0eb85477ab5b26443492a631e8a7ee2629c11ddd59afffed257e0bed2",
+    "icon_compact_url": "/gr3/film-icons/39.png?v=45b5e9b0eb85",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 40,
@@ -356,8 +434,10 @@
     "title": "HB",
     "code": "PORTR",
     "color": "#ba794f",
-    "icon_url": "/gr3/film-icons/40-large.png",
-    "sha256": "a99f4590f028728d4cbaa6e8cd76991bd2d12c872580d68bd76898eea9a062e5"
+    "icon_url": "/gr3/film-icons/40-large.png?v=01cf0e8bcc3a",
+    "sha256": "4acfc64e517400457a62b7b1ef7dea61336f99a174b00d930885133057b72550",
+    "icon_compact_url": "/gr3/film-icons/40.png?v=4acfc64e5174",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 41,
@@ -365,8 +445,10 @@
     "title": "HB",
     "code": "LOWSA",
     "color": "#858761",
-    "icon_url": "/gr3/film-icons/41-large.png",
-    "sha256": "2695d4e723f1e6a01b4545fea55795b3b200d8ccdcd3b3335341ad1ef8e845f5"
+    "icon_url": "/gr3/film-icons/41-large.png?v=928855bce629",
+    "sha256": "3b13a93cc273db47eba2ef81a369cf5817c31a43df1abe7be985c0d1c1ee4245",
+    "icon_compact_url": "/gr3/film-icons/41.png?v=3b13a93cc273",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 42,
@@ -374,8 +456,10 @@
     "title": "HB",
     "code": "HICON",
     "color": "#aebcb1",
-    "icon_url": "/gr3/film-icons/42-large.png",
-    "sha256": "9e43da23ab7a757edcca09a816e0624618f8c1fe2d3fd7c1687e3283280d38d9"
+    "icon_url": "/gr3/film-icons/42-large.png?v=8a13214dc239",
+    "sha256": "c6c8437bc4750e9674ee93cc696b03fe28ffda8b30c11d65f3d2fd7b60b912a0",
+    "icon_compact_url": "/gr3/film-icons/42.png?v=c6c8437bc475",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 43,
@@ -383,8 +467,10 @@
     "title": "PX",
     "code": "MYABI",
     "color": "#498c92",
-    "icon_url": "/gr3/film-icons/43-large.png",
-    "sha256": "66944b334f6333e42a67b4e2549d6ab5ab12bf0bf211bfba2c7cdd3a871c41aa"
+    "icon_url": "/gr3/film-icons/43-large.png?v=1dc971935d68",
+    "sha256": "3a33201388fcd6470498f392b0388acf9a8b53ca8c5cb6c1e49ea00bc1c746eb",
+    "icon_compact_url": "/gr3/film-icons/43.png?v=3a33201388fc",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 44,
@@ -392,8 +478,10 @@
     "title": "PX",
     "code": "GOLD",
     "color": "#b47787",
-    "icon_url": "/gr3/film-icons/44-large.png",
-    "sha256": "5f02eb8e10effafd1ef351c7a6ce32caa9194211a489ee20902e1c583437b31c"
+    "icon_url": "/gr3/film-icons/44-large.png?v=c74161e36662",
+    "sha256": "6d46bc1f514bba9b173810e30d94ba3f91004cc427b614e498a0a5b821d303a5",
+    "icon_compact_url": "/gr3/film-icons/44.png?v=6d46bc1f514b",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 45,
@@ -401,8 +489,10 @@
     "title": "PX",
     "code": "REVRS",
     "color": "#b2aa90",
-    "icon_url": "/gr3/film-icons/45-large.png",
-    "sha256": "466be7779a2f58f621dc812d634d0d6901ee777cf9044d285c4dccbd0a240f86"
+    "icon_url": "/gr3/film-icons/45-large.png?v=78e9b4a3f97f",
+    "sha256": "af26e513f9bffba164102987a96f6fb031fd876d85648d98e9302cb74673361b",
+    "icon_compact_url": "/gr3/film-icons/45.png?v=af26e513f9bf",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 46,
@@ -410,8 +500,10 @@
     "title": "PX",
     "code": "KYUSH",
     "color": "#9caec1",
-    "icon_url": "/gr3/film-icons/46-large.png",
-    "sha256": "da286a163d6a6def939616cd99c4e2bca303e1708b416df9373fb099b2827dc2"
+    "icon_url": "/gr3/film-icons/46-large.png?v=14fbe0c71fbe",
+    "sha256": "15ce3ba95e76b097538725584e05f4834bf60214bb6040b744d5be49ae507308",
+    "icon_compact_url": "/gr3/film-icons/46.png?v=15ce3ba95e76",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 47,
@@ -419,8 +511,10 @@
     "title": "PX",
     "code": "HARUB",
     "color": "#9c7a53",
-    "icon_url": "/gr3/film-icons/47-large.png",
-    "sha256": "5178a9b2a4ede57838735dde0a0bab119e09706bfe0e1aa486b020de1b595d5c"
+    "icon_url": "/gr3/film-icons/47-large.png?v=c6c801b7c50f",
+    "sha256": "e8f093a9982721f32e2147360e9e1987b58694c949978592a280485111b93156",
+    "icon_compact_url": "/gr3/film-icons/47.png?v=e8f093a99827",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 48,
@@ -428,8 +522,10 @@
     "title": "PX",
     "code": "MUTED",
     "color": "#917b61",
-    "icon_url": "/gr3/film-icons/48-large.png",
-    "sha256": "dfeab05e74c1dc95ca3343146fb4a271b18cc2f3460845f559ada9d2582cbbdd"
+    "icon_url": "/gr3/film-icons/48-large.png?v=881bb5f59928",
+    "sha256": "61f2aa027e995f39d5658e41e9d08f52c5f23b6e0c65caa6572d0efee992ddd0",
+    "icon_compact_url": "/gr3/film-icons/48.png?v=61f2aa027e99",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 49,
@@ -437,8 +533,10 @@
     "title": "PX",
     "code": "RADNT",
     "color": "#899090",
-    "icon_url": "/gr3/film-icons/49-large.png",
-    "sha256": "777428e119ce1390d66e4808b5544605304b93e32201fe2a12a799309a764ba7"
+    "icon_url": "/gr3/film-icons/49-large.png?v=f7762d08b1d6",
+    "sha256": "a67b33e2dde6b1a96df02f7114a7a865e93cdac5f41fe13023818a183f79e331",
+    "icon_compact_url": "/gr3/film-icons/49.png?v=a67b33e2dde6",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 50,
@@ -446,8 +544,10 @@
     "title": "PX",
     "code": "FUYUN",
     "color": "#b3b4a9",
-    "icon_url": "/gr3/film-icons/50-large.png",
-    "sha256": "77a6b409ab2f34464c337d0e2746aac989f5e00b01ed125f2f8c4bb5de4595fa"
+    "icon_url": "/gr3/film-icons/50-large.png?v=1843cb424eb0",
+    "sha256": "c2ce12a11fa4e6678a074d6999d735825142115632e07e99a18eea795581c2be",
+    "icon_compact_url": "/gr3/film-icons/50.png?v=c2ce12a11fa4",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 51,
@@ -455,8 +555,10 @@
     "title": "PX",
     "code": "KATEN",
     "color": "#66696a",
-    "icon_url": "/gr3/film-icons/51-large.png",
-    "sha256": "207bc951fcaab6f8a6354224efa0e0a424a0d3aa74da47dbdeefa9aa9b2742ba"
+    "icon_url": "/gr3/film-icons/51-large.png?v=9803bada2107",
+    "sha256": "88f8ccdb75b4fef3bed508fd3e5986c8a83c22b88805c46c644baedfd3c8166d",
+    "icon_compact_url": "/gr3/film-icons/51.png?v=88f8ccdb75b4",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 52,
@@ -464,8 +566,10 @@
     "title": "PX",
     "code": "SATOB",
     "color": "#a99988",
-    "icon_url": "/gr3/film-icons/52-large.png",
-    "sha256": "d972015ceafef5dc3cb6e333de0ceb4d2ce45a7a20694556d9bd8ee1393f5a3d"
+    "icon_url": "/gr3/film-icons/52-large.png?v=dcc6f4d9da02",
+    "sha256": "2ccd8914e2e0a9de9d8f9cedf2bc866cbb1d72d9bffe8f69715d58342dffb1f2",
+    "icon_compact_url": "/gr3/film-icons/52.png?v=2ccd8914e2e0",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 53,
@@ -473,8 +577,10 @@
     "title": "PX",
     "code": "BLEAC",
     "color": "#839ba5",
-    "icon_url": "/gr3/film-icons/53-large.png",
-    "sha256": "6c587853a58327bf299f7d3adba6617c6c58c13a8f2aebae66c064133b077d8f"
+    "icon_url": "/gr3/film-icons/53-large.png?v=57322104b474",
+    "sha256": "44f7e56478b322d58626ee164e5dc1faa40acb6bcb05162ffbd7b735c984b545",
+    "icon_compact_url": "/gr3/film-icons/53.png?v=44f7e56478b3",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 54,
@@ -482,8 +588,10 @@
     "title": "M9",
     "code": "",
     "color": "#6c967c",
-    "icon_url": "/gr3/film-icons/54-large.png",
-    "sha256": "e8e622ae5946f672836ce9b7bad00ee78c54cb2d9ee57c4f2350460287979de0"
+    "icon_url": "/gr3/film-icons/54-large.png?v=360d9645c312",
+    "sha256": "e104d5ed16f8f86467d2f15d67bd813483e7cd88c77382575268c7a07c1c5c66",
+    "icon_compact_url": "/gr3/film-icons/54.png?v=e104d5ed16f8",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 55,
@@ -491,8 +599,10 @@
     "title": "M9",
     "code": "STD",
     "color": "#a08baa",
-    "icon_url": "/gr3/film-icons/55-large.png",
-    "sha256": "83faf408602f876e89640238b9989ac804c9055f7f1cbe6cede78ad861206bc9"
+    "icon_url": "/gr3/film-icons/55-large.png?v=e12d1b2ebcbb",
+    "sha256": "761f12a096348d137867a9533fba5e6a526bc2f745870ca60231f227b96c65ab",
+    "icon_compact_url": "/gr3/film-icons/55.png?v=761f12a09634",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 56,
@@ -500,8 +610,10 @@
     "title": "SUPRA",
     "code": "200",
     "color": "#c1a275",
-    "icon_url": "/gr3/film-icons/56-large.png",
-    "sha256": "2c77fce9621c9986976a5ff518c170e3060d79ca21c040df7d75c270bcf06553"
+    "icon_url": "/gr3/film-icons/56-large.png?v=b127ca98e707",
+    "sha256": "3a9c570d7e3675189c0f4632d3fa50674fa18e46a7331ce3eecd127748ef8ed4",
+    "icon_compact_url": "/gr3/film-icons/56.png?v=3a9c570d7e36",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 57,
@@ -509,8 +621,10 @@
     "title": "SUPRA",
     "code": "200B",
     "color": "#748895",
-    "icon_url": "/gr3/film-icons/57-large.png",
-    "sha256": "2aeab9d7e572e8d2c339fe6e45b9524edbdaaf0a3ddcf0bff1f165a4915fb8ec"
+    "icon_url": "/gr3/film-icons/57-large.png?v=9f5b8f332a99",
+    "sha256": "9c10a807ba7518672573545148d9598b8c4f729a184b7d8d8dcf506d0926acd8",
+    "icon_compact_url": "/gr3/film-icons/57.png?v=9c10a807ba75",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 58,
@@ -518,8 +632,10 @@
     "title": "UMAX",
     "code": "400",
     "color": "#8eab6a",
-    "icon_url": "/gr3/film-icons/58-large.png",
-    "sha256": "5da3f8903e8435bd179bc9b66fd6131f4ad16a3a2a7659c4b17a29f21ed3eeb3"
+    "icon_url": "/gr3/film-icons/58-large.png?v=bcbfb889043c",
+    "sha256": "e6f18e55d346c5303f5cde2b7c664a700e0bb0b540d04cb4a2f4c9da42864328",
+    "icon_compact_url": "/gr3/film-icons/58.png?v=e6f18e55d346",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 59,
@@ -527,8 +643,10 @@
     "title": "UMAX",
     "code": "400",
     "color": "#bb6655",
-    "icon_url": "/gr3/film-icons/59-large.png",
-    "sha256": "814a78646c36607c04aeaac18232e6f08a9b79824cc2233c0e37410cca4cd056"
+    "icon_url": "/gr3/film-icons/59-large.png?v=2d224d9f961f",
+    "sha256": "892f3fd5ef9e768484645af9d0c079cff8175fa0b4453564d1832b81b7ce49fb",
+    "icon_compact_url": "/gr3/film-icons/59.png?v=892f3fd5ef9e",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 60,
@@ -536,8 +654,10 @@
     "title": "UMAX",
     "code": "400",
     "color": "#c9c6b5",
-    "icon_url": "/gr3/film-icons/60-large.png",
-    "sha256": "a947261311888aa0efea12f1387f1c6b6634f3fec34ccf8b6b2eaf848bac8147"
+    "icon_url": "/gr3/film-icons/60-large.png?v=6e8670cef2e4",
+    "sha256": "9a969c5a8e1e3147601fb8a54c4cfcbb68883d9fe4686b53676ade3f018188a2",
+    "icon_compact_url": "/gr3/film-icons/60.png?v=9a969c5a8e1e",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 61,
@@ -545,8 +665,10 @@
     "title": "V3",
     "code": "250DF",
     "color": "#c6a450",
-    "icon_url": "/gr3/film-icons/61-large.png",
-    "sha256": "0c11caa485b2a54bac9697b6f92f71d019341034d8210baace5f2012d91fe2ab"
+    "icon_url": "/gr3/film-icons/61-large.png?v=5c2825921666",
+    "sha256": "5bd425fd81361ef32c03e859f87f7e04d66786cec6d15d8476c276fd9e2de1a4",
+    "icon_compact_url": "/gr3/film-icons/61.png?v=5bd425fd8136",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 62,
@@ -554,8 +676,10 @@
     "title": "5219",
     "code": "500T",
     "color": "#bca26c",
-    "icon_url": "/gr3/film-icons/62-large.png",
-    "sha256": "bedacf87ea1578e786f207f2381c1bec17e43f66dd400a22fc802e2deb69d59e"
+    "icon_url": "/gr3/film-icons/62-large.png?v=4a00d8d61024",
+    "sha256": "5dd724c2335cd65a4c7ab4431449caa81a16193d2226f531e60fac181f379d9c",
+    "icon_compact_url": "/gr3/film-icons/62.png?v=5dd724c2335c",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 63,
@@ -563,8 +687,10 @@
     "title": "5219",
     "code": "500TN",
     "color": "#687469",
-    "icon_url": "/gr3/film-icons/63-large.png",
-    "sha256": "21f2f1efb02dba7e87050c0365415093088af52da6118b124c98972d5a6a90ee"
+    "icon_url": "/gr3/film-icons/63-large.png?v=9028babc12cd",
+    "sha256": "409cb63131583ac688fe824c50e6656d9dcebef4debf41f91ed05288880e873e",
+    "icon_compact_url": "/gr3/film-icons/63.png?v=409cb6313158",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 64,
@@ -572,8 +698,10 @@
     "title": "V3",
     "code": "5207",
     "color": "#bab7a4",
-    "icon_url": "/gr3/film-icons/64-large.png",
-    "sha256": "8d04aaf5a6de447f0f6fff33cb68c8a1829cc26dc3e11f65569718c1c6b85d3e"
+    "icon_url": "/gr3/film-icons/64-large.png?v=810bc4b18c7b",
+    "sha256": "b0f66ce042fcf1e7197c8dc3eaadc5eebf61af4afc686de586b0c17d550c1553",
+    "icon_compact_url": "/gr3/film-icons/64.png?v=b0f66ce042fc",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 65,
@@ -581,8 +709,10 @@
     "title": "GR2",
     "code": "VIVID",
     "color": "#728d88",
-    "icon_url": "/gr3/film-icons/65-large.png",
-    "sha256": "5b332b12f30e7fc044aeae81447e8a9c628d72253ee92405bc9f2b5333fcb6e2"
+    "icon_url": "/gr3/film-icons/65-large.png?v=64ec3d2dc1f7",
+    "sha256": "e804597f882475a9688d44613f509805391b633a75e6a23751ee7ebeb1b5ab57",
+    "icon_compact_url": "/gr3/film-icons/65.png?v=e804597f8824",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 66,
@@ -590,8 +720,10 @@
     "title": "5207",
     "code": "250D",
     "color": "#b59a45",
-    "icon_url": "/gr3/film-icons/66-large.png",
-    "sha256": "9131a2e49cc3f39cc4fbef3ba21d7bcb2339c4a6f0d075b900001b8f95409472"
+    "icon_url": "/gr3/film-icons/66-large.png?v=d3d082ee45a0",
+    "sha256": "21c03f1990a7ce4ff5275e90a4af63c4bcb9be6b58acde66985d72293204ac92",
+    "icon_compact_url": "/gr3/film-icons/66.png?v=21c03f1990a7",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 67,
@@ -599,8 +731,10 @@
     "title": "PHNX",
     "code": "II200",
     "color": "#397ac4",
-    "icon_url": "/gr3/film-icons/67-large.png",
-    "sha256": "1ac8cdb382744def0425b2509a56789bb76abf749e42470e8da32e0b19e4ded0"
+    "icon_url": "/gr3/film-icons/67-large.png?v=be6aa28288e3",
+    "sha256": "c45ed673f16799ec299b30f89c8b44dbdfd36a1fade6f6742012db847f0759c2",
+    "icon_compact_url": "/gr3/film-icons/67.png?v=c45ed673f167",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 68,
@@ -608,8 +742,10 @@
     "title": "RED",
     "code": "125",
     "color": "#c74435",
-    "icon_url": "/gr3/film-icons/68-large.png",
-    "sha256": "72cb0f7926784b0db7443679fe287dc80d8d1d0a59c54f4f680107a4e37e743d"
+    "icon_url": "/gr3/film-icons/68-large.png?v=6c705a8b6c92",
+    "sha256": "1ba7630e73cdbaf5bceda4ab43b191be4dcc22ad1cbe577d85d0e2e69788d930",
+    "icon_compact_url": "/gr3/film-icons/68.png?v=1ba7630e73cd",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 69,
@@ -617,8 +753,10 @@
     "title": "PORTR",
     "code": "160",
     "color": "#a484ad",
-    "icon_url": "/gr3/film-icons/69-large.png",
-    "sha256": "716d4ead1f0ce053f7432345c7ad6fd83bc60b87c7c53ccff823e01b8bf20f17"
+    "icon_url": "/gr3/film-icons/69-large.png?v=3967a64256e7",
+    "sha256": "1237a5f0f75e35af10723d71cb8ed58b9af480b7e625e32987306aa2752bb1e4",
+    "icon_compact_url": "/gr3/film-icons/69.png?v=1237a5f0f75e",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 70,
@@ -626,8 +764,10 @@
     "title": "FUJI",
     "code": "100",
     "color": "#41a66b",
-    "icon_url": "/gr3/film-icons/70-large.png",
-    "sha256": "903516640e8d3fc39a1bd277722493f229bf50e6660b3a905a3e3cd89cff5112"
+    "icon_url": "/gr3/film-icons/70-large.png?v=7cfff99fa063",
+    "sha256": "06f5c8fec4aa3ea770165de56f599ce3359bec79089b151d7d4ee5b4af32866c",
+    "icon_compact_url": "/gr3/film-icons/70.png?v=06f5c8fec4aa",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 71,
@@ -635,8 +775,10 @@
     "title": "LUCKY",
     "code": "C200",
     "color": "#d94735",
-    "icon_url": "/gr3/film-icons/71-large.png",
-    "sha256": "8c30319958482f3ccf2d42934e247af6b754ee0721b146ede2a910768ccb0d76"
+    "icon_url": "/gr3/film-icons/71-large.png?v=d75d377831b0",
+    "sha256": "be015f7924287c1849ac30b004eafecc6b81267c3a141ee92e0e132c1491db20",
+    "icon_compact_url": "/gr3/film-icons/71.png?v=be015f792428",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 72,
@@ -644,8 +786,10 @@
     "title": "GR",
     "code": "CCD",
     "color": "#567f8e",
-    "icon_url": "/gr3/film-icons/72-large.png",
-    "sha256": "ea01de06f9abe5f1123ffd8601d4c1b9bfe40f9f93bf507f45de27f2d38f95be"
+    "icon_url": "/gr3/film-icons/72-large.png?v=c8463159123c",
+    "sha256": "e6cfed959ddf53332350ee2292bcb4d191e65fa7a75409cfccdd4c05d1dfa04b",
+    "icon_compact_url": "/gr3/film-icons/72.png?v=e6cfed959ddf",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 73,
@@ -653,8 +797,10 @@
     "title": "FUJI",
     "code": "C200",
     "color": "#41995b",
-    "icon_url": "/gr3/film-icons/73-large.png",
-    "sha256": "8e8e8958fddf7c4247b3dac65bae7c6a4111d0258055306120129708949943e2"
+    "icon_url": "/gr3/film-icons/73-large.png?v=033753bb3b7e",
+    "sha256": "e2f7b7c67a04f714301907af49558bcf6e2aed754fc3e5faee0ab498f4748a7c",
+    "icon_compact_url": "/gr3/film-icons/73.png?v=e2f7b7c67a04",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 74,
@@ -662,8 +808,10 @@
     "title": "PROIM",
     "code": "100",
     "color": "#c7a357",
-    "icon_url": "/gr3/film-icons/74-large.png",
-    "sha256": "a24e714ec23a1cb887dc56f5b6e4a81d014727678e49e30ad833e55549a76b95"
+    "icon_url": "/gr3/film-icons/74-large.png?v=177aa64014fa",
+    "sha256": "9858ab6440b859d179b2f145dc6a864048b4fe14a5502c90a145f9e2810aa9de",
+    "icon_compact_url": "/gr3/film-icons/74.png?v=9858ab6440b8",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 75,
@@ -671,8 +819,10 @@
     "title": "TMAX",
     "code": "100",
     "color": "#84817b",
-    "icon_url": "/gr3/film-icons/75-large.png",
-    "sha256": "cea220180903f20ea4f9c83f8fedce15b124beb39a1d4387769f1631c2c4d1fd"
+    "icon_url": "/gr3/film-icons/75-large.png?v=d11daec63947",
+    "sha256": "1d720f13f6062f3678cf9a04fd4e9aa1c405e9df2affe114950f2731f6757b58",
+    "icon_compact_url": "/gr3/film-icons/75.png?v=1d720f13f606",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 76,
@@ -680,8 +830,10 @@
     "title": "AERO",
     "code": "1443",
     "color": "#ca527d",
-    "icon_url": "/gr3/film-icons/76-large.png",
-    "sha256": "08737b1d4abc0a7c522f1e5ed851d17bd35165e33a7d53896b7bddbf25f28740"
+    "icon_url": "/gr3/film-icons/76-large.png?v=4886e78beb34",
+    "sha256": "26ec6982820397b9e5da76d7522002a16df42a7f295c1f4e5af3e890be8f302b",
+    "icon_compact_url": "/gr3/film-icons/76.png?v=26ec69828203",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 77,
@@ -689,8 +841,10 @@
     "title": "AERO",
     "code": "2460",
     "color": "#58a3a8",
-    "icon_url": "/gr3/film-icons/77-large.png",
-    "sha256": "3b5a0e569f8d0f06b99f83c28d7c9cdc6a457c358588447a983694f6792ef081"
+    "icon_url": "/gr3/film-icons/77-large.png?v=1275e7f49d53",
+    "sha256": "cd47b598083c7375a21c82e86e071283ba3826cc8b8b9b570a079a51714828c7",
+    "icon_compact_url": "/gr3/film-icons/77.png?v=cd47b598083c",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 78,
@@ -698,8 +852,10 @@
     "title": "5203",
     "code": "50D",
     "color": "#bfaa4c",
-    "icon_url": "/gr3/film-icons/78-large.png",
-    "sha256": "2cca0f9fdb4ad8c395f76eb640d2a608ece411e847f1ac50b0c5ec226dd17fa4"
+    "icon_url": "/gr3/film-icons/78-large.png?v=7e9f5efc3d76",
+    "sha256": "587c3177d60c2a73b44bddee12d6ab8f36311df590f4e8285d2a237f3231c4e1",
+    "icon_compact_url": "/gr3/film-icons/78.png?v=587c3177d60c",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 289,
@@ -707,8 +863,10 @@
     "title": "KODA",
     "code": "PIXEL",
     "color": "#fad84e",
-    "icon_url": "/gr3/film-icons/289-large.png",
-    "sha256": "5928c7f1117c70677083cfe1f524ffa7858b8dd10c3010f0318b1a8745386016"
+    "icon_url": "/gr3/film-icons/289-large.png?v=6af870ee2a5e",
+    "sha256": "59d3050c8eb09db0d5523daf548f2c3e94a6f1b673c734befc0383f0a9d06d6f",
+    "icon_compact_url": "/gr3/film-icons/289.png?v=59d3050c8eb0",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 290,
@@ -716,8 +874,10 @@
     "title": "PIXEL",
     "code": "WORLD",
     "color": "#76a849",
-    "icon_url": "/gr3/film-icons/290-large.png",
-    "sha256": "3350095da4f60b2a0c9a49ae30855ebe1737765433a6ce1d68299d992fd049a7"
+    "icon_url": "/gr3/film-icons/290-large.png?v=18bffa1ddffb",
+    "sha256": "883df2e23991be1be2c8fc1347a76050ed220fc4c3cbf0ec516264ed6158d8f9",
+    "icon_compact_url": "/gr3/film-icons/290.png?v=883df2e23991",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 291,
@@ -725,8 +885,10 @@
     "title": "LEICA",
     "code": "MONO",
     "color": "#71767a",
-    "icon_url": "/gr3/film-icons/291-large.png",
-    "sha256": "348f414b27ae9556085144b0296ccad1cdda31178773acd4eec56f49970255a2"
+    "icon_url": "/gr3/film-icons/291-large.png?v=38df91220138",
+    "sha256": "8e3b637232eecf770823e4b92e74bc36a0914e35b58418fecd085bd5f4833e5e",
+    "icon_compact_url": "/gr3/film-icons/291.png?v=8e3b637232ee",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 292,
@@ -734,8 +896,10 @@
     "title": "LOMO",
     "code": "400",
     "color": "#df624b",
-    "icon_url": "/gr3/film-icons/292-large.png",
-    "sha256": "c44b92af12461b7223d4033efc3018a2d45515d9678c28e9461bb55caee48d26"
+    "icon_url": "/gr3/film-icons/292-large.png?v=12a0ea6d255b",
+    "sha256": "978d9c26c588ce3aeb51a2d6aac513d74a744368c772df5bdbdcaa47cda865c4",
+    "icon_compact_url": "/gr3/film-icons/292.png?v=978d9c26c588",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 293,
@@ -743,8 +907,10 @@
     "title": "POLAR",
     "code": "600",
     "color": "#d5bd9b",
-    "icon_url": "/gr3/film-icons/293-large.png",
-    "sha256": "47dac8c248736dd3b9108e75756007ac8ec780a37f2f933c04e5d17253d4a2fc"
+    "icon_url": "/gr3/film-icons/293-large.png?v=c59364b3f2a9",
+    "sha256": "957269c04228a5037b41cd19653e8611437e1750f88958c5608575c270155f59",
+    "icon_compact_url": "/gr3/film-icons/293.png?v=957269c04228",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 294,
@@ -752,8 +918,10 @@
     "title": "VELV",
     "code": "50",
     "color": "#74983c",
-    "icon_url": "/gr3/film-icons/294-large.png",
-    "sha256": "2d3893c37df46c2eb5525c5942afc3acc8f98663134d15cec8f0411e1f0de0f0"
+    "icon_url": "/gr3/film-icons/294-large.png?v=6ec43a1fbe08",
+    "sha256": "4087990e6a5ac8dc7a24c4de8c60290b3efbdb1b506a5854152c6977912c0f78",
+    "icon_compact_url": "/gr3/film-icons/294.png?v=4087990e6a5a",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 295,
@@ -761,8 +929,10 @@
     "title": "CYBER",
     "code": "NEON",
     "color": "#9b4ad2",
-    "icon_url": "/gr3/film-icons/295-large.png",
-    "sha256": "d53dfe0c01f268b404fd250412132304aa5292bb8b3ee23f90bd08b2ee1c2ff6"
+    "icon_url": "/gr3/film-icons/295-large.png?v=b2126f53e9b3",
+    "sha256": "586e3a085ea338b82c2b54051c330e0b8cdeb39902dd1addcbe3cf418d505908",
+    "icon_compact_url": "/gr3/film-icons/295.png?v=586e3a085ea3",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 296,
@@ -770,8 +940,10 @@
     "title": "CYANO",
     "code": "BLUE",
     "color": "#275a91",
-    "icon_url": "/gr3/film-icons/296-large.png",
-    "sha256": "0cf54ee5b8aae99f8c18692150a767cbceaeedbd2dd80236b36fc8b458ff7957"
+    "icon_url": "/gr3/film-icons/296-large.png?v=230338a9ca5a",
+    "sha256": "0efc5985ba7bb7e92b60e348db0dd2e484a3606e9875f5be44376827aba2a763",
+    "icon_compact_url": "/gr3/film-icons/296.png?v=0efc5985ba7b",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 297,
@@ -779,8 +951,10 @@
     "title": "COOL",
     "code": "DE",
     "color": "#6b8792",
-    "icon_url": "/gr3/film-icons/297-large.png",
-    "sha256": "5c7f9a070cbd56098c85a5011aa2cd0da6ea2c63a644ad86466d60f508653f86"
+    "icon_url": "/gr3/film-icons/297-large.png?v=a56bb1e9d53f",
+    "sha256": "1cc42de90576492f1d76003472e9118ed4b60d0fb2800a3e82f64f342abc7916",
+    "icon_compact_url": "/gr3/film-icons/297.png?v=1cc42de90576",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 298,
@@ -788,8 +962,10 @@
     "title": "5213",
     "code": "200T",
     "color": "#b59a45",
-    "icon_url": "/gr3/film-icons/298-large.png",
-    "sha256": "286f0564eaba03654f6ee43d74fbc491772bf05bd92c0e4fe19c93ef34fe829c"
+    "icon_url": "/gr3/film-icons/298-large.png?v=ef6b711a902a",
+    "sha256": "083c1939fc624f68a194d7c5f565b997a6fe7de72ad8d06382adf4ffa3494a72",
+    "icon_compact_url": "/gr3/film-icons/298.png?v=083c1939fc62",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 299,
@@ -797,8 +973,10 @@
     "title": "TRI-X",
     "code": "400",
     "color": "#49443b",
-    "icon_url": "/gr3/film-icons/299-large.png",
-    "sha256": "37af7c1372f60e983adf54a4227ba892646ddec351e2b61eb4f3b94c2acbd865"
+    "icon_url": "/gr3/film-icons/299-large.png?v=15990e4b24d8",
+    "sha256": "8a601acc4a5232872d9e125f958cce469ee7bc3b9740a90a18924bac1906e8e9",
+    "icon_compact_url": "/gr3/film-icons/299.png?v=8a601acc4a52",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 300,
@@ -806,8 +984,10 @@
     "title": "DELTA",
     "code": "100",
     "color": "#777b83",
-    "icon_url": "/gr3/film-icons/300-large.png",
-    "sha256": "a43caf2ccc51e751f72cc03917bdce384819698a1cc09fc78e00d93436af5c49"
+    "icon_url": "/gr3/film-icons/300-large.png?v=b9d4f5943887",
+    "sha256": "6d083abfd5a45aa502bb22d004a25f98e1b80d9d5bd24cc1058ed12cf0074968",
+    "icon_compact_url": "/gr3/film-icons/300.png?v=6d083abfd5a4",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 301,
@@ -815,8 +995,10 @@
     "title": "PAN",
     "code": "400",
     "color": "#b19b51",
-    "icon_url": "/gr3/film-icons/301-large.png",
-    "sha256": "11c54fad7449940a8347646798387964ffa400ccfc02f6ed9b17fb4dac2fc923"
+    "icon_url": "/gr3/film-icons/301-large.png?v=f748ac0d2c8a",
+    "sha256": "89b2639fe1ac09eba7b12a1f6086ffc93670f51465a1742c3c14721dea8256ae",
+    "icon_compact_url": "/gr3/film-icons/301.png?v=89b2639fe1ac",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 302,
@@ -824,8 +1006,10 @@
     "title": "INFRARED",
     "code": "400 IR",
     "color": "#9c473b",
-    "icon_url": "/gr3/film-icons/302-large.png",
-    "sha256": "da6e5676afbda3e83ea47fca30560427dbeb128298f406110a1a59c0206f30c8"
+    "icon_url": "/gr3/film-icons/302-large.png?v=0d148bc0cf2c",
+    "sha256": "fd997c075cf71863b360fd1d6b29166c572dac085b6825806e59e1a458b9c1b4",
+    "icon_compact_url": "/gr3/film-icons/302.png?v=fd997c075cf7",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 303,
@@ -833,8 +1017,10 @@
     "title": "SFX",
     "code": "200 IR",
     "color": "#923f40",
-    "icon_url": "/gr3/film-icons/303-large.png",
-    "sha256": "511f3b2bfbd0bc1e5ae0f57bff743da3c8b21f59b822ea7a47a4d3fc56077568"
+    "icon_url": "/gr3/film-icons/303-large.png?v=c27c788bd0c4",
+    "sha256": "46d12ee0ab98a8dbf7150ca516cc450a85f8e208a9b1e3983010128ab0198475",
+    "icon_compact_url": "/gr3/film-icons/303.png?v=46d12ee0ab98",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 304,
@@ -842,8 +1028,10 @@
     "title": "FOMAPAN",
     "code": "400",
     "color": "#387e9e",
-    "icon_url": "/gr3/film-icons/304-large.png",
-    "sha256": "df6cac2b621ebe661bbf95ab63b1a851e3469c092daf40dc4e89e8e8bd1ce0f6"
+    "icon_url": "/gr3/film-icons/304-large.png?v=cadedf19eed6",
+    "sha256": "137d4ba06fcb30e3aa8a49672117fdeb6cf9ff56e35196d2613ff75f02f8eabb",
+    "icon_compact_url": "/gr3/film-icons/304.png?v=137d4ba06fcb",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 305,
@@ -851,8 +1039,10 @@
     "title": "X FILM",
     "code": "80 MKII",
     "color": "#71916f",
-    "icon_url": "/gr3/film-icons/305-large.png",
-    "sha256": "1cf62ec23895db519e01e5f019b023186b721ac13b987aa3fb99226bd1a9f4bb"
+    "icon_url": "/gr3/film-icons/305-large.png?v=5ab4f83acab3",
+    "sha256": "3c0d12d6115fecf864b6bd9569b45a64e2c899570b328a231528a0e5353bd6c0",
+    "icon_compact_url": "/gr3/film-icons/305.png?v=3c0d12d6115f",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 309,
@@ -860,8 +1050,10 @@
     "title": "PROVIA",
     "code": "100F",
     "color": "#378b70",
-    "icon_url": "/gr3/film-icons/309-large.png",
-    "sha256": "5545f76182228909636993acb1461953888368b1c1211707cb91b836ed754afb"
+    "icon_url": "/gr3/film-icons/309-large.png?v=3d31dbeb2933",
+    "sha256": "1f32e395bd48ce8145c8117df4ca73c7e4b07f106dea62487011f4d551143569",
+    "icon_compact_url": "/gr3/film-icons/309.png?v=1f32e395bd48",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 310,
@@ -869,8 +1061,10 @@
     "title": "EKTACHROME",
     "code": "E100",
     "color": "#cfab47",
-    "icon_url": "/gr3/film-icons/310-large.png",
-    "sha256": "358c21904423a84fa2d43108206f96b731f2830dbb99b14727fff27f9f31bbbb"
+    "icon_url": "/gr3/film-icons/310-large.png?v=16d220b8c377",
+    "sha256": "bf797d6cc8e6d905f3726e140857977063b0678fc1dac029824cc32e8e136f62",
+    "icon_compact_url": "/gr3/film-icons/310.png?v=bf797d6cc8e6",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 311,
@@ -878,8 +1072,10 @@
     "title": "EKTACHROME",
     "code": "5294",
     "color": "#b8954b",
-    "icon_url": "/gr3/film-icons/311-large.png",
-    "sha256": "8ffc8acc4c423d9a0b70c9be4974cef42398d6f9ca6bba12f9f2bab2a3bafe11"
+    "icon_url": "/gr3/film-icons/311-large.png?v=e3c78202709b",
+    "sha256": "c3c7876bc7ed08290d2c2c9ef9adc5bedd880777b279bbff8d1182d5cccd47e1",
+    "icon_compact_url": "/gr3/film-icons/311.png?v=c3c7876bc7ed",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 312,
@@ -887,8 +1083,10 @@
     "title": "OPTICOLOUR",
     "code": "200",
     "color": "#73946b",
-    "icon_url": "/gr3/film-icons/312-large.png",
-    "sha256": "cb6db60c03787e35b936f6a4b86d680781da1a1e2649f7f8dfcdc0273ff1e724"
+    "icon_url": "/gr3/film-icons/312-large.png?v=5b87b3f3467f",
+    "sha256": "d6f7db03d2902907c6ac2198b45e74f59fa75800653d9d9d5a5d1d7520907f5f",
+    "icon_compact_url": "/gr3/film-icons/312.png?v=d6f7db03d290",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 313,
@@ -896,8 +1094,10 @@
     "title": "WOLFEN",
     "code": "NC500",
     "color": "#8c7e4f",
-    "icon_url": "/gr3/film-icons/313-large.png",
-    "sha256": "2605e8fbc53e7295a08f528aea66979fc8a7710f0f1da1cdcdd4297e3593dc2d"
+    "icon_url": "/gr3/film-icons/313-large.png?v=bb98e7b1a0e7",
+    "sha256": "9396a3654abc79e2298030df52f1d881543e0193fb3126371d307d3a3b81b498",
+    "icon_compact_url": "/gr3/film-icons/313.png?v=9396a3654abc",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 314,
@@ -905,8 +1105,10 @@
     "title": "ACROS II",
     "code": "100",
     "color": "#777b72",
-    "icon_url": "/gr3/film-icons/314-large.png",
-    "sha256": "5fc7f3abac87d1e2c4524f4f9a9dc68f9f4ec64f433908a7bbb9d6c5ea516c88"
+    "icon_url": "/gr3/film-icons/314-large.png?v=70a7428ddcb6",
+    "sha256": "cc0a0028f34ddc0d8a038420cc7b1265c94909f5b5ef8135f1fafc4ccbcb87f3",
+    "icon_compact_url": "/gr3/film-icons/314.png?v=cc0a0028f34d",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 315,
@@ -914,8 +1116,10 @@
     "title": "DOUBLE-X",
     "code": "5222",
     "color": "#6a6961",
-    "icon_url": "/gr3/film-icons/315-large.png",
-    "sha256": "a655f9c5cb091057e250e1dfa4f12e85a18d8e5a8a8e148a2d03fdd930eb3ac7"
+    "icon_url": "/gr3/film-icons/315-large.png?v=20a50e25c44e",
+    "sha256": "58887798ddcd332de5840b4988bbce9b6b0d7790c7b049c351db3efb4765734c",
+    "icon_compact_url": "/gr3/film-icons/315.png?v=58887798ddcd",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 316,
@@ -923,8 +1127,10 @@
     "title": "TURQUOISE",
     "code": "100-400",
     "color": "#397f8c",
-    "icon_url": "/gr3/film-icons/316-large.png",
-    "sha256": "892b5a4a0a36075f6abe59c88ba47e11abac4b17787b5d251eb94998e7f5c2ad"
+    "icon_url": "/gr3/film-icons/316-large.png?v=7b5be8a4bc1a",
+    "sha256": "275c2ac0d0a2f0d73b835a40813094d199b9dd1b5f1987da2aac0fe14983e559",
+    "icon_compact_url": "/gr3/film-icons/316.png?v=275c2ac0d0a2",
+    "artwork_revision": "classic-square-v1"
   },
   {
     "id": 317,
@@ -932,7 +1138,9 @@
     "title": "INSTAX",
     "code": "800",
     "color": "#4bafaa",
-    "icon_url": "/gr3/film-icons/317-large.png",
-    "sha256": "15bea1739fb9ee32da212e13b6f06986e95b2e682eff161fd627492ceadce47b"
+    "icon_url": "/gr3/film-icons/317-large.png?v=54039f8fa653",
+    "sha256": "b6df64252c4df5af58317fc555dd503c1f18f3f9d8df073f51d90e1fa9f0823b",
+    "icon_compact_url": "/gr3/film-icons/317.png?v=b6df64252c4d",
+    "artwork_revision": "classic-square-v1"
   }
 ]

@@ -9,7 +9,7 @@ int gr2_film_card_rgba(uint8_t *,uint32_t capacity,uint32_t film,uint32_t slot,u
 /* UI thread only, initialized stock 640x480 logical context. Rectangle is
  * left/top/right/bottom, count excludes the required UTF-16 terminator. */
 int gr2_text_draw(const uint16_t *,uint32_t,const int16_t rectangle[4],uint32_t color);
-/* UI owner only; physical x/y packed in low/high16, one 120x196 card. */
+/* UI owner only; physical x/y packed in low/high16, one 128x128 card. */
 int gr2_card_draw(uint32_t film,uint32_t slot,uint32_t selected,uint32_t position);
 /* Fresh caller-owned storage. Only the UI owner may attach/detach; callbacks
  * remain alive until detach completes. destroy may release its owner and must

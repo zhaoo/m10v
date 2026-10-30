@@ -26,7 +26,7 @@ class FilmIconCoverageTests(unittest.TestCase):
    else:return
    u.reg_write(A.UC_ARM_REG_R0,result);u.reg_write(A.UC_ARM_REG_PC,u.reg_read(A.UC_ARM_REG_LR))
   e.u.hook_add(UC_HOOK_CODE,services)
-  inventory=[*[(i,670+i) for i in range(1,79)],(79,754),(288,754),(289,755),(290,761),*[(291+i,762+i) for i in range(7)],(298,774),*[(299+i,775+i) for i in range(7)],*[(306+i,858+i) for i in range(6)]]
+  inventory=[*[(i,670+i) for i in range(1,79)],(79,754),(288,754),(289,755),(290,761),*[(291+i,762+i) for i in range(7)],(298,774),*[(299+i,775+i) for i in range(7)],*[(306+i,858+i) for i in range(6)],(314,871),(315,872),(316,873),(317,875)]
   for film,icon in inventory:
    for slot in range(10):
     struct.pack_into('<H',state,12+8*slot,film)

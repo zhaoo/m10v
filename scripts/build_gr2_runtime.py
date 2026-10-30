@@ -256,7 +256,9 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     for name in ('m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks','m10v_sd_library','m10v_settings','m10v_film_card'):
         target=out_dir/(name+'.o')
         initial_flags=['-DM10V_INITIAL_STATE_BYTES='+','.join(map(str,initial_native))] if name=='m10v_library' else []
-        subprocess.run([clang,*FLAGS,*initial_flags,'-c',str(COMPAT/f'native/gr3/{name}.c'),'-o',str(target)],check=True,capture_output=True)
+        # Recipe/state ABI remains frozen; artwork follows the current square design.
+        source=(ROOT if name=='m10v_film_card' else COMPAT)/f'native/gr3/{name}.c'
+        subprocess.run([clang,*FLAGS,*initial_flags,'-c',str(source),'-o',str(target)],check=True,capture_output=True)
         render_objects.append(str(target))
     subprocess.run([linker,'-m','armelfb','--no-undefined','-T',str(script),str(obj),str(startup),*render_objects,'-o',str(elf)],check=True,capture_output=True)
     report=audit_elf(elf.read_bytes())

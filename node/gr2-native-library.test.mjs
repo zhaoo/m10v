@@ -4,6 +4,8 @@ import {readFile} from 'node:fs/promises';
 import {prepareGr2Native,generateGr2Native} from './gr2-native-library.mjs';
 import {defaultConfiguration} from '../web/gr2/native-library-state.mjs';
 const source=()=>readFile(new URL('../bin/rg2_v003.frm',import.meta.url));
+// New square artwork changes the runtime while the frozen recipe ABI stays v4.
+const defaultSquareRuntimeSha='8f677dc16efa9e0c07413dd5de8c67639a3def545d95c37565e72ead7fd9dd1f';
 test('GR2 plan binds independent initial HDF and rejects invalid grades',async()=>{
  const b=await source(),c=defaultConfiguration(),a=await prepareGr2Native(b,c);c.slots[0].grain=2;
  assert.notEqual((await prepareGr2Native(b,c)).configuration_sha256,a.configuration_sha256);
@@ -15,7 +17,7 @@ test('GR2 actual native build reconstructs and packages exact candidate',async()
  const b=await source(),c=defaultConfiguration(),plan=await prepareGr2Native(b,c),result=await generateGr2Native(b,c,plan.configuration_sha256);
  assert.equal(result.receipt.verified,true);assert.equal(result.receipt.independent_component_reconstruction,true);
  assert.equal(result.receipt.hardware_verified,false);assert.equal(result.receipt.release_ready,false);
- assert.equal(result.runtime.runtime_sha256,'9aa7c2e1195046f6bc85a59bfa85507c62a6f797796d8f04d8a8a675b5f4e03d');assert.equal(result.runtime.can_package,false);assert.equal(result.audit.activation_ready,false);
+ assert.equal(result.runtime.runtime_sha256,defaultSquareRuntimeSha);assert.equal(result.runtime.can_package,false);assert.equal(result.audit.activation_ready,false);
 });
 
 test('GR II ABI remains five slots while GR III uses ten-slot v5',async()=>{
@@ -32,6 +34,6 @@ test('GR2 nonzero initial HDF is compiled and bound into the verified candidate 
  const plan=await prepareGr2Native(b,c),result=await generateGr2Native(b,c,plan.configuration_sha256);
  assert.equal(result.runtime.initial_hdf_strength,3);assert.equal(result.receipt.initial_hdf_strength,3);
  assert.equal(result.plan.configuration.hdf,3);assert.equal(result.receipt.configuration_sha256,plan.configuration_sha256);
- assert.notEqual(result.runtime.runtime_sha256,'9aa7c2e1195046f6bc85a59bfa85507c62a6f797796d8f04d8a8a675b5f4e03d');
+ assert.notEqual(result.runtime.runtime_sha256,defaultSquareRuntimeSha);
  assert.equal(result.receipt.hardware_verified,false);assert.equal(result.receipt.release_ready,false);
 });

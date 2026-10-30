@@ -50,9 +50,9 @@ int m10v_settings_view_create(m10v_settings_view *v){
  if(make(v,1,0,0,720,480)||make(v,11,0,0,720,480)||
     make(v,17,20,12,580,42)||make(v,0,24,58,672,38)||
     make(v,17,20,432,680,40)||make(v,17,20,378,680,40))goto fail;
- for(uint32_t i=0;i<10;i++)if(make(v,11,24+(i%5)*136,96+(i/5)*160,128,156))goto fail;
- for(uint32_t i=0;i<10;i++)if(make(v,11,26+(i%5)*136,98+(i/5)*160,124,152))goto fail;
- for(uint32_t i=0;i<10;i++)if(make(v,10,28+(i%5)*136,100+(i/5)*160,120,M10V_CARD_HEIGHT))goto fail;
+ for(uint32_t i=0;i<10;i++)if(make(v,11,20+(i%5)*136,98+(i/5)*140,136,136))goto fail;
+ for(uint32_t i=0;i<10;i++)if(make(v,11,22+(i%5)*136,100+(i/5)*140,132,132))goto fail;
+ for(uint32_t i=0;i<10;i++)if(make(v,10,24+(i%5)*136,102+(i/5)*140,M10V_CARD_WIDTH,M10V_CARD_HEIGHT))goto fail;
  /* Selection rectangles precede text in the child draw order. */
  for(uint32_t i=0;i<4;i++)if(make(v,11,0,84+i*72,720,64))goto fail;
  for(uint32_t i=0;i<4;i++)if(make(v,11,0,147+i*72,720,1))goto fail;

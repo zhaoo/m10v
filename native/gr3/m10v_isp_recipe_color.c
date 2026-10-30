@@ -2,6 +2,22 @@
 #include "m10v_isp_recipe_color.h"
 #include <stddef.h>
 #include "m10v_custom_isp.h"
+#include "m10v_film_identity.h"
+void m10v_isp_frame_identity_clear(uint32_t si){
+ m10v_film_identity *p=m10v_film_identity_owned(si);if(!p)return;
+ __atomic_store_n(&p->magic,0,__ATOMIC_RELEASE);p->generation++;p->code=0;p->check=0;
+}
+uint32_t m10v_isp_frame_identity_code(uint32_t si){return m10v_film_identity_read(si);}
+static void identity_publish(uint32_t si,const m10v_library_state *state,uint32_t tone){
+ m10v_film_identity *p=m10v_film_identity_owned(si);uint32_t slot=m10v_tone_slot(tone);
+ if(!p||slot>=M10V_SLOT_COUNT)return;
+ uint32_t film=state->slots[slot].film,bank=state->effects[slot].reserved[0],code=0;
+ if(M10V_BUILTIN(film))code=0x1000u+film;
+ else if(M10V_CUSTOM(film)&&bank>=21&&bank<=255)code=0x2000u+(film-79u)*235u+bank-21u;
+ if(!code)return;
+ p->code=code;p->check=~code^p->generation;
+ __atomic_store_n(&p->magic,M10V_FILM_IDENTITY_MAGIC,__ATOMIC_RELEASE);
+}
 typedef struct {uint32_t magic;m10v_isp_frame_target target;} custom_isp_snapshot;
 _Static_assert(sizeof(custom_isp_snapshot)==M10V_SAVE_CUSTOM_ISP_BYTES,"custom recipe extent");
 static custom_isp_snapshot *custom_snapshot(m10v_isp_recipe_color *s){
@@ -155,6 +171,7 @@ int m10v_isp_frame_recipe_producer(void *recipe){
     uintptr_t si=*(const uint32_t *)((const uint8_t *)recipe+0x44c8u);
     if(!config_ram(si,0x94c))return 0;
     uint32_t producer_tone=((const volatile uint8_t *)si)[0x77c];
+    m10v_isp_frame_identity_clear((uint32_t)si);
     if(!m10v_tone_valid(producer_tone))return 0;
     if(m10v_camera_library_mutation_busy())return producer_mutating(s);
     m10v_library_state verify;
@@ -165,6 +182,7 @@ int m10v_isp_frame_recipe_producer(void *recipe){
     /* The exposed frame owns its tone. UI Property can already name a later
      * shot by task submission; never use it to recolor a queued exposure. */
     s->selected_tone=(uint16_t)producer_tone;
+    identity_publish((uint32_t)si,&state,producer_tone);
     uint32_t slot=m10v_tone_slot(producer_tone);
     if(slot<M10V_SLOT_COUNT&&M10V_CUSTOM(state.slots[slot].film)){
         custom_isp_snapshot *custom=custom_snapshot(s);

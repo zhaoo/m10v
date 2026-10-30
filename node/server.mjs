@@ -129,7 +129,9 @@ export function createServer(store = new Store(path.join(root, 'data')),
       await handleGr4Request({ request, response, runtime: gr4, token, readBody, send, origin });
       return;
     }
-    const pathname = request.url;
+    // Only generated film artwork accepts its bounded content version query.
+    // Keep the existing strict URL contract for APIs and all other assets.
+    const pathname = request.method==='GET'&&/^\/gr3\/film-icons\/\d+(?:-large)?\.png\?v=[a-f0-9]{12}$/.test(request.url||'')?request.url.split('?')[0]:request.url;
     if (!pathname || pathname.includes('?') || pathname.includes('#') || pathname.includes('%') ||
       pathname.includes('\\') || pathname.includes('..')) return send(response, 404, { error: 'not found' });
     if(pathname==='/hooks/github'){

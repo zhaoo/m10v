@@ -40,7 +40,7 @@ export async function nativeCatalog(){
  films.forEach(f=>{const d=directoryFilm(f.id);if(d)Object.assign(f,d);});
  const icons=JSON.parse(await readFile(path.join(root,'web/gr3/film-icons/catalog.json'),'utf8'));
  if(icons.length!==films.length||icons.some((v,i)=>v.id!==films[i].id||v.name!==films[i].name))throw Error('M10V 图标目录与胶卷不同步');
- films.forEach((f,i)=>Object.assign(f,{icon_url:icons[i].icon_url,icon_color:icons[i].color}));
+ films.forEach((f,i)=>Object.assign(f,{icon_url:icons[i].icon_url,icon_compact_url:icons[i].icon_compact_url,icon_color:icons[i].color}));
  let available=false;try{available=hash(await readFile(path.join(root,'fwdc239b-offical.bin')))===officialHash;}catch{}
  const byId=new Map(films.map(f=>[f.id,f]));
  const visibleFilms=FILM_DIRECTORY.map(d=>({...byId.get(d.id),...d}));

@@ -53,6 +53,7 @@ sources.push('native/gr3/m10v_save_trace.c','native/gr3/m10v_save_trace.h','nati
 sources.push('native/gr3/m10v_file_trace.c','scripts/build_gr3_file_trace.py');
 sources.push(...hdfSources);
 sources.push('node/gr3-sd-pre-oriented-stamp-contract.json');
+sources.push('native/gr3/m10v_film_identity.h','native/gr3/m10v_unknown_film.rgba','node/gr3-sd-pre-square-art-contract.json');
 sources.push('native/gr3/m10v_custom_isp.h','native/gr3/m10v_isp_frame_color.c','native/gr3/m10v_isp_frame_color.h','native/gr3/m10v_isp_recipe_color.c','native/gr3/m10v_isp_recipe_color.h','scripts/build_gr3_isp_recipe_color.py','scripts/build_gr3_isp_color_hook.py');
 const textureSources=['native/gr3/m10v_texture_accel.c','native/gr3/m10v_texture_accel.h','scripts/build_gr3_texture_accel.py'];
 const nativeGrainSources=['scripts/build_gr3_native_grain_hooks.py'];
@@ -168,7 +169,7 @@ function checkRuntime(runtime, manifest) {
       'native symbol outside module: '+name);
   }
   const focalIcons=manifest.zoom?.enabled===true&&manifest.sd_library;
-  const aspectFirst=focalIcons?855:782,iconCount=876,descriptorCount=122+(focalIcons?1:0)+Number(!!manifest.hdf_adj);
+  const aspectFirst=focalIcons?855:782,iconCount=877,descriptorCount=123+(focalIcons?1:0)+Number(!!manifest.hdf_adj);
   const icons=manifest.icons, stock=readFileSync(new URL('../native/gr3/m10v_stock_icon_directory.bin',import.meta.url)), artwork=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));
   need(icons?.first_id===671&&icons.last_id===748&&icons.width===40&&icons.height===40&&artwork.length===78*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
   const retired=manifest.sd_library?32:0, packedArt=artwork.subarray(retired*6400), packedCount=78-retired;
@@ -234,9 +235,9 @@ function checkRuntime(runtime, manifest) {
       runtime.readUInt32LE(icons.table-BASE+754*4)===descriptor&&
       runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&
       runtime.readUInt32LE(at+4)*4===pixels&&runtime.subarray(pixels-BASE,pixels-BASE+icon.length).equals(icon),'native custom LUT icon differs');
-    need(JSON.stringify(custom.name_resources)==='[1007,1011]'&&custom.name_storage==='getter-stack-80-bytes'&&Number.isInteger(manifest.symbols.m10v_menu_custom_resource),'native custom LUT name resources differ');
+    need(JSON.stringify(custom.name_resources)==='[1007,1011]'&&JSON.stringify(custom.appended_name_resources)==='[1111,1115]'&&custom.name_storage==='getter-stack-80-bytes'&&Number.isInteger(manifest.symbols.m10v_menu_custom_resource),'native custom LUT name resources differ');
     const c=manifest.film_cards;
-    need(c?.first_id===749&&c.last_id===773&&c.width===120&&c.height===148&&c.artwork_height===148&&c.caption_height===0&&c.heap_bytes===710580&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===710400&&c.directory_offset===710480&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
+    need(c?.first_id===749&&c.last_id===773&&c.width===128&&c.height===128&&c.artwork_height===128&&c.caption_height===0&&c.heap_bytes===655540&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===655360&&c.directory_offset===655440&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
     for(const name of ['width','height','draw']){
       const at=c.directory_hooks?.[name];need(Number.isInteger(at)&&at>=BASE&&at+100<=BASE+runtime.length&&at===manifest.symbols['m10v_icon_directory_'+name],'native dynamic directory hook differs');
       need(runtime.readUInt32LE(at-BASE)===0xe92d5fff&&runtime.readUInt32LE(at-BASE+4)===0xe10fc000,'native dynamic directory register guard differs');
@@ -263,6 +264,9 @@ function checkRuntime(runtime, manifest) {
     }
     need(offset===art.length,'native anime artwork extent differs');
   }
+  const unknownDescriptor=icons.descriptors+(descriptorCount-1)*8,unknownAt=unknownDescriptor-BASE;
+  const unknownPixels=runtime.readUInt32LE(unknownAt+4)*4;
+  need(runtime.readUInt32LE(icons.table-BASE+876*4)===unknownDescriptor&&runtime.readUInt16LE(unknownAt)===40&&runtime.readUInt16LE(unknownAt+2)===40&&runtime.subarray(unknownPixels-BASE,unknownPixels-BASE+6400).equals(readFileSync(new URL('../native/gr3/m10v_unknown_film.rgba',import.meta.url))),'unknown recorded film artwork differs');
   const resourceCount=373; // Border 1155..1157 reserved; Instax name 1158.
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
@@ -504,13 +508,27 @@ function appendedSlotPatches(runtime,manifest,raw) {
   [0x53599e4c,0xe353000c,0xe3530016],[0x53599e60,0xe2800030,0xe2800058],
  ])patches.push({address,expected,replacement,name:'appended EXIF '+address.toString(16)});
  const playback=m.playback;
- need(playback?.icon_id===754&&playback.metadata_key===0x25&&JSON.stringify(playback.recorded_codes)==='[268,277]'&&playback.identity==='recorded-slot-generic-film','playback identity contract differs');
+ need(playback?.icon_id===876&&playback.metadata_key===0x25&&JSON.stringify(playback.recorded_codes)==='[268,277]'&&playback.identity==='recorded-film-short-v1','playback identity contract differs');
  const checkPlayback=(name,words)=>{const start=playback[name],body=read(start,words.length*4);words.forEach((w,i)=>{if(Array.isArray(w))w=branch(start+4*i,w[0],true);need(body.readUInt32LE(4*i)===(w>>>0),'playback '+name+' instructions differ');});};
- checkPlayback('metadata_decode',[0xe3500015,0x93802801,0x83a02000,0xe350000b,branch(playback.metadata_decode+16,0x535c2520)]);
+ checkPlayback('metadata_decode',[0xe3500015,0x93802801,0x9a00000d,0xe3a02000,0xe300cf01,0xe150000c,0x3a000009,0xe301c04e,0xe150000c,0x9a000005,0xe301cf00,0xe150000c,0x3a000003,0xe30dcfc5,0xe150000c,0x8a000000,0xe3802802,0xe350000b,branch(playback.metadata_decode+72,0x535c2520)]);
  patches.push({address:0x535c251c,expected:0x83a02000,replacement:((branch(0x535c251c,playback.metadata_decode)&0x0fffffff)|0x80000000)>>>0,name:'recorded film playback metadata decode'});
- checkPlayback('icon',[0xe92d4010,[0x532b6eec],0xe3500000,0x1a00000a,[0x5320ad88],[0x5320b97c],0xe3500000,0x0a000006,0xe5902220,0xe300c00c,0xe340c001,0xe042200c,0xe3520009,0x930002f2,0x83a00000,0xe8bd8010]);
- checkPlayback('detail',[0xe92d4013,[0x532b44bc],0xe3500000,0x1a00000b,0xe59d2000,0xe5922220,0xe300c00c,0xe340c001,0xe042200c,0xe3520009,0x8a000004,0xe59d1004,0xe3510000,0x13a0200b,0x15c12000,0xe3a00001,0xe28dd008,0xe8bd8010]);
+ checkPlayback('icon',[0xe92d4010,[0x532b6eec],0xe3500000,0x1a000005,[0x5320ad88],[0x5320b97c],0xe3500000,0x0a000001,0xe5900220,[manifest.symbols.m10v_menu_recorded_icon],0xe8bd8010]);
+ checkPlayback('detail',[0xe92d4013,[0x532b44bc],0xe3500000,0x1a000009,0xe59d0000,0xe5900220,[manifest.symbols.m10v_menu_recorded_icon],0xe3500000,0x0a000004,0xe59d1004,0xe3510000,0x13a0200b,0x15c12000,0xe3a00001,0xe28dd008,0xe8bd8010]);
  for(const [address,expected,name] of [[0x53179b7c,0xeb04f4da,'icon'],[0x532b7cfc,0xebfff1ee,'detail']])patches.push({address,expected,replacement:branch(address,playback[name],true),name:'recorded film playback '+name});
+ if(playback.identity_enabled){
+  const h=playback.identity_hooks,clear=manifest.symbols.m10v_isp_frame_identity_clear,code=manifest.symbols.m10v_isp_frame_identity_code;
+  const check=(name,words)=>{const start=h[name],body=read(start,words.length*4);words.forEach((w,i)=>{if(Array.isArray(w))w=branch(start+i*4,w[0],w[1]!==false);need(body.readUInt32LE(i*4)===(w>>>0),'recorded identity '+name+' instructions differ');});};
+  const snapshot=manifest.capture_lifecycle?.snapshot;
+  need(snapshot?.snapshot_ingress_installed===true&&JSON.stringify(snapshot.producer_sites)==='[1397877404]'&&snapshot.exports?.m10v_isp_frame_identity_code===code&&snapshot.exports?.m10v_isp_frame_identity_clear===clear,'recorded identity requires frozen snapshot exports');
+  need(lifecyclePatches(manifest,runtime).some(p=>p.address===0x5351ea9c&&p.expected===0xe1a0c00d),'recorded identity requires verified processing-task producer');
+  check('pool_init',[0xe92d4010,0xe1a04000,[0x5355e87c],0xe304c270,0xe340c007,0xe084c00c,0xe3a01000,0xe58c1000,0xe58c1004,0xe58c1008,0xe58c100c,0xe8bd4010,[0x535239e8,false]]);
+  check('checkout',[0xe5c12024,0xe92d5fff,0xe10fc000,0xe92d5000,0xe1a00006,[clear],0xe8bd5000,0xe128f00c,0xe8bd5fff,[0x53523e04,false]]);
+  check('return',[0xe92d5fff,0xe10fc000,0xe92d5000,0xe1a00001,[clear],0xe8bd5000,0xe128f00c,0xe8bd5fff,0xe5c32024,[0x53523a6c,false]]);
+  check('writer',[0xe92d401f,0xe1a00002,[code],0xe3500000,0x0a000005,0xe1a02000,0xe59d0004,0xe3a01000,0xe28dd010,0xe8bd4010,[0x535d02c8,false],0xe8bd401f,[0x535c780c,false]]);
+  check('copy',[0xe92d401f,[clear],0xe8bd401f,[0x5313fd80,false]]);
+  const extra=[{address:0x53523984,expected:0xe3043270,replacement:movw(3,0x4280)},...[['pool_init',0x535239e4,branch(0x535239e4,0x5355e87c,true)],['checkout',0x53523e00,0xe5c12024],['return',0x53523a68,0xe5c32024]].map(([name,address,expected])=>({address,expected,replacement:branch(address,h[name])})),{address:0x53510830,expected:branch(0x53510830,0x5313fd80,true),replacement:branch(0x53510830,h.copy,true)},...[0x53608080,0x5361c0cc].map(address=>({address,expected:branch(address,0x535c780c,true),replacement:branch(address,h.writer,true)}))];
+  patches.splice(patches.length-3,0,...extra);
+ }
  need(m.patches.length===patches.length&&patches.every((p,i)=>p.address===m.patches[i].address&&p.expected===m.patches[i].expected&&p.replacement===m.patches[i].replacement),'appended patch inventory differs');
  return patches;
 }

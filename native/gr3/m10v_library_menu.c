@@ -194,6 +194,20 @@ uint32_t m10v_menu_value_icon(uint32_t translator, uint32_t value) {
     if(M10V_APPENDED_SLOTS&&m10v_tone_slot(value)<M10V_SLOT_COUNT)return m10v_menu_icon(translator,value);
     return ((call2_fn)(M10V_NATIVE_BASE + 0x40u))(translator, value);
 }
+/* This tag comes from the photograph's ImageTone, never the selected journal. */
+uint32_t m10v_menu_recorded_icon(uint32_t tag){
+ if((tag&0xffff0000u)!=0x20000u)return tag>=0x1000cu&&tag<=0x10015u?876:0;
+ uint32_t code=(tag&65535u)+0x100u;
+ if(code>=0x2000u&&code<=0xe0c5u)return 754;
+ uint32_t film=code-0x1000u;if(!M10V_BUILTIN(film))return 0;
+ if(M10V_EXTRA_FILM(film))return M10V_EXTRA_FILM_ICON(film);
+ if(M10V_C41(film))return M10V_C41_ICON_FIRST+film-312;
+ if(M10V_ANIME_E6(film))return M10V_ANIME_E6_ICON_FIRST+film-M10V_ANIME_FIRST;
+ if(M10V_D76(film))return 775+film-M10V_D76_FIRST;
+ if(film==M10V_5213_ID)return 774;
+ if(M10V_STYLE(film))return 762+film-M10V_STYLE_FIRST;
+ return film==M10V_PIXEL_ID?(M10V_SD_LIBRARY?761:755):film==M10V_CHAR_ID?(M10V_SD_LIBRARY?755:749):670+film;
+}
 uint32_t m10v_menu_focus(uint32_t controller, uint32_t index) {
     uint8_t *m = model();
     M10V_LOG(30,controller,index,m[0],(uint32_t)m[0x1d]|((uint32_t)m[0x1e]<<8));
@@ -351,9 +365,13 @@ uint32_t m10v_menu_enter(uint32_t controller) {
  * heap pointer, writable ROM descriptor or shared scratch is published. The
  * first 16 bytes remain available for original outgoing stack arguments. */
 uint32_t m10v_menu_custom_resource(uint32_t resource,uint32_t *out){
- if(resource<1007||resource>1011||!out)return 0;
+ uint32_t slot;
+ if(resource>=1007&&resource<=1011)slot=resource-1007;
+ else if(resource>=1111&&resource<=1115)slot=resource-1111+5;
+ else return 0;
+ if(!out)return 0;
  char name[24];const char *text="Custom LUT";m10v_library_state state;
- if(m10v_camera_library_load(&state)>=0&&m10v_sd_camera_custom_name(&state,resource-1007,name,sizeof(name)))text=name;
+ if(m10v_camera_library_load(&state)>=0&&m10v_sd_camera_custom_name(&state,slot,name,sizeof(name)))text=name;
  uint16_t *utf=(uint16_t *)(out+2);uint32_t n=0;
  for(;n<23&&text[n];n++)utf[n]=(uint8_t)text[n];utf[n++]=0;
  out[0]=n|0x100u;out[1]=(uint32_t)(uintptr_t)utf;

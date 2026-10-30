@@ -6,6 +6,7 @@ import {FILM_GROUPS} from './gr3-film-directory.mjs';
 import {buildSdFilmPack,auditSdFilmPack,sdFilmRecord,sdCrc} from './gr3-sd-film-pack.mjs';
 import {initialState} from './gr3-native-library.mjs';
 import {defaultConfiguration} from '../web/gr3/native-library-state.mjs';
+import {preSquareArtRecord} from './test-support/pre-square-records.mjs';
 test('Instax appends identity 317 under creative and serializes an ISP builtin',()=>{
  const group=FILM_GROUPS.find(g=>g.name==='创意');
  assert.deepEqual(group.films.at(-1),{id:317,name:'Instax Color'});
@@ -37,7 +38,7 @@ test('all 46 visible pre-Instax builtin records remain accepted with original re
  const pack=buildSdFilmPack(prior.ids.filter(id=>visible.has(id))),hash=bytes=>createHash('sha256').update(bytes).digest('hex');
  const ordered=auditSdFilmPack(pack).ids;
  for(let i=0;i<ordered.length;i++){
-  const id=ordered[i],r=sdFilmRecord(id);Buffer.from(prior.renderer,'hex').copy(r,8448);
+  const id=ordered[i],r=preSquareArtRecord(id);Buffer.from(prior.renderer,'hex').copy(r,8448);
   r.writeUInt32LE(sdCrc(r.subarray(0,-4)),12284);
   assert.equal(hash(r),prior.hashes[prior.ids.indexOf(id)],`authentic old record ${id}`);
   r.copy(pack,4096+i*12288);pack.writeUInt32LE(r.readUInt32LE(12284),68+i*12);
