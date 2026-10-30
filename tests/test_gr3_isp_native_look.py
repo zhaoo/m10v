@@ -28,7 +28,7 @@ class NativeLookTests(unittest.TestCase):
   self.assertEqual(self.call(e,'matches',s,67,0,13),0)
   self.assertEqual(self.call(e,'prepare',s,67,2,14),0)
  def test_all_films_and_red_exposures_apply_owned_frame_without_cached_mutation(self):
-  for film,exposure in [(f,0) for f in list(range(33,79))+list(range(290,297))]+[(68,1),(68,2)]:
+  for film,exposure in [(f,0) for f in list(range(33,79))+list(range(290,297))+[317]]+[(68,1),(68,2)]:
    with self.subTest(film=film,exposure=exposure):
     e,s,f,g=self.fixture();before=bytes(e.u.mem_read(f,0x9000));cached=bytes(e.u.mem_read(g,0x3240));obj=bytes(e.u.mem_read(0x60000000,0x400))
     self.assertEqual(self.call(e,'prepare',s,film,exposure,41),1)

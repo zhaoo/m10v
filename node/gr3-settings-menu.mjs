@@ -10,7 +10,7 @@ export function settingsPatches(m){
  if(!m.sd_library)return [];
  need(typeof m.zoom?.enabled==='boolean','explicit zoom enabled contract');
  const zoom=m.zoom.enabled,count=2;
- const d=m.settings_menu,s=m.symbols,ownerBytes=m.capture_lifecycle?.snapshot?.snapshot_ingress_installed?0x223c:0x213c;
+ const d=m.settings_menu,s=m.symbols,ownerBytes=m.capture_lifecycle?.snapshot?.snapshot_ingress_installed?0x613c:0x213c;
  need(d&&d.owner_bytes===ownerBytes&&JSON.stringify(d.private_routes)===JSON.stringify([33616128,33616129,33616131,33616132,...(zoom?[33616133]:[])])&&d.rows?.length===count,'missing route/owner contract');
  const patches=[];
  for(const [a,e,n,l] of [[0x5316f3b8,0xe300313b,'factory',false],[0x5319667c,0xe1a0c00d,'top_dtor',false],[0x5316fcf8,0xeb00ab5a,'top_ctor',true],[0x53221a4c,0xeb001c7e,'key_route',true]])patches.push({address:a,expected:e,replacement:branch(a,s['m10v_settings_controller_'+n],l),name:'settings '+n});

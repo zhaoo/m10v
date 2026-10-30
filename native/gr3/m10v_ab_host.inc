@@ -19,7 +19,7 @@ static uint32_t ab_host_start_row(uint32_t focus,uint32_t size){uint32_t start=0
 static uint32_t ab_host_film(m10v_native_ab_host *h,uint32_t choice){uint32_t slot=m10v_ab_slot(choice);return slot<M10V_SLOT_COUNT?h->films[slot]:0;}
 static uint32_t ab_host_icon(m10v_native_ab_host *h,uint32_t choice){
  uint32_t id=ab_host_film(h,choice);
- if(M10V_EXTRA_FILM(id))return M10V_EXTRA_FILM_ICON_FIRST+id-314;
+ if(M10V_EXTRA_FILM(id))return M10V_EXTRA_FILM_ICON(id);
  if(M10V_C41(id))return M10V_C41_ICON_FIRST+id-312;
  if(M10V_ANIME_E6(id))return M10V_ANIME_E6_ICON_FIRST+id-M10V_ANIME_FIRST;
  if(M10V_D76(id))return 775+id-M10V_D76_FIRST;

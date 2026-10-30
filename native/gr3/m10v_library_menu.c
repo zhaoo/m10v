@@ -122,7 +122,7 @@ static uint32_t resource(uint32_t tone) {
     return 0;
 }
 static uint32_t film_resource(uint32_t film) {
-    if(M10V_EXTRA_FILM(film))return M10V_EXTRA_FILM_NAME_FIRST+film-314;
+    if(M10V_EXTRA_FILM(film))return M10V_EXTRA_FILM_NAME(film);
     if(M10V_C41(film))return M10V_C41_NAME_FIRST+film-312;
     if(M10V_ANIME_E6(film))return 1142+film-306;
     if(M10V_D76(film))return (M10V_SD_LIBRARY?1130:962)+film-M10V_D76_FIRST;
@@ -179,7 +179,7 @@ uint32_t m10v_menu_icon(uint32_t translator, uint32_t tone) {
 #if M10V_SD_LIBRARY
             if(M10V_CUSTOM(state.slots[i].film))return 754;
 #endif
-            if(M10V_EXTRA_FILM(state.slots[i].film))return M10V_EXTRA_FILM_ICON_FIRST+state.slots[i].film-314;
+            if(M10V_EXTRA_FILM(state.slots[i].film))return M10V_EXTRA_FILM_ICON(state.slots[i].film);
             if(M10V_C41(state.slots[i].film))return M10V_C41_ICON_FIRST+state.slots[i].film-312;
             if(M10V_ANIME_E6(state.slots[i].film))return M10V_ANIME_E6_ICON_FIRST+state.slots[i].film-M10V_ANIME_FIRST;
             if(M10V_D76(state.slots[i].film))return 775+state.slots[i].film-M10V_D76_FIRST;

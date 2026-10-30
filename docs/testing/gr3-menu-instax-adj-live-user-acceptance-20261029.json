@@ -1,0 +1,20 @@
+{
+  "schema": "m10v-user-acceptance/v1",
+  "date": "2026-10-29",
+  "candidate": "20261029-r4",
+  "source_commit": "dcadff33374771decd89fe8e6fd8a7bb21895ff8",
+  "feedback": "HDF 菜单里面有句描述「全局数字柔焦 · 独立于胶卷」删掉，别的没问题了，合并 main 并发布宝塔和github",
+  "candidate_bin_sha256": {
+    "gr3": "981852373ab67f9646008a9b4546daeddfe16781db9d2d5fd5e59edbb78ef6e3",
+    "gr3x": "e77e78e9508d3fce9ba05fc3335c6964d729005a252ff3323d2614ab603ffc2e"
+  },
+  "scope": "User accepted the current candidate's other behavior and explicitly requested deleting one HDF description then merging and publishing. No additional model-specific physical measurements were supplied.",
+  "authorized_final_change": "Remove the HDF description and its resource text; retain error messages and all resource IDs.",
+  "release_authorized": true,
+  "physical_metrics_supplied": false,
+  "final_bin_sha256": {
+    "gr3": "4b8459e6bdc8e2d42db6d14a625e7613a3a8ed97f3cf1c8cfb59530616c98d54",
+    "gr3x": "eb8d742178acaf97ea4dfe75c44684f41cb6591952196e173748d4215542b46d"
+  },
+  "final_checks": {"hdf_menu_adj_python": 33, "hdf_native_node": 13, "deployment_node": 12, "deployment_python": 24, "verified_hooks_per_model": 239}
+}

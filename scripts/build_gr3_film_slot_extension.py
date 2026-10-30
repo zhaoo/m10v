@@ -62,7 +62,14 @@ def build_appended_slots(base, native_base, stock, symbols):
         (0x53599e60,0xe2800030,0xe2800058),
     ]:patch(at,old,new)
     # The EXIF writer above stores slot tones 25..34 as ImageTone 0x10c..0x115.
-    # Native metadata key25 exposes these as 0x10000 | (ImageTone - 0x100).
+    # Official EXIF reader 0x535c24ec clamps normalized values >11 to zero.
+    # Preserve its stock mapping and teach only its unknown branch about our
+    # recorded private range; otherwise the existing playback hooks never see it.
+    metadata_decode=base+len(image)
+    image.extend(assembly('cmp r0,#21;orrls r2,r0,#0x10000;movhi r2,#0;'
+        'cmp r0,#11;b 0x535c2520',metadata_decode))
+    patch(0x535c251c,0x83a02000,(branch(0x535c251c,metadata_decode)&0x0fffffff)|0x80000000)
+    # Private metadata key25 is 0x10000 | (ImageTone - 0x100).
     # Use a generic film mark: journals can be reassigned after capture, so a
     # current-slot artwork would incorrectly relabel older photos.
     private='movw ip,#12;movt ip,#1;sub r2,r2,ip;cmp r2,#9;'
@@ -82,5 +89,5 @@ def build_appended_slots(base, native_base, stock, symbols):
         library_index='14+enabled_films',movie_choices=10,raw_development_choices=12,
         entries=dict(count=count,index=index,position=position,maximum=maximum,display=display),
         exif_table=table,exif_bytes=88,patches=patches,
-        playback=dict(icon=icon,detail=detail,icon_id=754,metadata_key=0x25,recorded_codes=[0x10c,0x115],identity="recorded-slot-generic-film"),
+        playback=dict(icon=icon,detail=detail,metadata_decode=metadata_decode,icon_id=754,metadata_key=0x25,recorded_codes=[0x10c,0x115],identity="recorded-slot-generic-film"),
         stock_parameter_proxy=False,state_version=5,camera_tested=False)

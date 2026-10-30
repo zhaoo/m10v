@@ -37,9 +37,13 @@ typedef struct {uint8_t base[0x158];uint32_t widgets[WORDS],count,value,saved,er
 #if M10V_BORDER_ENABLED
  uint8_t hdf_cache_reserved[sizeof(m10v_hdf_ui)];
  uint32_t focus;m10v_border_cache border;uint32_t child;
+#else
+ uint8_t reserved_cache_tail[0x2c];
 #endif
+ uint32_t style;
 } page;
 _Static_assert(sizeof(page)<=0x1c0,"HDF owned controller capacity");
+_Static_assert(offsetof(page,style)==0x1bc,"HDF style pointer must follow caches");
 #if M10V_BORDER_ENABLED
 _Static_assert(offsetof(page,hdf_cache_reserved)==M10V_HDF_CACHE_OFFSET,"HDF cache placement");
 _Static_assert(offsetof(page,border)==M10V_BORDER_CACHE_PAGE_OFFSET,"border cache placement");
@@ -56,10 +60,36 @@ static int make(page *p,uint32_t type,uint32_t x,uint32_t y,uint32_t width,uint3
  return 0;
 }
 static void clear(page *p){
+ if(p->style){
+  uint32_t *w=(uint32_t *)(uintptr_t)p->style,n=0;
+  while(n<8&&w[n])n++;
+  ((fn3)0x5316cde8u)(0,p->style,n);
+  ((fn1)0x536af2e4u)(p->style);p->style=0;
+ }
  ((fn3)0x5316cde8u)(0,ptr(p->widgets),p->count);
  for(uint32_t i=0;i<WORDS;i++)p->widgets[i]=0;p->count=0;
 }
+static int make_style(page *p){
+ p->style=((fn1)0x536af2a8u)(8*4);if(!p->style)return -1;
+ uint32_t *words=(uint32_t *)(uintptr_t)p->style;
+ for(uint32_t i=0;i<8;i++)words[i]=0;
+ for(uint32_t i=0;i<8;i++){
+  uint32_t w=((fn1)0x536af2a8u)(0xf0);if(!w)return -1;
+  ((uint32_t (*)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t))0x53393d84u)(w,0,i<4?84+i*72:147+(i-4)*72,720,i<4?64:1);
+  words[i]=w;((fn2)0x533aba64u)(p->widgets[0],w);
+  ((fn2)0x53393e00u)(w,i<4?6:2);
+ }
+ return 0;
+}
+static void style_row(page *p,uint32_t i,uint32_t visible,uint32_t selected){
+ uint32_t *words=(uint32_t *)(uintptr_t)p->style;
+ ((fn2)0x533ad3c0u)(words[i],visible&&selected);
+ ((fn2)0x533ad3c0u)(words[4+i],visible);
+ /* Official glyph palette28 is dark; palette10 is yellow text. */
+ ((fn2)0x5339658cu)(p->widgets[4+i],visible&&selected?28:31);
+}
 static void draw(page *p){
+ if(p->count!=WORDS||!p->style)return;
 #if M10V_BORDER_ENABLED
  uint32_t border=!p->root&&p->child;
  caption(p->widgets[2],p->root?1140:border?1155:970);caption(p->widgets[3],p->root?941:971);
@@ -68,18 +98,18 @@ static void draw(page *p){
   ((fn2)0x533ad3c0u)(p->widgets[4+i],visible);
   uint32_t id=p->root?(M10V_HDF_ENABLED&&i==0?1141:1155):border?(i==0?972:i==1?1156:1157):972+i;
   caption(p->widgets[4+i],id);
-  ((fn2)0x5339658cu)(p->widgets[4+i],(p->root?p->focus==i:p->value==i)?10:31);
+  style_row(p,i,visible,p->root?p->focus==i:p->value==i);
  }
 #else
  caption(p->widgets[2],p->root?1140:970);caption(p->widgets[3],p->root?941:971);
  for(uint32_t i=0;i<4;i++){
   ((fn2)0x533ad3c0u)(p->widgets[4+i],!p->root||i==0);
   caption(p->widgets[4+i],p->root?1141:972+i);
-  ((fn2)0x5339658cu)(p->widgets[4+i],p->root||p->value==i?10:31);
+  style_row(p,i,!p->root||i==0,p->root?i==0:p->value==i);
  }
 #endif
- ((fn2)0x533ad3c0u)(p->widgets[8],!p->root);
- caption(p->widgets[8],p->error?976:977);
+ ((fn2)0x533ad3c0u)(p->widgets[8],!p->root&&p->error);
+ caption(p->widgets[8],976);
  ((fn1)0x533ad308u)(p->widgets[0]);
 }
 void m10v_hdf_menu_cache_init(uint32_t owner){
@@ -118,12 +148,13 @@ uint32_t m10v_hdf_menu_ready(page *p,uint32_t route){
 #else
  p->value=p->saved=0;
 #endif
- if(p->count==WORDS)return 1;
+ if(p->count==WORDS&&p->style)return 1;
  if(p->count){clear(p);return 0;}
  if(make(p,1,0,0,720,480)||make(p,11,0,0,720,480)||make(p,17,20,20,680,50)||make(p,17,20,414,680,42))goto fail;
  ((fn2)0x53393e00u)(p->widgets[1],1);
- for(uint32_t i=0;i<4;i++)if(make(p,17,40+i*170,188,160,64))goto fail;
- if(make(p,17,20,320,680,50))goto fail;
+ if(make_style(p))goto fail;
+ for(uint32_t i=0;i<4;i++)if(make(p,17,36,90+i*72,644,52))goto fail;
+ if(make(p,17,20,384,680,30))goto fail;
  uint32_t root=p->widgets[0],*v=(uint32_t *)(uintptr_t)*(uint32_t *)(uintptr_t)root;
  ((fn1)(uintptr_t)v[0x28/4])(root);((fn1)(uintptr_t)v[0x34/4])(root);return 1;
 fail:clear(p);return 0;

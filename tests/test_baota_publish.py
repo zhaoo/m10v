@@ -66,6 +66,8 @@ class BaotaPublishTests(unittest.TestCase):
    self.assertIn(control,trace)
   self.assertIn('FIRMWARE_BUILD_START model=gr3x',r.stdout)
   self.assertIn('FIRMWARE_BUILD_START model=gr4',r.stdout)
+  self.assertRegex(r.stdout,r'FIRMWARE_BUILD_START model=gr4 .*timeout=900s')
+  self.assertIn('RuntimeMaxSec=900',trace)
  def test_term_interrupts_wait_and_stops_build_before_rollback(self):
   proc=subprocess.Popen(['bash',str(SCRIPT),'--deploy',AFTER],env={**self.env,'FAKE_BUILD_SLEEP':'1'},stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
   try:

@@ -116,7 +116,7 @@ class HalfFrameTests(unittest.TestCase):
 
 
 class HalfFrameDngTests(dng.AspectDngTests):
-    def test_makernote_writer_preserves_half_frame_identity(self):
+    def test_makernote_writer_marks_baked_half_pixels_without_mutating_capture_identity(self):
         u=self.overlay_machine();props=dng.RAM+0x100
         self.w32(u,dng.IMAGE+0x20,props);u.mem_write(props+0xf2,b'\x06')
         u.mem_map(0x535d0000,0x1000);observed=[]
@@ -126,7 +126,27 @@ class HalfFrameDngTests(dng.AspectDngTests):
                 m.reg_write(A.UC_ARM_REG_R0,1);m.reg_write(A.UC_ARM_REG_PC,m.reg_read(A.UC_ARM_REG_LR))
         u.hook_add(UC_HOOK_CODE,writer)
         self.assertEqual(self.call(u,self.overlay_entries['m10v_aspect_write']),1)
-        self.assertEqual(observed,[(dng.OUT,0,6)])
+        self.assertEqual(observed,[(dng.OUT,0,1)])
+        self.assertEqual(bytes(u.mem_read(props+0xf2,1)),b"\x06")
+
+    def test_baked_half_makernote_round_trips_through_original_reader_as_uncropped(self):
+        # Execute both original byte-IFD accessors and original reader body.
+        # The new writer leaves raw6 capture properties intact; only the
+        # serialized aspect is neutral, so album routing cannot select the
+        # private Half screen/thumbnail-origin hooks for a baked pair.
+        u=self.overlay_machine();props=dng.RAM+0x100;target=dng.RAM+0x82000
+        self.w32(u,dng.IMAGE+0x20,props);self.w32(u,dng.IMAGE+12,target)
+        u.mem_write(props+0xf2,b"\x06")
+        u.mem_write(target+0x7b6,b"\xa5")
+        u.mem_write(dng.OUT,bytes(32))
+        original=(dng.ROOT/'builds/gr3-extension-validation/official-rtos.bin').read_bytes()
+        for base in (0x535d0000,0x535ed000):
+            u.mem_map(base,4096);u.mem_write(base,original[base-0x53000000:base-0x53000000+4096])
+        self.call(u,self.overlay_entries['m10v_aspect_write'])
+        self.assertEqual(bytes(u.mem_read(dng.OUT+12,1)),b"\x01")
+        self.assertEqual(bytes(u.mem_read(props+0xf2,1)),b"\x06")
+        self.call(u,self.overlay_entries['m10v_aspect_extract'])
+        self.assertEqual(bytes(u.mem_read(target+0x7b6,1)),b"\x00")
 
     def test_custom_half_frame_dng_uses_frozen_dimensions(self):
         for mm,w,h in [(29,2880,3856),(41,2032,2720),(70,1184,1600),(100,832,1120)]:

@@ -59,7 +59,7 @@ class HdfAdjArmTests(unittest.TestCase):
   self.put(0x55063910,1);self.put(0x55063988,self.owner);self.put(self.cache+4,0x43464448)
   for index in range(1,9):self.put(self.model+index*4,self.settings)
   self.put(0x55002008,0x55002100);self.put(0x55002100,0x55002200);u.mem_write(0x55002220,b'\x01')
-  self.files={};self.reads=[];self.writes=[];self.fail_write=False;self.fail_verify=False;self.cursor=0;self.parent_keys=[];self.captions=[];self.genuine_parent=False;self.queued=[];self.destroyed=[]
+  self.files={};self.reads=[];self.writes=[];self.fail_write=False;self.fail_verify=False;self.cursor=0;self.parent_keys=[];self.captions=[];self.genuine_parent=False;self.queued=[];self.destroyed=[];self.icons=[];self.visibility=[]
   from scripts.build_gr3_menu_patches import assembly
   u.mem_write(0x550e1000,assembly('ldrh r3,[r1];b 0x531a4dbc',0x550e1000))
   self.put(self.c+0x1f0,0x55050000);self.put(self.c+0x160,0x55050100)
@@ -85,6 +85,9 @@ class HdfAdjArmTests(unittest.TestCase):
    elif a==0x53394820:result=self.cursor
    elif a==0x53394758:result=0x55050200+r[1]*8
    elif a in (0x53396f80,0x533a1808):self.captions.append(r[:3])
+   elif a==0x5339a9a0:self.icons.append((r[0],r[1]))
+   elif a==0x533ad3c0:self.visibility.append((r[0],r[1]))
+   elif a==0x53393e00:pass
    elif a==0x550e1000 and self.genuine_parent:return
    elif a==0x550e1000:self.parent_keys.append(int.from_bytes(uc.mem_read(r[1],2),'little'));result=77
    else:return
@@ -101,6 +104,52 @@ class HdfAdjArmTests(unittest.TestCase):
   n=u.reg_read(A.UC_ARM_REG_R0);return n if n<0x80000000 else n-0x100000000
  def assign(self,slot,function):self.u.mem_write(self.settings+0x918+slot*2,bytes([function]))
  def key(self,k):self.u.mem_write(0x55006000,struct.pack('<H',k));return self.call('m10v_hdf_adj_event',self.c,0x55006000)
+ def render_slot_icons(self):
+  # Execute the real renderer through its five-slot loop, stopping before the
+  # unrelated header and list refresh. No table dispatch or predicate is stubbed.
+  for slot in range(5):
+   self.put(self.c+0x184+4*slot,0x55051000+slot*0x100)
+   self.put(self.c+0x16c+4*slot,0x55052000+slot*0x100)
+  A=self.A;self.u.reg_write(A.UC_ARM_REG_R0,self.c)
+  self.u.reg_write(A.UC_ARM_REG_SP,0x550ff000);self.u.reg_write(A.UC_ARM_REG_LR,0x550ff800)
+  self.u.emu_start(0x531a4168,0x531a4314,count=100000)
+  self.assertEqual(self.u.reg_read(A.UC_ARM_REG_PC),0x531a4314)
+ def test_original_five_slot_renderer_shows_assigned_hdf_with_cold_or_warm_cache(self):
+  for marker in (0,0x100,0x103):
+   self.put(self.cache,marker)
+   for slot in range(5):
+    for other in range(5):self.assign(other,20 if other==slot else 0)
+    self.icons.clear();self.visibility.clear();reads=len(self.reads)
+    self.render_slot_icons()
+    self.assertEqual(self.icons,[(0x55051000+i*0x100,874 if i==slot else 0) for i in range(5)])
+    self.assertEqual(self.visibility,[(0x55052000+i*0x100,int(i==slot)) for i in range(5)])
+    self.assertEqual(len(self.reads),reads);self.assertEqual(self.writes,[])
+ def test_original_initial_slot_selection_accepts_hdf_in_each_of_five_slots(self):
+  for slot in range(5):
+   for other in range(5):self.assign(other,20 if other==slot else 0)
+   self.u.mem_write(self.settings+0x914,bytes([(slot+4)%5]));reads=len(self.reads)
+   self.call(0x531a2a7c,self.c)
+   self.assertEqual(self.u.mem_read(self.c+0x1f4,1),bytes([slot]))
+   self.assertEqual(len(self.reads),reads);self.assertEqual(self.writes,[])
+ def test_original_renderer_hides_hdf_when_owner_is_unavailable(self):
+  self.put(0x55063988,0)
+  for slot in range(5):self.assign(slot,20)
+  self.render_slot_icons()
+  self.assertEqual(self.icons,[(0x55051000+i*0x100,0) for i in range(5)])
+  self.assertEqual(self.visibility,[(0x55052000+i*0x100,0) for i in range(5)])
+ def test_original_entry_selects_hdf_and_bootstraps_cold_cache_before_drawing(self):
+  for slot in range(5):
+   for other in range(5):self.assign(other,20 if other==slot else 0)
+   self.put(self.cache,0);self.u.mem_write(self.settings+0x914,bytes([(slot+4)%5]))
+   A=self.A;self.u.reg_write(A.UC_ARM_REG_R0,self.c)
+   self.u.reg_write(A.UC_ARM_REG_SP,0x550ff000);self.u.reg_write(A.UC_ARM_REG_LR,0x550ff800)
+   # Includes stock mode/assignment reads, exclusion dispatch and ID20 enter.
+   self.u.emu_start(0x531a4554,0x531a45bc,count=100000)
+   self.assertEqual(self.u.reg_read(A.UC_ARM_REG_PC),0x531a45bc)
+   self.assertEqual(self.u.mem_read(self.c+0x1f4,1),bytes([slot]))
+   self.assertEqual(self.get(self.cache),0x100)
+   self.assertEqual(self.get(self.cache+8),self.c)
+   self.assertEqual(self.get(self.cache+12),0);self.assertEqual(self.writes,[])
  def test_all_five_genuine_assignment_setters_getters_and_list_counts(self):
   for slot in range(5):
    for index,fn in enumerate((*range(5),16,5,6,7,8,9,18,19,10,11,12,13,17,14,20)):

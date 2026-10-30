@@ -108,7 +108,7 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
     if(manifest.camera_model==='gr3'){
      need(halfAt>=0x540bc000-LOAD&&halfAt+12<=ASPECT_END-LOAD&&rtos.indexOf(halfMarker,halfAt+1)===-1,'half-frame model/resource binding differs');
      rtos.writeUInt32LE(manifest.resources.last_id+3,halfAt+4);
-     if(manifest.film_library_enabled!==false){need(manifest.half_frame_icon?.id===875,'half-frame icon missing');rtos.writeUInt32LE(875,halfAt+8);}
+     if(manifest.film_library_enabled!==false){need(manifest.half_frame_icon?.id===876,'half-frame icon missing');rtos.writeUInt32LE(876,halfAt+8);}
     }else need(halfAt===-1,'half-frame must be disabled for this model');
     const marker=Buffer.from('413752362b03000011030000','hex');
     const at=rtos.indexOf(marker,COMPONENT_END-LOAD);
@@ -142,9 +142,10 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
   shared_resource_routes:e.aspect?2:0,adapted_resource_words:e.aspect?6:0,component_stock_words:stockWords,
   aspect_indicator:e.aspect&&componentEnd===ASPECT_END&&manifest.film_library_enabled!==false?{render_path:'native-grid-overlay/icon-blitter',first_id:manifest.aspect_icons.first_id,last_id:manifest.aspect_icons.last_id,width:60,height:40}:null,
   six_by_seven_resource_id:e.aspect&&componentEnd===ASPECT_END?manifest.resources.last_id+2:null,
+  half_pair:manifest.half_pair||{enabled:false},
   half_frame:{enabled:!!(e.aspect&&componentEnd===ASPECT_END&&manifest.camera_model==='gr3'),raw_id:6,
    resource_id:e.aspect&&manifest.camera_model==='gr3'?manifest.resources.last_id+3:null,
-   icon_id:e.aspect&&manifest.camera_model==='gr3'&&manifest.film_library_enabled!==false?875:null},
+   icon_id:e.aspect&&manifest.camera_model==='gr3'&&manifest.film_library_enabled!==false?876:null},
   negative_grain_sites:e.negativeGrain?[0x53b348c0,0x53b3501e]:[],
   raw_nr:{configuration:e.rawNr,...rawNrEvidence(source,e.rawNr),patch_count:rawEdits.length,
    patched_bytes:rawEdits.reduce((n,p)=>n+p.replacementHex.length/2,0),

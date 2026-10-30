@@ -45,22 +45,23 @@ const ispHooks = [
  [0x536dd3e0,0xe5d7177c,1,0xe51401e0,'curve'],
  [0x535131c0,0xe5d1377c,3,0xe1a0000e,'local_process'],
 ];
-const sources = ['native/gr3/m10v_aspect_config.h','native/gr3/m10v_half_frame_icon.rgba','native/gr3/half-frame-icon.json','scripts/generate_gr3_half_frame_icon.py','native/gr3/extra-films-reference.json','native/gr3/m10v_extra_films_native_profiles.h','native/gr3/m10v_extra_films.rgba','web/gr3/extra-films-luts.json','scripts/build_gr3_extra_films_reference.py','scripts/fit_gr3_extra_films_native.py','scripts/verify_gr3_extra_films_reference.py','native/gr3/c41-reference.json','native/gr3/m10v_c41_native_profiles.h','native/gr3/m10v_c41.rgba','web/gr3/c41-luts.json','scripts/build_gr3_c41_reference.py','scripts/fit_gr3_c41_native.py','scripts/verify_gr3_c41_reference.py','node/gr3-sd-pre-retired-anime-contract.json','node/gr3-sd-pre-c41-contract.json','native/gr3/m10v_anime.h','native/gr3/anime-e6-reference.json','native/gr3/m10v_anime_e6_native_profiles.h','native/gr3/m10v_anime_e6.rgba','native/gr3/m10v_anime_ui.rgba','native/gr3/anime-ui.json','native/gr3/anime-ui-raster.json','third_party/anime-ui-font/OFL.txt','web/gr3/anime-e6-luts.json','scripts/build_gr3_anime_e6_reference.py','scripts/fit_gr3_anime_e6_native.py','scripts/verify_gr3_anime_e6_reference.py','scripts/generate_m10v_anime_ui.py','node/gr3-sd-pre-anime-e6-contract.json','node/gr3-sd-pre-d76-mono-contract.json','native/gr3/m10v_aspect_icons.rgba','native/gr3/aspect-icons.json','scripts/generate_gr3_aspect_icons.py','native/gr3/film_d76_0.c','native/gr3/film_d76_1.c','native/gr3/film_d76_0_data.h','native/gr3/film_d76_1_data.h','native/gr3/m10v_d76.rgba','native/gr3/d76-reference.json','web/gr3/d76-luts.json','scripts/build_gr3_d76_reference.py','scripts/fit_gr3_d76_native.py','scripts/verify_gr3_d76_reference.py','native/gr3/m10v_d76_native_profiles.h','node/gr3-sd-pre-universal-halation-contract.json','node/gr3-sd-pre-d76-contract.json','native/gr3/m10v_spectral_native_profiles.h','native/gr3/m10v_film_directory.h','web/gr3/film-directory.json','node/gr3-film-directory.mjs','scripts/generate_m10v_directory.py','native/gr3/film_spectral_data.h','native/gr3/spectral-reference.json','web/gr3/spectral-luts.json','scripts/build_gr3_spectral_reference.py','scripts/fit_gr3_spectral_native.py','scripts/verify_gr3_spectral_reference.py','native/gr3/m10v_5213.rgba','docs/research/aerocolor-2460/official-medium-curves.json','node/gr3-sd-pre-aerocolor-contract.json','node/gr3-sd-pre-directory-contract.json','native/gr3/m10v_tone.h','native/gr3/m10v_pixel_world.h','native/gr3/m10v_pixel_world.rgba','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/m10v_charmera_ui.rgba','scripts/generate_m10v_charmera_ui.py','native/gr3/film_style_filters_0.c','native/gr3/film_style_filters_1.c','native/gr3/film_style_filters_0_data.h','native/gr3/film_style_filters_1_data.h','native/gr3/m10v_style_filters.rgba','native/gr3/style-filters-reference.json','web/gr3/style-filters-luts.json','scripts/build_gr3_style_filters_reference.py','scripts/fit_gr3_style_filters_native.py','scripts/verify_gr3_style_filters_reference.py','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/m10v_universal_halation.h','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
+const sources = ['native/gr3/m10v_aspect_config.h','native/gr3/m10v_half_frame_icon.rgba','native/gr3/half-frame-icon.json','scripts/generate_gr3_half_frame_icon.py','native/gr3/extra-films-reference.json','native/gr3/m10v_extra_films_native_profiles.h','native/gr3/m10v_extra_films.rgba','web/gr3/extra-films-luts.json','scripts/build_gr3_extra_films_reference.py','scripts/fit_gr3_extra_films_native.py','scripts/verify_gr3_extra_films_reference.py','native/gr3/c41-reference.json','native/gr3/m10v_c41_native_profiles.h','native/gr3/m10v_c41.rgba','web/gr3/c41-luts.json','scripts/build_gr3_c41_reference.py','scripts/fit_gr3_c41_native.py','scripts/verify_gr3_c41_reference.py','node/gr3-sd-pre-instax-contract.json','node/gr3-sd-pre-retired-anime-contract.json','node/gr3-sd-pre-c41-contract.json','native/gr3/m10v_anime.h','native/gr3/anime-e6-reference.json','native/gr3/m10v_anime_e6_native_profiles.h','native/gr3/m10v_anime_e6.rgba','native/gr3/m10v_anime_ui.rgba','native/gr3/anime-ui.json','native/gr3/anime-ui-raster.json','third_party/anime-ui-font/OFL.txt','web/gr3/anime-e6-luts.json','scripts/build_gr3_anime_e6_reference.py','scripts/fit_gr3_anime_e6_native.py','scripts/verify_gr3_anime_e6_reference.py','scripts/generate_m10v_anime_ui.py','node/gr3-sd-pre-anime-e6-contract.json','node/gr3-sd-pre-d76-mono-contract.json','native/gr3/m10v_aspect_icons.rgba','native/gr3/aspect-icons.json','scripts/generate_gr3_aspect_icons.py','native/gr3/film_d76_0.c','native/gr3/film_d76_1.c','native/gr3/film_d76_0_data.h','native/gr3/film_d76_1_data.h','native/gr3/m10v_d76.rgba','native/gr3/d76-reference.json','web/gr3/d76-luts.json','scripts/build_gr3_d76_reference.py','scripts/fit_gr3_d76_native.py','scripts/verify_gr3_d76_reference.py','native/gr3/m10v_d76_native_profiles.h','node/gr3-sd-pre-universal-halation-contract.json','node/gr3-sd-pre-d76-contract.json','native/gr3/m10v_spectral_native_profiles.h','native/gr3/m10v_film_directory.h','web/gr3/film-directory.json','node/gr3-film-directory.mjs','scripts/generate_m10v_directory.py','native/gr3/film_spectral_data.h','native/gr3/spectral-reference.json','web/gr3/spectral-luts.json','scripts/build_gr3_spectral_reference.py','scripts/fit_gr3_spectral_native.py','scripts/verify_gr3_spectral_reference.py','native/gr3/m10v_5213.rgba','docs/research/aerocolor-2460/official-medium-curves.json','node/gr3-sd-pre-aerocolor-contract.json','node/gr3-sd-pre-directory-contract.json','native/gr3/m10v_tone.h','native/gr3/m10v_pixel_world.h','native/gr3/m10v_pixel_world.rgba','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/m10v_charmera_ui.rgba','scripts/generate_m10v_charmera_ui.py','native/gr3/film_style_filters_0.c','native/gr3/film_style_filters_1.c','native/gr3/film_style_filters_0_data.h','native/gr3/film_style_filters_1_data.h','native/gr3/m10v_style_filters.rgba','native/gr3/style-filters-reference.json','web/gr3/style-filters-luts.json','scripts/build_gr3_style_filters_reference.py','scripts/fit_gr3_style_filters_native.py','scripts/verify_gr3_style_filters_reference.py','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/m10v_universal_halation.h','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
   'native/gr3/m10v_library_camera.c','native/gr3/m10v_library_menu.c',
   'native/gr3/m10v_library_capture.c','native/gr3/m10v_debug.c','native/gr3/m10v_debug.h','native/gr3/m10v_capture_profile.h','scripts/build_gr3_m10v_library.py'];
 sources.push('native/gr3/m10v_film_color_candidates.h','native/gr3/isp-film-targets.json','scripts/build_gr3_isp_film_targets.py','native/gr3/m10v_spatial_accel.c','native/gr3/m10v_spatial_accel.h');
 sources.push('native/gr3/m10v_save_trace.c','native/gr3/m10v_save_trace.h','native/gr3/m10v_capture_raw_lifetime.c','native/gr3/m10v_capture_raw_lifetime.h','scripts/build_gr3_save_trace.py','scripts/build_gr3_capture_lifecycle.py','native/gr3/m10v_capture_lifecycle.c');
 sources.push('native/gr3/m10v_file_trace.c','scripts/build_gr3_file_trace.py');
+const halfPairSources=['native/gr3/m10v_half_pair.c','native/gr3/m10v_half_pair.h','native/gr3/m10v_half_pair_camera.c','native/gr3/m10v_half_pair_camera.h'];
 sources.push(...hdfSources);
 sources.push('node/gr3-sd-pre-oriented-stamp-contract.json');
-sources.push('native/gr3/m10v_isp_frame_color.c','native/gr3/m10v_isp_frame_color.h','native/gr3/m10v_isp_recipe_color.c','native/gr3/m10v_isp_recipe_color.h','scripts/build_gr3_isp_recipe_color.py','scripts/build_gr3_isp_color_hook.py');
+sources.push('native/gr3/m10v_custom_isp.h','native/gr3/m10v_isp_frame_color.c','native/gr3/m10v_isp_frame_color.h','native/gr3/m10v_isp_recipe_color.c','native/gr3/m10v_isp_recipe_color.h','scripts/build_gr3_isp_recipe_color.py','scripts/build_gr3_isp_color_hook.py');
 const textureSources=['native/gr3/m10v_texture_accel.c','native/gr3/m10v_texture_accel.h','scripts/build_gr3_texture_accel.py'];
 const nativeGrainSources=['scripts/build_gr3_native_grain_hooks.py'];
 const viewDeferredSources=['native/gr3/m10v_view_deferred.c','native/gr3/m10v_view_deferred.h','native/gr3/m10v_view_recovery.h','scripts/build_gr3_view_deferred.py'];
 const nativeColorSources=['native/gr3/m10v_isp_native_look.c','native/gr3/m10v_isp_native_look.h','native/gr3/m10v_isp_native_look_profiles.h','native/gr3/m10v_isp_multiaxis.c','native/gr3/m10v_isp_multiaxis.h'];
 const saveChainSources=['native/gr3/m10v_module_dispatch_trace.c','scripts/build_gr3_module_dispatch_trace.py','scripts/build_gr3_pool_release_trace.py'];
 const sdSources=[...settingsSources,'node/gr3-settings-menu.mjs','native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','node/gr3-sd-texture-prior-contract.json','node/gr3-sd-pre-styles-contract.json','node/gr3-sd-20261023-contract.json','node/gr3-sd-pre-pixel-contract.json','node/gr3-sd-prior-contract.json','node/gr3-sd-20261021-contract.json','scripts/generate_gr3_sd_contract.mjs'];
-export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
+export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
 const movw = (register, value) => (0xe3000000 | ((value & 0xf000) << 4) | (register << 12) | (value & 0xfff)) >>> 0;
 function branch(address, target, link=false) {
   const delta = target - address - 8;
@@ -77,11 +78,25 @@ function checkRuntime(runtime, manifest) {
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');
   need(manifest.film_count === 103 && manifest.slots === 10 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
-  const expectedSources=[...new Set([...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[]),...(manifest.border?.enabled?borderSources:[])])];
+  const expectedSources=[...new Set([...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[]),...(manifest.border?.enabled?borderSources:[]),...(manifest.half_pair?.enabled?halfPairSources:[])])];
   borderPatches(runtime,manifest);
+  if(manifest.half_pair?.enabled){
+   const p=manifest.half_pair,h=p.handoff;
+   need(manifest.camera_model==='gr3'&&BASE>=0x540be000&&p.schema==='m10v-half-pair/v1'&&p.first_original_preserved===true&&p.camera_tested===false,'half-pair model/provenance differs');
+   for(const n of ['plan','compose','camera','init','reset','select','destroy']){const a=manifest.symbols['m10v_half_pair_'+n];need(Number.isInteger(a)&&!(a&3)&&a>=BASE&&a<BASE+runtime.length,'half-pair API missing: '+n);}
+   need(h&&h.target===manifest.symbols.m10v_half_pair_camera&&h.callsite>=manifest.symbols.m10v_chain_capture&&h.callsite+4<=manifest.icons.table&&runtime.readUInt32LE(h.callsite-BASE)===branch(h.callsite,h.target,true),'half-pair JPEG handoff differs');
+  }
+
   if(manifest.experimental_capture?.texture_neon)need((manifest.debug_mode===true||manifest.experimental_capture.native_color===true)&&manifest.experimental_capture.spatial_neon===true&&Number.isInteger(manifest.symbols?.m10v_texture_block8)&&Number.isInteger(manifest.symbols?.m10v_harman_texture_table),'incomplete full texture block runtime');
   need(typeof manifest.sd_library==='boolean','missing SD capability');
   need(!manifest.sd_library||(runtime.includes(Buffer.from('C:\\M10V\\FILMS.M10'))&&['m10v_sd_camera_item','m10v_sd_camera_install'].every(n=>Number.isInteger(manifest.symbols[n])&&manifest.symbols[n]>=BASE&&manifest.symbols[n]<BASE+runtime.length)),'SD runtime incomplete');
+  if(manifest.sd_library){
+   const c=manifest.custom_isp;
+   need(c?.schema==='m10v-custom-isp/v1'&&c.record_offset===6688&&c.payload_bytes===1572&&c.preview_offset===0x213c&&c.preview_bytes===0x4000&&c.storage==='inline TopMenu allocation'&&c.recipe_offset===0x5150&&c.recipe_bytes===1576&&c.frame_filesystem_calls===0,'custom ISP ownership differs');
+   for(const [name,off,symbol] of [['record',0xf0,'m10v_sd_camera_custom_record'],['u32',0xf4,'m10v_sd_u32']]){
+    need(c.reader_veneers?.[name]===BASE+off&&runtime.readUInt32LE(off)===branch(BASE+off,manifest.symbols[symbol]),'custom ISP reader veneer differs');
+   }
+  }
   need(Object.keys(manifest.sources || {}).sort().join('|') === [...expectedSources].sort().join('|'), 'native source inventory differs');
   for (const name of expectedSources) need(manifest.sources[name] === sha(readFileSync(new URL('../'+name,import.meta.url))),
     'native source changed since compilation: '+name);
@@ -162,7 +177,7 @@ function checkRuntime(runtime, manifest) {
   }
   const focalIcons=manifest.zoom?.enabled===true&&manifest.sd_library;
   const halfFrame=manifest.camera_model==='gr3'&&manifest.base>=0x540be000;
-  const aspectFirst=focalIcons?855:782,iconCount=halfFrame?876:874+Number(!!manifest.hdf_adj),descriptorCount=121+(focalIcons?1:0)+Number(!!manifest.hdf_adj)+Number(halfFrame);
+  const aspectFirst=focalIcons?855:782,iconCount=halfFrame?877:876,descriptorCount=122+(focalIcons?1:0)+Number(!!manifest.hdf_adj)+Number(halfFrame);
   const icons=manifest.icons, stock=readFileSync(new URL('../native/gr3/m10v_stock_icon_directory.bin',import.meta.url)), artwork=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));
   need(icons?.first_id===671&&icons.last_id===748&&icons.width===40&&icons.height===40&&artwork.length===78*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
   const retired=manifest.sd_library?32:0, packedArt=artwork.subarray(retired*6400), packedCount=78-retired;
@@ -192,9 +207,9 @@ function checkRuntime(runtime, manifest) {
   }
   if(halfFrame){
     const a=manifest.half_frame_icon,art=readFileSync(new URL('../native/gr3/m10v_half_frame_icon.rgba',import.meta.url));
-    const d=icons.descriptors+(121+Number(focalIcons)+Number(!!manifest.hdf_adj))*8,at=d-BASE;
-    need(a?.id===875&&a.descriptor===d&&a.width===60&&a.height===40&&art.length===9600&&a.sha256===sha(art)&&
-      runtime.readUInt32LE(icons.table-BASE+875*4)===d&&runtime.readUInt16LE(at)===60&&runtime.readUInt16LE(at+2)===40&&
+    const d=icons.descriptors+(122+Number(focalIcons)+Number(!!manifest.hdf_adj))*8,at=d-BASE;
+    need(a?.id===876&&a.descriptor===d&&a.width===60&&a.height===40&&art.length===9600&&a.sha256===sha(art)&&
+      runtime.readUInt32LE(icons.table-BASE+876*4)===d&&runtime.readUInt16LE(at)===60&&runtime.readUInt16LE(at+2)===40&&
       runtime.readUInt32LE(at+4)*4===a.pixels&&runtime.subarray(a.pixels-BASE,a.pixels-BASE+art.length).equals(art),'half-frame icon readback differs');
   }else need(!manifest.half_frame_icon,'half-frame icon outside GR III aspect build');
   for(let i=0;i<78;i++){
@@ -253,18 +268,18 @@ function checkRuntime(runtime, manifest) {
     // Bind each newly appended film/enum descriptor and every pixel byte to
     // checked-in artwork, independent of a rehashed runtime manifest.
     const art=Buffer.concat([readFileSync(new URL('../native/gr3/m10v_anime_e6.rgba',import.meta.url)).subarray(3*6400),readFileSync(new URL('../native/gr3/m10v_c41.rgba',import.meta.url)),readFileSync(new URL('../native/gr3/m10v_extra_films.rgba',import.meta.url))]);
-    const shapes=Array.from({length:8},()=>[40,40]);
+    const shapes=Array.from({length:9},()=>[40,40]);
     for(const id of [858,859,860,864,865,866,867,868])need(runtime.readUInt32LE(icons.table-BASE+id*4)===0,'retired anime enum still bound');
     const firstDescriptor=113+(focalIcons?1:0);let pixel=manifest.aspect_icons.pixels+19200,offset=0;
-    for(let i=0;i<8;i++){
-      const id=i<3?861+i:869+i-3,d=icons.descriptors+(firstDescriptor+i)*8,at=d-BASE,[w,h]=shapes[i],bytes=w*h*4;
+    for(let i=0;i<9;i++){
+      const id=i===8?875:i<3?861+i:869+i-3,d=icons.descriptors+(firstDescriptor+i+(i===8?Number(!!manifest.hdf_adj):0))*8,at=d-BASE,[w,h]=shapes[i],bytes=w*h*4;
       need(runtime.readUInt32LE(icons.table-BASE+id*4)===d&&runtime.readUInt16LE(at)===w&&runtime.readUInt16LE(at+2)===h&&runtime.readUInt32LE(at+4)*4===pixel,'native anime icon descriptor differs');
       need(runtime.subarray(pixel-BASE,pixel-BASE+bytes).equals(art.subarray(offset,offset+bytes)),'native anime artwork differs');
       pixel+=bytes;offset+=bytes;
     }
     need(offset===art.length,'native anime artwork extent differs');
   }
-  const resourceCount=manifest.border?.enabled?372:369;
+  const resourceCount=373; // Border 1155..1157 reserved; Instax name 1158.
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   for (let i=0;i<resourceCount;i++) {
@@ -376,7 +391,7 @@ function checkIspBase(runtime,manifest) {
 function lifecyclePatches(manifest,runtime){
  const m=manifest.capture_lifecycle;if(!m)return [];
  const inRuntime=a=>Number.isInteger(a)&&!(a&3)&&a>=manifest.base&&a<manifest.base+manifest.code_bytes;
- need((manifest.debug_mode===true||manifest.experimental_capture?.native_color===true)&&m.owner?.schema===2&&m.owner.storage?.recipe_bytes===0x4778&&m.owner.storage?.extended_recipe_bytes===0x5150&&m.owner.storage?.trace_offset===0x4778&&m.owner.storage?.color_offset===0x4a08&&m.owner.storage?.stamp_offset===0x5140&&m.owner.storage?.stamp_bytes===16&&m.buffer_policy_changed===false,'invalid recipe lifetime contract');
+ need((manifest.debug_mode===true||manifest.experimental_capture?.native_color===true)&&m.owner?.schema===2&&m.owner.storage?.recipe_bytes===0x4778&&m.owner.storage?.extended_recipe_bytes===0x5778&&m.owner.storage?.trace_offset===0x4778&&m.owner.storage?.color_offset===0x4a08&&m.owner.storage?.stamp_offset===0x5140&&m.owner.storage?.stamp_bytes===16&&m.owner.storage?.custom_isp_offset===0x5150&&m.owner.storage?.custom_isp_bytes===1576&&m.buffer_policy_changed===false,'invalid recipe lifetime contract');
  const calls=[[0x53523e0c,0x5351091c,'m10v_save_trace_recipe_alloc'],
   ...[0x535153ec,0x53516e14,0x53516ebc,0x5351897c,0x5351af20,0x5351feb4].map(a=>[a,0x535216d0,'m10v_save_trace_recipe_allocate']),
   ...[0x5351703c,0x535170cc,0x535182f8,0x5351f3a8,0x5351fd50].map(a=>[a,0x53521d14,'m10v_save_trace_recipe_release'])];
@@ -413,7 +428,7 @@ function lifecyclePatches(manifest,runtime){
   const o=m.snapshot.stamp_orientation;
   need(o?.source==='this recipe ShootingInfo +0xc8'&&o.shooting_pointer_offset===0x44c8&&o.field_offset===0xc8&&
     JSON.stringify(o.normalized_directions)==='[0,1,2,3]'&&JSON.stringify(o.exif_mapping)==='[1,8,3,6]'&&o.unknown_direction===0&&
-    o.freeze==='first original processing-task producer before enqueue'&&o.live_direction_reads===0&&o.stamp_offset===0x5140&&o.stamp_bytes===16&&o.extended_recipe_bytes===0x5150&&o.exif_table===0x53d30190&&
+    o.freeze==='first original processing-task producer before enqueue'&&o.live_direction_reads===0&&o.stamp_offset===0x5140&&o.stamp_bytes===16&&o.extended_recipe_bytes===0x5778&&o.exif_table===0x53d30190&&
     JSON.stringify(o.guard_words)===JSON.stringify({'0x53491528':'0xe5d000c8','0x53491530':'0xe5c010c8','0x534322f0':'0xe2524000','0x53432360':'0xe5c41946','0x535f63d0':'0xe28320c8','0x535f63d4':'0xe5842014','0x535f67ac':'0xe5923014','0x535f67b0':'0xe5d33000'}),'invalid per-exposure stamp orientation contract');
   need((m.snapshot.observer===true||(manifest.experimental_capture?.native_color===true&&m.snapshot.native_color===true&&m.snapshot.observer===false))&&m.snapshot.snapshot_ingress_installed===true&&m.snapshot.isp_filesystem_calls===0&&m.snapshot.color_bytes===1796&&m.snapshot.patches?.length===2+(m.snapshot.shared_hdf?2:0)+(m.snapshot.live_color?1:0),'invalid frame snapshot contract');
   need(m.snapshot.producer_sites?.length===1&&m.snapshot.producer_sites[0]===0x5351ea9c&&m.snapshot.filesystem_calls===0,'snapshot must freeze at processing-task submission without storage');
@@ -442,7 +457,7 @@ function lifecyclePatches(manifest,runtime){
   }
  }
  if(m.snapshot?.live_color){
-  need(manifest.sd_library&&manifest.settings_menu?.owner_bytes===0x223c,'preview requires owned parameter cache');
+  need(manifest.sd_library&&manifest.settings_menu?.owner_bytes===0x613c,'preview requires owned parameter cache');
   const row=m.snapshot.patches.at(-1);need(row.address===0x53dbd954&&inRuntime(row.entry),'invalid Live Make entry');
   expected.push({address:0x53dbd954,expected:0x536ddecc,replacement:row.entry,name:'native Live Make color'});
   const at=row.entry,ex=m.snapshot.exports;
@@ -507,6 +522,8 @@ function appendedSlotPatches(runtime,manifest,raw) {
  const playback=m.playback;
  need(playback?.icon_id===754&&playback.metadata_key===0x25&&JSON.stringify(playback.recorded_codes)==='[268,277]'&&playback.identity==='recorded-slot-generic-film','playback identity contract differs');
  const checkPlayback=(name,words)=>{const start=playback[name],body=read(start,words.length*4);words.forEach((w,i)=>{if(Array.isArray(w))w=branch(start+4*i,w[0],true);need(body.readUInt32LE(4*i)===(w>>>0),'playback '+name+' instructions differ');});};
+ checkPlayback('metadata_decode',[0xe3500015,0x93802801,0x83a02000,0xe350000b,branch(playback.metadata_decode+16,0x535c2520)]);
+ patches.push({address:0x535c251c,expected:0x83a02000,replacement:((branch(0x535c251c,playback.metadata_decode)&0x0fffffff)|0x80000000)>>>0,name:'recorded film playback metadata decode'});
  checkPlayback('icon',[0xe92d4010,[0x532b6eec],0xe3500000,0x1a00000a,[0x5320ad88],[0x5320b97c],0xe3500000,0x0a000006,0xe5902220,0xe300c00c,0xe340c001,0xe042200c,0xe3520009,0x930002f2,0x83a00000,0xe8bd8010]);
  checkPlayback('detail',[0xe92d4013,[0x532b44bc],0xe3500000,0x1a00000b,0xe59d2000,0xe5922220,0xe300c00c,0xe340c001,0xe042200c,0xe3520009,0x8a000004,0xe59d1004,0xe3510000,0x13a0200b,0x15c12000,0xe3a00001,0xe28dd008,0xe8bd8010]);
  for(const [address,expected,name] of [[0x53179b7c,0xeb04f4da,'icon'],[0x532b7cfc,0xebfff1ee,'detail']])patches.push({address,expected,replacement:branch(address,playback[name],true),name:'recorded film playback '+name});
@@ -534,7 +551,7 @@ function patchList(manifest,runtime) {
       {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound primary'},
       {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound secondary'}];
   }
-  return [...borderPatches(runtime,manifest),...zoomPatches(runtime,manifest),...appendedSlotPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
+  return [...(manifest.half_pair?.enabled?[{address:0x531b6be4,expected:0xea026e6e,replacement:branch(0x531b6be4,manifest.symbols.m10v_half_pair_select),name:'Half pair explicit menu cancellation'}]:[]),...borderPatches(runtime,manifest),...zoomPatches(runtime,manifest),...appendedSlotPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
     replacement:branch(address,manifest.symbols[name],link),name})),
     {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum primary'},
     {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum secondary'},
@@ -577,9 +594,9 @@ export function buildNativeLibrary(source,runtime,manifest) {
   const report=inspectOfficial(source);need(report.model==='GR III','native detail requires exact GR III 2.10 official source');checkRuntime(runtime,manifest);
   const {decoded}=decodeFrameMap(source),rows=sectionMap(decoded,report),rtos=rows.find(row=>row.name==='RTOS');
   const programOffset=BASE-LOAD,newPayload=programOffset+runtime.length;
-  // The bounded allowance includes all immutable LUT/icon banks and native profiles.
-  // Mapping/readback/section preservation checks below still cover the whole extent.
-  const growth=newPayload-(rtos.size-16);need(growth>0&&growth<=MAX_NATIVE_RTOS_GROWTH,`native RTOS growth invalid: ${growth} bytes exceeds budget ${MAX_NATIVE_RTOS_GROWTH}`);
+  // The source-bound container limit is independent of the selected feature mix.
+  // The full appended range is checked against the official MMU table in auditNativeLibrary.
+  const growth=newPayload-(rtos.size-16);need(growth>0&&growth<=MAX_NATIVE_RTOS_GROWTH,`native RTOS growth invalid: ${growth} bytes exceeds decoded container limit ${MAX_NATIVE_RTOS_GROWTH}`);
   const insertion=rtos.offset+rtos.size;
   const target=Buffer.concat([decoded.subarray(0,insertion),Buffer.alloc(growth),decoded.subarray(insertion)]);
   target.writeUInt32LE(newPayload,rtos.offset+12);

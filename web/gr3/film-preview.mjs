@@ -75,7 +75,7 @@ let animeE6TablesPromise,c41TablesPromise,extraFilmsTablesPromise;
 let harmanTablesPromise,curatedTablesPromise,newstocksTablesPromise,styleFiltersTablesPromise,spectralTablesPromise,d76TablesPromise;
 export async function renderPreviewPixels(source, look, width, height) {
   const film=look.film??look.id;
-  if(Number.isInteger(film)&&film>=314&&film<=316){
+  if(Number.isInteger(film)&&film>=314&&film<=317){
     extraFilmsTablesPromise??=fetch(new URL('./extra-films-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('Film LUT unavailable');return r.json();}).catch(e=>{extraFilmsTablesPromise=undefined;throw e;});
     const lut=await extraFilmsTablesPromise;return previewRgbLutPixels(source,lut,lut.stocks.find(s=>s.id===film)?.native_values);
   }

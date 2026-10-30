@@ -105,6 +105,9 @@ def apply_overlay(rtos,half_frame=True):
         struct.pack_into('<I',rtos,at,value)
 
     for address,name in HOOKS.items(): word(address,branch(address,symbols['m10v_aspect_'+name]))
+    if half_frame:
+        for site,preimage in [(0x53664c60,0xeb00f772),(0x536649f0,0xeb00f80e)]:
+            word(site,branch(site,symbols['m10v_aspect_encoded_resolution'],True),preimage)
     # Redirect internal callers, retaining the unchanged implementations for
     # the new adapters' legacy fallbacks. Relocations distinguish code/data.
     report=json.loads((ROOT/'.runtime/grlife-current/reconstruction/firmware_store/templates/urban160-link-report.json').read_text())

@@ -5,6 +5,7 @@
 #include "m10v_library.h"
 #include "m10v_tone.h"
 #include <stddef.h>
+#include "m10v_custom_isp.h"
 
 typedef uint32_t (*manager_fn)(void);
 typedef int (*read_fn)(uint32_t, const char *, uint32_t, void *);
@@ -32,9 +33,10 @@ static void copy(m10v_library_state *dst, const m10v_library_state *src) {
 #endif
 #if M10V_LIVE_COLOR
 #define PREVIEW_OFFSET 0x213cu
-#define PREVIEW_BYTES 256u
+#define PREVIEW_BYTES 0x4000u
 #define PREVIEW_MAGIC 0x3856504du
-typedef struct {uint32_t magic,version; m10v_library_state state;} preview_cache;
+typedef struct {uint32_t id,bank;m10v_isp_frame_target target;} custom_profile;
+typedef struct {uint32_t magic,version; m10v_library_state state;custom_profile profiles[M10V_SLOT_COUNT];} preview_cache;
 _Static_assert(sizeof(preview_cache)<=PREVIEW_BYTES,"preview owner capacity");
 static preview_cache *preview_owner(void){
     /* Original5316f350 singleton guard,5316fce0 factory+74 TopMenu owner.
@@ -45,10 +47,36 @@ static preview_cache *preview_owner(void){
     preview_cache *p=(preview_cache *)(uintptr_t)(owner+PREVIEW_OFFSET);
     return p->magic==PREVIEW_MAGIC?p:0;
 }
+static int refresh_profiles(preview_cache *p,const m10v_library_state *s,uint32_t version){
+#if M10V_SD_LIBRARY
+ uint8_t *record=0;
+ int valid=1;
+ for(uint32_t i=0;i<M10V_SLOT_COUNT;i++){
+  custom_profile *c=&p->profiles[i];uint32_t id=s->slots[i].film,bank=s->effects[i].reserved[0];
+  if(!M10V_CUSTOM(id)){c->id=c->bank=0;continue;}
+  if(c->id==id&&c->bank==bank&&bank>=M10V_CUSTOM_IMMUTABLE_FIRST)continue;
+  c->id=c->bank=0;
+  if(!record)record=(uint8_t *)(uintptr_t)((uint32_t (*)(uint32_t))0x536af2a8u)(M10V_SD_RECORD_BYTES);
+  if(!record)continue;
+  int loaded=m10v_sd_camera_custom_record(s,i,record,M10V_SD_RECORD_BYTES);
+  /* Storage is allowed to reenter UI. Reacquire identity before touching
+   * owned memory again; a new constructor starts at version0. */
+  if(preview_owner()!=p||__atomic_load_n(&p->version,__ATOMIC_ACQUIRE)!=version){valid=0;break;}
+  if(!loaded||m10v_sd_u32(record+M10V_CUSTOM_ISP_OFFSET)!=0x5053494du)continue;
+  for(uint32_t k=0;k<sizeof(c->target);k++)((uint8_t *)&c->target)[k]=record[M10V_CUSTOM_ISP_OFFSET+16+k];
+  c->bank=bank;c->id=id;
+ }
+ if(record)((void (*)(void *))0x536af2e4u)(record);
+ return valid;
+#else
+ (void)p;(void)s;(void)version;return 1;
+#endif
+}
 static void publish_preview(preview_cache *p,const m10v_library_state *s){
     if(!p||!m10v_library_valid(s)||(s->reserved&510u))return;
     uint32_t v=__atomic_load_n(&p->version,__ATOMIC_ACQUIRE);
     if((v&1u)||!__atomic_compare_exchange_n(&p->version,&v,v+1,0,__ATOMIC_ACQ_REL,__ATOMIC_RELAXED))return;
+    if(!refresh_profiles(p,s,v+1))return;
     copy(&p->state,s);__atomic_store_n(&p->version,v+2,__ATOMIC_RELEASE);
 }
 #endif
@@ -72,7 +100,7 @@ void m10v_camera_library_mutation_end(const m10v_library_state *state){
 #if M10V_LIVE_COLOR
  preview_cache *p=preview_owner();if(!p)return;
  uint32_t v=__atomic_load_n(&p->version,__ATOMIC_ACQUIRE);if(!(v&1u))return;
- if(m10v_library_valid(state))copy(&p->state,state);
+ if(m10v_library_valid(state)){if(!refresh_profiles(p,state,v))return;copy(&p->state,state);}
  __atomic_store_n(&p->version,v+1,__ATOMIC_RELEASE);
 #else
  (void)state;
@@ -89,11 +117,28 @@ int m10v_camera_library_preview(m10v_library_state *out){
     (void)out;return 0;
 #endif
 }
+int m10v_camera_library_custom_profile(const m10v_library_state *state,uint32_t slot,m10v_isp_frame_target *out){
+#if M10V_LIVE_COLOR && M10V_SD_LIBRARY
+ preview_cache *p=preview_owner();
+ if(!p||!state||!ram(out,sizeof(*out))||slot>=M10V_SLOT_COUNT)return 0;
+ uint32_t v=__atomic_load_n(&p->version,__ATOMIC_ACQUIRE);
+ if(!v||(v&1u)||p->state.sequence!=state->sequence)return 0;
+ const custom_profile *c=&p->profiles[slot];
+ if(!M10V_CUSTOM(c->id)||c->id!=state->slots[slot].film||c->bank!=state->effects[slot].reserved[0])return 0;
+ for(uint32_t i=0;i<sizeof(*out);i++)((uint8_t *)out)[i]=((const uint8_t *)&c->target)[i];
+ __atomic_thread_fence(__ATOMIC_ACQUIRE);
+ return p->magic==PREVIEW_MAGIC&&v==__atomic_load_n(&p->version,__ATOMIC_RELAXED);
+#else
+ (void)state;(void)slot;(void)out;return 0;
+#endif
+}
 void m10v_camera_library_preview_init(uint32_t owner){
 #if M10V_LIVE_COLOR
     if(!ram((void *)(uintptr_t)owner,PREVIEW_OFFSET+PREVIEW_BYTES))return;
     preview_cache *p=(preview_cache *)(uintptr_t)(owner+PREVIEW_OFFSET);
-    p->magic=0;p->version=0;p->magic=PREVIEW_MAGIC;
+    p->magic=0;p->version=0;
+    for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)p->profiles[i].id=p->profiles[i].bank=0;
+    p->magic=PREVIEW_MAGIC;
     /* Constructor is allocation-only: storage may re-enter the factory.
      * Ready/load publishes after the original factory has installed owner+74. */
 #else
@@ -102,8 +147,10 @@ void m10v_camera_library_preview_init(uint32_t owner){
 }
 void m10v_camera_library_preview_clear(uint32_t owner){
 #if M10V_LIVE_COLOR
-    if(ram((void *)(uintptr_t)owner,PREVIEW_OFFSET+PREVIEW_BYTES))
-        ((preview_cache *)(uintptr_t)(owner+PREVIEW_OFFSET))->magic=0;
+    if(ram((void *)(uintptr_t)owner,PREVIEW_OFFSET+PREVIEW_BYTES)){
+        preview_cache *p=(preview_cache *)(uintptr_t)(owner+PREVIEW_OFFSET);
+        p->magic=0;
+    }
 #else
     (void)owner;
 #endif

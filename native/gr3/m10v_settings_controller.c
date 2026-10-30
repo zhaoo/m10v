@@ -7,6 +7,12 @@
 #include "m10v_film_card.h"
 #include "m10v_film_directory.h"
 #include "m10v_zoom_camera.h"
+#ifndef M10V_HALF_PAIR_ENABLED
+#define M10V_HALF_PAIR_ENABLED 0
+#endif
+#if M10V_HALF_PAIR_ENABLED
+#include "m10v_half_pair_camera.h"
+#endif
 #ifndef M10V_LIVE_COLOR
 #define M10V_LIVE_COLOR 0
 #endif
@@ -58,7 +64,7 @@ static m10v_settings_controller *page(uint32_t owner,uint32_t i){
  return (m10v_settings_controller *)(uintptr_t)(owner+M10V_SETTINGS_OWNER_BYTES+i*M10V_SETTINGS_CONTROLLER_BYTES);
 }
 #include "m10v_ab_camera.inc"
-uint32_t m10v_settings_controller_owner_size(void){return M10V_SETTINGS_OWNER_BYTES+2*M10V_SETTINGS_CONTROLLER_BYTES+(M10V_LIVE_COLOR?256u:0u);}
+uint32_t m10v_settings_controller_owner_size(void){return M10V_SETTINGS_OWNER_BYTES+2*M10V_SETTINGS_CONTROLLER_BYTES+(M10V_LIVE_COLOR?0x4000u:0u);}
 uint32_t m10v_settings_controller_top_ctor(uint32_t owner){
  ((fn1)0x5319aa68u)(owner);
  for(uint32_t i=0;i<2;i++){
@@ -72,6 +78,9 @@ uint32_t m10v_settings_controller_top_ctor(uint32_t owner){
 #if M10V_LIVE_COLOR
  m10v_camera_library_preview_init(owner);
 #endif
+ #if M10V_HALF_PAIR_ENABLED
+ m10v_half_pair_init(owner);
+ #endif
  return owner;
 }
 uint32_t m10v_settings_controller_destroy(m10v_settings_controller *p){
@@ -81,6 +90,9 @@ uint32_t m10v_settings_controller_destroy(m10v_settings_controller *p){
  return (uint32_t)(uintptr_t)p;
 }
 uint32_t m10v_settings_controller_top_dtor(uint32_t owner){
+#if M10V_HALF_PAIR_ENABLED
+ m10v_half_pair_destroy(owner);
+#endif
  ab_clear(&page(owner,0)->ab);
 #if M10V_LIVE_COLOR
  m10v_camera_library_preview_clear(owner);

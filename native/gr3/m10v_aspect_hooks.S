@@ -43,6 +43,16 @@ entry resolution_hook
     b m10v_aspect_resolution
 1:  cmp r2,#4
     jump 0x540b9454
+/* Only the two encoded-bank sizing callers use this entry. Full-frame
+ * capacity/target leaves room for two Half exposures; capture resolution,
+ * sensor window and per-exposure DNG geometry retain raw identity 6. */
+entry encoded_resolution
+#if M10V_HALF_FRAME
+    cmp r2,#6
+    moveq r2,#0
+#endif
+    jump 0x536a2a30
+
 entry capture_identity
 #if M10V_HALF_FRAME
     cmp r9,#6
@@ -74,10 +84,21 @@ entry binary_class
 entry write
     ldr ip,[r0,#0x20]
     ldrb ip,[ip,#0xf2]
-    cmp ip,#5
 #if M10V_HALF_FRAME
-    cmpne ip,#6
+    /* Half JPEG pixels are already cropped, and the second exposure can
+     * contain the baked pair. Native MakerNote byte 1 decodes to raw0
+     * (uncropped), so playback does not apply private Half origins again.
+     * Do not mutate capture properties: DNG DefaultCropTags still derive
+     * their individual Half crop from frozen raw6 and sensor geometry. */
+    cmp ip,#6
+    bne 8f
+    mov r0,r1
+    mov r1,#0
+    mov r2,#1
+    jump 0x535d02b4
+8:
 #endif
+    cmp ip,#5
     bne 1f
     mov r0,r1
     mov r1,#0

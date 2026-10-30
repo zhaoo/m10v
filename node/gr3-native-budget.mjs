@@ -1,8 +1,8 @@
-// Seven style LUT/icon banks and native preview curves remain immutable ROM.
-// Latest main border budget:1120 KiB. Half-frame appends a 9,612-byte
-// native icon/directory/descriptor. Reserve one bounded 16 KiB increment.
-// Overlay allocation, preimages, full section and MMU checks remain intact.
-// Full half-frame+border diagnostic build measured 1,170,620 bytes, 8,624
-// above its non-debug counterpart. One further bounded 16 KiB allowance keeps
-// the same full readback and overflow rejection checks for diagnostic code.
-export const MAX_NATIVE_RTOS_GROWTH=1152*1024;
+// The firmware decoder accepts at most 128 MiB of decoded data. The exact
+// official GR III/IIIx source decodes to 59,718,388 bytes; only RTOS can grow.
+// This is a container bound, not a manually reserved native-code allowance.
+// The complete appended address range is checked against the official MMU
+// descriptors, and the whole candidate is independently decoded and audited.
+export const MAX_DECODED_FIRMWARE_BYTES=128*1024*1024;
+export const OFFICIAL_DECODED_FIRMWARE_BYTES=59718388;
+export const MAX_NATIVE_RTOS_GROWTH=MAX_DECODED_FIRMWARE_BYTES-OFFICIAL_DECODED_FIRMWARE_BYTES;

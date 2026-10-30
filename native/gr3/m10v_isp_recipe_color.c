@@ -1,6 +1,12 @@
 #include "m10v_tone.h"
 #include "m10v_isp_recipe_color.h"
 #include <stddef.h>
+#include "m10v_custom_isp.h"
+typedef struct {uint32_t magic;m10v_isp_frame_target target;} custom_isp_snapshot;
+_Static_assert(sizeof(custom_isp_snapshot)==M10V_SAVE_CUSTOM_ISP_BYTES,"custom recipe extent");
+static custom_isp_snapshot *custom_snapshot(m10v_isp_recipe_color *s){
+ return (custom_isp_snapshot *)((uint8_t *)s-M10V_SAVE_COLOR_OFFSET+M10V_SAVE_CUSTOM_ISP_OFFSET);
+}
 #if M10V_BORDER_SHOT
 #include "m10v_border_shot.h"
 #endif
@@ -22,7 +28,8 @@ _Static_assert(sizeof(m10v_isp_recipe_color)==M10V_SAVE_COLOR_BYTES,"recipe colo
 _Static_assert(sizeof(m10v_stamp_recipe)==M10V_SAVE_STAMP_BYTES,"stamp extent");
 _Static_assert(M10V_SAVE_COLOR_OFFSET+M10V_SAVE_COLOR_BYTES<=M10V_CAPTURE_RAW_TOKEN_OFFSET,"color before RAW token");
 _Static_assert(M10V_CAPTURE_RAW_TOKEN_OFFSET+M10V_CAPTURE_RAW_TOKEN_BYTES<=M10V_SAVE_STAMP_OFFSET,"RAW and HDF before stamp owner");
-_Static_assert(M10V_SAVE_STAMP_OFFSET+M10V_SAVE_STAMP_BYTES==M10V_SAVE_RECIPE_EXTENDED_BYTES,"stamp allocation extent");
+_Static_assert(M10V_SAVE_STAMP_OFFSET+M10V_SAVE_STAMP_BYTES==M10V_SAVE_CUSTOM_ISP_OFFSET,"stamp before custom ISP");
+_Static_assert(M10V_SAVE_CUSTOM_ISP_OFFSET+M10V_SAVE_CUSTOM_ISP_BYTES==M10V_SAVE_RECIPE_EXTENDED_BYTES,"custom ISP allocation extent");
 #if M10V_ISP_RECIPE_COLOR_PRODUCER || M10V_ISP_LIVE_COLOR
 static int config_ram(uintptr_t p,uint32_t bytes){return !(p&3)&&p>=0x55000000u&&p<=0x80000000u-bytes;}
 #endif
@@ -95,6 +102,7 @@ int m10v_isp_frame_recipe_snapshot(void *recipe,const m10v_library_state *state)
     if(!s||!m10v_library_valid(state))return 0;
     if(s->magic==M10V_ISP_RECIPE_COLOR_MAGIC&&s->busy)return 0;
     s->magic=0;
+    custom_snapshot(s)->magic=0;
     ((m10v_stamp_recipe *)((uint8_t *)recipe+M10V_SAVE_STAMP_OFFSET))->magic=0;
     for(uint32_t i=0;i<sizeof(*state);i++)((uint8_t *)&s->state)[i]=((const uint8_t *)state)[i];
     s->version=1;s->bytes=sizeof(*s);s->status=M10V_ISP_RECIPE_READY;
@@ -157,6 +165,11 @@ int m10v_isp_frame_recipe_producer(void *recipe){
     /* The exposed frame owns its tone. UI Property can already name a later
      * shot by task submission; never use it to recolor a queued exposure. */
     s->selected_tone=(uint16_t)producer_tone;
+    uint32_t slot=m10v_tone_slot(producer_tone);
+    if(slot<M10V_SLOT_COUNT&&M10V_CUSTOM(state.slots[slot].film)){
+        custom_isp_snapshot *custom=custom_snapshot(s);
+        if(m10v_camera_library_custom_profile(&state,slot,&custom->target))custom->magic=0x31505343u;
+    }
     if(state.stamp||(state.reserved&1u)){
         /* Read this recipe's ShootingInfo, precisely the byte bound by the
          * official EXIF setter535f63d0. Never sample the live/UI singleton:
@@ -236,6 +249,12 @@ int m10v_isp_frame_recipe_finish(const void *context){
     uint32_t tone=selected_tone(s,s->tone);
     uint32_t slot=m10v_tone_slot(tone);
     uint32_t film=s->state.slots[slot].film;
+    if(M10V_CUSTOM(film)){
+        custom_isp_snapshot *custom=custom_snapshot(s);
+        int result=custom->magic==0x31505343u&&m10v_isp_frame_apply(gamma,info,&custom->target,cs);
+        s->status=result?M10V_ISP_RECIPE_APPLIED:M10V_ISP_RECIPE_UNSUPPORTED;
+        return result;
+    }
     /* Still and live color use the same fitted ISP profiles. Spatial Pixel
      * World and Charmera's exact pairwise palette remain software effects;
      * their live approximation must never authorize skipping those effects. */
@@ -362,6 +381,11 @@ int m10v_isp_frame_live_color(void *tuning,void *info){
     if(slot>=M10V_SLOT_COUNT)return 0;
     m10v_library_state state;if(!m10v_camera_library_preview(&state))return 0;
     uint32_t film=state.slots[slot].film,exposure=(film==67||film==68)?state.effects[slot].film_exposure:0;
+    if(M10V_CUSTOM(film)){
+        m10v_isp_frame_target target;
+        return m10v_camera_library_custom_profile(&state,slot,&target)&&
+            m10v_isp_frame_apply(*(const void *const *)((const uint8_t *)tuning+0x17c),info,&target,shot[0x7be]==1);
+    }
     if(film==M10V_CHAR_ID)exposure=state.effects[slot].reserved[1];
     m10v_isp_native_look look;
     return m10v_isp_native_look_prepare(&look,film,exposure,state.sequence+1u)&&

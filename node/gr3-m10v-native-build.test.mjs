@@ -21,7 +21,7 @@ test('M10V native library builds from official bytes without a compatibility run
     const result = buildNativeLibrary(source, runtime, manifest);
     assert.deepEqual(result.receipt.changed_sections, ['RTOS']);
     assert.equal(result.receipt.camera_tested, false);
-    assert.equal(result.receipt.film_count, 88);
+    assert.equal(result.receipt.film_count, 103);
     assert.equal(result.receipt.external_film_pack, false);
     assert.deepEqual(auditNativeLibrary(source, result.candidate, runtime, manifest), result.receipt);
     // Data appended to the valid runtime must not hit an arbitrary byte ceiling.
@@ -31,9 +31,9 @@ test('M10V native library builds from official bytes without a compatibility run
     assert.ok(largeRuntime.length>runtime.length);
     assert.deepEqual(auditNativeLibrary(source,large.candidate,largeRuntime,largeManifest),large.receipt);
 
-    // Reproduce Ubuntu clang's observed full-build extent independently of
-    // source compiler padding; appended ROM data still receives full audits.
-    const serverGrowth=1115104,ceiling=MAX_NATIVE_RTOS_GROWTH;
+    // Reproduce the website's observed RTOS extent independently of compiler
+    // padding; appended ROM data still receives full mapping and byte audits.
+    const serverGrowth=1156188,ceiling=MAX_NATIVE_RTOS_GROWTH;
     const withGrowth=growth=>{
       const bytes=Buffer.concat([runtime,Buffer.alloc(growth-result.receipt.rtos_growth)]);
       return [bytes,{...manifest,code_bytes:bytes.length,code_sha256:createHash('sha256').update(bytes).digest('hex')}];

@@ -1,5 +1,6 @@
 // In-memory GR III frame replay used by the independently verified export path.
 import { inspectOfficial } from './firmware.mjs';
+import {MAX_DECODED_FIRMWARE_BYTES} from './gr3-native-budget.mjs';
 
 function check(ok, message) { if (!ok) throw new Error(message); }
 export function sum32(bytes) {
@@ -15,7 +16,7 @@ export function decodeFrameMap(container, expectedDecodedSize) {
   const encodedSize = container.readUInt32LE(footer + 12);
   const decodedSize = container.readUInt32LE(footer + 16);
   expectedDecodedSize ??= decodedSize;
-  check(decodedSize === expectedDecodedSize && decodedSize > 0 && decodedSize <= 128 * 1024 * 1024 &&
+  check(decodedSize === expectedDecodedSize && decodedSize > 0 && decodedSize <= MAX_DECODED_FIRMWARE_BYTES &&
     128 + encodedSize <= footer, 'invalid frame sizes');
   const payload = container.subarray(128, 128 + encodedSize);
   const decoded = Buffer.allocUnsafe(expectedDecodedSize);

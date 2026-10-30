@@ -98,15 +98,17 @@ for model in gr3 gr3x gr4; do
   else
     build_args=(scripts/check_gr4_release.mjs)
   fi
+  build_timeout=600
+  [[ $model == gr4 ]] && build_timeout=900
   # Bound the entire compiler/Python/Node process tree, not just the JS heap.
   # Reclaim above 600 MiB; cap resident build memory at 700 MiB so the
   # ~1.6 GiB host retains headroom. Swap stays bounded by the existing 1 GiB pool.
   active_unit="m10v-build-${expected:0:12}-$$-$model.service"
-  printf 'FIRMWARE_BUILD_START model=%s unit=%s memory_high=600M memory=700M swap=384M timeout=600s\n' "$model" "$active_unit"
+  printf 'FIRMWARE_BUILD_START model=%s unit=%s memory_high=600M memory=700M swap=384M timeout=%ss\n' "$model" "$active_unit" "$build_timeout"
   systemd-run --quiet --wait --pipe --collect --unit="$active_unit" \
     --property=MemoryHigh=600M --property=MemoryMax=700M --property=MemorySwapMax=384M \
     --property=CPUQuota=100% --property=TasksMax=64 \
-    --property=RuntimeMaxSec=600 --property=OOMPolicy=kill \
+    --property=RuntimeMaxSec="$build_timeout" --property=OOMPolicy=kill \
     --property=KillMode=control-group --property=TimeoutStopSec=10 \
     --working-directory="$repo" -- runuser -u www -- env NODE_OPTIONS=--max-old-space-size=128 M10V_LLVM_CLANG=/usr/bin/clang M10V_PYTHON="$repo/.venv/bin/python" "$node" \
     "${build_args[@]}" >"$work/$model.log" 2>&1 &

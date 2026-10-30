@@ -35,7 +35,7 @@ test('independent settings audit binds owned controllers, original fallback and 
   }
   const official=readFileSync('bin/fwdc239b-gr3-official.bin');
   buildNativeLibrary(official,r,m);
-  for(const name of ['icon','detail']){
+  for(const name of ['metadata_decode','icon','detail']){
    const broken=Buffer.from(r);broken[m.appended_slots.playback[name]-m.base+8]^=1;
    assert.throws(()=>buildNativeLibrary(official,broken,m));
   }

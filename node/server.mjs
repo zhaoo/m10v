@@ -245,7 +245,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
         nativeMatch || pathname==='/api/gr3/power-images/preview' ? 3*1024*1024 : bridgeMatch || pathname === '/api/gr3/native-library/import-official' ? 4096 : haloMatch ? 4096 : editMatch ? 256 * 1024 : versionMatch ? 0 :
         sdMatch ? 1024 : candidateMatch || candidateExportMatch ? 2 * 1024 * 1024 : MAX_UPLOAD);
       if(pathname==='/api/gr3/power-images/preview')return send(response,200,previewPowerImages(JSON.parse(body.toString('utf8'))));
-      if(pathname==='/api/gr3/sd-library/export'){const {zip}=exportSdFilms(JSON.parse(body.toString('utf8')));return send(response,200,zip,'application/zip','M10V-SD-films.zip');}
+      if(pathname==='/api/gr3/sd-library/export'){const {zip}=await exportSdFilms(JSON.parse(body.toString('utf8')));return send(response,200,zip,'application/zip','M10V-SD-films.zip');}
       if(pathname==='/api/platform/inspect'||pathname==='/api/platform/inspect-official'){
         const bytes=pathname==='/api/platform/inspect'?body:await readModelOfficial(JSON.parse(body.toString('utf8')).model);
         return send(response,200,await inspectModelFirmware(bytes));

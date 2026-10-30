@@ -20,7 +20,7 @@ export async function handleGr4NativeRequest({request,response,runtime,token,rea
   const input=JSON.parse(body.toString('utf8')||'{}');
   if(route==='sd-export'){
    if(!Array.isArray(input.ids)||input.ids.some(id=>id>78))throw Error('GR IV 尚未适配此胶卷');
-   const {receipt}=exportSdFilms({model:'gr3',ids:input.ids});
+   const {receipt}=await exportSdFilms({model:'gr3',ids:input.ids});
    const {buildSdFilmPack}=await import('./gr3-sd-film-pack.mjs');
    const pack=buildSdFilmPack(input.ids),record={...receipt,model:'gr4',camera_tested:false};
    return send(response,200,encodeZip({'SD/M10V/FILMS.M10':pack,'manifest.json':Buffer.from(JSON.stringify(record,null,2)),'README.txt':Buffer.from(gr4SdInstructions())}),'application/zip','M10V-GR4-SD-films.zip'),true;

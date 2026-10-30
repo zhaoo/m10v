@@ -925,5 +925,14 @@
     "color": "#397f8c",
     "icon_url": "/gr3/film-icons/316-large.png",
     "sha256": "892b5a4a0a36075f6abe59c88ba47e11abac4b17787b5d251eb94998e7f5c2ad"
+  },
+  {
+    "id": 317,
+    "name": "Instax Color",
+    "title": "INSTAX",
+    "code": "800",
+    "color": "#4bafaa",
+    "icon_url": "/gr3/film-icons/317-large.png",
+    "sha256": "15bea1739fb9ee32da212e13b6f06986e95b2e682eff161fd627492ceadce47b"
   }
 ]

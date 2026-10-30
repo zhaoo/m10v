@@ -30,7 +30,7 @@ $('custom-add').onclick=async()=>{
 $('sd-all').onclick=()=>{films.forEach(f=>selected.add(f.id));update();};
 $('sd-none').onclick=()=>{selected.clear();update();};
 $('sd-download').onclick=async()=>{
- busy=true;update();status('正在打包并校验胶卷…');
+ busy=true;update();status(custom.length?'正在拟合自定义 LUT 并生成误差报告，请稍候…':'正在打包并校验胶卷…');
  try{
   const response=await fetch(model==='gr4'?'/api/gr4/native-library/sd-export':'/api/gr3/sd-library/export',{method:'POST',headers:{'Content-Type':'application/json','X-M10V-Token':token},body:JSON.stringify({model,ids:films.filter(f=>selected.has(f.id)).map(f=>f.id),...(model==='gr3'?{customFilms:custom}: {})})});
   if(!response.ok)throw Error((await response.json()).error||'下载失败');

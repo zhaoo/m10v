@@ -19,6 +19,8 @@ export function hdfAdjPatches(runtime,m){
  if(m.settings_menu)need(h.parent_event===m.symbols?.m10v_settings_controller_ab_adj_event,'parent event composition differs');
  const names=['enter','draw','current','set','count','available','event'];
  for(const n of names)need(inside(m.symbols?.['m10v_hdf_adj_'+n])&&h.handlers?.[n]===m.symbols['m10v_hdf_adj_'+n],'handler outside runtime or differs');
+ // "available" is the existing export name for stock +0x3c exclusion:
+ // native render/navigation consumes zero as usable, nonzero as hidden.
  const record=Array(17).fill(0);
  for(const [off,n] of [[0,'enter'],[0x18,'draw'],[0x20,'current'],[0x28,'set'],[0x30,'count'],[0x3c,'available']])record[off/4]=m.symbols['m10v_hdf_adj_'+n];
  const words=(at,values)=>{need(within(at,values.length*4),'shim bounds');values.forEach((v,i)=>need(runtime.readUInt32LE(at-m.base+i*4)===(v>>>0),'instruction differs at '+(at+i*4).toString(16)));};

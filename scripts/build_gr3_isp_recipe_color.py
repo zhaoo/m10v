@@ -29,7 +29,7 @@ def stamp_orientation_contract(rom):
     return dict(source='this recipe ShootingInfo +0xc8',shooting_pointer_offset=0x44c8,
         field_offset=0xc8,normalized_directions=[0,1,2,3],exif_mapping=[1,8,3,6],
         unknown_direction=0,freeze='first original processing-task producer before enqueue',
-        live_direction_reads=0,stamp_offset=0x5140,stamp_bytes=16,extended_recipe_bytes=0x5150,
+        live_direction_reads=0,stamp_offset=0x5140,stamp_bytes=16,extended_recipe_bytes=0x5778,
         guard_words={hex(k):hex(v) for k,v in words.items()},exif_table=0x53d30190)
 
 def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,producer_snapshot=False,native_color=False,native_grain=False,external_noise=False,live_color=False,shared_hdf=False,appended_slots=False,border_snapshot=False):
@@ -39,14 +39,14 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
     if struct.unpack_from('<I',rom,SITE-0x53000000)[0]!=EXPECTED:raise ValueError('Develop Still Make callback differs')
     if type(base)!=int or base&3 or not 0x540b6000<=base<=0x54fe0000:raise ValueError('invalid appendRX base')
     owner=owner_manifest.get('storage',{})
-    if owner.get('color_offset')!=0x4a08 or owner.get('color_bytes')!=COLOR_BYTES or owner.get('extended_recipe_bytes')!=0x5150 or owner.get('stamp_offset')!=0x5140 or owner.get('stamp_bytes')!=16 or not any(p.get('address')==0x53523e0c for p in owner_manifest.get('patches',[])):
+    if owner.get('color_offset')!=0x4a08 or owner.get('color_bytes')!=COLOR_BYTES or owner.get('extended_recipe_bytes')!=0x5778 or owner.get('stamp_offset')!=0x5140 or owner.get('stamp_bytes')!=16 or not any(p.get('address')==0x53523e0c for p in owner_manifest.get('patches',[])):
         raise ValueError('matching extended recipe factory hook required')
     if type(observer)is not bool or type(producer_snapshot)is not bool:raise ValueError('invalid hook mode')
     if type(external_noise)is not bool or external_noise:raise ValueError('CPU grain noise shaping has been removed')
     if type(native_grain)is not bool or (native_grain and not native_color):raise ValueError('native grain requires native per-recipe color mode')
     if type(native_color)is not bool or (native_color and observer):raise ValueError('native color requires apply mode')
     if type(border_snapshot)is not bool or (border_snapshot and not producer_snapshot):raise ValueError('border snapshot requires producer ingress')
-    required=(('m10v_hdf_reserve','m10v_hdf_task_snapshot','m10v_hdf_settings','m10v_hdf_done') if shared_hdf else ())+ (('m10v_camera_library_preview',) if live_color or producer_snapshot else ())+('m10v_library_valid',)+(('m10v_library_tables',) if not observer else ())+(('m10v_camera_library_mutation_busy',) if producer_snapshot else ())+(('m10v_border_shot_freeze',) if border_snapshot else ())
+    required=(('m10v_hdf_reserve','m10v_hdf_task_snapshot','m10v_hdf_settings','m10v_hdf_done') if shared_hdf else ())+ (('m10v_camera_library_preview','m10v_camera_library_custom_profile') if live_color or producer_snapshot else ())+('m10v_library_valid',)+(('m10v_library_tables',) if not observer else ())+(('m10v_camera_library_mutation_busy',) if producer_snapshot else ())+(('m10v_border_shot_freeze',) if border_snapshot else ())
     if any(type(library_exports.get(k))!=int or library_exports[k]&3 for k in required):raise ValueError('real library decoder/validator ARM exports required')
     compiler=os.environ.get('M10V_LLVM_CLANG') or '/opt/homebrew/opt/llvm/bin/clang'
     if not Path(compiler).is_file():compiler=shutil.which('clang')
