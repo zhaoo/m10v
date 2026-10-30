@@ -71,7 +71,7 @@ BIN SHA-256：${binSha}。
 ${checks.map(c=>'- '+c.name+'：exit '+c.exit_code+(c.required===false?'（非门禁，结果完整保留）':'')).join('\n')}
 
 完整输出在 evidence/checks 中。ARM 模拟、像素测试与封包校验不能证明相机 AF、实际编码、回放、SD 写入或性能已通过。
-仅构建 GR III 候选；IIIx/IV 未执行设备验证。上一版 r3 已收到设备故障反馈，其通过日志不作为本包通过证据。
+仅构建 GR III 候选；IIIx/IV 未执行设备验证。r4 的对焦和画幅已收到设备通过反馈，取景与双拼失败；其离线通过日志不作为本包通过证据。
 
 ## 恢复
 
