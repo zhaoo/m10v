@@ -3,7 +3,7 @@ import json,re,sys,base64,hashlib,struct
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from scripts.generate_m10v_icons import artwork,box_icon,FONT
+from scripts.generate_m10v_icons import artwork,FONT
 
 def canonical_raster():
  """Pinned coverage avoids FreeType/RAQM differences across build hosts."""
@@ -89,7 +89,14 @@ def caption_blob():
  offsets,packed=caption_data()
  return struct.pack('<'+str(len(offsets))+'I',*offsets)+packed
 
-def custom_icon():return box_icon('Custom LUT',0).tobytes()
+def custom_icon():
+ """Builds verify accepted pixels, independent of host FreeType/Pillow versions."""
+ data=json.loads((ROOT/'native/gr3/m10v_square_icon_raster.json').read_text())
+ if (data['schema'],data['artwork_revision'],data['width'],data['height'],data['format'])!=('m10v-square-icon-raster/v1','classic-square-v1',40,40,'RGBA8'):raise ValueError('square icon raster extent differs')
+ if hashlib.sha256(FONT.read_bytes()).hexdigest()!=data['font_sha256']:raise ValueError('square icon font provenance differs')
+ pixels=base64.b64decode(data['custom_icon_base64'],validate=True)
+ if len(pixels)!=6400 or hashlib.sha256(pixels).hexdigest()!=data['custom_icon_sha256']:raise ValueError('square icon raster digest differs')
+ return pixels
 if __name__=='__main__':
  (ROOT/'native/gr3/m10v_film_card_data.h').write_text(generate())
  (ROOT/'native/gr3/m10v_custom_icon.rgba').write_bytes(custom_icon())

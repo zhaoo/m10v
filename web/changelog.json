@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.30.2",
+      "date": "2026-10-30",
+      "title": "发布正方形胶卷图标，修复跨平台构建校验",
+      "changes": [
+        "构建时使用已验收的固定 Custom 图标像素与 SHA-256 校验，避免 Linux 与 macOS 字体栅格化差异阻止固件导出。",
+        "发布正方形胶卷包装图标、新照片回放身份和 MENU / ADJ 导入名称修复；保留已验收图标像素及相机运行逻辑。"
+      ],
+      "notice": "上一轮服务器构建因字体重新绘制结果与固定图标不一致而停止，已自动回滚。本轮只修复构建校验的跨平台确定性，不改变相机 C 代码或图标资源字节。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.30.1",
       "date": "2026-10-30",
       "title": "重设计正方形胶卷图标，修复回放身份与导入名称",
@@ -12,9 +25,9 @@
         "保留旧 SD 胶卷资源的精确校验兼容，GR II 正方形卡片与 GR IV 共享图标同步更新。"
       ],
       "notice": "用户已反馈本次 r1 测试包验证通过并要求发布，未细分各机型的实测覆盖。GR III / IIIx 回放身份修复适用于新拍照片；旧照片不能从槽位编号可靠反推实际胶卷。导入 LUT 回放保留 Custom 类型图标及既有详情布局。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "14c4ae86e8556ed189f2c8fd71241e08eb7c9303",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/14c4ae86e8556ed189f2c8fd71241e08eb7c9303"
     },
     {
       "version": "2026.10.29.5",
