@@ -6,7 +6,7 @@ export function navigationItems(pathname = '/') {
   return [
     ['gr3', '/gr3/', 'GR III / IIIx'], ['gr4', '/gr4/', 'GR IV'],
     ['gr2', '/gr2/', 'GR II'], ['sd', path.startsWith('/gr2') ? '/gr2/#sd' : `/${model}/sd-library.html`, 'SD 胶卷'],
-    ['test-packages', '/test-packages/', '测试包'], ['guide', '/guide/', '说明'], ['changelog', '/changelog/', '更新日志'],
+    ['test-packages', '/test-packages/', '测试包'], ['guide', '/guide/', '说明'], ['changelog', '/changelog/', '更新日志'], ['support', '/support/', '支持 M10V'],
   ].map(([id, href, label]) => ({id, href, label, active: id === 'sd' ? sd : !sd && (id === 'gr3' ? path.startsWith('/gr3') : id === 'gr4' ? path.startsWith('/gr4') : id === 'gr2' ? path.startsWith('/gr2') : path.startsWith(`/${id}`))}));
 }
 export function renderNavigation(pathname = '/') {

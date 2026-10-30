@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.30.3",
+      "date": "2026-10-30",
+      "title": "新增支持 M10V 打赏入口",
+      "changes": [
+        "各机型工作台及公共页面顶部导航新增支持 M10V 入口，展示作者提供的支付宝和微信收款码。",
+        "支持查看收款码原图、保存图片及手机相册扫码，适配桌面和手机浏览。"
+      ],
+      "notice": "打赏完全自愿，不影响固件下载与功能使用，网站不记录付款状态。本次仅更新网页，适用于所有机型后台，不改变相机固件。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.30.2",
       "date": "2026-10-30",
       "title": "发布正方形胶卷图标，修复跨平台构建校验",
@@ -10,9 +23,9 @@
         "发布正方形胶卷包装图标、新照片回放身份和 MENU / ADJ 导入名称修复；保留已验收图标像素及相机运行逻辑。"
       ],
       "notice": "上一轮服务器构建因字体重新绘制结果与固定图标不一致而停止，已自动回滚。本轮只修复构建校验的跨平台确定性，不改变相机 C 代码或图标资源字节。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "f1c8ef9bca98b93b10d20436f213bbe0b62ed06b",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/41001640454"
     },
     {
       "version": "2026.10.30.1",

@@ -46,6 +46,8 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const web = path.join(root, 'web');
 const MAX_UPLOAD = 128 * 1024 * 1024;
 const staticFiles = {
+  '/support/': ['support.html', 'text/html; charset=utf-8'],
+  '/support': ['support.html', 'text/html; charset=utf-8'],
   '/test-packages/': ['test-packages.html', 'text/html; charset=utf-8'],
   '/test-packages': ['test-packages.html', 'text/html; charset=utf-8'],
   '/': ['index.html', 'text/html; charset=utf-8'],
@@ -215,7 +217,8 @@ export function createServer(store = new Store(path.join(root, 'data')),
                 target.endsWith('.json') ? 'application/json; charset=utf-8' :
                 target.endsWith('.html') ? 'text/html; charset=utf-8' :
                   target.endsWith('.svg') ? 'image/svg+xml; charset=utf-8' :
-                  target.endsWith('.png') ? 'image/png' : 'application/octet-stream';
+                  target.endsWith('.png') ? 'image/png' :
+                    /\.jpe?g$/.test(target) ? 'image/jpeg' : 'application/octet-stream';
             return send(response, 200, await readFile(target), type);
           } catch { /* fall through */ }
         }
