@@ -1,5 +1,6 @@
 export function mountPowerImages(root,{api,onChange,model}){
  let configuration={};
+ let enabled=true;
  const cards={};
  const tabs=document.createElement('div');tabs.className='power-mode-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','开关机画面');root.prepend(tabs);
  let activeKind='startup';
@@ -24,5 +25,6 @@ export function mountPowerImages(root,{api,onChange,model}){
   card.querySelector('[data-reset]').addEventListener('click',()=>{delete configuration[kind];onChange();showSaved();});
   cards[kind]={showSaved,card,tab,apply,hasPending:()=>!!bitmap||previewFailed};draw();
  }
- return {hasPending:()=>Object.values(cards).some(item=>item.hasPending()),applyPending:async()=>{for(const item of Object.values(cards))if(item.hasPending()&&!await item.apply())return false;return true;},getConfiguration:()=>structuredClone(configuration),setConfiguration:value=>{configuration=structuredClone(value||{});for(const item of Object.values(cards))item.showSaved();},setModel:()=>{root.hidden=!['gr3','gr3x'].includes(model());}};
+ const setModel=()=>{root.hidden=!enabled||!['gr3','gr3x'].includes(model());};
+ return {setEnabled:value=>{enabled=value;setModel();},hasPending:()=>enabled&&Object.values(cards).some(item=>item.hasPending()),applyPending:async()=>{if(!enabled)return true;for(const item of Object.values(cards))if(item.hasPending()&&!await item.apply())return false;return true;},getConfiguration:()=>structuredClone(configuration),setConfiguration:value=>{configuration=structuredClone(value||{});for(const item of Object.values(cards))item.showSaved();},setModel};
 }

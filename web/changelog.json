@@ -2,6 +2,21 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.31.3",
+      "date": "2026-10-31",
+      "title": "重设计网站与影像方案，统一功能开关和使用说明",
+      "changes": [
+        "首页改为 M10V 简介与完整功能展示，修正宽屏对齐并精简文案；统一机型菜单、D76 分类和胶卷库命名。",
+        "影像方案改为功能网格，扩展默认关闭；开关机图片合并为展开设置，A/B 快切支持独立选择。",
+        "修复边框草稿恢复、HDF 独立模式和撤销同步，更新各机型胶卷库、安装与功能说明。",
+        "删除测试包页面与固件桥接入口，保留桥接后端能力；优化 GR II 三步流程、手机胶卷列表及 README。"
+      ],
+      "notice": "网页、接口和离线 ARM 检查通过；本次未执行相机实测，固件生成与发布不代表所有机型和功能组合已获设备验证。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.31.2",
       "date": "2026-10-31",
       "title": "修复 GR III 换卷后持续闪灯与拍立得 3:2 白边",
@@ -11,9 +26,9 @@
         "保留 Half 双拍、黑色分隔条和现有裁切功能；调试模式增加边框编码交接前后的尺寸诊断。"
       ],
       "notice": "用户已确认 GR III 2.10 r2 测试包 c2a092eb 的 LED 和拍立得两项修复通过，并确认此前怀疑的 Half 裁切问题原本正常。GR IIIx 共享代码经 ARM 检查，本次不据此声明其获得实机验收。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "a901016cd4f1ebfe917dbe195d2c5711af9309a1",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/41164474270"
     },
     {
       "version": "2026.10.31.1",

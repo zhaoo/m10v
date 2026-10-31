@@ -5,10 +5,10 @@ import { readFile } from 'node:fs/promises';
 test('product home exposes GR IV native workbench and GR II inspection with truthful limits', async () => {
   const html = await readFile(new URL('../web/index.html', import.meta.url), 'utf8');
   assert.match(html, /href="\/gr3\/"/);
-  assert.match(html, /class="camera-card gr-family"/);
+  assert.match(html, /class="camera-entry primary-entry"/);
   assert.match(html,/href="\/gr4\/"/);
   assert.match(html,/href="\/gr2\/"/);
-  assert.match(html,/只读检查/);
+  assert.match(html,/实验固件构建/);
   assert.match(html,/原生胶卷工作台/);
   assert.match(html,/固件 1.11 · 待实机验证/);
   assert.match(html, /选择相机型号/);

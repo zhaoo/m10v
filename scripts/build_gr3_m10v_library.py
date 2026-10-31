@@ -20,7 +20,7 @@ FLAGS = ['--target=armv7-none-eabi', '-mcpu=cortex-a9', '-marm', '-mfloat-abi=so
          '-fno-vectorize', '-fno-slp-vectorize', '-Wall', '-Wextra', '-Werror']
 # Saved-image CPU loops must optimize for throughput. Keep the UI/ABI modules
 # size-optimized, and keep scalar soft-float ARM (no unproved NEON/FPU state).
-AB_CONTROLLER_EXPORTS=tuple('m10v_settings_controller_ab_'+n for n in ['selector','mapper','live_enter','live_leave','live_destroy','live_event','adj_event','setup','render','adj_refresh','adj_exit','adj_destroy','adj_changed','dispatch'])
+AB_CONTROLLER_EXPORTS=tuple('m10v_settings_controller_ab_'+n for n in ['selector','mapper','live_enter','live_leave','live_destroy','live_event','adj_event','setup','render','adj_refresh','adj_exit','adj_destroy','adj_changed','dispatch','available'])
 RENDER_FLAGS = ['-O2' if flag == '-Os' else flag for flag in FLAGS]
 
 
@@ -169,9 +169,10 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
     return bytes(image), symbols
 
 
-def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None,live_color=False,appended_slots=False,custom_zoom=True,zoom_seed=None,universal_halation=False,camera_model='gr3',adj_exit_trace=False,border_enabled=False,border_hardware=False):
+def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None,live_color=False,appended_slots=False,custom_zoom=True,zoom_seed=None,universal_halation=False,camera_model='gr3',adj_exit_trace=False,border_enabled=False,border_hardware=False,ab_enabled=True):
     if type(border_enabled)is not bool or (border_enabled and not(sd_library and film_library)):raise ValueError('border requires boolean opt-in and the owned film/SD UI lifecycle')
     if camera_model not in ('gr3','gr3x'):raise ValueError('invalid camera model')
+    if type(ab_enabled)is not bool:raise ValueError('A/B enabled must be boolean')
     if type(custom_zoom)is not bool:raise ValueError('custom zoom must be boolean')
     if zoom_seed is not None and not (custom_zoom and film_library and sd_library):raise ValueError('zoom seed requires GR III film/SD library')
     custom_zoom=custom_zoom and film_library
@@ -499,7 +500,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                     additional_exports=('m10v_settings_view_zoom',) if prefix=='m10v_settings_view_' else ())
                 image+=bytes(start-base-len(image))+code;symbols.update(entries)
             controller_obj=folder/'settings-controller.o'
-            subprocess.run([compiler,*compile_flags,*debug_flags,*border_flags,*pair_flags,'-DM10V_LIVE_COLOR='+str(int(owner_cache)),'-c',str(ROOT/'native/gr3/m10v_settings_controller.c'),'-o',str(controller_obj)],check=True,capture_output=True)
+            subprocess.run([compiler,*compile_flags,*debug_flags,*border_flags,*pair_flags,f'-DM10V_AB_ENABLED={int(ab_enabled)}','-DM10V_LIVE_COLOR='+str(int(owner_cache)),'-c',str(ROOT/'native/gr3/m10v_settings_controller.c'),'-o',str(controller_obj)],check=True,capture_output=True)
             start=(base+len(image)+15)&~15
             placeholders={name:start for name in ['m10v_settings_factory_original','m10v_settings_top_dtor_original','m10v_settings_controller_vtable',*[f'm10v_ab_{n}_original' for n in ['selector','mapper','live_enter','live_leave','live_destroy','live_event','adj_event','adj_refresh','adj_exit','adj_destroy','adj_changed','dispatch']]]}
             provisional,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**placeholders},'m10v_settings_controller_',additional_exports=AB_CONTROLLER_EXPORTS)
@@ -1080,6 +1081,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     if sd_library:
         manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in ['native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','node/gr3-sd-texture-prior-contract.json','node/gr3-sd-pre-styles-contract.json','node/gr3-sd-20261023-contract.json','node/gr3-sd-pre-pixel-contract.json','node/gr3-sd-prior-contract.json','node/gr3-sd-20261021-contract.json','scripts/generate_gr3_sd_contract.mjs']})
     manifest['settings_menu']=settings_report
+    manifest['ab_enabled']=ab_enabled
     manifest['zoom']=zoom_report
     if zoom_report:manifest['sources'].update(zoom_report['sources'])
     if sd_library:
@@ -1177,5 +1179,6 @@ if __name__ == '__main__':
     parser.add_argument('--border-hardware',action='store_true',help='Include the complete guarded ISP border pipeline for a camera-test candidate')
     parser.add_argument('--zoom-seed',help='Validated one-time two-slot preset JSON')
     parser.add_argument('--camera-model',choices=['gr3','gr3x'],default='gr3')
+    parser.add_argument('--no-ab-compare',action='store_true',help='Disable A/B selection and DISP switching while preserving shared film lifecycle hooks')
     parser.add_argument('--no-custom-zoom',action='store_true',help='Keep original focal crop hooks and hide custom zoom menu (GR IIIx)')
-    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,adj_exit_trace=args.adj_exit_trace,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,live_color=args.live_color,appended_slots=args.appended_slots,custom_zoom=not args.no_custom_zoom,zoom_seed=json.loads(args.zoom_seed) if args.zoom_seed else None,universal_halation=args.universal_halation,camera_model=args.camera_model,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else True if args.with_hdf else None,border_enabled=args.border_enabled,border_hardware=args.border_hardware), indent=2))
+    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,adj_exit_trace=args.adj_exit_trace,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,live_color=args.live_color,appended_slots=args.appended_slots,custom_zoom=not args.no_custom_zoom,zoom_seed=json.loads(args.zoom_seed) if args.zoom_seed else None,universal_halation=args.universal_halation,camera_model=args.camera_model,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else True if args.with_hdf else None,border_enabled=args.border_enabled,border_hardware=args.border_hardware,ab_enabled=not args.no_ab_compare), indent=2))

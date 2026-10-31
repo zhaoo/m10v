@@ -9,41 +9,27 @@ function controls(source,model,standalone=false){
  const map=new Map(),$=id=>{if(!map.has(id))map.set(id,{checked:true,value:model==='gr3x'?'1.60.11.18':'2.10.21.40',disabled:false,hidden:false,textContent:''});return map.get(id);};
  $(standalone?'#native-version-known':'version-known').checked=false;
  const context=vm.createContext({$,state:{profile:'native'},normalizeVersionUnlock});
- const declarations=standalone?`let sourceModel='${model}',busy=false;`:`let chosenModel='${model}',saving=false,activeBuildController=null,bridgeBusy=false;`;
+ const declarations=standalone?`let sourceModel='${model}',busy=false;`:`let chosenModel='${model}',saving=false,activeBuildController=null;`;
  const end=standalone?'function segment(':'function renderLedger()';
  vm.runInContext(declarations+source.slice(source.indexOf('function versionUnlockSnapshot()'),source.indexOf(end)),context);
  return {context,$};
 }
-test('GR III studio and standalone exporter ignore retired adaptation and guide users to bridge',()=>{
+test('GR III ignores retired adaptation in both workbench entries',()=>{
  for(const [source,standalone] of [[studio,false],[independent,true]]){
   const h=controls(source,'gr3',standalone);assert.equal(h.context.renderVersionUnlock(),true);
   assert.deepEqual(JSON.parse(JSON.stringify(h.context.versionUnlockSnapshot())),{enabled:false});
   assert.equal(h.$(standalone?'#native-version-unlock-option':'version-unlock-option').hidden,true);
  }
 });
-test('GR IIIx keeps its separate opt-in adaptation and never gains a GR III bridge',()=>{
+test('GR IIIx retains its separate opt-in version adaptation',()=>{
  const h=controls(studio,'gr3x');assert.equal(h.context.renderVersionUnlock(),true);
- assert.equal(h.$('bridge-option').hidden,true);assert.equal(h.$('version-unlock-option').hidden,false);
- assert.equal(h.context.versionUnlockSnapshot().mode,'dsp-package-only');
+ assert.equal(h.$('version-unlock-option').hidden,false);assert.equal(h.context.versionUnlockSnapshot().mode,'dsp-package-only');
 });
-test('formal bridge entry and guidance name user hardware feedback and retain both stages',async()=>{
- const html=await readFile(new URL('../web/gr3/index.html',import.meta.url),'utf8');
- const bridge=html.slice(html.indexOf('<section id="bridge-option"'),html.indexOf('<section class="version-unlock-option" id="version-unlock-option"'));
- assert.match(bridge,/待实机验证/);assert.match(bridge,/下载两阶段桥接测试套件/);
- assert.match(bridge,/2.10.32.27/);
- const dialog=html.slice(html.indexOf('<dialog id="bridge-dialog"'),html.indexOf('<dialog id="firmware-disclaimer"'));
- assert.match(dialog,/stage-1-bridge/);assert.match(dialog,/stage-2-official/);assert.match(dialog,/待实机验证/);assert.doesNotMatch(dialog,/实机未验证/);
- for(const file of ['native-library.html','native-library-controls.html'])assert.match(await readFile(new URL('../web/gr3/'+file,import.meta.url),'utf8'),/href="\/gr3\/#bridge"/);
-});
-
-test('source guidance clears once the official project is imported without erasing export status',()=>{
- const h=controls(studio,'gr3');h.context.renderVersionUnlock();assert.match(h.$('bridge-result').textContent,/请先/);
- h.context.state.projectId='official';h.context.renderVersionUnlock();assert.doesNotMatch(h.$('bridge-result').textContent,/请先/);
- h.$('bridge-result').textContent='两阶段桥接套件已生成并发起下载。';h.context.renderVersionUnlock();assert.match(h.$('bridge-result').textContent,/已生成/);
-});
-
-test('2.20 automatic update compatibility hides the incompatible old bridge',()=>{
- const h=controls(studio,'gr3');h.context.state.source={build_source:{update_compatibility:{package_version:'2.20.21.28'}}};
- assert.equal(h.context.renderVersionUnlock(),true);assert.equal(h.$('bridge-option').hidden,true);
- h.context.state.source={build_source:{public_version:'2.10'}};h.context.renderVersionUnlock();assert.equal(h.$('bridge-option').hidden,false);
+test('bridge entry and instructions are removed while backend capability remains',async()=>{
+ for(const file of ['gr3/index.html','gr3/native-library.html','gr3/native-library-controls.html','gr2/native-library-controls.html','guide.html']){
+  const html=await readFile(new URL('../web/'+file,import.meta.url),'utf8');
+  assert.doesNotMatch(html,/bridge-open|bridge-dialog|native-bridge-guide|href="[^"]*#bridge"|固件桥接/);
+ }
+ const server=await readFile(new URL('./server.mjs',import.meta.url),'utf8');
+ assert.match(server,/prepareGr3Bridge/);assert.match(server,/exportGr3Bridge/);
 });
