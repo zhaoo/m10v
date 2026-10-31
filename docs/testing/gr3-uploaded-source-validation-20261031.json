@@ -1,0 +1,91 @@
+{
+  "schema": "m10v-release-validation/v1",
+  "baseline_commit": "b0c6c9053dcfa65c8d4e670030db75d714673dab",
+  "scope": "partial_source_preservation_and_data_edit_fix",
+  "validation_stage": "pre_release_local",
+  "latest_native_port_complete": false,
+  "camera_tested": false,
+  "checks": {
+    "default_suite": {
+      "tests": 502,
+      "pass": 428,
+      "fail": 49,
+      "skipped": 25,
+      "baseline_failed_file_suite": {
+        "tests": 119,
+        "pass": 70,
+        "fail": 49,
+        "skipped": 0
+      },
+      "pre_existing_failed_tests": [
+        "old web configuration migrates into v4 and validates effect ranges",
+        "legacy effects serialize as neutral and resetting preserves film and special controls",
+        "all six film icons and five FN enum resources have independent immutable readback",
+        "GR III preflight preserves factory choices and binds the new slot layout to approval",
+        "actual builder component independently produces twenty patches and permits border-only Effects",
+        "missing hook, partial table, source and central-symbol tampering are rejected",
+        "code, guard subrange and independent full-context shim readback reject tampering",
+        "Charmera has an independent identity without stealing existing custom ID 79",
+        "four colors persist per slot, texture reset preserves color and switching film clears it",
+        "requested groups retain stock identities",
+        "D76 adds the seven exact requested identities after T-Max and preserves all groups",
+        "new monochrome and experimental films have correct groups and stable IDs",
+        "linked fit workbench and modules are reachable over HTTP",
+        "actual separately linked native IIP and guard yield exactly18 independently checked patches",
+        "retired SD frame storage, CPU compositor and inaccurate zero-pixel declarations reject",
+        "source, model, worker ABI, original word and target forgeries reject",
+        "guard and native IIP binary subranges must match declared hashes and distinct export bounds",
+        "full border runtime reuses the exact same checked guard with zero duplicate patches",
+        "Harman films append stable IDs and shared 40px icon records",
+        "old effects upgrade and film-specific bounds accept bounded integer simulated EI",
+        "schema4 packs EI in each effects reserved byte and common reset preserves EI and disables extra effects",
+        "all 46 prior display identities and group order stay unchanged",
+        "both models expose the same two editable crop controls with correct lens units",
+        "IIIx web export downloads the complete shared ISP ten-film HDF and halation bundle",
+        "III and IIIx share ISP film 306",
+        "III and IIIx share ISP film 307",
+        "III and IIIx share ISP film 308",
+        "legacy retired effects migrate to neutral without losing other slot settings",
+        "web debug export uses the running Node when the service PATH contains no node",
+        "original M10V web workflow binds all five slots and timestamp into audited firmware",
+        "fresh defaults and every film selection leave extra effects off",
+        "switching away from a manually enabled effect resets extras, selecting same film preserves them",
+        "Phoenix EI120 persists independently per slot and resets on a different stock",
+        "backend exposes exactly the requested forty-four identities, names and group order",
+        "default SD export and every record retain the requested names and order",
+        "deleting texture processing retains all55 previous-revision film records",
+        "prior renderer custom LUTs remain accepted while repaired-CRC tampering is rejected",
+        "SD pack contains every current platform recipe, independent of five active slots",
+        "new builtin LUT records retain names icons and source contract identity",
+        "v1 built-in pack from the preceding release remains readable",
+        "last delivered 47-film and named custom packs remain readable after opt-in defaults",
+        "five retained style filters keep their identities and requested group names",
+        "fresh journals preserve independent timestamp corner and colour bytes",
+        "one catalogue exposes only requested legacy simulations",
+        "four halo controls and grain/soft are packed in each version4 slot",
+        "film name stamp migrates off and packs independently from date",
+        "both colour views edit a single native configuration and do not restore the legacy film builder",
+        "GR IIIx extension tab retains the native workflow",
+        "opening imaging settings preserves an HDF-only selection"
+      ],
+      "new_failed_tests": []
+    },
+    "source_and_version_specialization": {
+      "tests": 28,
+      "pass": 28,
+      "fail": 0,
+      "skipped": 0
+    },
+    "latest_full_native_http": {
+      "tests": 2,
+      "pass": 0,
+      "fail": 2,
+      "skipped": 0,
+      "failed_tests": [
+        "gr3 real newer input builds full native firmware through an 8 KiB header client",
+        "gr3x real newer input builds full native firmware through an 8 KiB header client"
+      ]
+    }
+  },
+  "note": "Latest full native firmware remains unported. Raw logs and all firmware bytes remain local; this is offline verification, not camera acceptance."
+}

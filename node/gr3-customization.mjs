@@ -5,7 +5,8 @@ import {auditStockIntent} from './gr3-stock-audit.mjs';
 import {auditFilmTexture} from './gr3-film-texture.mjs';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
-import {inspectOfficial} from './firmware.mjs';
+import {inspectFirmwareImport,inspectOfficial} from './firmware.mjs';
+import {inspectNativeSource} from './gr3-native-source.mjs';
 import {createStorePlan} from './gr3-store-plan.mjs';
 import {runGr3Runtime} from './gr3-runtime.mjs';
 import {auditGr3Candidate} from './gr3-candidate-audit.mjs';
@@ -43,14 +44,18 @@ export function normalizeCustomization(input){
 function editsFor(source,config){return [...createStockEdits(source,{presets:config.selection.stockPresets,negativeGrainMenu:config.selection.negativeGrainMenu}),
  ...planRawNr(source,config.selection.rawNr)];}
 export async function prepareCustomization(source,input,options={}){
- const report=inspectOfficial(source);
+ const report=inspectFirmwareImport(source),requested=normalizeCustomization(input);
+ // Factory data edits operate on the actual source for either camera. They
+ // never need a GR III reference image or the executable native-port adapter.
+ const dataOnly=!requested.upstreamPlan&&!requested.selection.negativeGrainMenu&&requested.selection.rawNr.mode==='stock';
  const targetFitModel=options.fitReportModel||(report.model==='GR IIIx'?'gr3x':'gr3');
  for(const look of input.filmLibrary||[])if(look.quality){
   need(look.quality.model===targetFitModel,'拟合报告与固件机型不匹配');
   validateQualityBinding(look,look.quality);
   need(envelopeViolations(look,deriveFitEnvelope(source)).length===0,'拟合参数超出原厂表达范围');
  }
- if(report.model==='GR IIIx'){
+ if(!dataOnly){inspectNativeSource(source);inspectOfficial(source);}
+ if(report.model==='GR IIIx'&&!dataOnly){
   const gr3=readFileSync(new URL('../bin/fwdc239b-gr3-official.bin',import.meta.url)),prepared=await prepareCustomization(gr3,input,{...options,fitReportModel:'gr3x'});
   const engineSources=['gr3x-native-port.mjs','gr3-customization.mjs'].map(n=>[n,hash(readFileSync(new URL(n,import.meta.url)))]);
   const configuration_sha256=hash(JSON.stringify({source:report.sha256,gr3_source:hash(gr3),gr3_configuration_sha256:prepared.configuration_sha256,engineSources}));
@@ -70,7 +75,7 @@ export async function prepareCustomization(source,input,options={}){
  ].map(n=>[n,hash(readFileSync(new URL(n,import.meta.url)))]);
  const configuration_sha256=hash(JSON.stringify({source:report.sha256,config,engineSources,upstream:upstream?.configuration_sha256}));
  return {schema:'m10v-gr3-customization-preparation/v2',ready:blockers.length===0&&(upstream?.ready??edits.length>0),
- configuration_sha256,source_sha256:report.sha256,filename:'fwdc239b.bin',features:config.selection.features,
+ configuration_sha256,source_sha256:report.sha256,filename:report.model==='GR IIIx'?'fwdc243b.bin':'fwdc239b.bin',features:config.selection.features,
  fit_reports:config.selection.features.includes('film')?assignFilmSlots(config.selection.filmIds||['ektar100','gold200','pro400h','portra400','vision3-250d'],config.selection.filmLibrary||[]).filter(f=>f.id.startsWith('lut-')).map(f=>({id:f.id,assessment:f.assessment,report:f.quality||null,validation_used:f.quality?(f.mode==='bleach'?{overall:f.quality.knot_validation,groups:f.quality.knot_groups}:{overall:f.quality.validation,groups:f.quality.groups}):null,encoded_curve_form:f.mode==='bleach'?'knots':'curves'})):[],
  camera_tested:false,patch_count:edits.length,affected_languages:[...new Set(edits.flatMap(e=>e.affectedLanguages||[]))],
  runtime:config.upstreamPlan?'locally_cached_grlife_browser_core + m10v audited overlays':'m10v source-locked native edits',
@@ -79,7 +84,7 @@ export async function prepareCustomization(source,input,options={}){
 export async function buildCustomization(source,input,accepted,options={}){
  const prepared=await prepareCustomization(source,input,options);
  need(prepared.ready&&accepted===prepared.configuration_sha256,'方案已变化或预检未通过，请重新预检');
- if(inspectOfficial(source).model==='GR IIIx'){
+ if(prepared.gr3_configuration_sha256){
   const gr3=readFileSync(new URL('../bin/fwdc239b-gr3-official.bin',import.meta.url));
   const result=await buildCustomization(gr3,input,prepared.gr3_configuration_sha256,{...options,fitReportModel:'gr3x'});
   const ported=portNativeToGr3x(gr3,source,result.candidate),candidate=ported.candidate;

@@ -8,7 +8,7 @@ import {readFileSync,existsSync} from 'node:fs';
 import os from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {normalizeConfiguration,normalizeExtensions,activeExtensions} from '../web/gr3/native-library-state.mjs';
-import {inspectOfficial} from './firmware.mjs';
+import {inspectNativeSource as inspectOfficial} from './gr3-native-source.mjs';
 import {buildNativeLibrary,nativeSourceFingerprint} from './gr3-m10v-native-build.mjs';
 import {buildCameraComponents,composeNative,integrationFingerprint,cameraComponentBase} from './gr3-integrated-components.mjs';
 import {normalizeVersionUnlock,applyVersionUnlock} from './gr3-version-unlock.mjs';
@@ -65,6 +65,8 @@ export function initialState(configuration){
 export function prepareNative(source,value,{debug_mode=false,extensions:requestedExtensions,version_unlock:requestedUnlock,film_library=true,hdf_enabled,live_color,appended_slots,halation_enabled=false,border_enabled=false,ab_enabled=false}={}){
  const report=inspectOfficial(source),extensions=normalizeExtensions(requestedExtensions),version_unlock=normalizeVersionUnlock(requestedUnlock,report.model==='GR IIIx'?'gr3x':'gr3');
  const camera_model=report.model==='GR IIIx'?'gr3x':'gr3',capabilities=modelCapabilities(camera_model);
+ if(!report.proof.identity&&version_unlock.enabled)throw Error('旧版版本适配不适用于此上传固件；默认构建会保留上传版本。');
+ if(camera_model==='gr3'&&!report.proof.identity&&(extensions.aspect||extensions.level))throw Error('此固件的原生 ABI 核验通过，但组合扩展运行时尚未适配该来源；请关闭画幅和水平仪扩展。');
  if(typeof film_library!=='boolean')throw Error('胶卷库开关必须为布尔值');
  if(typeof ab_enabled!=='boolean'||(ab_enabled&&!film_library))throw Error('A/B 快切需要启用胶卷库，开关必须为布尔值');
  if(typeof border_enabled!=='boolean'||(border_enabled&&!film_library))throw Error('边框需要原生胶卷库和布尔开关');

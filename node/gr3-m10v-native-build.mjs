@@ -4,7 +4,7 @@ import {MAX_NATIVE_RTOS_GROWTH} from './gr3-native-budget.mjs';
 // No browser compatibility runtime, signed film file or external catalog is used.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { inspectOfficial } from './firmware.mjs';
+import { inspectNativeSource as inspectOfficial } from './gr3-native-source.mjs';
 import { decodeFrameMap, sum32 } from './gr3-frames.mjs';
 import {settingsSources,settingsPatches,checkSettings,abPatches} from './gr3-settings-menu.mjs';
 import {zoomPatches} from './gr3-zoom.mjs';
@@ -64,7 +64,7 @@ const nativeColorSources=['native/gr3/m10v_isp_native_look.c','native/gr3/m10v_i
 const saveChainSources=['native/gr3/m10v_module_dispatch_trace.c','scripts/build_gr3_module_dispatch_trace.py','scripts/build_gr3_pool_release_trace.py'];
 const sdSources=[...settingsSources,'node/gr3-settings-menu.mjs','native/gr3/m10v_sd_library.h','native/gr3/m10v_sd_library.c','native/gr3/m10v_sd_camera.c','native/gr3/m10v_sd_contract.h','node/gr3-sd-film-pack.mjs','node/gr3-sd-texture-prior-contract.json','node/gr3-sd-pre-styles-contract.json','node/gr3-sd-20261023-contract.json','node/gr3-sd-pre-pixel-contract.json','node/gr3-sd-prior-contract.json','node/gr3-sd-20261021-contract.json','scripts/generate_gr3_sd_contract.mjs'];
 sdSources.push('native/gr3/m10v_square_icon_raster.json');
-export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
+export function nativeSourceFingerprint(){return sha(JSON.stringify(['node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
 const movw = (register, value) => (0xe3000000 | ((value & 0xf000) << 4) | (register << 12) | (value & 0xfff)) >>> 0;
 function branch(address, target, link=false) {
   const delta = target - address - 8;

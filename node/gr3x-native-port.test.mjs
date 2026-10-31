@@ -38,5 +38,5 @@ test('history-dependent compressed frame must be replaced after prior model chan
  const packed=t.pack(base,r,target,base);assert.equal(packed.replaced_frames,2);assert.ok(decodeFrameMap(packed.candidate,80).decoded.equals(target));
 });
 test('public APIs reject fabricated official identities',()=>{
- const {g,x,c}=setup();assert.throws(()=>portNativeToGr3x(g,x,c),/unsupported firmware length/);assert.throws(()=>verifyGr3xNativePort(g,x,c,c),/unsupported firmware length/);
+ const {g,x,c}=setup();assert.throws(()=>portNativeToGr3x(g,x,c),/container: project mismatch/);assert.throws(()=>verifyGr3xNativePort(g,x,c,c),/container: project mismatch/);
 });

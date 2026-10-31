@@ -25,7 +25,7 @@ for(const [file,model,version] of [
  const changed=Buffer.from(uploaded);changed[200]^=1;
  await assert.rejects(()=>resolveBuildSource(changed),/identity/);
 });
-test('2.20 upload keeps its backup and builds from the disclosed 2.10 baseline',
+test('2.20 upload keeps its backup and builds data edits from the uploaded firmware',
  {skip:!fixture||!existsSync(fixture)},async()=>{
  const original=readFileSync(fixture),folder=await mkdtemp(path.join(os.tmpdir(),'m10v-build-source-'));
  const store=new Store(folder),server=createServer(store);
@@ -36,8 +36,8 @@ test('2.20 upload keeps its backup and builds from the disclosed 2.10 baseline',
   const post=(url,body)=>fetch(base+url,{method:'POST',headers:{'X-M10V-Token':token},body:Buffer.isBuffer(body)?body:JSON.stringify(body)});
   const imported=await post('/api/import',original);assert.equal(imported.status,200,await imported.clone().text());
   const report=await imported.json(),id=report.project_id;
-  assert.equal(report.public_version,'2.20');assert.equal(report.build_source.public_version,'2.10');
-  assert.equal(report.build_source.sha256,baselineSha);assert.equal(report.build_source.normalized,true);
+  assert.equal(report.public_version,'2.20');assert.equal(report.build_source.public_version,'2.20');
+  assert.equal(report.build_source.sha256,report.sha256);assert.equal(report.build_source.normalized,false);
   const reread=await(await fetch(base+`/api/projects/${id}`)).json();assert.deepEqual(reread.build_source,report.build_source);
   assert.ok((await store.readOriginal(id)).equals(original));
   const backup=await post(`/api/projects/${id}/backup`,{});
@@ -45,22 +45,20 @@ test('2.20 upload keeps its backup and builds from the disclosed 2.10 baseline',
   const stock=await fetch(base+`/api/projects/${id}/stock-presets`);assert.equal(stock.status,200,await stock.clone().text());
   assert.equal((await stock.json()).length,12);
   const prepared=await post(`/api/projects/${id}/native-library/prepare`,{configuration:defaultConfiguration()});
-  assert.equal(prepared.status,200,await prepared.clone().text());const plan=await prepared.json();
-  assert.equal(plan.ready,true);assert.equal(plan.source_sha256,baselineSha);
-  assert.equal(plan.build_source.imported_public_version,'2.20');assert.equal(plan.build_source.public_version,'2.10');
+  assert.equal(prepared.status,400);assert.match((await prepared.json()).error,/原生 ABI 尚未适配/);
   const incompatible=await post(`/api/projects/${id}/native-library/prepare`,{configuration:defaultConfiguration(),version_unlock:{enabled:true,mode:'dsp-package-only'}});
-  assert.equal(incompatible.status,400);assert.match((await incompatible.json()).error,/不能叠加/);
+  assert.equal(incompatible.status,400);assert.match((await incompatible.json()).error,/原生 ABI 尚未适配/);
   const selection={variant:'street',features:['presets'],stockPresets:[{slot:2,name:'Clear'}]};
   const editPlan=await post(`/api/projects/${id}/edit/prepare`,{selection});
   assert.equal(editPlan.status,200,await editPlan.clone().text());const edit=await editPlan.json();assert.equal(edit.ready,true);
   const built=await post(`/api/projects/${id}/edit/build`,{selection,accepted_configuration_sha256:edit.configuration_sha256});
   assert.equal(built.status,200,await built.clone().text());
   const receipt=JSON.parse(Buffer.from(built.headers.get('X-M10V-Build-Receipt'),'base64'));
-  assert.equal(receipt.build_source.imported_sha256,id);assert.equal(receipt.build_source.sha256,baselineSha);
+  assert.equal(receipt.build_source.imported_sha256,id);assert.equal(receipt.build_source.sha256,id);
   const candidate=Buffer.from(await built.arrayBuffer());
-  assert.equal(candidate.readUInt32BE(0x38),0x0214151c);assert.equal(candidate.readUInt32BE(0x50),0x0214151c);
-  assert.equal(receipt.update_compatibility.package_version,'2.20.21.28');assert.equal(decodeFrameMap(candidate).decoded.length,59718388);
+  assert.equal(candidate.readUInt32BE(0x38),0x0214141c);assert.equal(candidate.readUInt32BE(0x50),0x0214141c);
+  assert.equal(receipt.update_compatibility,undefined);assert.equal(decodeFrameMap(candidate).decoded.length,59798532);
   const bridge=await post(`/api/projects/${id}/bridge/prepare`,{});
-  assert.equal(bridge.status,409);assert.match((await bridge.json()).error,/2.20/);
+  assert.equal(bridge.status,400);assert.match((await bridge.json()).error,/exact official GR III 2.10/);
  }finally{await new Promise(resolve=>server.close(resolve));await rm(folder,{recursive:true,force:true});}
 });

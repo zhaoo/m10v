@@ -2,7 +2,7 @@ import {MAX_NATIVE_RTOS_GROWTH} from './gr3-native-budget.mjs';
 // Compose reviewed camera components with the native library, then compare every final byte.
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
-import {inspectOfficial} from './firmware.mjs';
+import {inspectNativeSource as inspectOfficial} from './gr3-native-source.mjs';
 import {decodeFrameMap,sum32} from './gr3-frames.mjs';
 import {auditGr3Candidate} from './gr3-candidate-audit.mjs';
 import {auditNativeLibrary} from './gr3-m10v-native-build.mjs';

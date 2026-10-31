@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {readFileSync,existsSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {inspectOfficial} from './firmware.mjs';
+import {inspectNativeSource as inspectOfficial} from './gr3-native-source.mjs';
 import {decodeFrameMap,sum32} from './gr3-frames.mjs';
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const need=(v,m)=>{if(!v)throw Error(m);};

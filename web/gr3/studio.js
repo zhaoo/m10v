@@ -576,8 +576,7 @@ async function importSource(file,local=false) {
     }
     node.append(dl);
     node.append(textNode('p',`输出基线：${report.model} · ${report.build_source?.public_version||report.public_version}（${report.build_source?.internal_version||report.internal_version}）。`));
-    if(report.build_source?.normalized)node.append(textNode('p',`上传的 ${report.public_version} 固件原包用于机型与版本核验，并保留在备份中。M10V 将基于已适配的 ${report.build_source.public_version} 官方包生成，不包含上传版本的新功能；实际相机能否接受更新仍取决于机内版本。`));
-    if(report.build_source?.update_compatibility)node.append(textNode('p',`机身更新兼容：导出包版本 ${report.build_source.update_compatibility.package_version}，保留 ${report.build_source.public_version} 功能基线并附带官方固件恢复准入；刷入与恢复待实机验证。`));
+    node.append(textNode('p','构建使用本次导入的固件，保留其原厂组件与版本。各功能会独立核验该固件的地址和数据布局；未适配的功能会在预检时说明。'));
     $('download-backup').disabled = false; $('source-next').disabled = false;
     showStep('features');showSettingsTab(state.profile==='native'?'library':'imaging');notice(report.proof?.identity===false?'固件结构核验通过，继续设置方案。':'官方固件核验通过，继续设置方案。');
   } catch (error) { notice(error.message, true); }

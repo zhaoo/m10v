@@ -1,7 +1,7 @@
 import {MAX_NATIVE_RTOS_GROWTH} from './gr3-native-budget.mjs';
 // Differential port of an already audited GR III native image onto exact GR IIIx stock.
 import {createHash} from 'node:crypto';
-import {inspectOfficial} from './firmware.mjs';
+import {inspectNativeSource as inspectOfficial} from './gr3-native-source.mjs';
 import {auditGr3Candidate} from './gr3-candidate-audit.mjs';
 import {decodeFrameMap,sum32} from './gr3-frames.mjs';
 const MAX=128*1024*1024,need=(v,m)=>{if(!v)throw Error('GR IIIx native port: '+m);};
@@ -54,7 +54,10 @@ function inputs(gr3official,xofficial,gr3candidate){
  auditGr3Candidate(gr3official,gr3candidate,{minRtosGrowth:0,maxRtosGrowth:MAX_NATIVE_RTOS_GROWTH});
  const original=read(gr3official,g.sections),other=read(xofficial,x.sections),native=read(gr3candidate,g.sections);
  const intent=expected(original,other,native);
- need(intent.words.length===19&&intent.words.reduce((n,w)=>n+Buffer.from(w.gr3_hex,'hex').reduce((m,v,i)=>m+(v!==Buffer.from(w.gr3x_hex,'hex')[i]),0),0)===31,'official RTOS parity differs');
+ // The component version is metadata, not a model-specific ABI word. It may
+ // share any bytes (or all four) with the reference in a later upload.
+ const modelWords=intent.words.filter(w=>w.offset!==0x2038);
+ need(modelWords.length===18&&modelWords.reduce((n,w)=>n+Buffer.from(w.gr3_hex,'hex').reduce((m,v,i)=>m+(v!==Buffer.from(w.gr3x_hex,'hex')[i]),0),0)===27,'official RTOS parity differs');
  return {layout:x.sections,original,other,native,...intent};
 }
 function pack(base,original,target,identity){

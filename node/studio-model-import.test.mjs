@@ -21,14 +21,14 @@ test('the same import handler accepts both models and updates target labels from
  const config=h.state.nativeConfig;await h.run(h.report('GR III','b'));
  assert.equal(h.state.source.model,'GR III');assert.equal(vm.runInContext('chosenModel',h.context),'gr3');assert.equal(h.node('build-model').textContent,'GR III · 输出基线 2.10');assert.equal(h.state.nativeConfig,config);
 });
-test('2.20 upload shows its imported version separately from the actual 2.10 output baseline',async()=>{
+test('2.20 upload shows the uploaded version as its actual build source',async()=>{
  const h=harness(),report={...h.report('GR III','a'),public_version:'2.20',internal_version:'2.20.20.28',
-  build_source:{public_version:'2.10',internal_version:'2.10.21.27',normalized:true,update_compatibility:{package_version:'2.20.21.28'}}};
+  build_source:{public_version:'2.20',internal_version:'2.20.20.28',normalized:false}};
  await h.run(report);
- assert.ok(h.texts.some(t=>t.includes('2.20.21.28')));assert.ok(!h.messages.some(v=>v[1]===true));
+ assert.ok(h.texts.some(t=>t.includes('构建使用本次导入的固件')));assert.ok(!h.messages.some(v=>v[1]===true));
  assert.equal(h.state.source,report);assert.equal(h.state.projectId,'a'.repeat(64));
  assert.equal(h.node('studio-model-status').textContent,'GR III · 2.20');
- assert.equal(h.node('build-model').textContent,'GR III · 输出基线 2.10');
+ assert.equal(h.node('build-model').textContent,'GR III · 输出基线 2.20');
 });
 test('local sample selection does not override the loaded target until import completes',async()=>{
  const h=harness();await h.run(h.report('GR IIIx','a'));h.node('local-source-model').value='gr3';

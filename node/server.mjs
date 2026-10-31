@@ -20,7 +20,6 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { createBackup, inspectBackup, restoreBytes } from './backup.mjs';
 import { inspectOfficial } from './firmware.mjs';
-import {applyGr3UpdateCompatibility} from './gr3-version-unlock.mjs';
 import {resolveBuildSource} from './firmware-build-source.mjs';
 import { shutdownCatalog } from './features.mjs';
 import { Store } from './storage.mjs';
@@ -101,22 +100,10 @@ export function createServer(store = new Store(path.join(root, 'data')),
       response.setHeader('X-M10V-Build-Source',Buffer.from(JSON.stringify(buildSource)).toString('base64'));
       return resolved.source;
     };
-    // Final compatibility pass runs after feature/composition/power-image audits.
-    // All firmware download routes share it; backups and official SD writes do not.
+    // Feature builders must preserve the uploaded component versions. Never
+    // disguise a different executable baseline with a raised package version.
     const sendBuild=(candidate,filename)=>{
-      const result=applyGr3UpdateCompatibility(candidate,buildSource);
-      if(result.receipt.enabled){
-        for(const name of ['X-M10V-Native-Receipt','X-M10V-Build-Receipt','X-M10V-800T-Receipt']){
-          const encoded=response.getHeader(name);if(!encoded)continue;
-          const receipt=JSON.parse(Buffer.from(encoded,'base64').toString('utf8'));
-          receipt.pre_update_candidate_sha256=receipt.candidate_sha256;
-          receipt.candidate_sha256=result.receipt.candidate_sha256;receipt.candidate_bytes=result.candidate.length;
-          receipt.update_compatibility=result.receipt;
-          response.setHeader(name,Buffer.from(JSON.stringify(receipt)).toString('base64'));
-        }
-        response.setHeader('X-M10V-Update-Compatibility',Buffer.from(JSON.stringify(result.receipt)).toString('base64'));
-      }
-      return sendFirmwareDownload(request,response,result.candidate,filename);
+      return sendFirmwareDownload(request,response,candidate,filename);
     };
     const localOrigin = `http://127.0.0.1:${server.address().port}`;
     const origin=configuredOrigin||localOrigin;
@@ -259,7 +246,6 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }
       if(bridgeMatch) {
         const original=await readBuildOriginal(bridgeMatch[1]),input=JSON.parse(body.toString('utf8'));
-        if(buildSource.update_compatibility)return send(response,409,{error:'此来源已自动适配更新版本，请直接导出功能固件；不使用旧版桥接包（包括 2.20 来源）。'});
         if(bridgeMatch[2]==='prepare'){
           if(!input||Array.isArray(input)||typeof input!=='object'||Object.keys(input).length)throw Error('桥接预检不接受自定义版本或补丁');
           return send(response,200,{...prepareGr3Bridge(original),build_source:buildSource});
@@ -269,7 +255,6 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }
       if(nativeMatch) {
         const original=await readBuildOriginal(nativeMatch[1]),input=JSON.parse(body.toString('utf8'));
-        if(buildSource.update_compatibility&&input.version_unlock?.enabled)throw Error('此来源已自动适配更新版本，不能叠加旧版单包版本适配');
         const nativeOptions={debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,film_library:input.film_library??true,hdf_enabled:input.hdf_enabled,halation_enabled:input.halation_enabled??false,border_enabled:input.border_enabled??false,ab_enabled:input.ab_enabled??false,appended_slots:input.appended_slots};
         const basePreparation=prepareNative(original,input.configuration,nativeOptions),powerPreparation=bindPowerPreparation(basePreparation,original,input.power_images);
         if(nativeMatch[2]==='prepare')return send(response,200,{...powerPreparation,build_source:buildSource});
