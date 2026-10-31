@@ -44,8 +44,11 @@ jobs:
           umask 077
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$key"
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$hosts"
-          git bundle create /tmp/m10v-release.bundle f34a53636bae0bb9939d4ae9f5057b1d2c005762..HEAD
+          # This prerequisite is the last confirmed successful production deploy.
+          git bundle create /tmp/m10v-release.bundle 725e2bf15f7e01caa4f26ffaaa48d41c068d2f74..HEAD
           git bundle verify /tmp/m10v-release.bundle
+          bundle_bytes=$(wc -c < /tmp/m10v-release.bundle)
+          test "$bundle_bytes" -le $((24 * 1024 * 1024))
           ssh -T -i "$key" -o IdentitiesOnly=yes -o BatchMode=yes \
             -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$hosts" \
             -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
