@@ -97,3 +97,29 @@ class ModuleDispatchTests(unittest.TestCase):
     if at in(0x5350bfb0,0x5350b2fc):seen.append((at,u.reg_read(A.UC_ARM_REG_R0),u.reg_read(A.UC_ARM_REG_R1)));u.reg_write(A.UC_ARM_REG_PC,u.reg_read(A.UC_ARM_REG_LR))
    e.u.hook_add(UC_HOOK_CODE,hook);e.call(0x5350c764,module,msg)
    self.assertEqual(seen,[(target,module,context)])
+
+ def test_pure_effects_drain_before_spatial_worker_without_waiting_for_jpeg(self):
+  with tempfile.TemporaryDirectory() as d:code,m=build(d,0x54160000,0x54170000,take=0x54170100,batch=0x54170200,pure_isp_debug=True)
+  b=bytearray(self.rom);off=m['base']-BASE;b.extend(bytes(max(0,off+len(code)-len(b))));b[off:off+len(code)]=code
+  e=StockISP(bytes(b));e.u.mem_map(0x54170000,4096)
+  r=e.alloc(0x57d8);e.w32(r,0x53d0fc90);e.w32(r+0x4778,0x31545653)
+  shot=r+0x5778
+  for off,v in ((0,0x31584653),(4,r),(8,1),(16,1)):e.w32(shot+off,v)
+  req=e.alloc(0x40);e.w32(r+0x5c,req);e.u.mem_write(req+0x24,b'\1')
+  e.u.mem_write(r+0x4368,b'\1\0');meta=r+0x5f0+10*32;e.w32(meta+20,r)
+  batches=[]
+  def hook(u,at,size,data):
+   if at==0x53050b7c:result=0
+   elif at==0x54170000:result=1
+   elif at==0x54170100:result=0
+   elif at==0x54170200:
+    p,n=u.reg_read(A.UC_ARM_REG_R0),u.reg_read(A.UC_ARM_REG_R1)
+    batches.extend(struct.unpack('<5I',u.mem_read(p+i*20,20)) for i in range(n));result=1
+   else:return
+   u.reg_write(A.UC_ARM_REG_R0,result);u.reg_write(A.UC_ARM_REG_PC,u.reg_read(A.UC_ARM_REG_LR))
+  e.u.hook_add(UC_HOOK_CODE,hook)
+  e.call(m['exports']['m10v_module_trace_finish'],meta,0x53508638)
+  self.assertEqual(batches,[(198,r,0x46584d00,10,0x101)])
+  batches.clear();e.w32(shot+16,0)
+  e.call(m['exports']['m10v_module_trace_finish'],meta,0x53508638)
+  self.assertEqual(batches,[])

@@ -176,6 +176,19 @@ uint32_t m10v_border_resize_dma_wait(void *event,uint32_t mask,uint32_t *bits,ui
  if(event==(uint8_t*)w+0x3c&&mask==3)c=active_client(w,RESIZE_TAIL,RESIZE_TAG,0x03020002u,0x40u);
  return protected_wait(c,event,mask,bits,timeout);
 }
+void m10v_border_effect_resize_status(void *context,uint32_t *frame){
+ /* Only the locked native Resize worker's ResolutionConvert frame can prove
+  * the appended worker/client allocation exists. Do not dereference saved r7
+  * for any other caller. Valid immutable frame/worker owners are prerequisites. */
+ if(!context||!frame||frame[-1]!=0x536733e4u||frame[-0x2d0/4]!=U(context))return;
+ void *w=(void*)(uintptr_t)frame[-7];
+ if(!w||*(uint32_t*)((uint8_t*)w+0x34)!=U(context))return;
+ m10v_border_native_client *c=active_client(w,RESIZE_TAIL,RESIZE_TAG,0x03020002u,0x40u);
+ if(c&&c->fill_bundle==M10V_BORDER_EFFECT_RESIZE_MARKER&&
+    *(const volatile uint8_t*)((uint8_t*)context+0x54)){
+  c->bundle_error=1;barrier();
+ }
+}
 /* Observe the stock driver's ordinary release conditions BEFORE stock release
  * drops callbacks/category reservations. This is not an abort or bus-drain API. */
 static uint32_t u32_at(void *p,uint32_t offset){return *(uint32_t*)((uint8_t*)p+offset);}

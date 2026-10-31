@@ -33,7 +33,8 @@ def official_rtos():
     script='import{readFileSync}from"node:fs";import{readOfficialSection}from"./node/firmware.mjs";process.stdout.write(readOfficialSection(readFileSync("bin/fwdc239b-gr3-official.bin"),"RTOS"));'
     return subprocess.run([node,'--input-type=module','-e',script],cwd=ROOT,check=True,capture_output=True).stdout
 
-def build(base,exports,rtos=None,shared_recipe=False,ui_cache=False):
+def build(base,exports,rtos=None,shared_recipe=False,ui_cache=False,pure_isp_blur=False):
+    if type(pure_isp_blur)is not bool:raise ValueError('pure_isp_blur must be bool')
     rom=bytes(rtos) if rtos is not None else official_rtos()
     if hashlib.sha256(rom).hexdigest()!=SHA:raise ValueError('HDF requires exact GR III 2.10 RTOS')
     for a,w in SITES.items():
@@ -56,7 +57,7 @@ def build(base,exports,rtos=None,shared_recipe=False,ui_cache=False):
              'mov r0,r6;mov r1,r5;bl '+hex(exports['m10v_hdf_settings'])+
              ';cmp r0,#1;ldreq r0,[sp,#8];orreq r0,r0,#1;streq r0,[sp,#8];'+RESTORE+
              'pop {r4-r6,pc};','settings_'+hex(site),True)
-    patches.append(dict(address=0x5367c1b0,expected=SITES[0x5367c1b0],replacement=0xe358000b,name='clarity_bound'))
+    patches.append(dict(address=0x5367c1b0,expected=SITES[0x5367c1b0],replacement=0xe358002f if pure_isp_blur else 0xe358000b,name='clarity_bound'))
     # Append rows after the row shim so the table is inside the audited module.
     row_at=base+len(image)
     def row_code(table):
@@ -64,10 +65,14 @@ def build(base,exports,rtos=None,shared_recipe=False,ui_cache=False):
             'sub r8,r8,#9;movw r0,#'+str(table&65535)+';movt r0,#'+str(table>>16)+';mla r8,r3,r8,r0;'
             'original_row:;msr cpsr_fs,ip;pop {r0,ip};b 0x5367c7e8',row_at)
     table=row_at+len(row_code(0));image.extend(row_code(table))
-    image.extend(struct.pack('<33h',*(n for row in ROWS for n in row)));image.extend(bytes(-len(image)&3))
+    rows=ROWS
+    if pure_isp_blur:
+        from scripts.build_gr3_isp_effect_blur import BLUR_ROWS
+        rows=ROWS+BLUR_ROWS
+    image.extend(struct.pack('<'+str(len(rows)*11)+'h',*(n for row in rows for n in row)));image.extend(bytes(-len(image)&3))
     patches.append(dict(address=0x5367c7e4,expected=SITES[0x5367c7e4],replacement=branch(0x5367c7e4,row_at),entry=row_at,name='clarity_row'))
-    if len(image)>1024:raise ValueError('HDF hooks exceed fixed1KiB budget')
-    return bytes(image),dict(schema='m10v-gr3-digital-hdf/v1',base=base,bytes=len(image),
+    if len(image)>(2048 if pure_isp_blur else 1024):raise ValueError('HDF hooks exceed fixed'+('2' if pure_isp_blur else '1')+'KiB budget')
+    metadata=dict(schema='m10v-gr3-digital-hdf/v1',base=base,bytes=len(image),
         patches=patches,entries=entries,rows=table,required_rtos_sha256=SHA,
         recipe_bytes=0x4778,recipe_extra_bytes=0 if shared_recipe else 16,shared_recipe=shared_recipe,shared_offset=0x5134 if shared_recipe else None,native_parameter_values=[5,6,7],
         helpers={k:exports[k] for k in (HELPERS[1:] if shared_recipe else HELPERS)},isp_filesystem_calls=0,
@@ -75,3 +80,8 @@ def build(base,exports,rtos=None,shared_recipe=False,ui_cache=False):
         producer_load='published HDF UI cache; cold/invalid fails closed' if ui_cache else 'legacy standalone journal snapshot per post-mutex producer',
         pixel_loops=0,mutable_global_bytes=0,independent_dma=False,
         stock_clarity_table=0x538f1fd4,stock_clarity_bytes=198,camera_tested=False)
+    if pure_isp_blur:
+        from scripts.build_gr3_isp_effect_blur import manifest
+        metadata['optional_blur']=manifest()
+        metadata['native_parameter_values']+=list(range(8,44))
+    return bytes(image),metadata

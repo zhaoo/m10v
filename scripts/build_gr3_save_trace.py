@@ -30,7 +30,8 @@ def lifecycle_patches(stock,exports):
  patches.append(dict(address=at,expected_hex=expected.hex(),replacement_hex=struct.pack('<I',exports['m10v_save_trace_recipe_set']).hex(),symbol='m10v_save_trace_recipe_set',kind='virtual-aapcs'))
  return patches
 
-def build(out,base=0x540e0000,rtos=None,border_debug=False):
+def build(out,base=0x540e0000,rtos=None,border_debug=False,pure_isp_effects=False):
+ if type(pure_isp_effects)is not bool:raise ValueError('pure ISP effects flag must be boolean')
  if type(base)!=int or base&3 or not 0x540b6000<=base<=0x54ff0000:raise ValueError('invalid appendRX base')
  out=Path(out);out.mkdir(parents=True,exist_ok=True)
  obj=out/'m10v_save_trace.o';elfpath=out/'m10v_save_trace.elf'
@@ -38,6 +39,7 @@ def build(out,base=0x540e0000,rtos=None,border_debug=False):
  for source in ['m10v_save_trace.c','m10v_capture_raw_lifetime.c']:
   obj=out/(Path(source).stem+'.o');subprocess.run(['clang',*[('-Oz' if flag=='-Os' else flag) for flag in FLAGS],
    *(['-DM10V_BORDER_ENABLED=1','-DM10V_DEBUG_MODE=1'] if border_debug else []),
+   *(['-DM10V_PURE_ISP_EFFECTS=1'] if pure_isp_effects else []),
    '-c',str(ROOT/'native/gr3'/source),'-o',str(obj)],check=True,capture_output=True);objects.append(obj)
  # Object must have no writable allocated data, even a four-byte pointer.
  for obj in objects:
@@ -68,6 +70,7 @@ def build(out,base=0x540e0000,rtos=None,border_debug=False):
   storage=dict(owner='extended locked BEStillRecipe factory allocation',recipe_bytes=0x4778,trace_offset=0x4778,bytes=656,records=32,color_offset=0x4a08,color_bytes=1796,extended_recipe_bytes=0x5778,stamp_offset=0x5140,stamp_bytes=16,custom_isp_offset=0x5150,custom_isp_bytes=1576,raw_token_offset=0x5110,raw_token_bytes=48,filesystem_calls=0),
   integration_blockers=['Caller must install all checked patches and drain recipe trace at an independently proved filesystem-safe boundary.','Save bridge remains explicit call-owned ABI; RAW recipe to file-write object association is not proven.'],
   lifecycle_contract=dict(factory_call=0x53523e0c,allocator=0x5351091c,deallocator=0x5351098c,allocation_failure='return exact original null; no fallback',transfer='RAW_BEFORE plus RAW_SET preserve old/new backing and original setter LR; target matching by backing',release='original stock free and setter execute unchanged',threading='bounded try-lock only; no filesystem or blocking calls in hooks',overflow='25 ordinary records plus 6 priority phase records 190..198; final record199 reports dropped count at drain',abi='only AAPCS BL callsites and vtable entry; r4-r11/sp preserved; flags caller-clobbered'))
+ if pure_isp_effects:manifest['storage'].update(extended_recipe_bytes=0x57d8,effects_offset=0x5778,effects_bytes=96)
  (out/'m10v_save_trace.bin').write_bytes(blob);(out/'patch-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
  return blob,manifest
 if __name__=='__main__':

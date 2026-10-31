@@ -85,7 +85,8 @@ m10v_module_trace_sink:
  ldr r0,[r5,#0x10]
  b stock_sink_continue
 '''
-def build(out,base,mark,rtos=None,take=None,batch=None,border_debug=False):
+def build(out,base,mark,rtos=None,take=None,batch=None,border_debug=False,pure_isp_debug=False):
+ if type(pure_isp_debug)is not bool or (pure_isp_debug and take is None):raise ValueError('pure ISP diagnostics require safe sink')
  if (take is None)!=(batch is None):raise ValueError('store sink requires both take and batch')
  sink=take is not None
  out=Path(out);out.mkdir(parents=True,exist_ok=True)
@@ -99,6 +100,7 @@ def build(out,base,mark,rtos=None,take=None,batch=None,border_debug=False):
   objects=[]
   for source in [ROOT/'native/gr3/m10v_module_dispatch_trace.c',asm]:
    obj=temp/(source.stem+'.o');subprocess.run(['clang',*save.FLAGS,f'-DM10V_MODULE_SAFE_STORE_SINK={int(sink)}',f'-DM10V_DEBUG_MODE={int(sink)}',
+    *(['-DM10V_PURE_ISP_EFFECTS=1','-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778'] if pure_isp_debug else []),
     *(['-DM10V_BORDER_ENABLED=1'] if border_debug else []),'-c',str(source),'-o',str(obj)],check=True,capture_output=True);objects.append(obj)
    for name,row in save.sections(obj.read_bytes()):
     if row[2]&3==3 and row[5]:raise ValueError('writable section '+name)
@@ -134,6 +136,9 @@ def build(out,base,mark,rtos=None,take=None,batch=None,border_debug=False):
   if off&3 or not -(1<<25)<=off<(1<<25):raise ValueError('B range')
   patch(at,bytes.fromhex('100095e5'),struct.pack('<I',0xea000000|((off>>2)&0xffffff)),'post StoreImageProcess safe caller sink')
  manifest=dict(schema=1,base=base,bytes=len(blob),sha256=hashlib.sha256(blob).hexdigest(),required_rtos_sha256=save.SHA,exports=exports,patches=patches,mutable_global_bytes=0,camera_tested=False,border_debug=border_debug,callback_filesystem_calls=0,probe_filesystem_calls=0,sink_filesystem_calls='existing debug batch only' if sink else 0,module_direct_allocation_calls=0,stock_handler_sp='unchanged',event_schema={'204':['recipe','kind','actual_handler_or_border_dimensions','module'],'205':['recipe','kind','actual_handler_or_border_dimensions','result']},owner_topology={'message':'recipe+0x3b0+24*kind','message_plus_12':'recipe+0x5f0+32*kind','metadata_plus_20':'recipe'},kind_range=[0,23],final_recipe_drain_proven=False,post_store_drain_attempted=sink,store_sink_enabled=sink,store_handler=0x5350c764,store_opcodes={'0x01000001':'main save5350bfb0','0x01000002':'alternate save5350b2fc'},sink_contract='Common generic receiver after handler return and refcounter mutex release, before recipe owner callback; StoreImageProcess only' if sink else None,limitations=['Uses existing bounded recipe trace; contention/full rings drop observations.','Post-JPEG records may be retired before an existing safe sink drains them.','A handler return is not media durability or directory visibility.','Local reference-counter mutex release is proven; absence of every transitive global filesystem lock is not proven.','Known JPEG handler535047d4 is physically observed, but this generic dispatch patch itself is not yet camera-tested.'])
+ if pure_isp_debug:
+  manifest['pure_isp_debug']=True
+  manifest['sink_contract']+='; active pure ISP shots also drain kinds19/4/12/10/11/5 at this same post-return boundary'
  (out/'m10v_module_dispatch_trace.bin').write_bytes(blob);(out/'patch-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n');return blob,manifest
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('--output',required=True);p.add_argument('--base',type=lambda x:int(x,0),required=True);p.add_argument('--mark',type=lambda x:int(x,0),required=True);p.add_argument('--take',type=lambda x:int(x,0));p.add_argument('--batch',type=lambda x:int(x,0));a=p.parse_args();_,manifest=build(a.output,a.base,a.mark,take=a.take,batch=a.batch);print(json.dumps(manifest,indent=2))

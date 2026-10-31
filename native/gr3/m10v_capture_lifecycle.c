@@ -1,5 +1,8 @@
 #include "m10v_save_trace.h"
 #include "m10v_debug.h"
+#if M10V_PURE_ISP_EFFECTS
+#include "m10v_isp_effects_shot.h"
+#endif
 #if M10V_BORDER_ENABLED
 #include "m10v_border_shot.h"
 #include "m10v_border_camera.h"
@@ -17,6 +20,7 @@ void m10v_lifecycle_file_flush(m10v_save_trace *trace){
  for(uint32_t i=0;i<count;i++)for(uint32_t j=0;j<5;j++)records[i][j]=trace->events[i][j];
  if(trace->dropped){uint32_t *r=records[count++];r[0]=199;r[1]=(uint32_t)at;r[2]=trace->dropped;r[3]=trace->count;r[4]=0;}
  if(count)m10v_debug_batch(&records[0][0],count);
+
 }
 /* Invoked only by the locked JPEG worker, outside a filesystem callback.
  * r4 is the native context owned by recipe+0x9b8. No image is retained and
@@ -46,6 +50,29 @@ void m10v_lifecycle_phase(uint32_t context,uint32_t event,uint32_t result){
  uint32_t records[M10V_SAVE_TRACE_CAPACITY][5];
  uint32_t count=m10v_save_trace_recipe_take(recipe,&records[0][0],M10V_SAVE_TRACE_CAPACITY);
  if(count)m10v_debug_batch(&records[0][0],count);
+#if M10V_PURE_ISP_EFFECTS && M10V_DEBUG_MODE
+ /* One bounded batch at the existing filesystem-safe JPEG boundary. Never
+  * log from ISP wait loops or publish completion from diagnostics. Keep this
+  * independent of the earlier trace ring, which can already be full. */
+ if(event==193&&recipe<=0x80000000u-M10V_SAVE_RECIPE_EXTENDED_BYTES&&
+    *(const uint32_t*)(uintptr_t)(recipe+M10V_SAVE_RECIPE_BYTES)==M10V_SAVE_TRACE_MAGIC){
+  const m10v_isp_effects_shot_snapshot *s=(const void*)(uintptr_t)(recipe+M10V_ISP_EFFECTS_SHOT_OFFSET);
+  uint32_t si=*(const uint32_t*)(uintptr_t)(recipe+0x44c8u),native=0xffffffffu;
+  if(si>=0x55000000u&&si<=0x80000000u-0x94cu&&!(si&3u)){
+   const uint8_t *p=(const void*)(uintptr_t)si;native=p[0x77c]|((uint32_t)p[0x795]<<16);
+  }
+  const uint32_t facts[8][5]={
+   {198,recipe,0x46583030u,s->magic,s->owner},
+   {198,recipe,0x46583031u,s->ready,s->sequence},
+   {198,recipe,0x46583032u,s->settings.leak_gain,s->settings.blur_gain},
+   {198,recipe,0x46583033u,s->planned,s->native_completed},
+   {198,recipe,0x46583034u,s->failed,s->source_si},
+   {198,recipe,0x46583035u,s->stock_workspace_bytes,s->stock_query_valid},
+   {198,recipe,0x46583036u,s->effective_grain_strength,s->settings.grain_mode},
+   {198,recipe,0x46583037u,si,native}};
+  m10v_debug_batch(&facts[0][0],8);
+ }
+#endif
 #if M10V_BORDER_ENABLED && M10V_DEBUG_MODE
  /* Capture both sides of the border JPEG handoff, including previews. These
   * are descriptor words only; never dereference a photo plane. One batch per

@@ -20,6 +20,9 @@
 #include "m10v_save_trace.h"
 #endif
 #include "m10v_isp_recipe_color.h"
+#if M10V_PURE_ISP_EFFECTS
+#include "m10v_isp_effects_pipeline.h"
+#endif
 #if M10V_BORDER_ENABLED && M10V_RECIPE_SNAPSHOT
 #include "m10v_border_shot.h"
 #endif
@@ -232,6 +235,13 @@ int m10v_capture_library(uint32_t context) {
         *(const uint32_t *)(uintptr_t)request != 0x53d0fe60u) REJECT(-3,5,request,shooting);
     const uint8_t *req = (const uint8_t *)(uintptr_t)request;
     if (req[12] != 1 || req[13] > 1 || ((const uint8_t *)(uintptr_t)jpeg)[16] != 1) REJECT(-4,6,req[12],req[13]);
+#if M10V_PURE_ISP_EFFECTS
+    /* This bridge's return value is not an encoder abort. The authenticated
+     * gate retains an incomplete admitted frame instead of returning and
+     * letting the original trampoline encode a partial ISP result. Run before
+     * stock-tone bypasses so global effects receive the same protection. */
+    m10v_isp_effects_pipeline_encoder_admit(recipe,shooting);
+#endif
 #if M10V_BORDER_ENABLED && M10V_RECIPE_SNAPSHOT
     /* The owned pre-review stage may run the EXISTING residual bridge once
      * before adding a border. Original Setup6/JPEG still run later; a second

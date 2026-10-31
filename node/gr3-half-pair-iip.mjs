@@ -13,7 +13,7 @@ export const halfPairIipSources=[...new Set([...guardSources,
 const guardNames=[...['client_construct','client_prepare','client_notify','client_done','client_destroy_if_done',
  'client_wait','transfer_construct','transfer_body','transfer_wait','fill_bundle_submit','fill_construct',
  'resize_construct','fill_body','resize_body','fill_wait','resize_wait','resize_dma_wait','fill_release',
- 'resize_release','stage_enter','stage_leave'].map(n=>'m10v_border_'+n),
+ 'resize_release','stage_enter','stage_leave','effect_resize_status'].map(n=>'m10v_border_'+n),
  ...['transfer_body','transfer_wait','fill_body','resize_body','fill_wait','resize_wait','resize_dma_wait',
  'fill_release','resize_release'].map(n=>'border_recovery_'+n+'_hook')];
 const iipNames=['m10v_half_pair_iip_ready','m10v_half_pair_iip_copy','m10v_half_pair_iip_compose'];

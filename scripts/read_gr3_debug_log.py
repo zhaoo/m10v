@@ -3,6 +3,8 @@ import argparse
 import json
 import struct
 import zlib
+EFFECTS_MENU_EVENTS={32:'effects.lifecycle',33:'effects.ready.before',34:'effects.ready.stage',
+                     35:'effects.enter',36:'effects.key.before',37:'effects.route',39:'effects.key.after'}
 from pathlib import Path
 
 EVENTS={10:'menu.enter.before',11:'menu.enter.after',20:'menu.key.before',21:'menu.key.after',
@@ -13,7 +15,7 @@ EVENTS={10:'menu.enter.before',11:'menu.enter.after',20:'menu.key.before',21:'me
 EVENTS.update({85:'ab.disp.route',86:'ab.setup.navigate',87:'ab.switch.result',88:'ab.controller.disp',89:'ab.setup.branch',90:'ab.owner',91:'ab.adj.scope',92:'ab.page.load',93:'ab.page.view',94:'ab.page.enter',95:'ab.raw.packet',96:'ab.navigation.return',99:'ab.navigation.gate'})
 EVENTS.update({218:'half-pair.result',219:'half-pair.bank',220:'half-pair.layout',221:'half-pair.session',222:'half-pair.iip.time',223:'half-pair.probe',224:'half-pair.native-wait.probe'})
 HALF_PAIR_STAGES={0:'entry',1:'first-ready',2:'pair-composed',3:'pending-cancelled',-1:'identity',-2:'topology',-3:'image-layout',-4:'protected-memory',-5:'thumbnail-layout',-6:'filesystem',-7:'first-write',-8:'scratch-unavailable',-9:'pending-read-or-compose',-10:'owner-unavailable',-11:'busy',-12:'pending-reset',-15:'native-iip-not-ready',-16:'native-iip-rejected',-19:'owned-frame-integrity'}
-EVENTS.update({210:'zoom.set.before',211:'zoom.set.after',212:'zoom.native.assert'})
+EVENTS.update({210:'zoom.set.before',211:'zoom.set.after',212:'firmware.assert'})
 EVENTS.update({208:'ab.dispatch.physical-down',209:'ab.dispatch.fallback'})
 EVENTS.update({97:'ab.display.snapshot',98:'ab.display.return'})
 EVENTS.update(dict(enumerate([
@@ -54,6 +56,8 @@ GUARDS={1:'context',2:'recipe',3:'topology',4:'sequence-mode',5:'objects',6:'jpe
         11:'raw-dimensions',12:'raw-bank',13:'protected-overlap',14:'preview-layout',
         15:'preview-planes',16:'settings',17:'scratch-allocation',18:'scratch-overlap'}
 
+EVENTS.update(EFFECTS_MENU_EVENTS)
+
 def page_records(data):
     if len(data)!=4096:return None
     h=struct.unpack_from('<16I',data)
@@ -65,6 +69,33 @@ def page_records(data):
         records.append({'sequence':r[2],'event':r[3],'stage':EVENTS.get(r[3],f'unknown.{r[3]}'),
                         'arguments':list(r[4:8]),'build_id':f'{r[8]:08x}','channel':{1:'menu',2:'capture',3:'io',4:'ab'}[r[9]]})
     for record in records:
+        if record['event']==198:
+            recipe,tag,a,b=record['arguments']
+            fields={0x46583030:('magic','owner'),0x46583031:('ready','sequence'),
+                0x46583032:('leak_gain','blur_gain'),0x46583033:('planned','native_completed'),
+                0x46583034:('failed','source_si'),0x46583035:('stock_workspace_bytes','stock_query_valid'),
+                0x46583036:('effective_grain_strength','grain_mode'),0x46583037:('current_si','native_flags'),
+                0x46583038:('planned_width','planned_height'),0x46583039:('workspace_bytes','saved_orientation')}
+            if tag in fields:
+                first,second=fields[tag]
+                record['isp_effects']={'recipe':hex(recipe),'tag':f'{tag:08x}',first:a,second:b,
+                    'diagnostic_only':True}
+            elif tag==0x46584800:
+                names={1:'settings.ready.before-native',2:'workspace.query.return',3:'stock.execution.return',
+                    4:'effects.completed',10:'hold.invalid-execution-parameters',11:'hold.stock-result-or-query',
+                    12:'hold.workspace',13:'hold.blur-parameters',14:'hold.partial-completion',15:'hold.renderer',
+                    16:'hold.completion-publish',20:'hold.encoder-context',21:'hold.encoder-tone',
+                    22:'hold.encoder-snapshot',23:'hold.encoder-settings',24:'hold.encoder-completion'}
+                record['isp_effects_checkpoint']={'recipe':hex(recipe),'id':a,'stage':names.get(a,'unknown'),
+                    'detail':b,'diagnostic_only':True}
+            elif tag==0x46584d00:
+                record['isp_effects_checkpoint']={'recipe':hex(recipe),'stage':'module.return.safe-sink',
+                    'kind':a,'request_spatial':b&255,'context_enabled':(b>>8)&255,
+                    'context_mode':(b>>16)&255,'diagnostic_only':True}
+            elif tag in (0x46585730,0x46585731):
+                record['isp_effects_workspace']={'recipe':hex(recipe),
+                    'kind':'native-allocation' if tag==0x46585730 else 'owned-aligned-view',
+                    'base':hex(a),'capacity':b,'diagnostic_only':True}
         if record['event'] in (223,224):
             phase,a,b,c=record['arguments']
             names={10:'ready.before',11:'ready.after',20:'pool-manager.before',21:'pool-manager.after',22:'frame-alloc.before',23:'frame-alloc.after',30:'copy.enter',33:'gate.before',34:'gate.after',35:'client-construct.before',36:'client-construct.after',37:'source-cache.before',38:'destination-cache.before',39:'cache.after',40:'transfer-prepare.before',41:'transfer-submit.before',42:'transfer-submit.after',44:'destination-cache-post.before',45:'destination-cache-post.after',50:'client-wait.before',51:'client-wait.after',60:'transfer-worker.before',61:'transfer-worker.after',62:'dma-wait.before',63:'dma-wait.after',70:'notify.enter',71:'native-notify.after',80:'gate.observe',100:'transfer-factory.before',101:'transfer-factory.after',102:'fill-factory.before',103:'fill-factory.after',104:'resize-factory.before',105:'resize-factory.after'}

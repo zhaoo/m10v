@@ -54,6 +54,11 @@ uint32_t m10v_border_resize_body(void *worker,void *parameters,uint32_t *job);
 uint32_t m10v_border_fill_wait(void *event,uint32_t mask,uint32_t *bits,uint32_t timeout,uint32_t *lower_frame,void *context);
 uint32_t m10v_border_resize_wait(void *event,uint32_t mask,uint32_t *bits,uint32_t timeout,uint32_t *lower_frame);
 uint32_t m10v_border_resize_dma_wait(void *event,uint32_t mask,uint32_t *bits,uint32_t timeout,void *worker);
+/* Optional pure-ISP private Resize error observation. EFX1 is metadata, never
+ * a Fill bundle pointer. Called before ResolutionConvert copies/clears its
+ * context error byte. Does not establish hardware completion or DMA idle. */
+#define M10V_BORDER_EFFECT_RESIZE_MARKER 0x31584645u
+void m10v_border_effect_resize_status(void *context,uint32_t *lower_frame);
 /* Private pre-release gates: preserve original reservation until native driver
  * conditions are observed under verified service locks. No abort/reset or DMA
  * idle guarantee. Mismatched reservation/failed unlock fatally retain owners. */

@@ -3,6 +3,9 @@
 #include <stddef.h>
 #include "m10v_custom_isp.h"
 #include "m10v_film_identity.h"
+#if M10V_PURE_ISP_EFFECTS
+#include "m10v_isp_effects_pipeline.h"
+#endif
 void m10v_isp_frame_identity_clear(uint32_t si){
  m10v_film_identity *p=m10v_film_identity_owned(si);if(!p)return;
  __atomic_store_n(&p->magic,0,__ATOMIC_RELEASE);p->generation++;p->code=0;p->check=0;
@@ -45,7 +48,12 @@ _Static_assert(sizeof(m10v_stamp_recipe)==M10V_SAVE_STAMP_BYTES,"stamp extent");
 _Static_assert(M10V_SAVE_COLOR_OFFSET+M10V_SAVE_COLOR_BYTES<=M10V_CAPTURE_RAW_TOKEN_OFFSET,"color before RAW token");
 _Static_assert(M10V_CAPTURE_RAW_TOKEN_OFFSET+M10V_CAPTURE_RAW_TOKEN_BYTES<=M10V_SAVE_STAMP_OFFSET,"RAW and HDF before stamp owner");
 _Static_assert(M10V_SAVE_STAMP_OFFSET+M10V_SAVE_STAMP_BYTES==M10V_SAVE_CUSTOM_ISP_OFFSET,"stamp before custom ISP");
+#if M10V_PURE_ISP_EFFECTS
+_Static_assert(M10V_SAVE_CUSTOM_ISP_OFFSET+M10V_SAVE_CUSTOM_ISP_BYTES==M10V_ISP_EFFECTS_SHOT_OFFSET&&
+    M10V_ISP_EFFECTS_SHOT_OFFSET+M10V_ISP_EFFECTS_SHOT_BYTES==M10V_SAVE_RECIPE_EXTENDED_BYTES,"pure ISP allocation extent");
+#else
 _Static_assert(M10V_SAVE_CUSTOM_ISP_OFFSET+M10V_SAVE_CUSTOM_ISP_BYTES==M10V_SAVE_RECIPE_EXTENDED_BYTES,"custom ISP allocation extent");
+#endif
 #if M10V_ISP_RECIPE_COLOR_PRODUCER || M10V_ISP_LIVE_COLOR
 static int config_ram(uintptr_t p,uint32_t bytes){return !(p&3)&&p>=0x55000000u&&p<=0x80000000u-bytes;}
 #endif
@@ -148,6 +156,11 @@ static int producer_mutating(m10v_isp_recipe_color *s){
 }
 int m10v_isp_frame_recipe_producer(void *recipe){
 #if M10V_ISP_RECIPE_COLOR_PRODUCER
+#if M10V_PURE_ISP_EFFECTS
+    /* Independent global effects freeze at genuine ingress even when color
+     * is already frozen, the stock tone has no slot, or color UI is cold. */
+    m10v_isp_effects_shot_freeze((uint32_t)(uintptr_t)recipe);
+#endif
 #if M10V_ISP_SHARED_HDF
     m10v_hdf_task_snapshot((uint32_t)(uintptr_t)recipe);
 #endif
@@ -301,10 +314,16 @@ uint32_t m10v_isp_frame_recipe_completed(void *recipe,uint32_t shooting,uint32_t
     for(uint32_t i=0;i<sizeof(*state);i++)if(((const uint8_t *)state)[i]!=((const uint8_t *)&s->state)[i])return 0;
     uint32_t completed=s->status==M10V_ISP_RECIPE_APPLIED&&s->si==shooting&&s->tone==tone?M10V_NATIVE_COLOR:0;
 #if M10V_ISP_NATIVE_GRAIN_MODE
+#if M10V_PURE_ISP_EFFECTS
+    m10v_isp_effects_shot_snapshot pure;
+    if(m10v_isp_effects_shot_read((uint32_t)(uintptr_t)recipe,&pure)&&pure.planned&&!pure.failed&&
+       pure.source_si==shooting&&(pure.native_completed&M10V_ISP_EFFECTS_NATIVE_GRAIN))completed|=M10V_NATIVE_GRAIN;
+#else
     uint32_t effective=selected_tone(s,tone);
     uint32_t slot=m10v_tone_slot(effective);
     if(slot<M10V_SLOT_COUNT&&s->native_grain.magic==0x374e5247u&&s->native_grain.si==shooting&&s->native_grain.tone==tone&&s->native_grain.done&&
        s->native_grain.grain==state->slots[slot].grain)completed|=M10V_NATIVE_GRAIN;
+#endif
 #endif
     return completed;
 #else
@@ -325,11 +344,42 @@ static m10v_isp_recipe_color *grain_owner(const void *context){
 #endif
 uint32_t m10v_isp_frame_recipe_grain_settings(const void *context,void *params,uint32_t execution){
 #if M10V_ISP_NATIVE_GRAIN_MODE
+#if M10V_PURE_ISP_EFFECTS
+    /* Invalid ownership also fails closed with respect to the original RNG. */
+    if(grain_ram((uintptr_t)params,0x34)){
+        ((uint32_t*)params)[0x20/4]=0;
+        uint32_t values=((const uint32_t*)params)[0x10/4];
+        if(grain_ram(values,12))((int16_t*)(uintptr_t)values)[2]=0;
+    }
+#endif
     if(execution>1||!grain_ram((uintptr_t)context,0x40)||*(const uint32_t *)context!=0x53d0fc60u||!grain_ram((uintptr_t)params,0x34))return 0;
     uint32_t hdf=0;
 #if M10V_ISP_SHARED_HDF
     hdf=m10v_hdf_settings((uint32_t)(uintptr_t)context,(uint32_t)(uintptr_t)params);
 #endif
+#if M10V_PURE_ISP_EFFECTS
+    uint32_t source=((const uint32_t*)context)[0x30/4];
+    if(source<0x1a8u)return hdf;
+    uint32_t recipe=source-0x1a8u,si=((const uint32_t*)context)[0x34/4];
+    if((uintptr_t)context!=recipe+0x4320u||!grain_ram(si,0x94c)||
+       !grain_ram(recipe,M10V_SAVE_RECIPE_EXTENDED_BYTES)||
+       *(const uint32_t*)(uintptr_t)(recipe+0x44c8u)!=si)return hdf;
+    m10v_isp_recipe_color *s=grain_owner(context);
+    uint32_t native_grain=*(const uint8_t*)(uintptr_t)(si+0x795u);
+    /* Stock menu795 is already the native reversed argument:1 strong,
+     * 3 weak. M10V slot data instead uses1 weak,3 strong. */
+    uint32_t strength=native_grain>3u?4u:native_grain?4u-native_grain:0u;
+    if(s){
+        uint32_t tone=*(const uint8_t*)(uintptr_t)(si+0x77cu);
+        uint32_t slot=m10v_tone_slot(selected_tone(s,tone));
+        if(slot<M10V_SLOT_COUNT&&s->state.slots[slot].film){
+            uint32_t film=s->state.slots[slot].film;
+            if(film==M10V_PIXEL_ID||film==M10V_CHAR_ID)return hdf;
+            strength=s->state.slots[slot].grain;
+        }
+    }
+    return hdf|m10v_isp_effects_pipeline_settings(recipe,si,params,strength);
+#else
     uint32_t si=((const uint32_t *)context)[0x34/4];
     if(!grain_ram(si,0x94c))return hdf;
     m10v_isp_recipe_color *s=grain_owner(context);
@@ -360,6 +410,7 @@ uint32_t m10v_isp_frame_recipe_grain_settings(const void *context,void *params,u
     }
     ((int16_t *)values)[2]=(int16_t)(grain?4-grain:0);
     return grain!=0||hdf;
+#endif
 #else
     (void)context;(void)params;(void)execution;return 0;
 #endif
@@ -370,11 +421,21 @@ void m10v_isp_frame_recipe_grain_done(const void *context,const void *params,uin
 #endif
 #if M10V_ISP_NATIVE_GRAIN_MODE
     m10v_isp_recipe_color *s=grain_owner(context);
+#if M10V_PURE_ISP_EFFECTS
+    if(!s)return;
+    uint32_t source=((const uint32_t*)context)[0x30/4];
+    m10v_isp_effects_shot_snapshot shot;
+    s->native_grain.done=result==1&&source>=0x1a8u&&
+        m10v_isp_effects_shot_read(source-0x1a8u,&shot)&&shot.planned&&!shot.failed&&
+        shot.source_si==((const uint32_t*)context)[0x34/4]&&
+        (shot.native_completed&M10V_ISP_EFFECTS_NATIVE_GRAIN)!=0;
+#else
     if(!s||s->native_grain.magic!=0x374e5247u||!s->native_grain.armed)return;
     uintptr_t values=grain_ram((uintptr_t)params,0x34)?((const uint32_t *)params)[0x10/4]:0;
     s->native_grain.done=result==1&&s->native_grain.grain&&grain_ram(values,12)&&
       ((const int16_t *)values)[2]==(int16_t)(4-s->native_grain.grain)&&s->native_grain.si==((const uint32_t *)context)[0x34/4];
     s->native_grain.armed=0;
+#endif
 #else
     (void)context;(void)params;(void)result;
 #endif
