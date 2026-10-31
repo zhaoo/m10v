@@ -113,7 +113,17 @@ def page_records(data):
             record['request_identity']={'context':hex(context),'stock_tone':tone,'sequence_mode':mode,'raw_source':hex(raw)}
         if record['event']==197:
             recipe,tag,value,detail=record['arguments']
-            if tag==0x424f5244:
+            if tag&0xff000000==0x4a000000:
+                offset=(tag>>8)&0xfff;pair=tag&255
+                diagnostic={'recipe':hex(recipe),'kind':'jpeg.handoff',
+                    'boundary':'after' if tag&0x100000 else 'before'}
+                if pair==0:diagnostic.update(descriptor=hex(offset),y=hex(value),c=hex(detail))
+                elif pair==1:diagnostic.update(descriptor=hex(offset),size=[value&65535,value>>16],
+                    stride=detail&65535,rows=detail>>16)
+                elif pair==2:diagnostic.update(shot_word=hex(value),full_size=[detail&65535,detail>>16])
+                elif pair==3:diagnostic.update(bank=hex(value),capacity=detail)
+                record['border_diagnostic']=diagnostic
+            elif tag==0x424f5244:
                 record['border_diagnostic']={'recipe':hex(recipe),'kind':'rejection',
                     'stage':value,'reason':detail}
             elif tag==0x4d313030:

@@ -275,6 +275,43 @@ class BorderRuntimeArmTests(unittest.TestCase):
   self.assertEqual(self.call('m10v_border_runtime_jpeg',RECIPE+0x9b8),0)
   self.assertEqual(bytes(self.u.mem_read(RECIPE+0xb0,32)),outer)
   self.assertEqual(bytes(self.u.mem_read(RECIPE+0x110,32)),outer)
+ def test_jpeg_handoff_recovers_native_center_crop_of_completed_polaroid(self):
+  # Camera 4feade09: bank6211a940, centered Y624c71e0, stride6336.
+  # Native owner crops6320x4640 to6000x4000 at(160,320), not the
+  # original photo's(160,160). Restore the previously composed canvas.
+  for frozen in (0x42524401,0x42524409,0x42524415,0x4252441d):
+   with self.subTest(frozen=hex(frozen)):
+    self.setUp();self.put(RECIPE+0x510c,frozen);self.post_fixture();self.finish_post()
+    outer=bytes(self.u.mem_read(RECIPE+0xb0,32));d=list(struct.unpack('<8I',outer))
+    ow,oh=d[4]&65535,d[4]>>16;stride=d[5]&65535
+    displacement=((oh-4000)//2)*stride+(ow-6000)//2
+    d[1]+=displacement;d[2]+=displacement;d[4]=6000|(4000<<16)
+    for offset in (0x70,0xb0,0x110):self.u.mem_write(RECIPE+offset,struct.pack('<8I',*d))
+    previous=(len(self.allocations),len(self.resize_calls),self.callbacks)
+    self.assertEqual(self.call('m10v_border_runtime_jpeg',RECIPE+0x9b8),0)
+    for offset in (0x70,0xb0,0x110):self.assertEqual(bytes(self.u.mem_read(RECIPE+offset,32)),outer)
+    self.assertEqual((len(self.allocations),len(self.resize_calls),self.callbacks),previous)
+ def test_completed_polaroid_rejects_nearby_unproven_center_crop_pointer(self):
+  self.put(RECIPE+0x510c,0x42524401);self.post_fixture();self.finish_post()
+  d=list(struct.unpack('<8I',self.u.mem_read(RECIPE+0xb0,32)))
+  displacement=320*6336+160+8 # eight pixels beyond the authenticated centered crop
+  d[1]+=displacement;d[2]+=displacement;d[4]=6000|(4000<<16)
+  for offset in (0x70,0xb0):self.u.mem_write(RECIPE+offset,struct.pack('<8I',*d))
+  before=bytes(self.u.mem_read(RECIPE+0xb0,32))
+  self.call('m10v_border_runtime_jpeg',RECIPE+0x9b8)
+  self.assertEqual(bytes(self.u.mem_read(RECIPE+0xb0,32)),before)
+  self.assertEqual(self.prepare_traces[-1][1:5],(197,0x424f5244,4,264))
+ def test_camera_4403_descriptor_metadata_restores_exact_completed_canvas(self):
+  # CRC-valid r1 device metadata. This is an isolated handoff fixture,
+  # not a fabricated native completion used in the full ISP pipeline test.
+  self.put(RECIPE+0x510c,0x42524461)
+  self.put(RECIPE+0x304,0x6211a940);self.put(RECIPE+0x364,74907648)
+  d=(1,0x624c71e0,0x6429a7e0,0,6000|(4000<<16),6336|(4640<<16),0,2)
+  for offset in (0x70,0xb0,0x110):self.put(RECIPE+offset,*d)
+  self.assertEqual(self.call('m10v_border_runtime_jpeg',RECIPE+0x9b8),0)
+  expected=(1,0x622d8140,0x640ab740,0,6320|(4640<<16),6336|(4640<<16),0,2)
+  for offset in (0x70,0xb0,0x110):self.assertEqual(struct.unpack('<8I',self.u.mem_read(RECIPE+offset,32)),expected)
+  self.assertEqual(self.allocations,[]);self.assertEqual(self.resize_calls,[]);self.assertEqual(self.callbacks,0)
  def test_jpeg_handoff_late_xpan_crop_uses_same_bank_and_hardware(self):
   self.put(RECIPE+0x510c,0x42524402);self.post_fixture()
   original=self.word(RECIPE+0xb0+4);chroma=self.word(RECIPE+0xb0+8)

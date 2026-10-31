@@ -47,6 +47,29 @@ void m10v_lifecycle_phase(uint32_t context,uint32_t event,uint32_t result){
  uint32_t count=m10v_save_trace_recipe_take(recipe,&records[0][0],M10V_SAVE_TRACE_CAPACITY);
  if(count)m10v_debug_batch(&records[0][0],count);
 #if M10V_BORDER_ENABLED && M10V_DEBUG_MODE
+ /* Capture both sides of the border JPEG handoff, including previews. These
+  * are descriptor words only; never dereference a photo plane. One batch per
+  * boundary avoids a separate SD transaction for each metadata pair. */
+ if((event==193||event==190)&&recipe<=0x80000000u-M10V_SAVE_RECIPE_EXTENDED_BYTES&&
+    *(const uint32_t *)(uintptr_t)(recipe+M10V_SAVE_RECIPE_BYTES)==M10V_SAVE_TRACE_MAGIC){
+  uint32_t shot=*(const uint32_t *)(uintptr_t)(recipe+M10V_BORDER_SHOT_OFFSET);
+  if((shot&~255u)==0x42524400u&&(shot&3u)>0u&&(shot&3u)<=2u){
+   static const uint32_t offsets[5]={0x70u,0xb0u,0xd0u,0xf0u,0x110u};
+   uint32_t n=0;
+   for(uint32_t i=0;i<5u;i++){
+    const uint32_t *d=(const uint32_t *)(uintptr_t)(recipe+offsets[i]);
+    uint32_t tag=0x4a000000u|((event==190?1u:0u)<<20)|(offsets[i]<<8);
+    uint32_t *r=records[n++];r[0]=197;r[1]=recipe;r[2]=tag;r[3]=d[1];r[4]=d[2];
+    r=records[n++];r[0]=197;r[1]=recipe;r[2]=tag|1u;r[3]=d[4];r[4]=d[5];
+   }
+   uint32_t *r=records[n++];r[0]=197;r[1]=recipe;r[2]=0x4a000002u|((event==190?1u:0u)<<20);
+   r[3]=shot;r[4]=*(const uint16_t *)(uintptr_t)(recipe+0x256u)|
+       ((uint32_t)*(const uint16_t *)(uintptr_t)(recipe+0x258u)<<16);
+   r=records[n++];r[0]=197;r[1]=recipe;r[2]=0x4a000003u|((event==190?1u:0u)<<20);
+   r[3]=*(const uint32_t *)(uintptr_t)(recipe+0x304u);r[4]=*(const uint32_t *)(uintptr_t)(recipe+0x364u);
+   m10v_debug_batch(&records[0][0],n);
+  }
+ }
  /* The bounded capture trace can fill before phase 193. Emit this one
   * diagnostic after the existing safe flush so a full trace cannot hide it. */
  if(event==193&&recipe<=0x80000000u-M10V_SAVE_RECIPE_EXTENDED_BYTES&&

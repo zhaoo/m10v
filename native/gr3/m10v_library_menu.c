@@ -145,7 +145,10 @@ uint32_t m10v_menu_name(uint32_t translator, uint32_t tone) {
             m10v_library_state state;
             /* Load initializes the compiled defaults even when storage is
              * unavailable. Never index a catalog with an unchecked journal. */
-            m10v_camera_library_load(&state);
+            /* Native LiveView refreshes captions repeatedly. The UI mutation
+             * path already publishes a validated state; do not reopen its SD
+             * journals on every display refresh. Cold menus retain the loader. */
+            if(!m10v_camera_library_preview(&state))m10v_camera_library_load(&state);
             if (m10v_library_valid(&state)) {
 #if M10V_SD_LIBRARY
                 if(M10V_CUSTOM(state.slots[i].film))return i<5?1007+i:1111+i-5;
@@ -175,7 +178,7 @@ uint32_t m10v_menu_icon(uint32_t translator, uint32_t tone) {
     uint8_t *m=model();
     if(M10V_APPENDED_SLOTS||supported(m))for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)if(tone==m10v_slot_tone(i) || (i<5&&tone==208+i)){
         m10v_library_state state;
-        if(m10v_camera_library_load(&state)>=0){
+        if(m10v_camera_library_preview(&state)||m10v_camera_library_load(&state)>=0){
 #if M10V_SD_LIBRARY
             if(M10V_CUSTOM(state.slots[i].film))return 754;
 #endif

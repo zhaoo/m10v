@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.10.31.2",
+      "date": "2026-10-31",
+      "title": "修复 GR III 换卷后持续闪灯与拍立得 3:2 白边",
+      "changes": [
+        "胶卷名称和图标刷新优先读取已校验的内存缓存，避免取景时反复读取存档造成 LED 持续闪烁。",
+        "修复拍立得 3:2 完整画布在 JPEG 编码前被居中裁回原尺寸的问题，恢复完整白边及主图与回放预览的一致比例。",
+        "保留 Half 双拍、黑色分隔条和现有裁切功能；调试模式增加边框编码交接前后的尺寸诊断。"
+      ],
+      "notice": "用户已确认 GR III 2.10 r2 测试包 c2a092eb 的 LED 和拍立得两项修复通过，并确认此前怀疑的 Half 裁切问题原本正常。GR IIIx 共享代码经 ARM 检查，本次不据此声明其获得实机验收。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.10.31.1",
       "date": "2026-10-31",
       "title": "GR III 新增 Half 半格双拍与黑色分隔条",
@@ -11,9 +25,9 @@
         "修复 Half 标签、取景与对焦适配，修复开机及16:9取景闪烁和残影；保留既有画幅、胶卷、RAW、HDF和边框能力。"
       ],
       "notice": "用户已明确验证 GR III r10 测试包 efc28b93 功能通过，并要求合并与发布。基础拍摄、相册、双拍拼接及黑条样式获本次反馈通过；其他机型不据此宣称实机验收。保留可选诊断日志，性能不作未经测量的数值承诺。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "4a89fd5d1fd3405c0f5f1fb1655709d4fe41e221",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/41094589266"
     },
     {
       "version": "2026.10.30.4",

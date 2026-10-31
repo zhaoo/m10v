@@ -250,9 +250,11 @@ int m10v_border_runtime_jpeg(uint32_t context){
     uint32_t base=shape.preview_base-2u*shape.plane_bytes;
     m10v_border_canvas_info canvas;
     if(phase==M10V_BORDER_PHASE_COMPLETE){
-        /* Once IIP completed, the frozen bank and exact inner Y addresses
-         * authenticate the pixels. The owner may have restored stale C,
-         * stride or auxiliary descriptor words before this JPEG handoff. */
+        /* Once IIP completed, the frozen bank identifies the full canvas.
+         * The native owner may center-crop that canvas back to stock size:
+         * for Polaroid this differs from its asymmetric photo inset. Admit
+         * only that exact derived crop or the original inner Y, never an
+         * arbitrary pointer inside the bank. C/pitch/tag may also be reset. */
         uint32_t reject=0;
         if(w!=fullw||h!=fullh||(source[4]&65535u)!=fullw||(source[4]>>16)!=fullh)reject|=1u;
         if((source[0]&255u)!=1u||(main[0]&255u)!=1u)reject|=2u;
@@ -260,7 +262,10 @@ int m10v_border_runtime_jpeg(uint32_t context){
          * provenance and frozen dimensions identify the completed image. */
         if(((source[7]&255u)!=2u&&(source[7]&255u)!=0u)||
            ((main[7]&255u)!=2u&&(main[7]&255u)!=0u))reject|=4u;
-        if(source[1]!=shape.source_y||main[1]!=shape.source_y)reject|=8u;
+        uint32_t canvas_y=shape.source_y-shape.canvas.inner.y*shape.canvas.stride-shape.canvas.inner.x;
+        uint32_t centered_y=canvas_y+((shape.canvas.outer.height-fullh)/2u)*shape.canvas.stride+
+            (shape.canvas.outer.width-fullw)/2u;
+        if(source[1]!=main[1]||(main[1]!=shape.source_y&&main[1]!=centered_y))reject|=8u;
         if(reject){trace_prepare(recipe,4u,0x100u|reject);return library;}
         uint32_t inner[8];copy8(inner,main);
         inner[1]=shape.source_y;inner[2]=shape.source_c;
