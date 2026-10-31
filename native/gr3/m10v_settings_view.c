@@ -116,7 +116,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   color(v->widgets[FRAME+i],i==focus?6:1);
   uint32_t enabled=0;for(uint32_t k=0;k<M10V_SLOT_COUNT;k++)if(s->saved.slots[k].film==id&&id)enabled=1;
   if(id){
-   uint32_t icon=M10V_EXTRA_FILM(id)?M10V_EXTRA_FILM_ICON(id):M10V_C41(id)?M10V_C41_ICON_FIRST+id-312:M10V_ANIME_E6(id)?M10V_ANIME_E6_ICON_FIRST+id-306:M10V_D76(id)?775+id-M10V_D76_FIRST:id==M10V_5213_ID?774:M10V_STYLE(id)?762+id-M10V_STYLE_FIRST:id==M10V_PIXEL_ID?761:id==M10V_CHAR_ID?755:M10V_CUSTOM(id)?754:670+id;
+   uint32_t icon=M10V_FOUR_LOOKS(id)?M10V_FOUR_LOOKS_ICON(id):M10V_EXTRA_FILM(id)?M10V_EXTRA_FILM_ICON(id):M10V_C41(id)?M10V_C41_ICON_FIRST+id-312:M10V_ANIME_E6(id)?M10V_ANIME_E6_ICON_FIRST+id-306:M10V_D76(id)?775+id-M10V_D76_FIRST:id==M10V_5213_ID?774:M10V_STYLE(id)?762+id-M10V_STYLE_FIRST:id==M10V_PIXEL_ID?761:id==M10V_CHAR_ID?755:M10V_CUSTOM(id)?754:670+id;
    if(v->widgets[M10V_VIEW_HEAP]){
     uint32_t *pixels=(uint32_t *)(uintptr_t)(v->widgets[M10V_VIEW_HEAP]+i*M10V_CARD_PIXELS*4);
     if(M10V_CUSTOM(id)){

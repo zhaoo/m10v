@@ -551,7 +551,7 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     const m10v_slot *choice = &state->slots[slot];
     /* New looks are ISP-only color. Never map these identities to old CPU LUTs. */
     if(M10V_ANIME(choice->film))return M10V_LIBRARY_INVALID;
-    if((M10V_ANIME_E6(choice->film)||M10V_C41(choice->film)||M10V_EXTRA_FILM(choice->film))&&!(completed&M10V_NATIVE_COLOR))return M10V_LIBRARY_INVALID;
+    if((M10V_FOUR_LOOKS(choice->film)||M10V_ANIME_E6(choice->film)||M10V_C41(choice->film)||M10V_EXTRA_FILM(choice->film))&&!(completed&M10V_NATIVE_COLOR))return M10V_LIBRARY_INVALID;
     if(M10V_CUSTOM(choice->film)&&!custom_lut)return M10V_LIBRARY_INVALID;
     uint32_t shift = 0, gw = image->width, gh = image->height;
     /* Power-of-two sampling must not depend on an ARM division runtime. */

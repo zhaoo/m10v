@@ -1,0 +1,41 @@
+[
+  {
+    "ids": [319, 320],
+    "author": "FUJIFILM Corporation",
+    "url": "https://dl.fujifilm-x.com/support/lut/gfx-eterna-55-3d-lut-v110.zip",
+    "sha256": "febfc7050999620651ca0cf162bf8b499970ef270b4da632765b61b958cf7940",
+    "version": "archive 1.10; named LUTs 1.00; 33Grid/F-Log2",
+    "members": {
+      "FLog2_to_CLASSIC-Neg._33grid_V.1.00.cube": "f3db5fe777c3a64e998b8ada64ff8cc2e61f9b44538fd7c550733d1c55c197c5",
+      "FLog2_to_CLASSIC-CHROME_33grid_V.1.00.cube": "b68c8f4b38da958388931c34ce9eb5c09a495e8c37e654537d534dfd8f023b75"
+    },
+    "input": "F-Log2 / F-Gamut (Rec.2020 primaries), full range",
+    "output": "Rec.709 D65 gamma2.2 interpreted from official monitor recommendation",
+    "formula_reference": "https://dl.fujifilm-x.com/technical-data/F-Log2_DataSheet_E_Ver.1.1.pdf",
+    "display_reference": "https://dl.fujifilm-x.com/support/lut/GFX_ETERNA_WhitePaper_260206_v101.pdf",
+    "license": "Manufacturer copyrighted input; no explicit redistribution grant established; fetch/hash only, original files not vendored",
+    "retrieved": "2026-10-31"
+  },
+  {
+    "ids": [318],
+    "author": "Jan Lohse / Spectral Film LUT",
+    "url": "https://github.com/JanLohse/spectral_film_lut",
+    "path": "third_party/spectral-film-lut/src/spectral_film_lut/print_film/kodak_2383.py",
+    "license_path": "third_party/spectral-film-lut/LICENSE",
+    "license": "MIT",
+    "snapshot": "third_party/spectral-film-lut/SOURCE.json",
+    "official_reference": "https://www.kodak.com/content/products-brochures/Film/KODAK-VISION-Color-Print-Film-2383-3383-data-sheet.pdf",
+    "adaptation": "ideal neutral negative APD slope0.6 at18percent; 6500K projection; Rec709/sRGB; no camera-negative stock substituted"
+  },
+  {
+    "ids": [321],
+    "author": "Lomography",
+    "url": "https://cdn.downloads.lomography.com/downloads/lomochrome-purple-film-guide.pdf",
+    "sha256": "0fb98ef8d13ae7d289f0fc7a70553a281e533e987d6fe72d186d0389b3505ec9",
+    "physical_page": 2,
+    "license": "Copyrighted reference linked/fetched only; original PDF and photographs not redistributed; numeric patch observations retained",
+    "numeric_source": "third_party/four-looks/purple-chart.json",
+    "adaptation": "ISO100 illustrative paired-chart digitization; 20training/4holdout patches; authored thin_plate_spline smoothing0.02; not measured spectral or sensitometric model",
+    "retrieved": "2026-10-31"
+  }
+]

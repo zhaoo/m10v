@@ -40,6 +40,12 @@ static inline uint32_t m10v_halo_workspace_planes(uint32_t film,uint32_t profile
 #define M10V_ANIME_LAST 308u
 #define M10V_ANIME(id) ((id)>=306u && (id)<=308u)
 #define M10V_E6(id) ((id)>=309u && (id)<=311u)
+#define M10V_FOUR_LOOKS(id) ((id)>=318u && (id)<=321u)
+#ifndef M10V_FOUR_LOOKS_NATIVE
+#define M10V_FOUR_LOOKS_NATIVE 0
+#endif
+#define M10V_FOUR_LOOKS_ICON(id) (878u+(id)-318u)
+#define M10V_FOUR_LOOKS_NAME(id) (1159u+(id)-318u)
 #define M10V_EXTRA_FILM(id) ((id)>=314u && (id)<=317u)
 #define M10V_EXTRA_FILM_ICON(id) ((id)==317u?875u:M10V_EXTRA_FILM_ICON_FIRST+(id)-314u)
 #define M10V_EXTRA_FILM_NAME(id) ((id)==317u?1158u:M10V_EXTRA_FILM_NAME_FIRST+(id)-314u)
@@ -53,7 +59,7 @@ static inline uint32_t m10v_halo_workspace_planes(uint32_t film,uint32_t profile
 #define M10V_ANIME_VALUE_FIRST 864u
 #define M10V_ANIME_SCALE_ICON 868u
 #define M10V_ANIME_CAPTION 1148u
-#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID || (id)==M10V_5213_ID || M10V_STYLE(id) || M10V_D76(id) || M10V_ANIME_E6(id)||M10V_C41(id)||M10V_EXTRA_FILM(id)))
+#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID || (id)==M10V_5213_ID || M10V_STYLE(id) || M10V_D76(id) || M10V_ANIME_E6(id)||M10V_C41(id)||M10V_EXTRA_FILM(id)||M10V_FOUR_LOOKS(id)))
 #define M10V_CUSTOM(id) ((id)>M10V_FILM_COUNT && (id)<=M10V_CUSTOM_MAX_ID)
 #define M10V_SLOT_COUNT 10u
 #define M10V_CUSTOM_IMMUTABLE_FIRST 21u

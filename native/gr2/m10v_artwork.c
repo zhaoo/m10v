@@ -1,5 +1,5 @@
 #include "m10v_ui.h"
-#include "../gr3/m10v_film_card.h"
+#include "../../compat/gr2-square-v1/native/gr3/m10v_film_card.h"
 /* The shared artwork renderer emits 0xAABBGGRR words for GR III's little
  * endian RGBA memory. Convert explicitly on BE32 before any GR II-specific
  * OSD/indexed/YUV upload. This function does not submit a screen bitmap. */

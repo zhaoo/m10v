@@ -48,6 +48,24 @@ class ISPSdCompatibilityTests(unittest.TestCase):
             record[100]^=1;struct.pack_into('<I',record,12284,zlib.crc32(record[:-4]))
             self.assertEqual(self.lib.m10v_sd_record(bytes(record),len(record),film),0)
 
+    def test_pre_four_looks_records_and_new_native_identities_remain_authenticated(self):
+        prior=json.loads((ROOT/'node/gr3-sd-pre-four-looks-contract.json').read_text())
+        js="""import{sdFilmRecord}from'./node/gr3-sd-film-pack.mjs';
+import{readFileSync}from'node:fs';const p=JSON.parse(readFileSync('node/gr3-sd-pre-four-looks-contract.json'));
+process.stdout.write(Buffer.concat([...p.ids,318,319,320,321].map(sdFilmRecord)));"""
+        records=subprocess.check_output(['node','--input-type=module','-e',js],cwd=ROOT)
+        for index,film in enumerate([*prior['ids'],318,319,320,321]):
+            with self.subTest(film=film):
+                record=bytearray(records[index*12288:(index+1)*12288])
+                if index<len(prior['ids']):
+                    record[8448:8480]=bytes.fromhex(prior['renderer'])
+                    struct.pack_into('<I',record,12284,zlib.crc32(record[:-4]))
+                    self.assertEqual(hashlib.sha256(record).hexdigest(),prior['hashes'][index])
+                self.assertEqual(self.lib.m10v_sd_record(bytes(record),len(record),film),film)
+                record[100]^=1
+                struct.pack_into('<I',record,12284,zlib.crc32(record[:-4]))
+                self.assertEqual(self.lib.m10v_sd_record(bytes(record),len(record),film),0)
+
     def test_native_accepts_all_63_exact_main_records_and_rejects_repaired_edits(self):
         for index, film in enumerate(self.prior['ids']):
             r = self.old_record(index)

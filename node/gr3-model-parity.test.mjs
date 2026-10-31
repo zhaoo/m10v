@@ -3,12 +3,13 @@ import {FILM_DIRECTORY} from './gr3-film-directory.mjs';
 import assert from 'node:assert/strict';
 import {readNativeOfficial,prepareNative} from './gr3-native-library.mjs';
 import {defaultConfiguration,selectNativeFilm} from '../web/gr3/native-library-state.mjs';
+import {supportsNativeFilm} from '../web/gr3/model-capabilities.mjs';
 const sources=await Promise.all(['gr3','gr3x'].map(readNativeOfficial));
 const comparable=p=>Object.fromEntries(['capture_pipeline','live_color','features','appended_slots','slot_tone_ids','stock_detail','hdf_enabled','halation_enabled','initial_state_hex','scope'].map(k=>[k,p[k]]));
 for(const [name,configure,options] of [
  ['default',c=>c,{}],
  ['native grain',c=>{c.slots[0].grain=3;return c;},{}],
- ['ten films',c=>{c.slots=Array.from({length:10},(_,i)=>({...structuredClone(c.slots[0]),film:FILM_DIRECTORY[i].id}));return c;},{}],
+ ['ten films',c=>{const shared=FILM_DIRECTORY.filter(f=>supportsNativeFilm('gr3x',f.id));c.slots=Array.from({length:10},(_,i)=>({...structuredClone(c.slots[0]),film:shared[i].id}));return c;},{}],
  ['HDF and universal halation',c=>({...c,hdf:2}),{halation_enabled:true}],
  ['standalone HDF',c=>({...c,hdf:1}),{film_library:false}],
  ...[294,306,307,308,309,310,311].map(id=>['ISP film '+id,c=>selectNativeFilm(c,0,id),{}])

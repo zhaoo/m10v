@@ -107,6 +107,7 @@ static int persist(const uint8_t *record,uint32_t id){
  uint32_t app=((const uint32_t *)(uintptr_t)manager)[2];if(!ram(app,4))return 0;
  uint32_t fs=*(const uint32_t *)(uintptr_t)app;if(!ram(fs,0x24)||!((const uint8_t *)(uintptr_t)fs)[0x20])return 0;
  char name[]="M10VS00.bin",primary[]="F:\\M10VS00.bin";
+ if(M10V_FOUR_LOOKS(id))id=id-318+29;
  if(M10V_EXTRA_FILM(id))id=id-314+25;
  if(M10V_C41(id))id=id-312+23;
  if(M10V_ANIME_E6(id))id=id-306+17;
