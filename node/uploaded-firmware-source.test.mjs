@@ -37,9 +37,10 @@ for (const [model, variable, version] of [
       assert.equal(presets[0].factoryName, 'Standard');
       assert.ok(presets.every(preset => Buffer.from(preset.iconPixelsBase64, 'base64').length === 6400));
     });
-  test(`${model} ${version} rejects unported native code before declaring a build ready`,
+  test(`${model} ${version} only declares a reviewed native target ready`,
     {skip: !fixture || !existsSync(fixture)}, () => {
-      assert.throws(()=>prepareNative(readFileSync(fixture),defaultConfiguration()),
+      if(model==='GR III')assert.equal(prepareNative(readFileSync(fixture),defaultConfiguration()).ready,true);
+      else assert.throws(()=>prepareNative(readFileSync(fixture),defaultConfiguration()),
         error=>error.code==='M10V_NATIVE_ABI_NOT_PORTED'&&/不会改用旧版/.test(error.message));
     });
   test(`${model} ${version} factory data edits preserve all uploaded components and versions`,
@@ -87,7 +88,8 @@ for (const [model, variable, version] of [
         assert.equal(receipt.update_compatibility,undefined);
         assert.equal(inspectFirmwareImport(candidate).internal_version,report.internal_version);
         const native=await post(route+'/native-library/prepare',{configuration:defaultConfiguration()});
-        assert.equal(native.status,400);assert.match((await native.json()).error,/原生 ABI 尚未适配/);
+        if(model==='GR III'){assert.equal(native.status,200,await native.clone().text());assert.equal((await native.json()).ready,true);}
+        else{assert.equal(native.status,400);assert.match((await native.json()).error,/原生 ABI 尚未适配/);}
       }finally{await new Promise(resolve=>server.close(resolve));await rm(folder,{recursive:true,force:true});}
     });
 }

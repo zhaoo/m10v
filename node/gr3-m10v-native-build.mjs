@@ -78,7 +78,7 @@ export const pureIspEffectSources=[
  'scripts/build_gr3_isp_effect_blur.py','scripts/build_gr3_isp_effect_granulation.py',
  'scripts/build_gr3_isp_effect_render.py','scripts/build_gr3_isp_effect_resize_status.py',
  'scripts/build_gr3_isp_effect_textures.py'];
-export function nativeSourceFingerprint(){return sha(JSON.stringify(['node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
+export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/gr3_target_relocations.py','node/gr3-native-target.mjs','node/gr3-220-native-target.json','node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
 export function pureIspEffectPatches(runtime,m){
  const p=m.pure_isp_effects;
  need(m.flags?.includes('-DM10V_PURE_ISP_EFFECTS=1')===!!p?.enabled,'pure ISP compile flag differs');

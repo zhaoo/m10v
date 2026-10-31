@@ -33,7 +33,21 @@ def assembly(text,address):
   src.write_text('.syntax unified\n.arm\n.text\n.global m10v_halation\nm10v_halation:\n'+'\n'.join(out)+'\n')
   r=subprocess.run(['clang',*FLAGS,'-c',str(src),'-o',str(obj)],capture_output=True,text=True)
   if r.returncode:raise ValueError(r.stderr)
-  return extract_text(obj.read_bytes())
+  raw=extract_text(obj.read_bytes())
+  from scripts.gr3_target_relocations import relocations,firmware_address
+  # Explicit .word firmware pointers are data; generated branch .words remain
+  # instructions. Pixel resources never pass through this assembler emitter.
+  start=address;code=bytearray()
+  for line in out:
+   if line.endswith(':'):continue
+   at=start+len(code)
+   parts=line.split()
+   pointer=parts[0]=='.word' and firmware_address(int(parts[1],0))
+   if pointer:
+    relocations.code(start,code);relocations.data(at,raw[at-address:at-address+4]);start=at+4;code=bytearray()
+   else:code+=raw[at-address:at-address+4]
+  relocations.code(start,code)
+  return raw
 
 def build_menu_patches(rtos):
  if hashlib.sha256(rtos).hexdigest()!=DIGEST:raise ValueError('menu requires exact original RTOS')

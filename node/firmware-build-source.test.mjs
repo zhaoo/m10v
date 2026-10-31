@@ -45,9 +45,9 @@ test('2.20 upload keeps its backup and builds data edits from the uploaded firmw
   const stock=await fetch(base+`/api/projects/${id}/stock-presets`);assert.equal(stock.status,200,await stock.clone().text());
   assert.equal((await stock.json()).length,12);
   const prepared=await post(`/api/projects/${id}/native-library/prepare`,{configuration:defaultConfiguration()});
-  assert.equal(prepared.status,400);assert.match((await prepared.json()).error,/原生 ABI 尚未适配/);
+  assert.equal(prepared.status,200,await prepared.clone().text());assert.equal((await prepared.json()).ready,true);
   const incompatible=await post(`/api/projects/${id}/native-library/prepare`,{configuration:defaultConfiguration(),version_unlock:{enabled:true,mode:'dsp-package-only'}});
-  assert.equal(incompatible.status,400);assert.match((await incompatible.json()).error,/原生 ABI 尚未适配/);
+  assert.equal(incompatible.status,400);assert.match((await incompatible.json()).error,/扩展尚未适配/);
   const selection={variant:'street',features:['presets'],stockPresets:[{slot:2,name:'Clear'}]};
   const editPlan=await post(`/api/projects/${id}/edit/prepare`,{selection});
   assert.equal(editPlan.status,200,await editPlan.clone().text());const edit=await editPlan.json();assert.equal(edit.ready,true);

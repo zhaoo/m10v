@@ -8,10 +8,10 @@ const cache=new WeakMap();
 const need=(ok,message)=>{if(!ok)throw new Error(message);};
 export function officialResources(source){
   if(cache.has(source))return cache.get(source);
-  const report=inspectFirmwareImport(source),{decoded}=decodeFrameMap(source);
+  const report=inspectFirmwareImport(source),{decoded,frames}=decodeFrameMap(source);
   let cursor=0;const sections={};
   for(const row of report.sections){sections[row.name]={offset:cursor+16,size:row.size-16};cursor+=row.size;}
-  const r={decoded,sections};cache.set(source,r);return r;
+  const r={decoded,frames,sections};cache.set(source,r);return r;
 }
 function reader(source){
   const {decoded,sections}=officialResources(source),start=sections.RTOS.offset;

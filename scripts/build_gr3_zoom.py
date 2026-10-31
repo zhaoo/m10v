@@ -213,6 +213,10 @@ def build(base, stock, aspect=False, seed=None, debug_log=None, camera_model='gr
         image+=bytes(-len(image)&15)
         code,symbols=link_object(linked.read_bytes(),base+len(image),bindings,'m10v_zoom_',additional_exports=EXPORTS+(['m10v_zoom_assert_trace'] if debug_log is not None else []))
         image+=code
+    from scripts.gr3_target_relocations import relocations
+    # The fixed prefix consists only of displaced-instruction trampolines;
+    # the subsequent compiler module is traced from its ELF mapping symbols.
+    relocations.code(base,image[:len(image)-len(code)])
     lo=int(seed['id'][:8],16) if seed else 0
     hi=int(seed['id'][8:],16) if seed else 0
     parameters=struct.pack('<6I',0x31575a4d,lo,hi,(~(0x31575a4d^lo^hi))&0xffffffff,*(seed['slots'] if seed else defaults))

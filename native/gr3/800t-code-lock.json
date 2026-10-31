@@ -1,9 +1,10 @@
 {
   "schema": "m10v-gr3-800t-code-lock/v1",
   "sources": {
+    "scripts/gr3_target_relocations.py": "99ea6011e6c10825411e0ed0eed15e8e906c8de9a30b2c2b636da8ef0b380147",
     "native/gr3/menu_controls.c": "bd073b63e26199e0a0ea3b89b132b193e4a724debabbd13659eb214bf7d295e5",
     "scripts/build_gr3_menu_controls.py": "8e95536ec0910e59be4c258db4a80d86374d081a376b868dfa67f6fe23e37cf9",
-    "scripts/build_gr3_menu_patches.py": "b7f98d0335733ac21ee1e443efcc9d7edd9dcce29e46167754fbfb1bd2910404",
+    "scripts/build_gr3_menu_patches.py": "d59b0c26c8800d21b2ea4e483033d821d868939e6680449f813e5f73ab123d02",
     "native/gr3/halation_camera.c": "e3f3be922ca43c1268681326e34164cd8136a1410fe7af1e3b3ae3405157828b",
     "native/gr3/halation_controls.h": "9c80dd3a8945d9d19154c9c8ab609a5b5e86d9faf702308868f7e44c7e0e307b",
     "native/gr3/halation_core.c": "70bf8825d33ae3a0335b52a3cd992599e4639e9a068271e4c34365f96bce77df",

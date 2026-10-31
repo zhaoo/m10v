@@ -44,6 +44,8 @@ def build(base,symbols,rtos=None,icon_id=874,parent_event=None):
  record=[0]*17
  for off,name in ((0,'enter'),(0x18,'draw'),(0x20,'current'),(0x28,'set'),(0x30,'count'),(0x3c,'available')):record[off//4]=handlers[name]
  table=data(rom[TABLE-0x53000000:TABLE-0x53000000+0x550]+struct.pack('<17I',*record))
+ from scripts.gr3_target_relocations import relocations
+ relocations.data(table,rom[TABLE-0x53000000:TABLE-0x53000000+0x550])
  for lo,hi in READERS:relocate(lo,hi,TABLE,table)
  length=stub('add r6,r4,#0x550;add r6,r6,#0x44;b 0x531a1e58')
  patch(0x531a1e54,branch(0x531a1e54,length),'constructor21-record walk',0xe2846e55)

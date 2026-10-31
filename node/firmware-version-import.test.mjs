@@ -83,7 +83,9 @@ for(const [env,model,version,target] of [['M10V_GR3_220_FIXTURE','GR III','2.20'
   const report=await imported.json(),route=`/api/projects/${report.project_id}`;
   assert.equal(report.model,model);assert.equal(report.public_version,version);assert.equal(report.build_source.update_compatibility,undefined);
   const backup=await post(route+'/backup',{});assert.equal(backup.status,200,await backup.clone().text());assert.ok(restoreBytes(Buffer.from(await backup.arrayBuffer())).equals(b));
-  const prepared=await post(route+'/native-library/prepare',{configuration:defaultConfiguration()});assert.equal(prepared.status,400);assert.match((await prepared.json()).error,/原生 ABI 尚未适配/);
+  const prepared=await post(route+'/native-library/prepare',{configuration:defaultConfiguration()});
+  if(model==='GR III'){assert.equal(prepared.status,200,await prepared.clone().text());assert.equal((await prepared.json()).ready,true);}
+  else{assert.equal(prepared.status,400);assert.match((await prepared.json()).error,/原生 ABI 尚未适配/);}
   const selection={variant:'street',features:['presets'],stockPresets:[{slot:2,name:'Clear'}]};
   const p=await post(route+'/edit/prepare',{selection});assert.equal(p.status,200,await p.clone().text());const plan=await p.json();
   const built=await post(route+'/edit/build',{selection,accepted_configuration_sha256:plan.configuration_sha256});assert.equal(built.status,200,await built.clone().text());

@@ -95,6 +95,8 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=
    if a==0x531ad060:w=0xe3a02000|maximum
    if a==0x531ad064:w=movw(3,360//maximum)
    output+=struct.pack('<I',w)
+  from scripts.gr3_target_relocations import relocations
+  relocations.code(destination,output)
   return data(output,'stock slider clone '+str(maximum))
  sliders={n:clone(n) for n in (8,3,2,1)}
  color_slider=clone(3,color=True)

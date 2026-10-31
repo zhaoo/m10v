@@ -32,6 +32,8 @@ def build_settings_hooks(base,symbols,live_color=False,appended_slots=False,cust
  for offset,name in [(4,'destroy'),(8,'destroy'),(0x1c,'enter'),(0x24,'ready'),(0x28,'key')]:
   table[offset//4]=symbols['m10v_settings_controller_'+name]
  vt=data(struct.pack('<15I',*table))
+ from scripts.gr3_target_relocations import relocations
+ relocations.data(vt,struct.pack('<15I',*table))
  exports['m10v_settings_controller_vtable']=stub(f'movw r0,#{vt&65535};movt r0,#{vt>>16};bx lr')
  for address,original,name,link in [(0x5316f3b8,0xe300313b,'factory',False),
    (0x5319667c,0xe1a0c00d,'top_dtor',False),(0x5316fcf8,0xeb00ab5a,'top_ctor',True),

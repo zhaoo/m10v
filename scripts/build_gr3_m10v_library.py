@@ -172,6 +172,8 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
     }[prefix]
     if not set(omitted_exports)<=required:raise ValueError('unknown omitted API')
     if set(symbols) != (required-set(omitted_exports)) | set(additional_exports) or not image_sections: raise ValueError('runtime API incomplete: '+prefix+' missing='+str(required-set(symbols))+' extra='+str(set(symbols)-required))
+    from scripts.gr3_target_relocations import relocations
+    relocations.elf(elf, starts, image)
     return bytes(image), symbols
 
 
@@ -356,6 +358,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             delta = address + 4 - (base + offset + 4) - 8
             if delta & 3 or not -(1 << 25) <= delta < 1 << 25: raise ValueError('trampoline branch out of range')
             struct.pack_into('<II', image, offset, word, 0xea000000 | ((delta >> 2) & 0xffffff))
+        from scripts.gr3_target_relocations import relocations
+        relocations.code(base, image[:0x100])
         (out / 'm10v-library-arm.o').write_bytes(obj.read_bytes())
         camera_obj = folder / 'camera.o'
         subprocess.run([compiler, *compile_flags, '-DM10V_LIVE_COLOR='+str(int(owner_cache)), '-DM10V_SD_LIBRARY='+str(int(sd_library)), '-DM10V_ISP_NATIVE_GRAIN_MODE='+str(int(native_grain)), '-c', str(ROOT / 'native/gr3/m10v_library_camera.c'), '-o', str(camera_obj)],
@@ -842,6 +846,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         descriptor_count=old_descriptor_count+14+int(hdf_adj_report is not None)+int(half_frame)
         icon_descriptors = icon_table + icon_count*4
         icon_data = icon_descriptors + descriptor_count*8
+        relocations.data(icon_table,stock_directory)
         image += stock_directory + b''.join(struct.pack('<I',icon_descriptors+i*8) for i in range(111))
         if focal_icons:image+=struct.pack('<I',icon_descriptors+111*8)*73
         image += b''.join(struct.pack('<I',icon_descriptors+(111+int(focal_icons)+i)*8) for i in range(2))
@@ -1263,6 +1268,18 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['half_frame_icon']={'id':877,'width':60,'height':40,'pixels':half_icon_data,'descriptor':icon_descriptors+(old_descriptor_count+10+int(hdf_adj_report is not None))*8,'sha256':sha(half_pixels)} if half_frame else None
     manifest['icons']={'catalog_count':icon_count,'descriptor_count':descriptor_count,'focal':{'first_id':782,'last_id':854,'width':60,'height':20,'descriptor':icon_descriptors+111*8,'storage':'draw-owned-heap','heap_bytes':4800,'owner_fp_offset':-0x80} if focal_icons else None,'first_id':671,'last_id':748,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':icon_artwork_sha,'payload_bytes':len(icon_pixels),'retired_generic_count':retired_icon_count}
     if sd_library:manifest['custom_film_display']={'name_resources':[1007,1011],'appended_name_resources':[1111,1115],'name_storage':'getter-stack-80-bytes','icon_id':754,'icon_sha256':sha(custom_icon()),'card_art':'name-fitted-inside-square-box-and-stable-palette','legacy_sd_compatible':True,'camera_tested':False}
+    # Linked diagnostic modules retain ARM mapping symbols. Recording the
+    # trace never changes runtime bytes; the manifest binds its exact inputs.
+    for linked in out.rglob('*.elf'):
+        relocations.linked(linked.read_bytes())
+    target_references=relocations.finish(base,image)
+    target_coverage=relocations.coverage(base,image)
+    manifest['target_relocations']={'schema':1,'count':len(target_references),
+        'sha256':sha(json.dumps(target_references,separators=(',',':')).encode()),
+        'runtime_sha256':sha(image),
+        'coverage_sha256':sha(json.dumps(target_coverage,separators=(',',':')).encode())}
+    (out / 'm10v-target-relocations.json').write_text(json.dumps(target_references,indent=2)+'\n')
+    (out / 'm10v-target-coverage.json').write_text(json.dumps(target_coverage,indent=2)+'\n')
     (out / 'm10v-library-arm.bin').write_bytes(image)
     (out / 'm10v-library-arm.json').write_text(json.dumps(manifest, indent=2) + '\n')
     return manifest
