@@ -5,12 +5,12 @@
   <title>m10v · GR固件工作台</title>
   <link rel="stylesheet" href="/gr3/styles.css"><link rel="stylesheet" href="/gr3/native-library-embedded.css">
   <script type="module" src="/gr3/studio.js"></script>
-<link rel="stylesheet" href="/gr3/film-picker.css"><link rel="stylesheet" href="/gr3/cinematic.css">
+<link rel="stylesheet" href="/gr3/film-picker.css"><link rel="stylesheet" href="/gr3/cinematic.css"><link rel="stylesheet" href="/gr3/imaging.css">
 <link rel="icon" type="image/png" sizes="128x128" href="/shared/m10v-favicon.png"><link rel="stylesheet" href="/shared/brand.css"><link rel="stylesheet" href="/shared/navigation.css"><script type="module" src="/shared/navigation.js"></script></head>
 <body class="cinematic-studio" data-view="source">
   <header class="topbar">
     <a class="brand m10v-brand" href="/" aria-label="m10v · GR固件工作台 首页"><img class="m10v-mark" src="/shared/m10v-logo.png" width="48" height="48" alt=""><span class="m10v-brand-name"><b>m10v</b><span class="brand-dot">·</span>GR固件工作台</span></a>
-    <nav class="model-nav" aria-label="主导航"><a href="/">选择机型</a><span class="current" id="studio-model-status" aria-current="page">GR III / GR IIIx</span><a href="/gr3/sd-library.html">SD 胶卷库</a><a href="/guide/">说明</a><a href="/gr4/">GR IV</a><a href="/gr2/">GR II · 检查</a><a href="/changelog/">更新日志</a><a href="https://github.com/zhaoo/m10v" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目，新窗口打开">GitHub ↗</a></nav>
+    <nav class="model-nav" aria-label="主导航"><a href="/">选择机型</a><span class="current" id="studio-model-status" aria-current="page">GR III / GR IIIx</span><a href="/gr3/sd-library.html">胶卷库</a><a href="/guide/">说明</a><a href="/gr4/">GR IV</a><a href="/gr2/">GR II · 检查</a><a href="/changelog/">更新日志</a><a href="https://github.com/zhaoo/m10v" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目，新窗口打开">GitHub ↗</a></nav>
   </header>
   <section class="hero"><div class="hero-inner">
     <p class="kicker">GR III / GR IIIx</p><h1>固件工作台</h1>
@@ -18,14 +18,13 @@
 
   </div></section>
   <div class="cinematic-scene" aria-hidden="true"></div>
-  <p class="scene-caption">M10V / PERSONAL COLOR <span>场景示意 · 不代表胶卷实拍效果</span></p>
+  <p class="scene-caption"><span>示意图片</span></p>
   <main class="studio">
     <aside class="steps" aria-label="工作台导航">
       <p class="section-kicker">工作流程</p>
       <button class="step active" data-step="source"><b>01</b><span>导入固件<small>官方文件 · 身份核验</small></span></button>
       <button class="step" data-step="features"><b>02</b><span>胶卷与功能<small>胶卷 · 扩展功能</small></span></button>
-      <button class="step" data-step="power"><b>03</b><span>开关机画面<small>图片 · 裁切预览</small></span></button>
-      <button class="step" data-step="build"><b>04</b><span>保存固件<small>确认配置 · 下载固件</small></span></button>
+      <button class="step" data-step="build"><b>03</b><span>保存固件<small>确认配置 · 下载固件</small></span></button>
       <div class="steps-foot"><strong>你的影像方案</strong><p>随时切换区域，右侧方案清单持续显示当前状态。</p></div>
     </aside>
     <div class="stage">
@@ -40,22 +39,17 @@
         <div class="stage-actions"><a class="quiet-link" href="/">← 返回机型入口</a><button class="primary" id="camera-next">打开影像方案 <span>→</span></button></div>
       </section>
       <section class="page" data-page="features" hidden>
-        <div class="page-head"><p>设置</p><h2>胶卷与功能</h2><span>让影像，成为你的语言。</span></div>
+        <div class="page-head"><p>设置</p><h2>胶卷与功能</h2><span>选择胶卷，按需开启扩展功能。</span></div>
         <div class="settings-tabs" role="tablist" aria-label="胶卷与功能"><button id="tab-library" role="tab" aria-selected="true" aria-controls="native-editor">胶卷设置</button><button id="tab-imaging" role="tab" aria-selected="false" aria-controls="imaging-settings">影像方案</button></div>
         <div class="toolbar"><span id="selection-count">已选择 0 项功能</span><span class="draft-indicator" id="draft-indicator" role="status">自动保存到本机</span><div><button class="outline" id="undo-edit" disabled>撤销</button><button class="outline" id="redo-edit" disabled>重做</button></div></div>
         <div id="imaging-settings" role="tabpanel" aria-labelledby="tab-imaging" hidden>
-        <div class="panel-heading"><h3>影像方案</h3><button class="outline" type="button" data-close-imaging>返回胶卷</button></div><div id="feature-list" class="feature-list"></div>
-        </div><div id="native-editor" role="tabpanel" aria-labelledby="tab-library"></div>
-        <div class="stage-actions"><button class="outline" data-back="source">返回导入固件</button><button class="primary" id="features-next" disabled>继续开关机画面 <span>→</span></button></div>
-      </section>
-      <section class="page" data-page="power" hidden>
-        <div class="page-head"><p>画面</p><h2>设置开关机画面</h2><span>上传图片并调整裁切，也可以保留原厂画面。</span></div>
-        <p id="power-unavailable" class="hint" hidden>当前机型暂未开放自定义开关机画面，可继续保存固件。</p>
+        <div class="panel-heading"><h3>扩展功能</h3><a href="/guide/#features">功能说明 ↗</a><button class="outline" type="button" data-close-imaging>返回胶卷</button></div><div id="feature-list" class="feature-list"></div>
         <div id="power-images" class="power-images" aria-label="开关机图片"></div>
-        <div class="stage-actions"><button class="outline" data-back="features">返回胶卷与功能</button><button class="primary" id="power-next">继续保存固件 <span>→</span></button></div>
+        </div><div id="native-editor" role="tabpanel" aria-labelledby="tab-library"></div>
+        <div class="stage-actions"><button class="outline" data-back="source">返回导入固件</button><button class="primary" id="features-next" disabled>继续保存固件 <span>→</span></button></div>
       </section>
       <section class="page" data-page="source">
-        <div class="page-head"><p>固件来源</p><h2>从你的 GR 开始。</h2><span>导入官方固件，准备属于你的影像方案。</span></div>
+        <div class="page-head"><p>固件来源</p><h2>导入官方固件</h2><span>选择对应机型的官方固件。</span></div>
         <div class="source-options">
         <label class="dropzone" id="dropzone" for="firmware-file"><span class="drop-icon">＋</span><strong>选择官方 BIN，或拖到这里</strong><small>支持 GR III 与 GR IIIx · 导入后自动识别机型</small></label>
         <input type="file" id="firmware-file" accept=".bin,application/octet-stream" hidden>
@@ -66,27 +60,21 @@
         <div class="stage-actions"><a class="outline" href="/">返回机型选择</a><button class="primary" id="source-next" disabled>继续胶卷与功能 <span>→</span></button></div>
       </section>
       <section class="page" data-page="build" hidden>
-        <div class="page-head"><p>保存</p><h2>带上你的影像方案。</h2><span>保存前自动核验固件与方案，完成后下载对应机型的 BIN。</span></div>
+        <div class="page-head"><p>保存</p><h2>保存固件</h2><span>保存前自动核验固件与方案，完成后下载对应机型的 BIN。</span></div>
         <div class="build-summary"><div><small>机型</small><strong id="build-model">等待导入固件</strong></div><div><small>扩展功能</small><strong id="build-feature-count">—</strong></div><div><small>构建状态</small><strong id="runtime-state">读取中</strong></div></div>
-        <div class="review-edit-links" aria-label="返回修改方案"><button type="button" data-back="source">修改固件来源 ↗</button><button type="button" data-back="features">修改胶卷与影像 ↗</button><button type="button" data-back="power">修改开关机画面 ↗</button></div><div id="build-details" class="build-details"></div>
+        <div class="review-edit-links" aria-label="返回修改方案"><button type="button" data-back="source">修改固件来源 ↗</button><button type="button" data-back="features">修改胶卷与影像 ↗</button></div><div id="build-details" class="build-details"></div>
         <button class="outline wide" id="prepare-build" hidden>核验方案 →</button>
         <div id="preflight-result" class="preflight-result" role="status">保存时自动核验来源和方案。</div>
 
-        <details class="advanced-options"><summary>高级选项 · 调试与版本适配</summary>
+        <details class="advanced-options"><summary>高级扩展 · 调试与版本适配（默认关闭）</summary>
         <label class="debug-option" id="debug-option"><input type="checkbox" id="debug-mode" aria-describedby="debug-mode-hint"><span>调试模式<small id="debug-mode-hint">将菜单切换和拍摄阶段记录到 SD 卡，便于排查黑屏；开启后操作和拍摄可能变慢。</small></span></label>
-        <section id="bridge-option" class="version-unlock-option" hidden>
-          <h3 id="bridge">GR III 固件桥接</h3>
-          <p class="hint">原图确认 DSP 为 2.10.32.27，高于旧桥接 2.10.22.27。新版桥接 2.10.33.27 仅提升第三段；先桥接成功并重启，再刷套件内官方 2.10。CPU 版本未知，完整刷写仍待实机验证。第一阶段失败时不要继续第二阶段。</p>
-          <button type="button" class="outline wide" id="bridge-open">下载两阶段桥接测试套件</button>
-          <p id="bridge-result" role="status" aria-live="polite"></p>
-        </section>
-        <section class="version-unlock-option" id="version-unlock-option" hidden><label class="debug-option"><input type="checkbox" id="version-unlock" aria-describedby="version-unlock-hint"><span>单包版本适配<small id="version-unlock-hint">仅用于 GR IIIx 1.60 的高级单包适配；CPU 版本较高时仍可能拒绝。GR III 请使用固件桥接。</small></span></label><div class="version-unlock-fields" id="version-unlock-fields" hidden><label class="version-known-toggle"><input id="version-known" type="checkbox" aria-controls="version-known-fields">按已知 DSP/CPU 版本适配</label><div class="version-known-fields" id="version-known-fields" hidden><label for="version-dsp">当前 DSP 完整版本<input id="version-dsp" type="text" inputmode="decimal" autocomplete="off" placeholder="2.10.x.x" aria-describedby="version-input-hint version-error"></label><label for="version-cpu">当前 CPU 完整版本<input id="version-cpu" type="text" inputmode="decimal" autocomplete="off" placeholder="2.10.x.x" aria-describedby="version-input-hint version-error"></label><p class="hint" id="version-input-hint">填写机身记录中的 DSP Version: 和 CPU Version: 四段数字，每段0–255，不要猜测。适配后重新安装较低版本的官方包仍可能受限。</p></div><p class="version-error" id="version-error" role="status" aria-live="polite"></p></div></section>
+        <section class="version-unlock-option" id="version-unlock-option" hidden><label class="debug-option"><input type="checkbox" id="version-unlock" aria-describedby="version-unlock-hint"><span>单包版本适配<small id="version-unlock-hint">仅用于 GR IIIx 1.60 的高级单包适配；CPU 版本较高时仍可能拒绝。</small></span></label><div class="version-unlock-fields" id="version-unlock-fields" hidden><label class="version-known-toggle"><input id="version-known" type="checkbox" aria-controls="version-known-fields">按已知 DSP/CPU 版本适配</label><div class="version-known-fields" id="version-known-fields" hidden><label for="version-dsp">当前 DSP 完整版本<input id="version-dsp" type="text" inputmode="decimal" autocomplete="off" placeholder="2.10.x.x" aria-describedby="version-input-hint version-error"></label><label for="version-cpu">当前 CPU 完整版本<input id="version-cpu" type="text" inputmode="decimal" autocomplete="off" placeholder="2.10.x.x" aria-describedby="version-input-hint version-error"></label><p class="hint" id="version-input-hint">填写机身记录中的 DSP Version: 和 CPU Version: 四段数字，每段0–255，不要猜测。适配后重新安装较低版本的官方包仍可能受限。</p></div><p class="version-error" id="version-error" role="status" aria-live="polite"></p></div></section>
         </details>
         <button class="primary wide" id="build-firmware" disabled>保存固件 →</button>
         <button class="outline wide" id="cancel-build" hidden>取消当前构建</button>
         <div id="build-result" class="build-result" role="status" aria-live="polite"></div>
         <section id="build-completion" class="build-completion" hidden aria-labelledby="completion-title">
-          <p class="completion-kicker">READY FOR YOUR NEXT FRAME <span data-completed-model></span></p><h3 id="completion-title">固件已生成，准备装卷。</h3>
+          <p class="completion-kicker">构建完成 <span data-completed-model></span></p><h3 id="completion-title">固件已生成</h3>
           <button type="button" class="primary" data-firmware-download>再次下载固件 BIN ↓</button>
           <button type="button" class="outline" data-record-download>下载配置与校验记录 ↓</button>
           <div data-library-guide><div class="completion-next"><span>02</span><div><h4>下载全量胶卷库</h4><p>包含与本次机型、固件匹配的全部可用胶卷，供机内后续装卷和换卷。</p></div></div><button type="button" class="primary" data-full-library>下载配套全量胶卷库 ↓</button>
@@ -97,7 +85,7 @@
 └─ DCIM/</pre><a href="/guide/">查看固件安装与机内装卷说明 ↗</a></details></div>
           <p data-library-status role="status" aria-live="polite"></p>
         </section>
-        <div class="stage-actions"><button class="outline" data-back="power">返回开关机画面</button></div>
+        <div class="stage-actions"><button class="outline" data-back="features">返回胶卷与功能</button></div>
       </section>
 
     </div>
@@ -121,14 +109,6 @@
     </div>
     <div class="dialog-actions"><button class="outline" value="cancel">取消</button><button class="primary" id="apply-recipe" value="apply">应用到此位置</button></div>
   </form></dialog>
-  <dialog id="bridge-dialog" class="firmware-disclaimer" aria-labelledby="bridge-title">
-    <h2 id="bridge-title">GR III 固件桥接 · 2.10.33.27</h2>
-    <p>旧版 2.10.22.27 低于原图记录的 DSP 2.10.32.27，已由 2.10.33.27 替代。新版待实机验证，不能保证其他未知版本兼容。仅用于 GR III，不适用 GR IIIx 或 GR IV；不能据此保证其他服务版本兼容或异常恢复。</p>
-    <ol><li>解压后只将 stage-1-bridge 中的 fwdc239b.bin 放入 SD 根目录，按官方流程更新。</li><li>明确更新成功并正常重启后，将卡上文件替换为 stage-2-official 中的同名文件，再更新。</li><li>第二阶段成功后，再生成普通 M10V 功能包，无需再开启版本适配。</li></ol>
-    <p>不要同时复制两个阶段文件。第一阶段异常时停止并记录提示。包版本是 2.10.33.27，机内菜单仍可能显示 2.10，不能仅凭菜单数字判定失败。</p>
-    <label><input type="checkbox" id="bridge-ack">我已了解两阶段顺序，每次只将对应阶段的 BIN 放入 SD 卡根目录。</label>
-    <div class="disclaimer-actions"><button type="button" class="outline" id="bridge-cancel">返回</button><button type="button" class="primary" id="bridge-export" disabled>下载桥接套件 ZIP</button></div>
-  </dialog>
   <dialog id="firmware-disclaimer" class="firmware-disclaimer" aria-labelledby="disclaimer-title" aria-describedby="disclaimer-summary">
     <p class="disclaimer-kicker">保存前，请了解风险</p>
     <h2 id="disclaimer-title">刷入修改固件可能导致变砖。</h2>

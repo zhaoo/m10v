@@ -5,7 +5,7 @@ import {normalizeVersionUnlock,assertVersionUnlockReceipt} from './version-unloc
 import {createFilmPreview} from './preview-controller.mjs';
 import {enhanceFilmSelect} from './film-picker.mjs';
 import {defaultConfiguration,normalizeConfiguration,configurationForModel,prepareZoomConfigurationForBuild,selectNativeFilm,toggleNativeFilm,resetNativeTexture,retainCatalogFilms,migrateRetiredFilms} from './native-library-state.mjs';
-export function mountNativeLibrary(root=document,{model='gr3',showZoom=true,defaultZoomWrite=false,onInspect=()=>{},onChange=()=>{},onEditStart=()=>{},onEditCommit=()=>{}}={}) {
+export function mountNativeLibrary(root=document,{model='gr3',showZoom=true,defaultZoomWrite=false,loadSaved=true,onInspect=()=>{},onChange=()=>{},onEditStart=()=>{},onEditCommit=()=>{}}={}) {
 const selectionLimit=()=>modelCapabilities(sourceModel).filmSlots;
 const catalogApi=model==='gr4'?'/api/gr4/native-library/catalog':'/api/gr3/native-library/catalog';
 let halationWrite=false;
@@ -16,7 +16,7 @@ const storageKey=model==='gr4'?'m10v-gr4-native-library-v1':'m10v-native-library
 const $=s=>root.querySelector(s),levels=['关闭','弱','中','强'];
 let configuration=defaultConfiguration(model),active=0,films=[],project=null,token='',busy=false,abort=null,urls=[],unresolved=[],sourceModel=model;
 configuration.zoom.write=defaultZoomWrite&&isGr3Family(model);
-try{const saved=localStorage.getItem(storageKey);if(saved)configuration=migrateRetiredFilms(JSON.parse(saved));}catch{}
+try{const saved=loadSaved&&localStorage.getItem(storageKey);if(saved)configuration=migrateRetiredFilms(JSON.parse(saved));}catch{}
 configuration=configurationForModel(configuration,sourceModel);
 // Retired M10V sketches migrate by slot; their numeric IDs remain firmware-compatible.
 
@@ -29,7 +29,7 @@ function versionUnlockSnapshot(){
  return normalizeVersionUnlock(option,sourceModel);
 }
 function renderVersionUnlock(){
- if($('#native-bridge-guide'))$('#native-bridge-guide').hidden=sourceModel!=='gr3';
+
  const supported=sourceModel==='gr3x',toggle=$('#native-version-unlock'),known=$('#native-version-known');
  $('#native-version-unlock-option').hidden=!supported;if(!supported){toggle.checked=false;known.checked=false;}
  toggle.disabled=busy||!supported;$('#native-version-unlock-fields').hidden=!toggle.checked;
@@ -139,6 +139,6 @@ $('#build').onclick=async()=>{
 };
 (async()=>{try{const [status,catalog]=await Promise.all([fetch('/api/status').then(jsonResponse),fetch(catalogApi).then(jsonResponse)]);token=status.session_token;films=catalog.films;const retained=retainCatalogFilms(configuration,films),removed=configuration.slots.length-retained.slots.length;if(removed){configuration=retained;invalidate({filmSelection:true});const status=$('#film-selection-status');if(status)status.textContent=`已清理 ${removed} 款已停用胶卷，请按当前目录选择。`;}$('#search').placeholder=`搜索 ${films.length} 套胶卷…`;for(const node of root.querySelectorAll('[data-film-count-copy]'))for(const child of node.childNodes)if(child.nodeType===3)child.textContent=child.textContent.replace(/[0-9]+(?=\s*[套款])/g,String(films.length));for(const group of [...new Set(films.map(f=>f.group))]){const option=document.createElement('option');option.value=group;option.textContent=group;option.dataset.icon=films.find(f=>f.group===group)?.icon_url;$('#film-group').append(option);}enhanceFilmSelect($('#film-group'),{caption:'胶卷分类',searchable:false});$('#local-source').dataset.available=catalog.local_source_available?'1':'';$('#source-status').textContent=catalog.local_source_available?'已找到目录中的官方包，请选择使用。':'请选择对应的官方固件包。';render();}catch(e){message(e.message,true);$('#source-status').textContent='服务暂不可用，请刷新页面。';}})();render();
 
-return {toggleFilm,setHalationWrite:value=>{if(halationWrite!==value){halationWrite=value;render();}},setModel:value=>{if(!['gr3','gr3x','gr4'].includes(value))throw Error('不支持的相机机型');sourceModel=value;const previous=JSON.stringify(configuration.zoom);configuration=configurationForModel(configuration,value);if(previous!==JSON.stringify(configuration.zoom))invalidate({globalZoom:true});render();},getConfiguration:()=>normalizeConfiguration(configuration),setFilm:(id,slot=active)=>{if(!supportsNativeFilm(sourceModel,id))throw Error('四款新增滤镜仅支持 GR III 原生 ISP');if(films.length&&!films.some(f=>f.id===id))throw Error('胶卷已停用，请从当前目录选择');active=slot;if(slot===configuration.slots.length){configuration=toggleNativeFilm(configuration,id);}else configuration=selectNativeFilm(configuration,slot,id);invalidate({filmSlot:slot});render();},setConfiguration:value=>{configuration=configurationForModel(films.length?retainCatalogFilms(value,films):normalizeConfiguration(value),sourceModel);invalidate();render();},setHdf:value=>{configuration=normalizeConfiguration({...configuration,hdf:value});invalidate({globalHdf:true});render();},setUnresolved:value=>{if(JSON.stringify(unresolved)!==JSON.stringify(value)){unresolved=value;render();}}};
+return {toggleFilm,setHalationWrite:value=>{if(halationWrite!==value){halationWrite=value;render();}},setModel:value=>{if(!['gr3','gr3x','gr4'].includes(value))throw Error('不支持的相机机型');sourceModel=value;const previous=JSON.stringify(configuration.zoom);configuration=configurationForModel(configuration,value);if(previous!==JSON.stringify(configuration.zoom))invalidate({globalZoom:true});render();},getConfiguration:()=>normalizeConfiguration(configuration),setFilm:(id,slot=active)=>{if(!supportsNativeFilm(sourceModel,id))throw Error('四款新增滤镜仅支持 GR III 原生 ISP');if(films.length&&!films.some(f=>f.id===id))throw Error('胶卷已停用，请从当前目录选择');active=slot;if(slot===configuration.slots.length){configuration=toggleNativeFilm(configuration,id);}else configuration=selectNativeFilm(configuration,slot,id);invalidate({filmSlot:slot});render();},setConfiguration:(value,meta={})=>{configuration=configurationForModel(films.length?retainCatalogFilms(value,films):normalizeConfiguration(value),sourceModel);invalidate(meta);render();},setHdf:value=>{configuration=normalizeConfiguration({...configuration,hdf:value});invalidate({globalHdf:true});render();},setUnresolved:value=>{if(JSON.stringify(unresolved)!==JSON.stringify(value)){unresolved=value;render();}}};
 }
 if(location.pathname.endsWith('/native-library.html'))mountNativeLibrary();

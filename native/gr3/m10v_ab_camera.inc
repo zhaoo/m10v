@@ -103,6 +103,7 @@ static uint32_t ab_event_key(uint32_t event){
 }
 #include "m10v_ab_host.inc"
 uint32_t m10v_settings_controller_ab_setup(uint32_t controller,uint32_t event,uint32_t parent){
+ if(!m10v_settings_controller_ab_available())return 0;
  uint32_t key=ab_event_key(event);
  m10v_settings_controller *entry=ab_owner();
  /* A physical press may have queued its logical DISP before MAIN/exit.
@@ -271,6 +272,7 @@ static int ab_live_films_match(m10v_ab *s){
 #endif
 }
 static uint32_t ab_live_key(m10v_settings_controller *p,uint32_t key){
+ if(!m10v_settings_controller_ab_available())return 0;
  if(!p||!p->ab.enabled||key<0x36||key>0x38)return 0;
  if(ab_route()!=0x08000000u){p->ab.down=0;return 0;}
  m10v_ab *s=&p->ab;

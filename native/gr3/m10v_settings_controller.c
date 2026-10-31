@@ -7,6 +7,13 @@
 #include "m10v_film_card.h"
 #include "m10v_film_directory.h"
 #include "m10v_zoom_camera.h"
+#ifndef M10V_AB_ENABLED
+#define M10V_AB_ENABLED 1
+#endif
+/* Keep one auditable ARM gate without optimizing away the shared lifecycle. */
+__attribute__((noinline)) uint32_t m10v_settings_controller_ab_available(void){
+ uint32_t value;__asm__ volatile("mov %0, %1":"=r"(value):"I"(M10V_AB_ENABLED));return value;
+}
 #ifndef M10V_HALF_PAIR_ENABLED
 #define M10V_HALF_PAIR_ENABLED 0
 #endif
@@ -101,6 +108,7 @@ uint32_t m10v_settings_controller_top_dtor(uint32_t owner){
  return m10v_settings_top_dtor_original(owner);
 }
 uint32_t m10v_settings_controller_factory(uint32_t factory,uint32_t route){
+ if(route==M10V_SETTINGS_AB_ROUTE&&!m10v_settings_controller_ab_available())return m10v_settings_factory_original(factory,route);
  if(route!=M10V_SETTINGS_FILMS_ROUTE&&route!=M10V_SETTINGS_STAMP_ROUTE&&route!=M10V_SETTINGS_NAME_ROUTE&&route!=M10V_SETTINGS_AB_ROUTE&&route!=M10V_SETTINGS_ZOOM_ROUTE)
   return m10v_settings_factory_original(factory,route);
  uint32_t owner=m10v_settings_factory_original(factory,0x0200004au);

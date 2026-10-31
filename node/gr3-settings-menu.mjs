@@ -24,6 +24,7 @@ export function checkSettings(runtime,m){
  settingsPatches(m);
  const d=m.settings_menu,s=m.symbols,base=m.base;
  const words=(a,list)=>{need(Number.isInteger(a)&&a%4===0&&a>=base&&a+list.length*4<=base+runtime.length,'code bounds');for(let i=0;i<list.length;i++)need(runtime.readUInt32LE(a-base+i*4)===(list[i]>>>0),'instruction at '+(a+i*4).toString(16));};
+ if(typeof m.ab_enabled==='boolean')words(s.m10v_settings_controller_ab_available,[0xe3a00000|Number(m.ab_enabled),0xe12fff1e]);
  for(const [name,old,target] of [['m10v_settings_factory_original',0xe300313b,0x5316f3b8],['m10v_settings_top_dtor_original',0xe1a0c00d,0x5319667c]]){const a=d.exports[name];words(a,[old,branch(a+4,target+4)]);}
  const vt=[...stockVtable];for(const [i,n] of [[1,'destroy'],[2,'destroy'],[7,'enter'],[9,'ready'],[10,'key'],[12,'ab_render']])vt[i]=s['m10v_settings_controller_'+n];words(d.vtable,vt);
  words(d.exports.m10v_settings_controller_vtable,[movw(0,d.vtable&65535),movt(0,d.vtable>>>16),0xe12fff1e]);
