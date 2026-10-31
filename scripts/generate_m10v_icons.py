@@ -148,7 +148,11 @@ def artwork(name,i,spec=None):
  313:('ORWO','WOLFEN','NC500','#262829','#f4e8ce','#d96a2b',7),
  315:('KODAK','DOUBLE-X','5222','#d5bd61','#232c2c','#7c8348',7),
  316:('LOMOGRAPHY','TURQUOISE','100-400','#1b6875','#f2e4ac','#d5993c',5),
- 317:('FUJIFILM','INSTAX','800','#eee9d6','#14684e','#db4b59',11)}
+ 317:('FUJIFILM','INSTAX','800','#eee9d6','#14684e','#db4b59',11),
+ 318:('KODAK','2383','PRINT','#d6b348','#282d28','#9d4635',7),
+ 319:('FUJIFILM','CLASSIC','NEGATIVE','#d5d7bc','#203e32','#a3654a',8),
+ 320:('FUJIFILM','CLASSIC','CHROME','#a6b3ae','#263c43','#ba8d58',9),
+ 321:('LOMOGRAPHY','LOMOCHROME','PURPLE','#543250','#f6e6cb','#b978af',5)}
  if i in curated:brand,title,code,paper,ink,accent,motif=curated[i]
  return brand,title,code,paper,ink,accent,motif
 
@@ -300,6 +304,12 @@ def generate():
   im.save(out/f"{spec['id']}.png",optimize=True);box_icon(spec['name'],spec['id'],160,spec).save(out/f"{spec['id']}-large.png",optimize=True)
   meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
  (ROOT/'native/gr3/m10v_extra_films.rgba').write_bytes(extra_pixels)
+ four_pixels=bytearray()
+ for spec in json.loads((ROOT/'web/gr3/four-looks-luts.json').read_text())['stocks']:
+  im=box_icon(spec['name'],spec['id'],spec=spec);raw=im.tobytes();four_pixels+=raw
+  im.save(out/f"{spec['id']}.png",optimize=True);box_icon(spec['name'],spec['id'],160,spec).save(out/f"{spec['id']}-large.png",optimize=True)
+  meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
+ (ROOT/'native/gr3/m10v_four_looks.rgba').write_bytes(four_pixels)
  for row in meta:
   large=out/f"{row['id']:02d}-large.png"
   revision=hashlib.sha256(large.read_bytes()).hexdigest()[:12]

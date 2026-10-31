@@ -14,7 +14,7 @@ export function renderZoomControls(root,configuration,model,onChange,busy=false,
  toggle.onchange=()=>onChange(normalizeConfiguration({...configuration,zoom:{...configuration.zoom,write:toggle.checked}}));
  const fields=make('div');fields.className='stamp-fields';
  configuration.zoom.slots.forEach((mm,index)=>{
-  const field=make('label',`第 ${index+1} 档（mm）`),input=make('input');input.type='number';input.min=String(lens.min);input.max=String(lens.max);input.step='1';input.value=String(mm);input.required=true;input.disabled=busy||!configuration.zoom.write;
+  const field=make('label',`第 ${index+1} 档（mm）`),input=make('input');input.type='number';input.dataset.imagingField='zoom-'+index;input.min=String(lens.min);input.max=String(lens.max);input.step='1';input.value=String(mm);input.required=true;input.disabled=busy||!configuration.zoom.write;
   input.setAttribute('aria-label',`裁切焦距第 ${index+1} 档（mm）`);
   input.oninput=()=>input.setCustomValidity('');
   input.onchange=()=>{
@@ -32,7 +32,7 @@ export function renderZoomControls(root,configuration,model,onChange,busy=false,
   title.className='feature-title';num.className='feature-num';tag.className='feature-tag';
   title.append(num,heading);copy.append(title,hint,tag);
   const button=make('button',configuration.zoom.write?'关闭':'开启');button.type='button';button.disabled=busy;
-  button.className='feature-toggle'+(configuration.zoom.write?' selected':'');button.setAttribute('aria-pressed',String(configuration.zoom.write));button.onclick=toggle.onchange=()=>onChange(normalizeConfiguration({...configuration,zoom:{...configuration.zoom,write:!configuration.zoom.write}}));
+  button.dataset.imagingField='zoom-toggle';button.className='feature-toggle'+(configuration.zoom.write?' selected':'');button.setAttribute('aria-pressed',String(configuration.zoom.write));button.onclick=toggle.onchange=()=>onChange(normalizeConfiguration({...configuration,zoom:{...configuration.zoom,write:!configuration.zoom.write}}));
   root.append(copy,button);
   if(configuration.zoom.write){const detail=make('div');detail.className='feature-detail zoom-detail';detail.append(fields,summary);root.append(detail);}
  }else root.append(heading,label,fields,hint,summary);

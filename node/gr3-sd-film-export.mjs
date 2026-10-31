@@ -1,6 +1,7 @@
 import {sha256} from './gr3-fit-binding.mjs';
 import {buildSdFilmPack,auditSdFilmPack,sdCrc} from "./gr3-sd-film-pack.mjs";
 import {parseCustomCube,fitCustomFilmIsp} from './gr3-custom-lut.mjs';
+import {supportsNativeFilm} from '../web/gr3/model-capabilities.mjs';
 export function encodeZip(rows) {
   const local = [];
   const central = [];
@@ -44,6 +45,7 @@ export function encodeZip(rows) {
 
 export async function exportSdFilms(input){
  if(!input||typeof input!=='object'||Array.isArray(input)||!Object.hasOwn(input,'ids')||Object.keys(input).some(k=>!['ids','model','customFilms'].includes(k))||(input.model!==undefined&&!['gr3','gr3x'].includes(input.model)))throw Error('请选择 GR III / GR IIIx 胶卷');
+ if(Array.isArray(input.ids)&&input.ids.some(id=>!supportsNativeFilm(input.model??'gr3',id)))throw Error('四款新增滤镜需要 GR III 已验证的原生 ISP 成片管线');
  const files=input.customFilms??[];
  if(!Array.isArray(files)||files.length>216)throw Error('自定义 LUT 数量超限');
  let total=0;const sourceHashes=[];
@@ -59,7 +61,7 @@ export async function exportSdFilms(input){
  for(let i=0;i<custom.length;i++)custom[i]=await fitCustomFilmIsp(custom[i],{model:input.model||'gr3',sourceSha256:sourceHashes[i],filename:files[i].filename});
  const pack=buildSdFilmPack(input.ids,custom),receipt={...auditSdFilmPack(pack),...(custom.length?{custom_lut_assessment:{status:'isp-approximation',isp_fit:true,path:'versioned native ISP matrix/post/curves; preserved source 13-cube',source_sha256:sourceHashes,profiles:custom.map(f=>f.ispAssessment),camera_verified:false}}:{})};
  const instructions='M10V SD 胶卷库 / GR III 2.10 / GR IIIx 1.60\n'+
- '需要配套的 M10V SD 胶卷库固件；旧内置胶卷库固件不读取此文件，GR III 与 GR IIIx 共用此配方包。\n'+
+ '需要配套的 M10V SD 胶卷库固件；旧内置胶卷库固件不读取此文件。2383、Classic Negative、Classic Chrome、LomoChrome Purple 仅支持 GR III 原生 ISP 候选；其他胶卷保持原有机型范围。\n'+
  '解压，将 SD/M10V 目录复制到 SD 卡根目录，与 DCIM 并列。更新时只替换 FILMS.M10，保留其他文件。\n'+
  '机内：MENU > 设置 > 胶卷库，管理已选胶卷，进入卡上的胶卷列表添加喜欢的胶卷。\n'+
  '按机内中文提示选择或取消胶卷，已选胶卷按顺序显示。GR III 最多十款；GR IIIx 保持五款上限。MENU 返回上一级，卡上可存全部当前平台胶卷。\n'+

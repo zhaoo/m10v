@@ -59,6 +59,42 @@ class EffectsStateTests(unittest.TestCase):
         self.assertEqual(bytes(settings), bytes(32))
         self.assertEqual(self.lib.m10v_isp_effects_validate(C.byref(settings)), 1)
 
+    def test_independent_switches_preserve_strength_and_disable_only_selected_effect(self):
+        for kind,field,value,off in ((0,'leak_gain',3,0),(1,'grain_mode',4,1),(2,'blur_gain',1,0)):
+            settings=Settings(2,1,2,3,1,2,1,0)
+            before=[getattr(settings,f) for f in FIELDS]
+            self.assertEqual(self.lib.m10v_isp_effects_set_strength(C.byref(settings),kind,value),1)
+            self.assertEqual(self.lib.m10v_isp_effects_set_enabled(C.byref(settings),kind,0),1)
+            self.assertEqual(getattr(settings,field),off)
+            self.assertEqual(self.lib.m10v_isp_effects_strength(C.byref(settings),kind),value)
+            self.assertEqual(self.lib.m10v_isp_effects_enabled(C.byref(settings),kind),0)
+            self.assertEqual(self.lib.m10v_isp_effects_set_enabled(C.byref(settings),kind,1),1)
+            self.assertEqual(getattr(settings,field),value)
+            for index,f in enumerate(FIELDS[:-1]):
+                if f!=field:self.assertEqual(getattr(settings,f),before[index])
+
+    def test_disabled_strength_persists_v2_without_enabling_and_capture_strips_ui_metadata(self):
+        settings=Settings(0,2,1,1,2,0,1,0)
+        for kind,value in ((0,3),(1,2),(2,1)):
+            self.assertEqual(self.lib.m10v_isp_effects_set_strength(C.byref(settings),kind,value),1)
+            self.assertEqual(self.lib.m10v_isp_effects_enabled(C.byref(settings),kind),0)
+        data=C.create_string_buffer(48)
+        self.assertEqual(self.lib.m10v_isp_effects_encode(C.byref(settings),7,data,48),1)
+        self.assertEqual(struct.unpack_from('<I',data.raw,4)[0],2)
+        restored=Settings();seq=C.c_uint32()
+        self.assertEqual(self.lib.m10v_isp_effects_decode(data,48,C.byref(restored),C.byref(seq)),1)
+        self.assertEqual(bytes(settings),bytes(restored))
+        snapshot=Snapshot()
+        self.assertEqual(self.lib.m10v_isp_effects_resolve_snapshot(C.byref(restored),3,C.byref(snapshot)),1)
+        self.assertEqual((snapshot.settings.leak_gain,snapshot.settings.grain_mode,snapshot.settings.blur_gain,snapshot.settings.reserved),(0,1,0,0))
+        self.assertEqual(snapshot.effective_grain_strength,0)
+
+    def test_switch_invalid_parameters_do_not_mutate_settings(self):
+        for name,args in (('set_enabled',(3,1)),('set_enabled',(0,2)),('set_strength',(0,0)),('set_strength',(1,1)),('set_strength',(2,4))):
+            settings=Settings(2,1,2,3,1,2,1,0);before=bytes(settings)
+            self.assertEqual(getattr(self.lib,'m10v_isp_effects_'+name)(C.byref(settings),*args),0)
+            self.assertEqual(bytes(settings),before)
+
     def test_every_parameter_boundary_and_reserved_word_is_validated(self):
         maxima = (3, 2, 2, 4, 2, 3, 2, 0)
         for i, maximum in enumerate(maxima):

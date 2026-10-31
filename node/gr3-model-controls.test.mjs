@@ -25,9 +25,9 @@ test('restoring a GR III draft on IIIx uses the normalized editor state for the 
  const {normalizeWorkbenchDraft}=await import('../web/gr3/workbench-state.mjs');
  const source=readFileSync(new URL('../web/gr3/studio.js',import.meta.url),'utf8');
  const original=defaultConfiguration();original.zoom.write=true;
- const state={nativeConfig:defaultConfiguration('gr3x'),nativeCatalog:[],unresolvedSlots:[]};let editor=state.nativeConfig;
- const ctx=vm.createContext({state,localStorage:{getItem:()=>JSON.stringify({profile:'native',features:['film'],nativeConfiguration:original})},draftKey:'draft',preserveLegacyDraft(){},normalizeWorkbenchDraft,powerImages:null,
- nativeEditor:{setConfiguration(c){editor=configurationForModel(c,'gr3x');state.nativeConfig=editor;},getConfiguration:()=>editor,setUnresolved(){}},notice(){},editHistory:{restore(){}},historyConfiguration(){return {};},updateHistoryButtons(){}});
+ const state={nativeConfig:defaultConfiguration('gr3x'),nativeCatalog:[],unresolvedSlots:[]},restoreErrors=[];let editor=state.nativeConfig;
+ const ctx=vm.createContext({state,chosenModel:'gr3x',localStorage:{getItem:()=>JSON.stringify({profile:'native',features:['film'],nativeConfiguration:original})},draftKey:'draft',preserveLegacyDraft(){},normalizeWorkbenchDraft,powerImages:null,
+ nativeEditor:{setConfiguration(c){editor=configurationForModel(c,'gr3x');state.nativeConfig=editor;},getConfiguration:()=>editor,setUnresolved(){}},notice(message,error){if(error)restoreErrors.push(message);},editHistory:{restore(){}},historyConfiguration(){return {};},updateHistoryButtons(){}});
  vm.runInContext('let restoringHistory=false,draftPersistenceAllowed=true;'+source.slice(source.indexOf('function restoreDraft()'),source.indexOf('function invalidate(')),ctx);
- ctx.restoreDraft();assert.deepEqual(state.nativeConfig.zoom.slots,[50,71]);assert.equal(state.nativeConfig.zoom.write,true);
+ ctx.restoreDraft();assert.deepEqual(restoreErrors,[]);assert.deepEqual(state.nativeConfig.zoom.slots,[50,71]);assert.equal(state.nativeConfig.zoom.write,true);
 });

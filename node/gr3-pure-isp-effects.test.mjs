@@ -19,6 +19,8 @@ test('pure ISP opt-in preserves default plan and defaults, binds distinct finger
  const pure=prepareNative(source,configuration,{...options,pure_isp_effects:true});
  assert.equal(pure.pure_isp_effects,true);assert.equal(pure.capture_pipeline,'gr3-native-v8');
  assert.notEqual(pure.configuration_sha256,normal.configuration_sha256);
+ const previewOff=prepareNative(source,configuration,{...options,pure_isp_effects:true,live_color:false});
+ assert.notEqual(pure.configuration_sha256,previewOff.configuration_sha256);
  assert.equal(pure.configuration.hdf,0);assert.deepEqual(pure.configuration,normal.configuration);
  assert.deepEqual(pure.stock_detail,normal.stock_detail);
  for(const feature of ['ispLightLeak','ispGrain','ispBlur'])assert.ok(pure.features.includes(feature));
@@ -29,9 +31,11 @@ test('pure ISP opt-in preserves default plan and defaults, binds distinct finger
 test('pure ISP rejects bad types and missing required native components',async()=>{
  const source=await readNativeOfficial('gr3'),c=defaultConfiguration();
  for(const pure_isp_effects of [1,'true',null])assert.throws(()=>prepareNative(source,c,{pure_isp_effects}),/ISP/);
- for(const invalid of [{film_library:false},{live_color:false},{hdf_enabled:false},{border_enabled:false}]){
+ for(const invalid of [{film_library:false},{hdf_enabled:false},{border_enabled:false}]){
   assert.throws(()=>prepareNative(source,c,{film_library:true,live_color:true,hdf_enabled:true,border_enabled:true,pure_isp_effects:true,...invalid}));
  }
+ const previewOff=prepareNative(source,c,{film_library:true,live_color:false,hdf_enabled:true,border_enabled:true,pure_isp_effects:true});
+ assert.equal(previewOff.live_color,false);assert.equal(previewOff.capture_pipeline,'gr3-native-v8');
 });
 
 test('pure ISP manifest validation rejects wrong capability and untrusted assets',()=>{
@@ -56,7 +60,7 @@ test('trusted runtime modulation bytes and closed patch inventory survive readba
   const base=0x543ff000,runtime=Buffer.concat([Buffer.alloc(4096),raw]);
   const branch=(at,link)=>((link?0xeb000000:0xea000000)|(((base-at-8)>>2)&0xffffff))>>>0;
   const patches=[[0x53771620,0xe51b12d4,false],[0x5367adac,0xe50be650,false],[0x5367ae14,0xeb003ec4,true],[0x5367b404,0xeb03c641,true],[0x5367b410,0xeb003c3e,true],[0x5367b41c,0xeb03c308,true],[0x535033e8,0xeb05f673,true]].map(([address,expected,link])=>({address,expected,replacement:branch(address,link)}));
-  const manifest={base,camera_model:'gr3',film_library_enabled:true,hdf_enabled:true,border:{enabled:true},capture_lifecycle:{snapshot:{live_color:true},native_grain:{query_entry:base}},flags:['-DM10V_PURE_ISP_EFFECTS=1','-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778'],pure_isp_effects:{enabled:true,recipe_bytes:0x57d8,menu_resource_ids:Array.from({length:21},(_,i)=>1159+i),runtime_assets:{base:0x54400000,bytes:raw.length,sha256:assets.blob_sha256,manifest:assets},patches}};
+  const manifest={base,camera_model:'gr3',film_library_enabled:true,hdf_enabled:true,border:{enabled:true},capture_lifecycle:{snapshot:{live_color:true},native_grain:{query_entry:base}},flags:['-DM10V_PURE_ISP_EFFECTS=1','-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778'],pure_isp_effects:{enabled:true,recipe_bytes:0x57d8,menu_resource_ids:Array.from({length:23},(_,i)=>1163+i),runtime_assets:{base:0x54400000,bytes:raw.length,sha256:assets.blob_sha256,manifest:assets},patches}};
   assert.equal(pureIspEffectPatches(runtime,manifest).length,7);
   const original=patches[0].replacement;patches[0].replacement=branch(patches[0].address,true);
   assert.throws(()=>pureIspEffectPatches(runtime,manifest),/branch kind/);patches[0].replacement=original;

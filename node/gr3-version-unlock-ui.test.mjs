@@ -40,15 +40,16 @@ import vm from 'node:vm';
 const studio=await readFile(new URL('../web/gr3/studio.js',import.meta.url),'utf8');
 const independent=await readFile(new URL('../web/gr3/native-library.js',import.meta.url),'utf8');
 function nodes(){const map=new Map();return id=>{if(!map.has(id))map.set(id,{checked:false,value:'',hidden:false,disabled:false,textContent:'',className:''});return map.get(id);};}
-function studioHarness({mismatch=false,simple=false,model='gr3',powerConfiguration={},duringBody=()=>{}}={}){
+function studioHarness({mismatch=false,simple=false,model='gr3',powerConfiguration={},powerEnabled=true,duringBody=()=>{}}={}){
  const $=nodes(),calls=[],downloads=[],completed=[],state={projectId:'official',profile:'native',revision:3,features:new Set(['film']),nativeConfig:{...defaultConfiguration(),slots:defaultConfiguration().slots.map((s,i)=>i===0?{...s,film:33}:s)}};
+ if(powerEnabled)state.features.add('powerImages');
  const input=simple?{enabled:true,mode:'dsp-package-only'}:model==='gr3x'?{enabled:true,dsp:'1.60.11.18',cpu:'1.60.11.17'}:{enabled:true,dsp:'2.10.21.40',cpu:'2.10.21.27'};
  const audit=simple?{enabled:true,mode:mismatch?'observed-versions':'dsp-package-only',checks:{cpu_payload_unchanged:true}}:{enabled:true,mode:'observed-versions',current_versions:{dsp:input.dsp,cpu:mismatch?'2.10.21.28':input.cpu}};
  const context=vm.createContext({$,state,Response,completion:{show:value=>completed.push(value)},prepareZoomConfigurationForBuild,validateZoomControls(){},nativeEditor:{setConfiguration(c){state.nativeConfig=c;state.revision++;}},AbortController,structuredClone,atob,Uint8Array,TextDecoder,JSON,normalizeVersionUnlock,assertVersionUnlockReceipt,powerImages:{getConfiguration:()=>structuredClone(powerConfiguration),setModel(){}},
   versionUnlockSnapshot:()=>normalizeVersionUnlock(input,model),nativeExtensions:()=>({aspect:false}),debugEnabled:()=>false,renderLedger(){},notice(){},
   api:async(path,options)=>{calls.push({path,body:JSON.parse(options.body)});return {blob:async()=>{duringBody(state);return new Blob(['candidate']);},json:async()=>({ready:true,configuration_sha256:'hash',filename:'candidate.bin'}),headers:{get:()=>Buffer.from(JSON.stringify({version_unlock:audit})).toString('base64')}};},
   download:async(...args)=>downloads.push(args)});
- vm.runInContext(`let activeBuildController=null,riskAcceptedRevision=3,chosenModel='${model}';`+studio.slice(studio.indexOf('async function prepare()'),studio.indexOf('function showSettingsTab(')),context);
+ vm.runInContext(`let activeBuildController=null,riskAcceptedRevision=3,chosenModel='${model}';`+studio.slice(studio.indexOf('const selectedPowerImages='),studio.indexOf('\n\nconst $'))+studio.slice(studio.indexOf('async function prepare()'),studio.indexOf('function showSettingsTab(')),context);
  return {context,state,$,calls,downloads,completed,input};
 }
 test('actual studio prepare/build reuse one captured snapshot and validate version receipt before download',async()=>{
@@ -154,7 +155,7 @@ test('GR IIIx advanced controls validate its line and receipt against an explici
 
 test('GR IIIx ledger exposes debug mode and forwards its enabled state in native mode',()=>{
  const $=nodes();$('plan-ledger').replaceChildren=()=>{};$('plan-ledger').append=()=>{};
- const context=vm.createContext({$,state:{profile:'native',features:new Set(['film']),nativeConfig:{slots:[]},nativeCatalog:[],unresolvedSlots:[],projectId:'x'},document:{createElement:()=>({append(){}})},textNode:()=>({}),renderVersionUnlock:()=>true,powerImages:{setModel(){},getConfiguration:()=>({})}});
+ const context=vm.createContext({$,state:{profile:'native',features:new Set(['film']),nativeConfig:{slots:[]},nativeCatalog:[],unresolvedSlots:[],projectId:'x'},document:{createElement:()=>({append(){}})},textNode:()=>({}),renderVersionUnlock:()=>true,renderFeatureCount(){},powerImages:{setEnabled(){},setModel(){},getConfiguration:()=>({})}});
  vm.runInContext("let chosenModel='gr3x',modelLabel='GR IIIx',activeBuildController=null,saving=false,debugMode=true;"+studio.slice(studio.indexOf('const debugEnabled='),studio.indexOf('\n\nconst $'))+studio.slice(studio.indexOf('function renderLedger()'),studio.indexOf('function textNode(')),context);
  context.renderLedger();assert.equal($('debug-option').hidden,false);assert.equal(vm.runInContext('debugEnabled()',context),true);
 });
@@ -171,6 +172,12 @@ test('studio freezes power images with the same preparation snapshot and preserv
  await h.context.prepare();powerConfiguration.startup.jpeg_base64='later-cropped-jpeg';await h.context.build();
  assert.deepEqual(h.calls[0].body.power_images,h.calls[1].body.power_images);assert.equal(h.calls[1].body.power_images.startup.jpeg_base64,'initial-cropped-jpeg');
  const x=studioHarness({model:'gr3x',powerConfiguration});await x.context.prepare();assert.deepEqual(x.calls[0].body.power_images,powerConfiguration);
+});
+
+test('disabled power-image switch omits retained images from the actual prepared request',async()=>{
+ const h=studioHarness({powerEnabled:false,powerConfiguration:{startup:{jpeg_base64:'retained-draft'}}});
+ await h.context.prepare();assert.deepEqual(h.calls[0].body.power_images,{});
+ assert.equal(h.calls[0].body.ab_enabled,false);
 });
 
 test('changing configuration while response bytes arrive suppresses stale binary and completion',async()=>{const h=studioHarness({duringBody:state=>{state.revision++;}});await h.context.prepare();await h.context.build();assert.equal(h.downloads.length,0);assert.equal(h.completed.length,0);});

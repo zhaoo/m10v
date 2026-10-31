@@ -43,12 +43,21 @@ export function gr4SdInstructions(){return `M10V SD 胶卷库 / GR IV 1.11
 解压，将 SD/M10V 目录复制到 SD 卡根目录，与 DCIM 并列。更新时只替换 FILMS.M10，保留其他文件。
 机内：MENU > 设置 > 胶卷库，选择要替换的槽位并按 OK，直接进入卡上的胶卷列表。
 左右选卷、上下翻页，按 OK 装入；成功后返回五槽列表。MENU 返回上一级，五槽页按 MENU 退出。
-最多五个活动槽，卡上可存全部46款当前胶卷。装入成功后重启或换卡仍保留。无卡、损坏或不兼容文件不替换原槽。
+最多五个活动槽，卡上可存全部可用胶卷。装入成功后重启或换卡仍保留。无卡、损坏或不兼容文件不替换原槽。
 时间水印：MENU > 设置 > 时间水印，设置模式、日期格式、位置、颜色，OK 保存，MENU 取消当前编辑。
 文件包含配方身份快照和图标；5207、Phoenix II、HARMAN RED 通过 SHA-256 绑定固件内完整 LUT（含 RED 三档曝光），不在文件中存放 LUT。
-仅接受匹配版本的46款胶卷，未来新配方需匹配固件。固件与资源包使用同一份渲染合同。
+仅接受匹配版本的胶卷，未来新配方需匹配固件。固件与资源包使用同一份渲染合同。
 胶卷效果作用于保存的静态 JPEG，实时取景和机内 RAW 再开发沿用原厂流程。异常时间只跳过日期水印。
 离线验证通过，GR IV 刷入、菜单、拍摄和 SD 换卷仍需真机验收。\n`;}
 export function gr4WorkbenchHtml(shared){return shared.replaceAll('GR III／GR IIIx','GR IV').replace('GR III / GR IIIx','GR IV').replaceAll('GR III / GR IIIx','GR IV').replace('支持 GR III 与 GR IIIx · 导入后自动识别机型','支持 GR IV · 官方固件身份核验').replace('<option value="gr3">GR III · Street 2.10</option><option value="gr3x">GR IIIx · 1.60</option>','<option value="gr4">GR IV · 1.11</option>').replaceAll('/gr3/sd-library.html','/gr4/sd-library.html').replace('<a href="/gr4/">GR IV</a>','<a href="/gr4/reference/">GR IV 参考工具</a>');}
 
-export function gr4SdLibraryHtml(shared){return shared.replaceAll('47','46').replaceAll('/gr3/','/gr4/').replace('/gr4/styles.css','/gr3/styles.css').replace('GR III / GR IIIx · SD 胶卷库','GR IV · SD 胶卷库').replace(/<p data-sd-model-scope>[\s\S]*?<\/p>/,'<p data-sd-model-scope>配套 GR IV 1.11 的 M10V 固件使用。菜单、SD 换卷和时间水印仍待实机验证。</p>');}
+export function gr4SdLibraryHtml(shared){
+ return shared.replaceAll('/gr3/','/gr4/').replace('/gr4/styles.css','/gr3/styles.css')
+  .replace('GR III / GR IIIx · 胶卷库','GR IV · 胶卷库')
+  .replace('选择胶卷并下载资源包，在机内管理最多十款已选胶卷。','选择胶卷并下载资源包，在机内管理五个胶卷位置。')
+  .replace(/<p data-sd-model-scope>[\s\S]*?<\/p>/,'<p data-sd-model-scope>配套 GR IV 1.11 的 M10V 固件使用。更新固件后重新下载匹配资源。</p>')
+  .replace(/<p data-sd-color-scope>[\s\S]*?<\/p>/,'<p data-sd-color-scope>胶卷效果仅作用于静态 JPEG，实时取景与机内 RAW 再开发保留原厂流程。当前未开放自定义 LUT，菜单与成像仍待实机验证。</p>')
+  .replace('<section class="sd-custom"','<section hidden class="sd-custom"')
+  .replace(/<a href="\/gr4\/fit.html">[\s\S]*?<\/a>/,'')
+  .replace(/<section class="sd-guide"[\s\S]*?<\/section>/,"<section class=\"sd-guide\" aria-labelledby=\"guide-heading\"><h2 id=\"guide-heading\">安装方法</h2><ol><li>解压胶卷包，将 <code>SD/M10V</code> 文件夹复制到 SD 卡根目录，与 <code>DCIM</code> 并列。更新时只替换 <code>FILMS.M10</code>，保留其他设置文件。</li><li>机内进入 <strong>MENU → 设置 → 胶卷库</strong>，选择五个位置中的一个，再从卡上选择胶卷，按 OK 装入。</li><li>MENU 返回上一级。装入成功后设置会保存；文件损坏或不兼容时保持原槽。</li></ol><p>GR IV 最多五个活动胶卷位置。胶卷效果作用于静态 JPEG，取景与机内 RAW 再开发沿用原厂流程。</p><p>时间水印：MENU → 设置 → 时间水印，调整日期、时间、格式、位置和颜色，OK 保存、MENU 取消。当前不提供胶卷名称印字。</p><p>GR IV 的刷入、菜单、拍摄与换卷仍待实机验证。</p></section>");
+}

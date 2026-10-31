@@ -5,10 +5,10 @@ import { readFile } from 'node:fs/promises';
 test('product home exposes GR IV native workbench and GR II inspection with truthful limits', async () => {
   const html = await readFile(new URL('../web/index.html', import.meta.url), 'utf8');
   assert.match(html, /href="\/gr3\/"/);
-  assert.match(html, /class="camera-card gr-family"/);
+  assert.match(html, /class="camera-entry primary-entry"/);
   assert.match(html,/href="\/gr4\/"/);
   assert.match(html,/href="\/gr2\/"/);
-  assert.match(html,/只读检查/);
+  assert.match(html,/实验固件构建/);
   assert.match(html,/原生胶卷工作台/);
   assert.match(html,/固件 1.11 · 待实机验证/);
   assert.match(html, /选择相机型号/);
@@ -109,7 +109,7 @@ test('HDF entry is independent of film and preserves the simplified workbench',a
 
 test('HDF-only feature cannot be removed until film is enabled',async()=>{
  const app=await readFile(new URL('../web/gr3/studio.js',import.meta.url),'utf8');
- const guard=app.slice(app.indexOf("if(id==='digitalHdf'&&active&&!state.features.has('film'))"),app.indexOf("active?state.features.delete(id):state.features.add(id)",app.indexOf("if(id==='digitalHdf'&&active&&!state.features.has('film'))")));
+ const guard=app.slice(app.indexOf("if(id==='digitalHdf'&&active&&!state.features.has('film'))"),app.indexOf("state.features=updateWorkbenchFeature(",app.indexOf("if(id==='digitalHdf'&&active&&!state.features.has('film'))")));
  const {default:vm}=await import('node:vm');
  for(const [features,blocked] of [[['digitalHdf'],true],[['digitalHdf','film'],false]]){
   let message='';const context=vm.createContext({id:'digitalHdf',active:true,state:{features:new Set(features)},notice:value=>{message=value;}});

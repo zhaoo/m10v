@@ -1142,5 +1142,49 @@
     "sha256": "b6df64252c4df5af58317fc555dd503c1f18f3f9d8df073f51d90e1fa9f0823b",
     "icon_compact_url": "/gr3/film-icons/317.png?v=b6df64252c4d",
     "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 318,
+    "name": "2383",
+    "title": "KODAK",
+    "code": "2383",
+    "color": "#b08a48",
+    "icon_url": "/gr3/film-icons/318-large.png?v=9e6fb0564231",
+    "sha256": "8d1bb57a465d5a1c9e04d783bda1a5c62ec90f4b8ff04c217f59ec657575b266",
+    "icon_compact_url": "/gr3/film-icons/318.png?v=8d1bb57a465d",
+    "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 319,
+    "name": "Classic Negative",
+    "title": "CLASSIC",
+    "code": "NEG",
+    "color": "#6b7869",
+    "icon_url": "/gr3/film-icons/319-large.png?v=180c9cc46b32",
+    "sha256": "044d91bebfa171e0c17aa10f23ed07037ea111e708c0b85f6b77eaf50d7ef55e",
+    "icon_compact_url": "/gr3/film-icons/319.png?v=044d91bebfa1",
+    "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 320,
+    "name": "Classic Chrome",
+    "title": "CLASSIC",
+    "code": "CHR",
+    "color": "#607d88",
+    "icon_url": "/gr3/film-icons/320-large.png?v=216e4ca47c0f",
+    "sha256": "9ca01c527319808a676731ea0d2f9dd26cfcc97b0b4a5f19daa0d9d51d43f713",
+    "icon_compact_url": "/gr3/film-icons/320.png?v=9ca01c527319",
+    "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 321,
+    "name": "LomoChrome Purple",
+    "title": "PURPLE",
+    "code": "100-400",
+    "color": "#985cb1",
+    "icon_url": "/gr3/film-icons/321-large.png?v=b8a174fbabdd",
+    "sha256": "99ab98ac640fdc5833656e5da027234e6721fe1a5befc38932a3c185fc681385",
+    "icon_compact_url": "/gr3/film-icons/321.png?v=99ab98ac640f",
+    "artwork_revision": "classic-square-v1"
   }
 ]

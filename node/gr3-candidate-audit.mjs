@@ -1,6 +1,6 @@
 import {MAX_NATIVE_RTOS_GROWTH} from './gr3-native-budget.mjs';
 import { createHash } from 'node:crypto';
-import { inspectOfficial } from './firmware.mjs';
+import { inspectFirmwareImport as inspectOfficial } from './firmware.mjs';
 import { decodeFrameMap, sum32 } from './gr3-frames.mjs';
 
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');

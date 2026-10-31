@@ -5,15 +5,18 @@ export function navigationItems(pathname = '/') {
   const sd = /\/sd-library(?:\.html)?\/?$/.test(path);
   return [
     ['gr3', '/gr3/', 'GR III / IIIx'], ['gr4', '/gr4/', 'GR IV'],
-    ['gr2', '/gr2/', 'GR II'], ['sd', path.startsWith('/gr2') ? '/gr2/#sd' : `/${model}/sd-library.html`, 'SD 胶卷'],
-    ['test-packages', '/test-packages/', '测试包'], ['guide', '/guide/', '说明'], ['changelog', '/changelog/', '更新日志'], ['support', '/support/', '打赏'],
+    ['gr2', '/gr2/', 'GR II'], ['sd', path.startsWith('/gr2') ? '/gr2/#sd' : `/${model}/sd-library.html`, '胶卷库'],
+    ['guide', '/guide/', '说明'], ['changelog', '/changelog/', '更新日志'], ['support', '/support/', '打赏'],
   ].map(([id, href, label]) => ({id, href, label, active: id === 'sd' ? sd : !sd && (id === 'gr3' ? path.startsWith('/gr3') : id === 'gr4' ? path.startsWith('/gr4') : id === 'gr2' ? path.startsWith('/gr2') : path.startsWith(`/${id}`))}));
 }
 export function renderNavigation(pathname = '/') {
   const items=navigationItems(pathname),models=items.slice(0,3);
-  const current=models.find(item=>pathname.startsWith(`/${item.id}`))||models[0];
-  const link=item=>`<a href="${item.href}"${item.active ? ' class="current" aria-current="page"' : ''}>${item.label}${item.id==='gr4'||item.id==='gr2'?'<small class="model-progress">进行中</small>':''}</a>`;
-  return `<nav class="site-navigation" aria-label="主导航"><details class="model-menu"><summary aria-label="切换机型">${current.label}<span aria-hidden="true">⌄</span></summary><div class="model-menu-options">${models.map(link).join('')}</div></details><div class="navigation-links">${items.slice(3).map(link).join('')}<a class="navigation-github" href="https://github.com/zhaoo/m10v" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目，新窗口打开">GitHub ↗</a></div></nav>`;
+  const current=models.find(item=>pathname.startsWith(`/${item.id}`));
+  const link=item=>`<a href="${item.href}"${item.active ? ' class="current" aria-current="page"' : ''}>${item.label}</a>`;
+  const descriptions={gr3:'胶卷与影像方案',gr4:'独立工作台 · 待实机验证',gr2:'固件检查与适配'};
+  const codes={gr3:'III',gr4:'IV',gr2:'II'};
+  const modelLink=item=>`<a class="model-choice${item.active?' current':''}" href="${item.href}"${item.active?' aria-current="page"':''}><span class="model-choice-icon" aria-hidden="true">${codes[item.id]}<i></i></span><span class="model-choice-copy"><b>${item.label}</b><small>${descriptions[item.id]}</small></span><span class="model-choice-state">${item.active?'<span class="model-check" aria-hidden="true">✓</span>':item.id==='gr3'?'<span aria-hidden="true">↗</span>':'<small class="model-progress">进行中</small>'}</span></a>`;
+  return `<nav class="site-navigation" aria-label="主导航"><details class="model-menu"><summary aria-label="切换机型"><span class="model-summary-label">${current?.label||'选择机型'}</span><span class="model-chevron" aria-hidden="true"></span></summary><div class="model-menu-options"><div class="model-menu-heading"><span>相机工作台</span><span>RICOH GR</span></div>${models.map(modelLink).join('')}</div></details><div class="navigation-links">${items.slice(3).map(link).join('')}<a class="navigation-github" href="https://github.com/zhaoo/m10v" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目，新窗口打开">GitHub ↗</a></div></nav>`;
 }
 export function mountNavigation() {
   if(!document.querySelector('link[data-workbench-theme]')){
@@ -36,7 +39,14 @@ export function mountNavigation() {
   if (menu) header.append(menu);
   const modelMenu=header.querySelector('.model-menu');
   document.addEventListener('click',event=>{if(!modelMenu.contains(event.target))modelMenu.open=false;});
-  modelMenu.addEventListener('keydown',event=>{if(event.key==='Escape'){modelMenu.open=false;modelMenu.querySelector('summary').focus();}});
+  modelMenu.addEventListener('keydown',event=>{
+    const summary=modelMenu.querySelector('summary'),choices=[...modelMenu.querySelectorAll('.model-choice')];
+    if(event.key==='Escape'){event.preventDefault();modelMenu.open=false;summary.focus();return;}
+    if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
+    event.preventDefault();const index=choices.indexOf(document.activeElement),wasOpen=modelMenu.open;modelMenu.open=true;
+    const next=event.key==='Home'?0:event.key==='End'?choices.length-1:!wasOpen||index<0?(event.key==='ArrowUp'?choices.length-1:0):(index+(event.key==='ArrowDown'?1:-1)+choices.length)%choices.length;
+    choices[next].focus();
+  });
 }
 function mountSupport(trigger) {
   trigger.setAttribute('aria-haspopup','dialog');

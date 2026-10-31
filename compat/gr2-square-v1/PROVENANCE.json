@@ -1,0 +1,15 @@
+{
+  "revision": "a901016cd4f1ebfe917dbe195d2c5711af9309a1",
+  "reason": "Freeze the existing GR II square-card artwork independently from later GR III native-only looks; preserve the existing GR II runtime hash and five-slot recipe ABI.",
+  "normalization": "Add an EOF newline to m10v_film_card_data.h; all C tokens and other file bytes are unchanged.",
+  "upstream_files": {
+    "native/gr3/m10v_film_card.c": "645a2a3706bee5a21ce259d27c6126857a6a8acf76042f98d4eebb519973fb04",
+    "native/gr3/m10v_film_card.h": "58cce65c4abcd9a1fa294ef65e0aa0488880490f69ec95fd9727b459e5d9845d",
+    "native/gr3/m10v_film_card_data.h": "ad29a2407e76159cd804b23f48ad9940ece9af2aeebef0e272c78e230abe9dab"
+  },
+  "files": {
+    "native/gr3/m10v_film_card.c": "645a2a3706bee5a21ce259d27c6126857a6a8acf76042f98d4eebb519973fb04",
+    "native/gr3/m10v_film_card.h": "58cce65c4abcd9a1fa294ef65e0aa0488880490f69ec95fd9727b459e5d9845d",
+    "native/gr3/m10v_film_card_data.h": "733f56bd3898402f43c2171d5eda67fd912eef32c71fc22877778288f885eef8"
+  }
+}

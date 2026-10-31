@@ -9,7 +9,7 @@ import {defaultConfiguration} from '../web/gr3/native-library-state.mjs';
 import {preSquareArtRecord} from './test-support/pre-square-records.mjs';
 test('Instax appends identity 317 under creative and serializes an ISP builtin',()=>{
  const group=FILM_GROUPS.find(g=>g.name==='创意');
- assert.deepEqual(group.films.at(-1),{id:317,name:'Instax Color'});
+ assert.deepEqual(group.films.slice(-3),[{id:316,name:'LomoChrome Turquoise'},{id:317,name:'Instax Color'},{id:321,name:'LomoChrome Purple'}]);
  const stocks=JSON.parse(readFileSync(new URL('../web/gr3/extra-films-luts.json',import.meta.url))).stocks;
  assert.deepEqual(stocks.map(s=>s.id),[314,315,316,317]);
  const f=stocks.at(-1);assert.equal(f.iso,800);assert.equal(f.camera_calibrated,false);
@@ -19,7 +19,7 @@ test('Instax appends identity 317 under creative and serializes an ISP builtin',
  assert.deepEqual(auditSdFilmPack(buildSdFilmPack([317])).ids,[317]);
 });
 test('all 46 prior display identities and group order stay unchanged',()=>{
- const previous=FILM_GROUPS.flatMap(g=>g.films.filter(f=>f.id!==317).map(f=>[g.name,f.id,f.name]));
+ const previous=FILM_GROUPS.flatMap(g=>g.films.filter(f=>f.id!==317&&f.id<318).map(f=>[g.name,f.id,f.name]));
  assert.equal(createHash('sha256').update(JSON.stringify(previous)).digest('hex'),'f7120c7e0bc7f5cbfc5a58d5f924a971aed0e94a73494f0cab9eeaeffdc3c4bc');
 });
 test('browser Instax preview uses the quantized camera target and preserves alpha',async()=>{

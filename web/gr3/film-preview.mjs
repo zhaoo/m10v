@@ -71,10 +71,14 @@ function previewRgbLutPixels(source,lut,table){
   }
   return output;
 }
-let animeE6TablesPromise,c41TablesPromise,extraFilmsTablesPromise;
+let animeE6TablesPromise,c41TablesPromise,extraFilmsTablesPromise,fourLooksTablesPromise;
 let harmanTablesPromise,curatedTablesPromise,newstocksTablesPromise,styleFiltersTablesPromise,spectralTablesPromise,d76TablesPromise;
 export async function renderPreviewPixels(source, look, width, height) {
   const film=look.film??look.id;
+  if(Number.isInteger(film)&&film>=318&&film<=321){
+    fourLooksTablesPromise??=fetch(new URL('./four-looks-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('Film LUT unavailable');return r.json();}).catch(e=>{fourLooksTablesPromise=undefined;throw e;});
+    const lut=await fourLooksTablesPromise;return previewRgbLutPixels(source,lut,lut.stocks.find(s=>s.id===film)?.native_values);
+  }
   if(Number.isInteger(film)&&film>=314&&film<=317){
     extraFilmsTablesPromise??=fetch(new URL('./extra-films-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('Film LUT unavailable');return r.json();}).catch(e=>{extraFilmsTablesPromise=undefined;throw e;});
     const lut=await extraFilmsTablesPromise;return previewRgbLutPixels(source,lut,lut.stocks.find(s=>s.id===film)?.native_values);

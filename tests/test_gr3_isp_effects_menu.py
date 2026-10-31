@@ -23,12 +23,13 @@ class EffectsMenuTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
   cls.tmp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.tmp.cleanup);p=Path(cls.tmp.name)
-  source=ROOT/'native/gr3/m10v_hdf_menu.c';obj=p/'menu.o';elf=p/'menu.elf';link=p/'link.ld'
+  source=ROOT/'native/gr3/m10v_hdf_menu.c';obj=p/'menu.o';stateobj=p/'state.o';elf=p/'menu.elf';link=p/'link.ld'
   cls.flags=[*FLAGS,'-DM10V_PURE_ISP_EFFECTS=1','-DM10V_BORDER_ENABLED=1','-DM10V_HDF_ENABLED=1','-DM10V_HDF_OWNER_OFFSET=0x13bc','-DM10V_BORDER_CACHE_OWNER_OFFSET=0x1564','-DM10V_ISP_EFFECT_CACHE_OWNER_OFFSET=0x15bc']
   cls.flags.append('-DM10V_DEBUG_MODE=1')
   subprocess.run([shutil.which('clang'),*cls.flags,'-c',str(source),'-o',str(obj)],check=True,capture_output=True)
+  subprocess.run([shutil.which('clang'),*FLAGS,'-c',str(ROOT/'native/gr3/m10v_isp_effects_state.c'),'-o',str(stateobj)],check=True,capture_output=True)
   link.write_text('\n'.join(f'{n} = {v};' for n,v in STUBS.items())+'\nSECTIONS { . = 0x54110000; .text : { *(.text*) } .rodata : { *(.rodata*) } /DISCARD/ : { *(.ARM.exidx*) *(.ARM.extab*) *(.comment*) *(.note*) } }')
-  subprocess.run([shutil.which('ld.lld'),'-T',str(link),'--entry=m10v_hdf_menu_key',str(obj),'-o',str(elf)],check=True,capture_output=True)
+  subprocess.run([shutil.which('ld.lld'),'-T',str(link),'--entry=m10v_hdf_menu_key',str(obj),str(stateobj),'-o',str(elf)],check=True,capture_output=True)
   b=elf.read_bytes();sh=struct.unpack_from('<I',b,32)[0];count=struct.unpack_from('<H',b,48)[0]
   rows=[struct.unpack_from('<10I',b,sh+40*i) for i in range(count)];image=bytearray();symbols={}
   for r in rows:
@@ -76,10 +77,26 @@ class EffectsMenuTests(unittest.TestCase):
   self.key(0xd8)
  def test_root_five_entries_scroll_without_persisting(self):
   self.ready();self.call('m10v_hdf_menu_enter',self.page,0,0)
-  self.assertEqual(self.rows(),[1141,1155,1159,1160])
+  self.assertEqual(self.rows(),[1141,1155,1163,1164])
   for _ in range(4):self.key(0xd1)
-  self.assertEqual(self.rows(),[1155,1159,1160,1161]);self.assertEqual(self.get(self.page+0x1a4),4)
+  self.assertEqual(self.rows(),[1155,1163,1164,1165]);self.assertEqual(self.get(self.page+0x1a4),4)
   self.assertEqual(self.saved_settings,[])
+ def test_switch_is_outer_row_and_strength_choices_never_contain_off(self):
+  self.ready();self.child(2)
+  self.assertEqual(self.rows(),[1184,1166,1167,1168])
+  self.key(0xd8);self.assertEqual(self.rows()[:2],[972,1185])
+  self.key(0xda);self.key(0xd1);self.key(0xd8)
+  self.assertEqual(self.rows()[:3],[973,974,975])
+ def test_disable_edit_strength_then_enable_restores_preference_without_other_changes(self):
+  self.settings=[3,1,2,4,1,2,1,0]
+  self.ready();self.child(2);self.key(0xd8);self.key(0xd0);self.key(0xd8)
+  self.assertEqual(self.settings[0],0)
+  self.key(0xd1);self.key(0xd8)
+  self.assertEqual(self.get(self.page+0x180),2)
+  self.key(0xd0);self.key(0xd0);self.key(0xd8)
+  self.assertEqual(self.settings[0],0)
+  self.key(0xd0);self.key(0xd8);self.key(0xd1);self.key(0xd8)
+  self.assertEqual(self.settings[:7],[1,1,2,4,1,2,1])
  def test_diagnostics_expose_entry_navigation_and_refresh_rejection(self):
   self.ready();self.call('m10v_hdf_menu_enter',self.page,0,0);self.key(0xd1)
   self.assertIn(33,[r[0] for r in self.traces]);self.assertIn(35,[r[0] for r in self.traces])
@@ -96,21 +113,22 @@ class EffectsMenuTests(unittest.TestCase):
   self.call('m10v_hdf_menu_factory',self.owner,0x0200f102)
   self.assertEqual(self.traces,[])
  def test_all_parameter_fields_round_trip(self):
-  for child,fields in ((2,((0,3),(1,2),(2,2))),(3,((3,4),(4,2))),(4,((5,3),(6,2)))):
+  for child,fields in ((2,((0,2,3),(1,2,2),(2,2,2))),(3,((3,3,4),(4,2,2))),(4,((5,2,3),(6,2,2)))):
    self.setUp();self.ready();self.child(child)
-   for index,(field,maximum) in enumerate(fields):
-    if index:self.key(0xd1)
+   self.key(0xd8);self.key(0xd1);self.key(0xd8)
+   for index,(field,maximum,stored) in enumerate(fields):
+    self.key(0xd1)
     self.key(0xd8)
     for _ in range(maximum+2):self.key(0xd1)
     self.assertEqual(self.get(self.page+0x180),maximum)
-    self.key(0xd8);self.assertEqual(self.settings[field],maximum)
+    self.key(0xd8);self.assertEqual(self.settings[field],stored)
     self.assertEqual(self.get(self.page+0x18c),2)
-   self.assertEqual(len(self.saved_settings),len(fields))
- def test_grain_five_choices_scroll_and_cancel_never_writes(self):
-  self.ready();self.child(3);self.key(0xd8)
-  self.assertEqual(self.rows(),[1167,972,973,974])
+   self.assertEqual(len(self.saved_settings),len(fields)+1)
+ def test_grain_four_strength_choices_exclude_off_and_cancel_never_writes(self):
+  self.ready();self.child(3);self.key(0xd1);self.key(0xd8)
+  self.assertEqual(self.rows(),[1171,973,974,975])
   for _ in range(4):self.key(0xd1)
-  self.assertEqual(self.rows(),[972,973,974,975])
+  self.assertEqual(self.get(self.page+0x180),3)
   self.key(0xda);self.assertEqual(self.saved_settings,[]);self.assertEqual(self.settings[3],0)
   self.assertEqual(self.get(self.page+0x18c),2)
  def test_failed_save_stays_open_reconciles_and_shows_error(self):
@@ -120,7 +138,7 @@ class EffectsMenuTests(unittest.TestCase):
   self.assertEqual(self.closed,[])
  def test_resources_have_all_stable_ids(self):
   words=json.loads((ROOT/'native/gr3/m10v_isp_effects_resources.json').read_text())
-  self.assertEqual(len(words),21);self.assertEqual((words[0],words[-1]),('漏光','大'))
+  self.assertEqual(len(words),23);self.assertEqual((words[0],words[-2],words[-1]),('漏光','开关','开启'))
  def test_hdf_border_remain_independent_children(self):
   self.ready();self.child(0);self.key(0xd1);self.key(0xd8)
   self.assertEqual(self.hdf_saved,[1]);self.assertEqual(self.get(self.page+0x18c),1)

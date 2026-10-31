@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';import{read
 import{nativeCatalog,prepareNative,readNativeOfficial,initialState}from'./gr3-native-library.mjs';import{FILM_GROUPS}from'./gr3-film-directory.mjs';import{defaultConfiguration}from'../web/gr3/native-library-state.mjs';import{buildSdFilmPack,auditSdFilmPack}from'./gr3-sd-film-pack.mjs';
 test('new monochrome and experimental films have correct groups and stable IDs',async()=>{
  const c=await nativeCatalog();for(const [id,name,group]of[[314,'ACROS II 100','黑白'],[315,'Double-X 5222','黑白'],[316,'LomoChrome Turquoise','创意']]){const f=c.films.find(f=>f.id===id);assert.equal(f?.name,name);assert.equal(f.group,group);assert.equal(f.camera_calibrated,false);}
- assert.ok(!FILM_GROUPS.some(g=>g.name==='D76'));assert.equal(c.film_count,47);
+ assert.ok(!FILM_GROUPS.some(g=>g.name==='D76'));assert.equal(c.film_count,51);
  assert.deepEqual(auditSdFilmPack(buildSdFilmPack([314,315,316])).ids,[314,315,316]);
 });
 test('both model exports serialize the new films and require native ISP',async()=>{

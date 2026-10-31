@@ -14,6 +14,7 @@ if __package__ in (None,''):sys.path.insert(0,str(Path(__file__).resolve().paren
 from scripts.analyze_unity_update import official_profile
 ROOT=Path(__file__).resolve().parents[1]
 COMPAT=ROOT/'compat/gr2-v1'
+SQUARE_COMPAT=ROOT/'compat/gr2-square-v1'
 BASE=0xA0798000
 LIMIT=0xA0800000
 FLAGS=['--target=armeb-none-eabi','-march=armv4t','-marm','-mfloat-abi=soft','-Os','-ffreestanding','-fno-builtin','-fno-stack-protector','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-fno-vectorize','-fno-slp-vectorize','-Wall','-Wextra','-Werror']
@@ -256,8 +257,8 @@ def build_gr2_runtime(official:bytes,configuration:dict,out_dir:Path)->dict:
     for name in ('m10v_library','halation_core','film_5207','film_harman','film_curated','film_newstocks','m10v_sd_library','m10v_settings','m10v_film_card'):
         target=out_dir/(name+'.o')
         initial_flags=['-DM10V_INITIAL_STATE_BYTES='+','.join(map(str,initial_native))] if name=='m10v_library' else []
-        # Recipe/state ABI remains frozen; artwork follows the current square design.
-        source=(ROOT if name=='m10v_film_card' else COMPAT)/f'native/gr3/{name}.c'
+        # Keep the accepted square artwork independent of GR III-only looks.
+        source=(SQUARE_COMPAT if name=='m10v_film_card' else COMPAT)/f'native/gr3/{name}.c'
         subprocess.run([clang,*FLAGS,*initial_flags,'-c',str(source),'-o',str(target)],check=True,capture_output=True)
         render_objects.append(str(target))
     subprocess.run([linker,'-m','armelfb','--no-undefined','-T',str(script),str(obj),str(startup),*render_objects,'-o',str(elf)],check=True,capture_output=True)

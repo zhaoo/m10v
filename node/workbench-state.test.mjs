@@ -45,3 +45,23 @@ test('combined HDF and film drafts retain film and preserve global HDF separatel
  const result=normalizeWorkbenchDraft({profile:'native',features:['film','digitalHdf'],nativeConfiguration:config});
  assert.deepEqual(result.features,['film','digitalHdf']);assert.equal(result.nativeConfiguration.hdf,3);
 });
+
+test('imaging switches survive draft and undo normalization, including border and A/B',()=>{
+ const draft={profile:'native',imagingSchema:1,features:['film','border','abCompare','powerImages'],nativeConfiguration:defaultConfiguration()};
+ assert.deepEqual(normalizeWorkbenchDraft(draft).features,['film','border','abCompare','powerImages']);
+ assert.deepEqual(normalizeWorkbenchDraft().features,['film']);
+});
+
+test('disabled extensions cannot leak retained parameter values into a restored build',()=>{
+ const config=defaultConfiguration();config.hdf=3;config.stamp=2;config.filmNameStamp=true;
+ const restored=normalizeWorkbenchDraft({profile:'native',features:['film'],nativeConfiguration:config});
+ assert.equal(restored.nativeConfiguration.hdf,0);
+ assert.equal(restored.nativeConfiguration.stamp,0);
+ assert.equal(restored.nativeConfiguration.filmNameStamp,false);
+});
+
+test('legacy custom power images remain selected, while a new explicit off switch stays off',()=>{
+ const draft={profile:'native',features:['film'],powerImages:{startup:{jpeg_base64:'saved-image'}}};
+ assert.ok(normalizeWorkbenchDraft(draft).features.includes('powerImages'));
+ assert.ok(!normalizeWorkbenchDraft({...draft,imagingSchema:1}).features.includes('powerImages'));
+});

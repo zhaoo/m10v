@@ -28,6 +28,7 @@ SAVED_STATE=VIEW+164
 SCREEN=SAVED_STATE+104
 
 class ControllerLifetimeTests(unittest.TestCase):
+ ab_enabled=True
  debug=False
  native_host=False
  appended_slots=False
@@ -55,7 +56,7 @@ class ControllerLifetimeTests(unittest.TestCase):
    blobs=[]
    for file,addr in [('m10v_settings.c',STATE),('m10v_settings_controller.c',CODE)]:
     obj=Path(d)/'module.o'
-    subprocess.run([cc,*FLAGS,f'-DM10V_DEBUG_MODE={int(cls.debug)}',f'-DM10V_ADJ_EXIT_TRACE={int(cls.exit_trace)}',f'-DM10V_AB_NATIVE_HOST={int(cls.native_host)}',f'-DM10V_APPENDED_SLOTS={int(cls.appended_slots)}',f'-DM10V_LIVE_COLOR={int(cls.owner_cache)}','-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
+    subprocess.run([cc,*FLAGS,f'-DM10V_AB_ENABLED={int(cls.ab_enabled)}',f'-DM10V_DEBUG_MODE={int(cls.debug)}',f'-DM10V_ADJ_EXIT_TRACE={int(cls.exit_trace)}',f'-DM10V_AB_NATIVE_HOST={int(cls.native_host)}',f'-DM10V_APPENDED_SLOTS={int(cls.appended_slots)}',f'-DM10V_LIVE_COLOR={int(cls.owner_cache)}','-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
     blob,symbols=link_object(obj.read_bytes(),addr,cls.externals,prefix='m10v_settings_controller_' if 'controller' in file else 'm10v_settings_',additional_exports=AB_CONTROLLER_EXPORTS if 'controller' in file else ())
     cls.externals.update(symbols);blobs.append((addr,blob))
    cls.blobs=blobs

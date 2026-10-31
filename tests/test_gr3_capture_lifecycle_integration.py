@@ -14,12 +14,16 @@ class CaptureLifecycleIntegrationTests(unittest.TestCase):
   cls.rom=(ROOT/'builds/gr3-extension-validation/official-rtos.bin').read_bytes()
  def fixture(self):
   u=Uc(UC_ARCH_ARM,UC_MODE_ARM);u.mem_map(0x53000000,0x1200000);u.mem_write(0x53000000,self.rom);u.mem_write(self.manifest['base'],self.code);u.mem_map(0x55000000,0x100000)
-  batches=[];ticks=[123];heap=[0x55020000];owner=self.manifest['capture_lifecycle']['owner']
+  batches=[];ticks=[123];heap=[0x55020000];owner=self.manifest['capture_lifecycle']['owner'];storage=owner['storage']
+  expected=max(storage['trace_offset']+storage['bytes'],storage['color_offset']+storage['color_bytes'],
+   storage['raw_token_offset']+storage['raw_token_bytes'],storage['stamp_offset']+storage['stamp_bytes'],
+   storage['custom_isp_offset']+storage['custom_isp_bytes'])
+  self.assertEqual(storage['extended_recipe_bytes'],expected)
   for p in self.manifest['capture_lifecycle']['patches']:
    self.assertEqual(bytes(u.mem_read(p['address'],4)).hex(),p['expected_hex']);u.mem_write(p['address'],bytes.fromhex(p['replacement_hex']))
   def service(machine,pc,size,data):
    if pc==0x5351091c:
-    self.assertEqual(machine.reg_read(A.UC_ARM_REG_R0),0x50f0);machine.reg_write(A.UC_ARM_REG_R0,heap[0]);heap[0]+=0x6000
+    self.assertEqual(machine.reg_read(A.UC_ARM_REG_R0),expected);machine.reg_write(A.UC_ARM_REG_R0,heap[0]);heap[0]+=0x6000
    elif pc==0x53050b7c:
     machine.mem_write(machine.reg_read(A.UC_ARM_REG_R0),struct.pack('<II',0,ticks[0]));ticks[0]+=10;machine.reg_write(A.UC_ARM_REG_R0,0)
    elif pc==self.manifest['symbols']['m10v_debug_batch']:

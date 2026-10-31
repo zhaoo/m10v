@@ -1,7 +1,7 @@
 // RAW/Bayer NR layout independently checked against GR III 2.10.
 // Reference: gr3-film-mods 04d5d5d raw_nr.py / FINDINGS section 21, MIT.
 import {createHash} from 'node:crypto';
-import {inspectOfficial} from './firmware.mjs';
+import {inspectNativeSource as inspectOfficial} from './gr3-native-source.mjs';
 import {officialResources} from './gr3-stock-presets.mjs';
 import {normalizeRawNr,rawNrThresholds} from '../web/gr3/native-library-state.mjs';
 const need=(v)=>{if(!v)throw new Error('RAW 降噪配置或原厂表无效（仅 GR III 2.10）');};

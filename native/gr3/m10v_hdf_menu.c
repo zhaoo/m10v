@@ -112,24 +112,37 @@ static void style_row(page *p,uint32_t i,uint32_t visible,uint32_t selected){
 }
 #if M10V_PURE_ISP_EFFECTS
 static uint32_t effect_title(uint32_t child){return M10V_ISP_TEXT_LEAK+child-2u;}
-static uint32_t parameter_count(page *p){return p->child==2u?3u:2u;}
+static uint32_t parameter_count(page *p){return p->child==2u?4u:3u;}
 static uint32_t parameter_title(page *p){
- if(!p->parameter_index)return M10V_ISP_TEXT_GAIN;
- if(p->child==2u)return p->parameter_index==1u?M10V_ISP_TEXT_POSITION:M10V_ISP_TEXT_SPREAD;
+ if(!p->parameter_index)return M10V_ISP_TEXT_SWITCH;
+ if(p->parameter_index==1u)return M10V_ISP_TEXT_GAIN;
+ if(p->child==2u)return p->parameter_index==2u?M10V_ISP_TEXT_POSITION:M10V_ISP_TEXT_SPREAD;
  return p->child==3u?M10V_ISP_TEXT_SIZE:M10V_ISP_TEXT_BLUR_RANGE;
 }
 static uint32_t *parameter(page *p){
- uint32_t index=p->child==2u?p->parameter_index:p->child==3u?3u+p->parameter_index:5u+p->parameter_index;
+ uint32_t index=p->child==2u?p->parameter_index-1u:p->child==3u?2u+p->parameter_index:4u+p->parameter_index;
  return ((uint32_t *)&p->editor)+index;
 }
+static uint32_t parameter_value(page *p){
+ uint32_t kind=p->child-2u;
+ if(!p->parameter_index)return m10v_isp_effects_enabled(&p->editor,kind);
+ if(p->parameter_index==1u){uint32_t value=m10v_isp_effects_strength(&p->editor,kind);return kind==1u?(value?value-1u:0u):value-1u;}
+ return *parameter(p);
+}
+static int set_parameter(page *p,uint32_t value){
+ uint32_t kind=p->child-2u;
+ if(!p->parameter_index)return m10v_isp_effects_set_enabled(&p->editor,kind,value);
+ if(p->parameter_index==1u)return m10v_isp_effects_set_strength(&p->editor,kind,kind==1u?(value?value+1u:0u):value+1u);
+ *parameter(p)=value;return 1;
+}
 static uint32_t parameter_max(page *p){
- return p->parameter_index?2u:p->child==3u?4u:3u;
+ return !p->parameter_index?1u:p->parameter_index==1u&&p->child==3u?3u:2u;
 }
 static uint32_t choice_title(page *p,uint32_t value){
- if(p->child==2u&&p->parameter_index)return (p->parameter_index==1u?M10V_ISP_TEXT_LEFT:M10V_ISP_TEXT_NARROW)+value;
- if(p->child==3u)return p->parameter_index?M10V_ISP_TEXT_FINE+value:value?971u+value:M10V_ISP_TEXT_INHERIT;
- if(p->child==4u&&p->parameter_index)return M10V_ISP_TEXT_SMALL+value;
- return 972u+value;
+ if(!p->parameter_index)return value?M10V_ISP_TEXT_ON:972u;
+ if(p->parameter_index==1u)return p->child==3u?(value?972u+value:M10V_ISP_TEXT_INHERIT):973u+value;
+ if(p->child==2u)return (p->parameter_index==2u?M10V_ISP_TEXT_LEFT:M10V_ISP_TEXT_NARROW)+value;
+ return (p->child==3u?M10V_ISP_TEXT_FINE:M10V_ISP_TEXT_SMALL)+value;
 }
 static int effect_snapshot(page *p){return m10v_isp_effects_camera_snapshot(&p->editor,&p->editor_sequence);}
 #endif
@@ -270,7 +283,7 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
  if(p->root==2u){
   if(up){if(p->parameter_index)p->parameter_index--;}
   else if(down){if(p->parameter_index+1u<parameter_count(p))p->parameter_index++;}
-  else if(key==0xd8||key==0xcf||key==0xd3){p->saved=p->value=*parameter(p);p->root=0;p->error=0;}
+  else if(key==0xd8||key==0xcf||key==0xd3){p->saved=p->value=parameter_value(p);p->root=0;p->error=0;}
   else if(back){p->root=1;p->error=0;}else return 0;
   draw(p);return 1;
  }
@@ -279,14 +292,15 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
   else if(up){if(p->value)p->value--;p->error=0;}
   else if(down||key==0xcf||key==0xd3){if(p->value<parameter_max(p))p->value++;p->error=0;}
   else if(key==0xd8){
-   *parameter(p)=p->value;
+   m10v_isp_effects_settings previous=p->editor;
+   if(!set_parameter(p,p->value)){p->error=1;draw(p);return 1;}
    int result=m10v_isp_effects_camera_save(ptr(p)-M10V_HDF_OWNER_OFFSET,&p->editor);
    if(result){
     /* A failed readback may follow a persisted write: refresh journal winner
      * and reconcile editor without publishing the unverified candidate. */
-    *parameter(p)=p->saved;
+    p->editor=previous;
     (void)m10v_isp_effects_camera_refresh(ptr(p)-M10V_HDF_OWNER_OFFSET);
-    if(effect_snapshot(p))p->saved=p->value=*parameter(p);
+    if(effect_snapshot(p))p->saved=p->value=parameter_value(p);
     p->error=1;
    }else {p->saved=p->value;(void)effect_snapshot(p);p->root=2;p->error=0;}
   }else return 0;

@@ -1,189 +1,177 @@
 <div align="center">
 
-![M10V — Your films. Your GR.](docs/previews/readme-hero.svg)
+<img src="web/shared/m10v-logo.png" width="72" alt="M10V">
 
-**你的胶卷，你的 GR。**
+# M10V
 
-面向 **RICOH GR III / GR IIIx / GR IV** 的原生胶卷工作台，并提供 **GR II** 固件检查。
+**Ricoh GR 固件定制工作台**
 
-[更新日志](https://m10v.izhaoo.com/changelog/) · [功能](#功能) · [开始使用](#开始使用) · [名字的故事](#名字的故事) · [开发与验证](#开发与验证) · [致谢](#致谢)
+[打开工作台](https://m10v.izhaoo.com/) · [使用说明](https://m10v.izhaoo.com/guide/) · [胶卷库](https://m10v.izhaoo.com/gr3/sd-library.html) · [更新日志](https://m10v.izhaoo.com/changelog/)
 
 </div>
 
-> **当前状态：待实机验证。** 网页、固件构建与 ARM 执行检查已完成，但修改固件的刷入、启动、菜单显示和成像仍需真实相机验证。刷入可能导致无法启动、数据丢失或设备损坏（变砖），且无法保证恢复。
+![M10V 工作台首页](docs/previews/readme-workbench.png)
 
-## 名字的故事
+选择胶卷、调整本卷参数、搭配影像功能，生成对应相机的固件。**GR III / IIIx 共用一个工作台**，导入官方文件后自动识别机型；GR IV 与 GR II 使用各自的适配。
 
-在 GR III 官方固件内部的 Linux 根文件系统中，`/etc/hostname` 写着四个字符：`m10v`。
-
-拿起 GR 时，我们关注镜头、色彩与快门；沿着固件往里走，还能看见这些体验背后的代码和配置。M10V 沿用了这个小小的内部名字，把它带到界面上，成为选胶卷、调质感、建立自己影像方案的工作台。
-
-**从读懂相机开始，最后回到拍照本身。**
-
-[查看名字来源的固件证据](docs/research/m10v-name-origin.md)
+> **这是非官方修改固件工具。** 刷入可能导致无法启动、数据丢失或设备损坏，且无法保证恢复。离线校验与网页生成成功不代表所有相机、功能组合均已通过实测；各版本的验证范围见[更新日志](https://m10v.izhaoo.com/changelog/)。
 
 ## 功能
 
-| | 你可以做什么 |
+### 胶卷与成像
+
+| 功能 | 用途与使用方式 |
 | --- | --- |
-| **胶卷库** | 46 款可选胶卷共用一个目录，配置五个活动槽位，保留历史胶卷编号 |
-| **新增六款胶卷** | 富士 C200、ProImage 100、T-Max 100、Aerochrome III 1443、Aerocolor IV 2460、VISION3 50D 5203；[资料、拟合误差与模拟边界](docs/research/gr3-six-film-references-2026-10-20.md) |
-| **胶卷图标** | 原创 40×40 胶卷罐图标，网页与固件使用相同像素；800T 为红色 |
-| **颗粒与柔光** | 每槽独立设置关闭、弱、中、强 |
-| **机内胶卷参数** | GR III 在【图像控制】按 FN，各卷可独立调颗粒、柔光、颗粒尺寸与漏光；800T／蓝凤凰另有三项光晕参数，蓝凤凰另有 EI 200／120、HARMAN RED 另有 EI 125／64／250 模拟曝光。参数行使用不同原厂图标和数值，选中后保留中文标题；实机验收待完成 |
-| **突破版本锁** | GR III／GR IIIx 原生导出可选，默认关闭；开启默认只适配 DSP 包头、保留 CPU，不需填写未知版本号。CPU 更高时仍可能被拒绝；高级方式需实际完整 DSP／CPU 版本。尚未验证纪念版机身刷写 |
-| **时间戳** | 日期或日期与时间，可选格式、位置和颜色，使用相机时钟 |
-| **开关机图片** | GR III 2.10 分别上传、裁切预览、恢复默认，随同一固件导出；开机原生资源替换已离线验证，正常开机显示入口尚未闭环，[证据与边界](docs/research/gr3-power-images.md) |
-| **统一工作台** | 导入后自动识别机型，设置方案，确认风险，再保存对应固件 |
-| **配置编辑** | 搜索与分类筛选、五槽同步、草稿、撤销／重做、取消构建 |
+| 胶卷库 | GR III 有 **51 款**、IIIx 有 **47 款胶卷风格**，均为 **6 个分类**，最多启用 **10 款**；原厂预设保留，机内可继续装卷、换卷 |
+| 本卷参数 | 原厂颗粒按胶卷独立设置关闭、弱、中、强；800T、蓝凤凰和 Harman Red 保留各自的光晕或模拟曝光 EI |
+| 自定义 LUT | 导入 sRGB 3D `.cube`，生成配套胶卷包；使用可表达的 ISP 色彩近似，支持 GR III / IIIx |
+| 色调取景 | GR III / IIIx 已接入原生 ISP 胶卷色调；光晕、HDF、边框与印字等效果以静态成片为准 |
 
-![M10V 胶卷图标目录](docs/previews/m10v-film-icons.png)
+### 影像方案
 
-### 支持机型
+**除胶卷库外，新方案的扩展功能默认关闭。** 所有开关集中在「影像方案」，开启后展开对应设置；已有草稿保留上次选择。
 
-| 机型 | 当前官方核验样本 | 导出文件 |
+| 功能 | 用途 |
+| --- | --- |
+| 光晕 | 高光溢出或横向拉丝，机内按胶卷调节模式、强度、范围与阈值 |
+| HDF 模拟 | 独立数字柔焦，可单独使用或与胶卷库组合，不随换卷重置 |
+| 边框 | 拍立得或 135 胶卷边框，向外扩展画布并保留完整构图 |
+| 时间与名称水印 | 日期、时间、胶卷名称，以及格式、四角位置和颜色 |
+| 画幅比例 | GR III / IIIx 增加 4:3、16:9、6x7、XPan 与取景蒙版；GR IV 为 65:24 |
+| Half 半格双拍 | GR III 连拍两张组成双画面，带黑色中央分隔条，保留首张原图 |
+| 两档裁切焦距 | GR III：28–50 mm；IIIx：40–71 mm，按 1 mm 调整；可选择在本次更新写入预设 |
+| 原厂负片颗粒 | 为原厂负片风格开放颗粒调节 |
+| RAW 降噪 | 使用原厂策略、关闭降噪，或设置开始降噪的 ISO |
+| 滑轨水平仪 | 显示左右倾斜与前后俯仰 |
+| A/B 快切 | 在两种原厂风格或胶卷之间切换；机内设置配对，取景中短按 DISP 切换 |
+| 开关机画面 | 上传图片、调整裁切并应用；关闭时保留图片草稿，导出使用原厂画面 |
+| 高级设置 | 可选诊断日志；GR IIIx 保留独立的单包版本适配选项 |
+
+上表是功能总览，**并非每款机型均支持全部功能**。工作台会禁用不支持的选项；具体范围与操作入口见[完整说明](https://m10v.izhaoo.com/guide/#features)。
+
+## 机型与状态
+
+| 机型 | 工作台能力 | 构建基线 / 文件 |
 | --- | --- | --- |
-| **GR III** | Street Edition 2.10 | `fwdc239b.bin` |
-| **GR IIIx** | 1.60 | `fwdc243b.bin` |
-| **GR IV** | 1.11（内部 1.11.10.7）；原生五槽胶卷库与配方工具，等待实机验收 | `fwdc248b.bin` |
-| **GR II** | 3.00；组件、资源与原样往返只读检查 | 修改导出未开放 |
+| **GR III** | 原生 ISP 胶卷、最多十款已选胶卷、机内参数、SD 换卷及影像扩展；部分功能已有用户实测反馈 | Street Edition 2.10 / `fwdc239b.bin` |
+| **GR IIIx** | 与 III 共用胶卷与主要影像能力，保留本机身份、CPU 与镜头范围；设备验证范围单独记录 | 1.60 / `fwdc243b.bin` |
+| **GR IV** | 独立原生适配，五个胶卷位置、静态 JPEG 胶卷与时间水印；具体目录和扩展按工作台显示，仍待实机验证 | 1.11 / `fwdc248b.bin` |
+| **GR II** | 五槽胶卷、水印、HDF 设置与实验固件构建；完整启动与拍摄仍待实机验证，另有[只读检查入口](https://m10v.izhaoo.com/gr2/inspect/) | 3.00 / `rg2_v003.frm` |
 
-GR III／GR IIIx 工作台支持配方参数、原厂名称与图标、负片颗粒、RAW 降噪、画幅比例和水平仪等工具；GR IV 同步提供五槽胶卷、SD 换卷、时间戳、六位置配方、20原厂名称/图标、65:24、水平仪及RAW降噪工具。工作台按机型显示可用状态。
+导入版本与构建基线可能不同，请以工作台核验结果为准。GR IV 的[原厂参数参考工具](https://m10v.izhaoo.com/gr4/reference/)单独保留。
 
-GR IV 的 `/gr4/` 使用共享工作台与独立原生ABI，复用GR3颜色算法和46款当前胶卷；原厂参考编辑器保留在 `/gr4/reference/`。实现通过原始ARM、完整封包及网页下载验证，GR4刷入和成像仍待实机验收。[功能对照与验证](docs/research/gr4-native-m10v-parity-2026-10-18.md)。GR II 已解析嵌套 UNITY 容器和 121 项资源，更新加权校验已通过原厂 CPU 与完整组件对照，加载链和原生接口仍在逆向。[校验与加载进展](docs/research/gr2-checksum-loader-2026-10-20.md)。[查看两款机型的逆向证据](docs/research/gr4-gr2-port-evidence.md)。
+## 使用流程
 
-### 使用边界
+### 1. 导入官方固件
 
-- 胶卷效果处理保存的静态 **JPEG**。取景采用 Standard 原色，不模拟胶卷色彩；机内 RAW 再开发暂未接入；RAW 原始像素受保护，DNG 内嵌 JPEG 预览需单独验收。
-- 五个胶卷承载槽的静态成像色彩配置统一采用 Standard 基底，避免与 Vivid／Bleach Bypass／Retro／HDR／Cross 的原厂色彩叠加；静态胶卷处理已获实拍确认；取景统一采用 Standard 原色，新优化待实机验收。
-- 目录含 33 套 M10V 风格和 32 套已有模拟预设，不保证与其他实现的成像逐像素一致。
-- 首次没有有效 M10V 记录时使用网页配置；已有机内记录优先，网页配置不会自动覆盖已有机内设置。
-- 原厂工具方案与原生胶卷库方案分开构建；切换方案会保留草稿，暂不叠加两套运行区。
-- 胶卷库随固件内置，无需 `FILMS.GRF`、授权码或外部图片文件。
+在[工作台](https://m10v.izhaoo.com/)选择机型，上传对应的官方文件，或使用提供的官方样本。确认上传版本、输出基线，并保留官方原包与个人数据备份。
 
-## 开始使用
+### 2. 设置胶卷与功能
 
-### 1. 准备环境
+- 在「胶卷设置」选卷，调整当前胶卷的参数。
+- 在「影像方案」开启所需扩展；开关机图片也在此处展开编辑。
+- 草稿保存在当前浏览器，支持撤销、重做；修改方案会使旧预检失效。
 
-需要 **Node.js ≥ 20、Python 3 和 LLVM clang**。Node 服务使用内置模块，无需 `npm install`。
+### 3. 保存固件与胶卷库
+
+核对方案并阅读风险提示，生成后下载固件及配置记录。启用胶卷库时，下载配套胶卷包，将解压得到的 `SD/M10V` 文件夹放入卡根目录，与 `DCIM` 并列，再按相机官方更新流程安装。
+
+**更新胶卷资源时，只替换 `FILMS.M10`，保留其他设置文件。** 已有机内 M10V 记录优先，网页初始配置不会自动覆盖全部机内设置；焦距的一次性写入有单独开关。
+
+### 成像边界
+
+- 胶卷效果主要作用于保存的 JPEG，机内 RAW 再开发仍沿用原厂流程。
+- RAW 降噪是独立扩展，会调整写入 DNG 前的 Bayer 降噪；不等同于 JPEG 降噪或胶卷颗粒。
+- 自定义 LUT、Charmera、像素化风格和部分胶卷模拟有各自的近似与性能边界，不保证与实片或其他实现逐像素一致。
+- 工作台只生成文件，不自动刷写相机。各机型与候选的实测结果不能互相代替。
+
+## 本地运行
+
+推荐 Node.js 24；最低要求 **Node.js 20、Python 3、LLVM clang 与 LLD**。Node 服务使用内置模块，无需安装 npm 依赖。
 
 ```bash
 git clone https://github.com/zhaoo/m10v.git
 cd m10v
-git switch develop
 python3 -m venv .venv
+.venv/bin/python -m pip install pillow numpy capstone unicorn
 ```
 
-macOS 可通过 Homebrew 安装 LLVM：
+macOS 安装工具链：
 
 ```bash
-brew install llvm
+brew install llvm lld
 ```
 
-开关机图片的预览与压缩需要 Pillow：`.venv/bin/python -m pip install pillow`。
-
-GR IV 参考编辑器还需要 LLD：`brew install lld`。导入后可在设置中查看编译、链接和 ARM ELF 预检结果。
-
-构建器会查找 Homebrew 的 LLVM；其他安装位置可用 `M10V_LLVM_CLANG` 指定 **clang 的完整路径**。
-
-### 2. 放入官方固件
-
-官方固件不随仓库分发。自行准备与当前核验样本完全匹配的官方文件：
+自行准备官方固件，文件不随仓库分发：
 
 ```text
 bin/
 ├── fwdc239b-gr3-official.bin       # GR III Street Edition 2.10
 ├── fwdc243b-gr3x-official.bin      # GR IIIx 1.60
-├── fwdc248b-gr4-officical.bin      # GR IV 1.11，保留现有本地文件名
-├── rg2_v003.frm                   # GR II 3.00
-└── rg1_v051.frm                   # GR 5.01（逆向研究输入）
+├── fwdc248b-gr4-officical.bin      # GR IV 1.11，沿用现有文件名
+└── rg2_v003.frm                   # GR II 3.00
 ```
 
-部分历史测试仍读取根目录别名，可创建符号链接：
+```bash
+npm start
+```
+
+打开终端显示的地址。macOS 也可双击 `start.command`。服务默认只监听本机；服务器部署使用 `M10V_PORT` 和 `M10V_PUBLIC_ORIGIN`，详见[部署说明](deploy/README.md)。
+
+<details>
+<summary><strong>可选运行时与开发环境</strong></summary>
+
+部分原厂工具组合需要锁定的兼容运行时：
+
+```bash
+node scripts/sync-grlife-runtime.mjs --current
+```
+
+该路径推荐 Python 3.12，可通过 `M10V_PYTHON` 指定解释器。自定义 LLVM 安装路径用 `M10V_LLVM_CLANG` 指定 clang 完整路径。GR IV 参考核心位于 `vendor/gr4/`，来源与许可见[第三方说明](THIRD_PARTY_NOTICES.md)。
+
+部分历史测试读取根目录别名，可按需建立：
 
 ```bash
 ln -s bin/fwdc239b-gr3-official.bin fwdc239b-offical.bin
 ln -s fwdc239b-offical.bin fwdc239b.bin
 ```
 
-### 3. 打开工作台
-
-```bash
-npm start
-```
-
-按终端显示的地址打开浏览器。macOS 也可双击 `start.command`。
-
-**导入固件 → 设置方案 → 保存固件**
-
-先选槽位，再选胶卷与质感。点击「保存固件」时阅读风险提示，明确确认后才会开始构建。取消或按 Esc 不会生成文件；每次保存都要重新确认。
-
-> 服务器监听 loopback；配置 `M10V_PORT` 和 `M10V_PUBLIC_ORIGIN` 后可通过 Nginx 反向代理。不能只上传静态 web 目录。Ubuntu 24.04 + 宝塔的具体步骤见 [部署指南](deploy/README.md)。
-
-<details>
-<summary><strong>GR III 原厂工具的可选兼容运行时</strong></summary>
-
-原生胶卷库采用本仓库 C/ARM 实现，不依赖外部胶卷包或 GRLife 兼容运行时。部分原厂工具仍使用锁定的兼容运行时，它不纳入源码仓库：
-
-```bash
-node scripts/sync-grlife-runtime.mjs
-```
-
-该路径需要 Python 3.12；可通过 `M10V_PYTHON` 指定解释器。GR IV 参考核心及其 Python 依赖保留在 `vendor/gr4/`。为保持源码仓库轻量，三份大体积 GR IV 校准 DNG 样片留在本机，不随 Git 分发；启用相关校准测试前，需从参考项目恢复，文件名与哈希见 `vendor/gr4/PROVENANCE.json`。各模块来源与许可见 [第三方说明](THIRD_PARTY_NOTICES.md)。
+官方固件、照片样本、`.venv/`、`.runtime/`、`data/` 和 `builds/` 不提交到 Git。GR IV 校准样本的文件名与哈希见 `vendor/gr4/PROVENANCE.json`。
 
 </details>
 
-### GR III 固件桥接
-
-新版 **2.10.33.27** 保持 2.10，只增加第三段。用户提供的 JPG 与 DNG 的 MakerNote `0x0027` 均为 `fd f5 df e4`，逐字节取反得到 DSP **2.10.32.27**，旧版 2.10.22.27 因此低于机内版本。CPU 完整版本未从照片取得。
-
-在工作台下载新版两阶段测试套件，先安装 stage-1-bridge/fwdc239b.bin；明确成功并重启后，换成 stage-2-official/fwdc239b.bin 安装官方 2.10。第一阶段失败时不要继续。新版仅完成离线验证，完整刷写与恢复仍待实机验收；旧版停止使用。机内任一组件高于 2.10.33.27 时仍可能拒绝。
-
 ## 开发与验证
 
-**`develop`** 为日常开发分支，**`main`** 为正式源码分支。分支名不表示固件已通过实机验收。
+`main` 是发布源码分支，`develop` 用于日常开发。分支名和构建成功均不表示固件已通过实机验收。
 
 ```bash
-# JavaScript、API、固件容器和导出检查
+# JavaScript、HTTP、固件容器与导出检查
 npm test
 
-# 原生运行体、ARM 执行与拍摄桥验证
-.venv/bin/python -m pip install pillow capstone unicorn
+# 原生与 ARM 执行检查
 .venv/bin/python -m unittest \
   tests.test_gr3_m10v_library \
   tests.test_gr3_m10v_library_arm \
   tests.test_gr3_m10v_capture
 
-# 与网页相同构建链的命令行导出
+# 与网页共用构建链的本地导出
 node scripts/export_gr3_m10v_native.mjs builds/gr3-test
-node scripts/export_gr3_m10v_native.mjs builds/gr3x-test --model=gr3x
+node scripts/export_gr3_m10v_native.mjs --model=gr3x builds/gr3x-test
 ```
 
-完整样本测试需要本机官方固件；部分兼容回归还需要单独准备参考样本与运行时。官方输入、`.venv/`、`.runtime/`、`data/` 和 `builds/` 均不提交到 Git。
+完整回归需要官方固件、对应参考样本与运行时。当前全量测试仍有旧目录合同和本地样本相关失败，不能将定向通过记为全量通过；本轮范围与失败索引见[网页与影像方案审核记录](docs/testing/2026-10-31-web-imaging-review.md)。
 
 | 目录 | 内容 |
 | --- | --- |
-| `web/` | 统一工作台、胶卷目录和说明页 |
-| `node/` | HTTP 服务、固件身份检查、构建与独立回读 |
-| `native/gr3/` | 原生胶卷、菜单、图标、持久化与 JPEG 处理 |
-| `scripts/` | ARM 编译、资源生成、导出与分析工具 |
-| `tests/` | 原生和 ARM 执行测试 |
-| `docs/` | 设计、逆向证据与验收记录 |
+| `web/` | 页面、胶卷目录与使用说明 |
+| `node/` | HTTP 服务、身份核验、构建与独立回读 |
+| `native/` | 各机型原生菜单、成像与持久化 |
+| `scripts/` | 编译、资源生成、导出与分析 |
+| `tests/` | 原生和 ARM 执行回归 |
+| `docs/` | 研究证据、验收与发布记录 |
 
-[机内功能验收](docs/testing/gr3-m10v-native-library.md) · [发布前检查](docs/testing/release-review-2026-10-14.md) · [第三方说明](THIRD_PARTY_NOTICES.md)
+## 名称与来源
 
-## 致谢
+GR III 官方 Linux 根文件系统的 `/etc/hostname` 为 `m10v`，项目沿用这一名称。[来源证据](docs/research/m10v-name-origin.md)。
 
-感谢 **gr-custom-tool、GRLife、gr3-film-mods、darkslide-gr** 在 GR 固件研究、胶片模拟与定制工具方面的公开探索。
-
-M10V 的界面与胶卷图标采用自己的设计。使用和移植的第三方代码、数据保留对应来源与许可；详情见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。项目源码采用 [GPL-2.0](LICENSE)。
-
----
-
-<div align="center"><sub>从相机里的一个名字，到你自己的影像工作台。</sub></div>
-
-GR II、GR IV 与 GR III 使用一致的三步工作台：导入固件 → 设置方案 → 保存固件，并共享方案清单与机型导航。GR II 当前展示只读组件与资源，修改固件保存保持禁用；GR IV 支持五槽胶卷与配方/原厂预设工作流，参考编辑器单独保留。
-
-GR IIIx 1.60 已开放与 GR III 相同的原生胶卷、机内 FN 调节、SD 换卷、时间戳、画幅、水平仪、颗粒、RAW 降噪、调试及版本适配；配方与原厂预设工具也可导出。以独立差异移植保留 GR IIIx 的型号和完整 CPU，不将 GR III 的型号数据刷入 IIIx。构建与 ARM 检查不代表 IIIx 实机验收。
-
-GR III 2.10 的胶卷库在 Custom2 后提供五个独立胶卷位置，保留全部原厂预设，沿用已有五槽存档与 FILMS.M10。新槽 FN 提供该胶卷支持的 M10V 参数；原厂参数保留在原厂风格中。GR IIIx／GR IV 保持原有槽位布局。
+参考项目包括 **gr-custom-tool、GRLife、gr3-film-mods、darkslide-gr**。第三方代码与数据保留对应来源和许可，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。项目源码采用 [GPL-2.0](LICENSE)。

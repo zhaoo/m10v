@@ -293,12 +293,34 @@ static int load_library(m10v_library_state *state){
 }
 int m10v_camera_library_load(m10v_library_state *state){
     int result=load_library(state);
+#if !M10V_FOUR_LOOKS_NATIVE
+    if(result>=0){
+        /* A journal moved from GR III must not enable an unverified look on
+         * another model. Keep all supported slots and their settings; do not
+         * rewrite the user's journal merely because it was read here. */
+        uint32_t count=0,changed=0;
+        for(uint32_t i=0;i<M10V_SLOT_COUNT;i++){
+            if(M10V_FOUR_LOOKS(state->slots[i].film)){changed=1;continue;}
+            state->slots[count]=state->slots[i];state->effects[count]=state->effects[i];count++;
+        }
+        if(changed){
+            for(;count<M10V_SLOT_COUNT;count++){
+                for(uint32_t j=0;j<sizeof(m10v_slot);j++)((uint8_t *)&state->slots[count])[j]=0;
+                for(uint32_t j=0;j<sizeof(m10v_film_effects);j++)((uint8_t *)&state->effects[count])[j]=0;
+            }
+            state->reserved&=1u;state->crc=state_crc(state,offsetof(m10v_library_state,crc));
+        }
+    }
+#endif
 #if M10V_LIVE_COLOR
     if(result>=0)publish_preview(preview_owner(),state);
 #endif
     return result;
 }
 int m10v_camera_library_select(m10v_library_state *state, uint32_t slot, uint32_t film) {
+#if !M10V_FOUR_LOOKS_NATIVE
+    if(M10V_FOUR_LOOKS(film))return M10V_LIBRARY_INVALID;
+#endif
 #if !M10V_LIVE_COLOR
     if(film==294||(M10V_ANIME_E6(film)||M10V_C41(film)||M10V_EXTRA_FILM(film)))return M10V_LIBRARY_INVALID;
 #endif

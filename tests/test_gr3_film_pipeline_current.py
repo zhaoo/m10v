@@ -337,8 +337,56 @@ const v=await exportSdFilms({ids:[],customFilms:[{name:'Warm',filename:'warm.cub
                     self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),1)
                     self.assertEqual(self.capture(e,recipe,si,request),0)
 
+    def test_four_looks_real_producer_freezes_queued_identity_and_zero_pixel_encoder(self):
+        for film in range(318,322):
+            for stage in (0,1):
+                with self.subTest(film=film,stage=stage):
+                    e,recipe,obj,frame,si,request,data=self.fixture(film,slot=9,stage=stage)
+                    e.u.mem_write(recipe+0x4a08,bytes(1796))
+                    owner=self.publish_owner(e,data)
+                    self.enqueue(e,recipe,19)
+                    newer=bytearray(e.u.mem_read(data,184))
+                    struct.pack_into('<I',newer,8,8)
+                    struct.pack_into('<H',newer,12+9*8,66)
+                    struct.pack_into('<I',newer,180,zlib.crc32(newer[:180]))
+                    e.u.mem_write(owner+0x2144,bytes(newer));e.w32(owner+0x2140,4)
+                    for kind in (0,16,1,8,9,2,4):self.enqueue(e,recipe,kind)
+                    frozen=e.alloc(184)
+                    self.assertEqual(self.call(e,'m10v_isp_frame_recipe_state',recipe,frozen),1)
+                    self.assertEqual(struct.unpack('<H',e.u.mem_read(frozen+12+9*8,2))[0],film)
+                    self.make(e,recipe,obj,frame)
+                    self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,34,data),1)
+                    self.assertEqual(self.capture(e,recipe,si,request),0)
+
+    def test_four_looks_missing_native_completion_rejects_before_pixel_work(self):
+        for film in range(318,322):
+            with self.subTest(film=film):
+                e,recipe,obj,frame,si,request,data=self.fixture(film)
+                e.u.mem_write(recipe+0x4a08,bytes(1796))
+                self.publish_owner(e,data);self.enqueue(e,recipe,19)
+                # No Still Make was executed. Completion must remain absent,
+                # and admission must reject before any CPU image work.
+                self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),0)
+                self.assertEqual(self.capture(e,recipe,si,request),0xfffffffb)
+
+    def test_four_looks_actual_arm_preparation_matches_quantized_source_profiles(self):
+        reference=json.loads((ROOT/'native/gr3/four-looks-reference.json').read_text())
+        targets=[]
+        for profile in reference['native_profiles_full']:
+            film=profile['film_id']
+            with self.subTest(film=film):
+                e,recipe,obj,frame,si,request,data=self.fixture(film)
+                native=e.alloc(1600)
+                self.assertEqual(self.call(e,'m10v_isp_native_look_prepare',native,film,0,42),1)
+                target=bytes(e.u.mem_read(native+28,1572));targets.append(target)
+                expected=tuple(v for key in ('matrix_q13','post_q9','curves') for row in profile[key] for v in row)
+                self.assertEqual(struct.unpack('<18h768H',target),expected)
+                self.assertEqual(self.call(e,'m10v_isp_native_look_prepare',native,film,1,43),0)
+                self.assertEqual(self.call(e,'m10v_isp_native_look_matches',native,film,0,42),0)
+        self.assertEqual(len(set(targets)),4)
+
     def test_repeated_still_make_does_not_accumulate_color_banks(self):
-        for film in (62, 66):
+        for film in (62, 66,318,319,320,321):
             e, recipe, obj, frame, *_ = self.fixture(film)
             self.make(e, recipe, obj, frame)
             first = bytes(e.u.mem_read(frame, 0x9000))
@@ -460,7 +508,8 @@ assert.throws(()=>buildNativeLibrary(s,r,m),/snapshot submission wrapper instruc
             js = """import{writeFileSync}from'node:fs';
 import{readNativeOfficial,prepareNative,generateNative}from'./node/gr3-native-library.mjs';
 import{defaultConfiguration}from'./web/gr3/native-library-state.mjs';import{decodeFrameMap}from'./node/gr3-frames.mjs';
-const model=process.argv[2],s=await readNativeOfficial(model),c=defaultConfiguration(model),o={debug_mode:true,live_color:false,hdf_enabled:false};
+const model=process.argv[2],s=await readNativeOfficial(model),c=defaultConfiguration(model),o={debug_mode:false,live_color:false,hdf_enabled:false};
+c.slots=[318,319,320,321,33].map(film=>({...c.slots[0],film}));
 const p=prepareNative(s,c,o),r=await generateNative(s,c,p.configuration_sha256,o);
 const b=decodeFrameMap(r.candidate).decoded;
 writeFileSync(process.argv[1]+'/rtos.bin',b.subarray(0x10870,0x10870+b.readUInt32LE(0x1086c)));
@@ -472,9 +521,10 @@ writeFileSync(process.argv[1]+'/manifest.json',JSON.stringify(r.manifest));
             self.assertFalse(self.manifest['capture_lifecycle']['snapshot']['live_color'])
             self.assertEqual(self.manifest['settings_menu']['owner_bytes'], 0x613c)
             self.test_durable_ui_load_publishes_owner_used_by_actual_task_submission()
+            self.test_four_looks_real_producer_freezes_queued_identity_and_zero_pixel_encoder()
 
     def test_ordinary_builtin_profiles_complete_under_native_parameter_changes(self):
-        for film in range(33, 79):
+        for film in (*range(33,79),318,319,320,321):
             for extra in ({}, {0x77d: 1, 0x77e: 7, 0x780: 2, 0x793: 6, 0x794: 2}):
                 with self.subTest(film=film, extra=extra):
                     e, recipe, obj, frame, si, request, data = self.fixture(film)

@@ -10,3 +10,11 @@ test('GR II pinned source closure has exact recorded hashes',async()=>{
   assert.equal(createHash('sha256').update(await readFile(new URL(file,root))).digest('hex'),expected,file);
  }
 });
+
+test('GR II square artwork closure remains pinned before GR III-only looks',async()=>{
+ const root=new URL('../compat/gr2-square-v1/',import.meta.url),report=JSON.parse(await readFile(new URL('PROVENANCE.json',root)));
+ assert.equal(report.revision,'a901016cd4f1ebfe917dbe195d2c5711af9309a1');
+ assert.deepEqual(Object.keys(report.files).sort(),['native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h']);
+ for(const [file,expected]of Object.entries(report.files))
+  assert.equal(createHash('sha256').update(await readFile(new URL(file,root))).digest('hex'),expected,file);
+});

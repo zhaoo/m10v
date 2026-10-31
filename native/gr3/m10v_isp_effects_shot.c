@@ -94,7 +94,7 @@ int m10v_isp_effects_shot_freeze(uint32_t recipe){
     uint32_t si=*(const volatile uint32_t*)(uintptr_t)(recipe+0x44c8u);
     uint32_t orientation=valid?shot_orientation(recipe,si):0;
     valid=valid&&orientation;
-    if(valid){shot_copy(&s->settings,&frozen,sizeof(frozen));s->sequence=sequence;s->source_si=si;s->saved_orientation=orientation;}
+    if(valid){frozen.reserved=0;shot_copy(&s->settings,&frozen,sizeof(frozen));s->sequence=sequence;s->source_si=si;s->saved_orientation=orientation;}
     __atomic_store_n(&s->ready,valid?1u:2u,__ATOMIC_RELEASE);
     return valid;
 }

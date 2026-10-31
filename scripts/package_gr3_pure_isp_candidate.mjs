@@ -28,6 +28,9 @@ for(const [p,expected]of Object.entries(manifest.sources)){
  sources[p]=b;
 }
 sources['scripts/analyze_gr3_isp_effect_fidelity.py']=await readFile('scripts/analyze_gr3_isp_effect_fidelity.py');
+for(const p of ['node/gr3-isp-effect-options.mjs','node/gr3-native-library.mjs','node/gr3-m10v-native-build.mjs',
+ 'node/server.mjs','web/gr3/model-capabilities.mjs','web/gr3/workbench-state.mjs','web/gr3/studio.js',
+ 'scripts/build_gr3_device_candidate.mjs','scripts/check_gr3x_release.mjs'])sources[p]=await readFile(p);
 for(const p of ['scripts/package_gr3_pure_isp_candidate.mjs','docs/superpowers/specs/2026-10-31-gr3-pure-isp-effects-design.md',
  'docs/superpowers/plans/2026-10-31-gr3-pure-isp-effects.md'])sources[p]=await readFile(p);
 for(const p of await readdir('tests'))if(p.startsWith('test_gr3_isp_effect')||p.startsWith('test_gr3_pure_isp'))

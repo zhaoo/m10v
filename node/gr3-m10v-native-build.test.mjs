@@ -21,7 +21,7 @@ test('M10V native library builds from official bytes without a compatibility run
     const result = buildNativeLibrary(source, runtime, manifest);
     assert.deepEqual(result.receipt.changed_sections, ['RTOS']);
     assert.equal(result.receipt.camera_tested, false);
-    assert.equal(result.receipt.film_count, 103);
+    assert.equal(result.receipt.film_count, 107);
     assert.equal(result.receipt.external_film_pack, false);
     assert.deepEqual(auditNativeLibrary(source, result.candidate, runtime, manifest), result.receipt);
     // Data appended to the valid runtime must not hit an arbitrary byte ceiling.

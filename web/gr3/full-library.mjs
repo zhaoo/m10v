@@ -1,7 +1,8 @@
+import {supportsNativeFilm} from './model-capabilities.mjs';
 export function fullLibraryRequest(model,catalog){
  if(!['gr3','gr3x','gr4'].includes(model))throw Error('此机型暂不支持此胶卷库下载');
  if(!Array.isArray(catalog)||!catalog.length||catalog.some(f=>!Number.isInteger(f.id)||f.id<1))throw Error('配套胶卷目录不可用，请重新读取');
- return {url:model==='gr4'?'/api/gr4/native-library/sd-export':'/api/gr3/sd-library/export',body:{model,ids:[...new Set(catalog.map(f=>f.id))]}};
+ return {url:model==='gr4'?'/api/gr4/native-library/sd-export':'/api/gr3/sd-library/export',body:{model,ids:[...new Set(catalog.filter(f=>supportsNativeFilm(model,f.id)).map(f=>f.id))]}};
 }
 export function mountBuildCompletion(root,{api}){
  let snapshot=null,libraryBusy=false,urls=[];

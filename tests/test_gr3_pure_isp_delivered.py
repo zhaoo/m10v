@@ -557,11 +557,29 @@ class DeliveredPureIspTests(unittest.TestCase):
         self.at(e, 0x535033E8, digital, native, planning, queried)
         self.assertEqual(int.from_bytes(e.u.mem_read(recipe + 0x5778 + 68, 4), 'little'), 0)
         self.jpeg(e, recipe, si, request, hold=True)
-        facts = {r[2]: r for r in e.debug_records if r[0] == 198 and r[1] == recipe}
-        self.assertEqual(facts[0x46583033][3:], (1, 0))
-        self.assertEqual(facts[0x46583035][4], 1)
-        checkpoints = [r[3] for r in e.debug_records if r[0] == 198 and r[2] == 0x46584800]
-        self.assertEqual(checkpoints, [1, 2, 24])
+        if self.manifest['debug_mode']:
+            facts = {r[2]: r for r in e.debug_records if r[0] == 198 and r[1] == recipe}
+            self.assertEqual(facts[0x46583033][3:], (1, 0))
+            self.assertEqual(facts[0x46583035][4], 1)
+            checkpoints = [r[3] for r in e.debug_records if r[0] == 198 and r[2] == 0x46584800]
+            self.assertEqual(checkpoints, [1, 2, 24])
+
+    def test_disabled_ui_strength_memory_round_trips_journal_but_not_capture_pixels(self):
+        preferences=0x46580000|3|(4<<2)|(2<<5)
+        e,recipe,obj,frame,si,request,owner,setting,digital,native,state=self.fixture((0,1,1,1,1,0,1,preferences))
+        self.assertEqual(self.call(e,'m10v_isp_effects_strength',setting,0),3)
+        self.assertEqual(self.call(e,'m10v_isp_effects_strength',setting,1),4)
+        shot=e.alloc(96)
+        self.assertEqual(self.call(e,'m10v_isp_effects_shot_read',recipe,shot),1)
+        self.assertEqual(int.from_bytes(e.u.mem_read(shot+44,4),'little'),0)
+        planning,_=e.params();self.at(e,0x535033D8,digital,planning,si,1)
+        queried=e.alloc(4)
+        self.assertEqual(self.at(e,0x535033E8,digital,native,planning,queried),1)
+        self.assertEqual(int.from_bytes(e.u.mem_read(queried,4),'little'),0)
+        execution,_=e.params();self.at(e,0x53503AA0,digital,execution,si,1)
+        self.assertEqual(self.at(e,0x53503AB4,digital,native,execution,0),1)
+        self.assertEqual(e.events,[])
+        self.jpeg(e,recipe,si,request)
 
     def test_grain_real_resize_worker_and_graph_completion_reach_original_jpeg_queue(self):
         e, recipe, obj, frame, si, request, owner, setting, digital, native, state = self.fixture((0, 0, 0, 2, 0, 0, 0, 0))

@@ -122,7 +122,7 @@ def build(out,base=0x54160000):
     with tempfile.TemporaryDirectory(prefix='m10v-native-look-') as d:
         d=Path(d);objs=[]
         for stem in ('m10v_isp_native_look','m10v_isp_frame_color','m10v_isp_multiaxis','m10v_library'):
-            obj=d/(stem+'.o');subprocess.run([clang,*FLAGS,'-ffunction-sections','-fdata-sections','-c',str(ROOT/f'native/gr3/{stem}.c'),'-o',str(obj)],check=True,capture_output=True);objs.append(str(obj))
+            obj=d/(stem+'.o');subprocess.run([clang,*FLAGS,'-DM10V_FOUR_LOOKS_NATIVE=1','-ffunction-sections','-fdata-sections','-c',str(ROOT/f'native/gr3/{stem}.c'),'-o',str(obj)],check=True,capture_output=True);objs.append(str(obj))
         script=d/'link.ld';script.write_text(f'SECTIONS {{ . = {base}; .text : {{ *(.text*) }} .rodata : {{ *(.rodata*) }} /DISCARD/ : {{ *(.ARM.exidx*) *(.ARM.extab*) *(.comment*) *(.note*) }} }}')
         elf=d/'look.elf';subprocess.run([linker,'--gc-sections',*[f'--undefined={s}' for s in sorted(API)],'-T',str(script),'--entry=m10v_isp_native_look_apply',*objs,'-o',str(elf)],check=True,capture_output=True)
         b=elf.read_bytes();shoff=struct.unpack_from('<I',b,32)[0];size,count,nidx=struct.unpack_from('<HHH',b,46)
