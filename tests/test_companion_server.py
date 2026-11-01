@@ -7,7 +7,7 @@ class Server(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
   cls.temp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.temp.cleanup);d=Path(cls.temp.name);cls.exe=d/'server'
-  result=subprocess.run(['clang','-std=c11','-Wall','-Wextra','-Werror','-DM10V_COMPANION_HOST_TEST','-I',str(ROOT/'native/companion'),*[str(ROOT/'native/companion'/f) for f in ['auth.c','http_parser.c','json.c','operations.c','http_server.c','linux_io.c','transaction.c','film_upload.c']],*[str(ROOT/'native/gr3'/f) for f in ['m10v_library.c','halation_core.c','film_5207.c','film_harman.c','film_curated.c','film_newstocks.c','film_style_filters_0.c','film_style_filters_1.c','film_d76_0.c','film_d76_1.c','m10v_sd_library.c']],str(ROOT/'tests/support_companion_server.c'),'-o',str(cls.exe)],capture_output=True,text=True)
+  result=subprocess.run(['clang','-std=c11','-Wall','-Wextra','-Werror','-DM10V_COMPANION_HOST_TEST','-I',str(ROOT/'native/companion'),*[str(ROOT/'native/companion'/f) for f in ['auth.c','http_parser.c','json.c','operations.c','http_server.c','linux_io.c','transaction.c','film_upload.c','extensions.c','extensions_json.c']],*[str(ROOT/'native/gr3'/f) for f in ['m10v_library.c','halation_core.c','film_5207.c','film_harman.c','film_curated.c','film_newstocks.c','film_style_filters_0.c','film_style_filters_1.c','film_d76_0.c','film_d76_1.c','m10v_sd_library.c']],str(ROOT/'tests/support_companion_server.c'),'-o',str(cls.exe)],capture_output=True,text=True)
   if result.returncode:raise AssertionError(result.stderr)
  def setUp(self):
   env=dict(os.environ)
@@ -16,6 +16,7 @@ class Server(unittest.TestCase):
   if self._testMethodName=='test_async_read_busy_and_submit_waits_for_read_turn':env['M10V_TEST_ASYNC_READ']='1'
   if self._testMethodName=='test_timeout_keeps_unknown_write_locked_but_reads_remain_available':env['M10V_TEST_STALL']='1'
   if 'mismatch' in self._testMethodName:env['M10V_TEST_MISMATCH']='1'
+  if self._testMethodName=='test_extensions_unknown_write_blocks_all_mutations':env['M10V_TEST_EXT_UNKNOWN']='1'
   self.process=subprocess.Popen([str(self.exe)],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);self.addCleanup(self.stop)
   line=self.process.stdout.readline()
   if not line:
@@ -40,6 +41,47 @@ class Server(unittest.TestCase):
    signed='\n'.join(['RESPONSE',method,path,out_headers['x-m10v-boot'],out_headers['x-m10v-session'],str(self.sequence),nonce,str(status),hashlib.sha256(raw).hexdigest()]);self.assertEqual(out_headers['x-m10v-response-signature'],hmac.digest(KEY,signed.encode(),'sha256').hex())
   return status,json.loads(raw)
  def envelope(self,state,request_id='a'*32):return {'protocol':1,'requestId':request_id,'bootId':self.boot,'baseRevision':state['revision'],'catalogHash':state['catalogHash'],'rendererHash':state['rendererHash'],'patch':[{'slot':0,'grain':2}],'activateSlot':None}
+ def test_extensions_independent_discovery_and_verified_commit(self):
+  status,caps=self.request('GET','/m10v/v1/extensions/capabilities');self.assertEqual(status,200)
+  self.assertEqual(caps['schema'],'m10v.extensions/v1');self.assertEqual(len(caps['fields']),21)
+  contract=json.loads((ROOT/'contracts/extensions-v1.json').read_text())
+  self.assertEqual([{k:v for k,v in f.items() if k!='supported'} for f in caps['fields']],[{k:v for k,v in f.items() if k!='id'} for f in contract['fields']])
+  self.assertEqual(caps['powerImages'],{'supported':False,'reason':'firmwareBuildRequired'})
+  status,state=self.request('GET','/m10v/v1/extensions/state');self.assertEqual(status,200)
+  self.assertEqual(set(state['values']),set(state['supported']))
+  payload={'requestId':'b'*32,'bootId':self.boot,'contractHash':caps['contractHash'],'baseRevision':state['revision'],'field':'hdf','value':2}
+  status,r=self.request('POST','/m10v/v1/extensions/operations',payload);self.assertEqual(status,202)
+  for _ in range(8):
+   status,r=self.request('GET','/m10v/v1/extensions/operations/'+'b'*32)
+   if r['status']=='committed':break
+  self.assertEqual(r['status'],'committed');self.assertEqual(r['snapshot']['values']['hdf'],2)
+  self.assertEqual(self.request('GET','/m10v/v1/extensions/state')[1],r['snapshot'])
+  self.assertEqual(self.request('POST','/m10v/v1/extensions/operations',payload)[1]['status'],'committed')
+  self.assertEqual(self.request('POST','/m10v/v1/extensions/operations',{**payload,'value':1})[0],409)
+  self.assertEqual(self.request('POST','/m10v/v1/extensions/operations',{**payload,'requestId':'c'*32})[0],202)
+  self.assertEqual(self.request('GET','/m10v/v1/extensions/operations/'+'c'*32)[1]['status'],'rejected')
+  self.assertEqual(self.request('GET','/m10v/v1/extensions/state',bad_signature=True)[0],401)
+  legacy=self.request('GET','/m10v/v1/capabilities')[1];self.assertNotIn('extensions',legacy);self.assertNotIn('extensions',legacy['capabilities'])
+ def test_extensions_unknown_write_blocks_all_mutations(self):
+  status,state=self.request('GET','/m10v/v1/extensions/state');self.assertEqual(status,200)
+  payload={'requestId':'d'*32,'bootId':self.boot,'contractHash':state['contractHash'],'baseRevision':state['revision'],'field':'hdf','value':2}
+  self.assertEqual(self.request('POST','/m10v/v1/extensions/operations',payload)[0],202)
+  status,r=self.request('GET','/m10v/v1/extensions/operations/'+'d'*32)
+  self.assertEqual(r['status'],'unknown');self.assertEqual(r['code'],'resultUnknown')
+  self.assertEqual(self.request('POST','/m10v/v1/extensions/operations',payload)[1]['status'],'unknown')
+  self.assertEqual(self.request('POST','/m10v/v1/extensions/operations',{**payload,'requestId':'e'*32})[0],409)
+  film=self.request('GET','/m10v/v1/state')[1]
+  self.assertEqual(self.request('POST','/m10v/v1/operations',self.envelope(film,'f'*32))[0],409)
+ def test_extensions_bad_contract_unknown_fields_and_shared_pending_lock(self):
+  status,state=self.request('GET','/m10v/v1/extensions/state');self.assertEqual(status,200)
+  payload={'requestId':'b'*32,'bootId':self.boot,'contractHash':state['contractHash'],'baseRevision':state['revision'],'field':'aspect','value':6}
+  self.assertEqual(self.request('POST','/m10v/v1/extensions/operations',{**payload,'extra':1})[0],400)
+  self.assertEqual(self.request('POST','/m10v/v1/extensions/operations',{**payload,'contractHash':'0'*64})[0],409)
+  self.assertEqual(self.request('POST','/m10v/v1/extensions/operations',payload)[0],202)
+  film=self.request('GET','/m10v/v1/state')[1]
+  # Fixture completes extension requests immediately; exercise other-domain ID isolation.
+  self.assertEqual(self.request('GET','/m10v/v1/operations/'+'b'*32)[0],404)
+  self.assertEqual(self.request('POST','/m10v/v1/operations',self.envelope(film,'b'*32))[0],409)
  def test_capabilities_publish_ten_slot_state_and_retired_fields(self):
   code,value=self.request('GET','/m10v/v1/capabilities')
   self.assertEqual(code,200)

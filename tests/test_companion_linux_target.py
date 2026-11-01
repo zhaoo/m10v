@@ -47,6 +47,7 @@ static void identity(fixture*f,m10v_companion_snapshot*s){
 static int execute(void*v,uint32_t command,const uint8_t*in,uint32_t n,uint8_t*out,uint32_t*bytes){
  fixture*f=v;f->execute++;
  if(command==1){if(n!=16)return 10;memcpy(out,in,16);if(f->nonce_bad)out[0]^=1;memcpy(out+16,f->cfg.build,32);*bytes=48;return 0;}
+ if(command>=5&&command<=7){m10v_extension_result e={.status=M10V_OPERATION_COMMITTED,.has_snapshot=1};e.snapshot.available=1;e.snapshot.values[0]=1;e.snapshot.revision[0]=42;memcpy(out,&e,sizeof(e));*bytes=sizeof(e);return 0;}
  m10v_companion_result result={0};result.status=M10V_OPERATION_COMMITTED;result.has_snapshot=1;result.snapshot.active_slot=9;result.snapshot.state.magic=0x5630314du;result.snapshot.state.version=5;result.snapshot.state.size=184;result.snapshot.state.sequence=7;result.snapshot.state.slots[9].film=321;result.snapshot.state.crc=crc(&result.snapshot.state,180);identity(f,&result.snapshot);memcpy(out,&result,sizeof(result));*bytes=sizeof(result);return 0;
 }
 static int cache(void*v,void*p,uint32_t n){(void)v;(void)p;(void)n;return 1;}
@@ -84,14 +85,21 @@ int linux_target_case(unsigned mode){fixture f;fixture_init(&f);m10v_companion_p
  request.command=M10V_BACKEND_SUBMIT;request.patch=&p;REQUIRE(!m10v_linux_target_exchange(&f.t,&request,&out));REQUIRE(!consume(&f));request.command=M10V_BACKEND_POLL;REQUIRE(!m10v_linux_target_exchange(&f.t,&request,&out));REQUIRE(out.has_snapshot&&out.status==2);
  REQUIRE(!m10v_linux_target_exchange(&f.t,&request,&out));REQUIRE(f.w.request.command==4);REQUIRE(f.w.request.bytes==16);REQUIRE(!consume(&f));REQUIRE(!m10v_linux_target_exchange(&f.t,&request,&out));REQUIRE(!f.violation);REQUIRE(f.execute==4);return 0;
 }
+int linux_extension_case(void){fixture f;fixture_init(&f);REQUIRE(!initialize(&f));REQUIRE(!hello(&f));m10v_extension_snapshot snap;m10v_backend_response out={0,0,(void*)&snap};m10v_backend_request r={.command=M10V_BACKEND_READ_EXTENSIONS};
+ REQUIRE(!m10v_linux_target_exchange(&f.t,&r,&out));REQUIRE(f.w.request.command==5);m10v_backend_request film={.command=M10V_BACKEND_READ_STATE};unsigned before=f.writes;REQUIRE(m10v_linux_target_exchange(&f.t,&film,&out)==M10V_ERROR_BUSY);REQUIRE(f.writes==before);REQUIRE(!consume(&f));REQUIRE(!m10v_linux_target_exchange(&f.t,&r,&out));REQUIRE(out.has_snapshot&&snap.values[0]==1&&snap.revision[0]==42);
+ m10v_extension_patch p={.field=0,.value=1};p.request_id[0]=4;memcpy(p.boot_id,f.cfg.nonce,16);m10v_unhex(M10V_EXTENSIONS_HASH,32,p.contract_hash);r.command=M10V_BACKEND_SUBMIT_EXTENSIONS;r.patch=(const void*)&p;
+ REQUIRE(!m10v_linux_target_exchange(&f.t,&r,&out));REQUIRE(f.w.request.command==6&&f.w.request.bytes==sizeof(p));unsigned writes=f.writes;p.value=0;REQUIRE(m10v_linux_target_exchange(&f.t,&r,&out)==M10V_ERROR_INVALID_RECIPE);REQUIRE(f.writes==writes);p.value=1;
+ REQUIRE(!consume(&f));r.command=M10V_BACKEND_POLL_EXTENSIONS;REQUIRE(!m10v_linux_target_exchange(&f.t,&r,&out));REQUIRE(out.status==M10V_OPERATION_COMMITTED);REQUIRE(!m10v_linux_target_exchange(&f.t,&r,&out));REQUIRE(f.w.request.command==7&&f.w.request.bytes==16);REQUIRE(!consume(&f));REQUIRE(!m10v_linux_target_exchange(&f.t,&r,&out));return 0;
+}
 '''
 class LinuxTargetTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
   cls.tmp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.tmp.cleanup);private=Path(cls.tmp.name);source=private/'fixture.c';source.write_text(FIXTURE);library=private/'linux-target.dylib'
-  result=subprocess.run(['clang','-std=c11','-O2','-Wall','-Wextra','-Werror','-DM10V_COMPANION_HOST_TEST','-dynamiclib','-I',str(ROOT/'native/companion'),str(source),str(ROOT/'native/companion/linux_target.c'),str(ROOT/'native/companion/resident_bridge.c'),str(ROOT/'native/companion/auth.c'),'-o',str(library)],capture_output=True,text=True)
+  result=subprocess.run(['clang','-std=c11','-O2','-Wall','-Wextra','-Werror','-DM10V_COMPANION_HOST_TEST','-dynamiclib','-I',str(ROOT/'native/companion'),str(source),str(ROOT/'native/companion/linux_target.c'),str(ROOT/'native/companion/resident_bridge.c'),str(ROOT/'native/companion/auth.c'),str(ROOT/'native/companion/extensions.c'),'-o',str(library)],capture_output=True,text=True)
   if result.returncode:raise AssertionError(result.stderr)
   cls.lib=C.CDLL(str(library));cls.lib.linux_target_case.argtypes=[C.c_uint];cls.lib.linux_target_case.restype=C.c_int
+ def test_extension_read_apply_poll_use_separate_bounded_frames(self):self.assertEqual(self.lib.linux_extension_case(),0)
  def test_async_hello_read_apply_poll_and_ten_slot_identity(self):self.assertEqual(self.lib.linux_target_case(0),0)
  def test_discovery_rejects_wrong_rom_descriptor_dead_owner_build_and_existing_sequence(self):
   for mode in range(1,6):
@@ -116,7 +124,7 @@ class LinuxTargetTests(unittest.TestCase):
   from unicorn import Uc, UC_ARCH_ARM, UC_MODE_ARM, UC_HOOK_INTR
   from unicorn.arm_const import UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3, UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R7, UC_ARM_REG_SP, UC_ARM_REG_LR
   private=Path(self.tmp.name);objects=[]
-  for name in ('linux_target','resident_bridge','auth','runtime'):
+  for name in ('linux_target','resident_bridge','auth','runtime','extensions'):
    obj=private/(name+'-arm.o')
    subprocess.run(['/opt/homebrew/opt/llvm/bin/clang','--target=armv7-none-eabi','-mcpu=cortex-a9','-marm','-mfloat-abi=soft','-Os','-std=c11','-ffreestanding','-fno-builtin','-fno-stack-protector','-c',str(ROOT/'native/companion'/f'{name}.c'),'-o',str(obj)],check=True,capture_output=True)
    objects.append(str(obj))

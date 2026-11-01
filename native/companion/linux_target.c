@@ -76,10 +76,26 @@ static int identity(m10v_linux_target*t,const m10v_companion_snapshot*s){
  m10v_sha256_init(&hash);m10v_sha256_update(&hash,(const uint8_t*)revision_prefix,sizeof(revision_prefix)-1);
  m10v_sha256_update(&hash,t->config.nonce,16);m10v_sha256_update(&hash,t->config.build,32);m10v_sha256_update(&hash,t->config.catalog,32);m10v_sha256_update(&hash,t->config.renderer,32);m10v_sha256_update(&hash,config,32);m10v_sha256_update(&hash,sequence,4);m10v_sha256_update(&hash,generation,4);m10v_sha256_finish(&hash,revision);return equal(revision,s->revision,32);
 }
+static int extension_exchange(m10v_linux_target*t,const m10v_backend_request*r,m10v_backend_response*out){
+ const m10v_extension_patch*p=(const void*)r->patch;unsigned read=r->command==M10V_BACKEND_READ_EXTENSIONS;
+ if(!read&&!p)return M10V_ERROR_INVALID_RECIPE;
+ if(r->command==M10V_BACKEND_SUBMIT_EXTENSIONS){uint8_t hash[32];m10v_unhex(M10V_EXTENSIONS_HASH,32,hash);if(!equal(p->boot_id,t->config.nonce,16))return M10V_ERROR_REVISION_CONFLICT;if(!equal(hash,p->contract_hash,32))return M10V_ERROR_INCOMPATIBLE_RENDERER;}
+ if(t->pending_command&&t->pending_command<5)return M10V_ERROR_BUSY;
+ if(!t->pending_command){unsigned command=read?5:r->command==M10V_BACKEND_SUBMIT_EXTENSIONS?6:7;if(!read)copy(t->pending_id,p->request_id,16);if(command==6)m10v_sha256((const uint8_t*)p,sizeof(*p),t->pending_digest);
+  if(publish(t,command,read?0:command==6?(const void*)p:p->request_id,read?0:command==6?sizeof(*p):16))return M10V_ERROR_BRIDGE_UNAVAILABLE;out->status=M10V_OPERATION_APPLYING;return 0;}
+ if((t->pending_command==5)!=read||(!read&&!equal(t->pending_id,p->request_id,16)))return M10V_ERROR_BUSY;
+ if(t->pending_command==6&&r->command==M10V_BACKEND_SUBMIT_EXTENSIONS){uint8_t digest[32];m10v_sha256((const uint8_t*)p,sizeof(*p),digest);if(!equal(digest,t->pending_digest,32))return M10V_ERROR_INVALID_RECIPE;}
+ int received=receive(t);if(received){if(received>0){out->status=M10V_OPERATION_APPLYING;return 0;}return M10V_ERROR_BRIDGE_UNAVAILABLE;}
+ if(t->scratch.bytes!=sizeof(m10v_extension_result)||t->scratch.code>M10V_ERROR_RESULT_UNKNOWN)return fail(t);m10v_extension_result result;copy(&result,t->scratch.payload,sizeof(result));
+ if(result.status>M10V_OPERATION_UNKNOWN||result.code!=t->scratch.code||result.has_snapshot>1||(result.has_snapshot&&(!out->snapshot||!m10v_extensions_valid(&result.snapshot)))||(result.status==M10V_OPERATION_COMMITTED&&!result.has_snapshot))return fail(t);
+ if(result.has_snapshot)copy(out->snapshot,&result.snapshot,sizeof(result.snapshot));t->pending_command=0;out->status=result.status;out->has_snapshot=result.has_snapshot;return (int)result.code;
+}
 int m10v_linux_target_exchange(void*v,const m10v_backend_request*r,m10v_backend_response*out){
  m10v_linux_target*t=v;if(!out)return M10V_ERROR_BRIDGE_UNAVAILABLE;out->has_snapshot=0;out->status=M10V_OPERATION_UNKNOWN;
  if(!t||!r||t->failed||!t->ready)return M10V_ERROR_BRIDGE_UNAVAILABLE;
+ if(r->command>=M10V_BACKEND_READ_EXTENSIONS&&r->command<=M10V_BACKEND_POLL_EXTENSIONS)return extension_exchange(t,r,out);
  if(r->command!=M10V_BACKEND_READ_STATE&&r->command!=M10V_BACKEND_SUBMIT&&r->command!=M10V_BACKEND_POLL)return M10V_ERROR_BRIDGE_UNAVAILABLE;
+ if(t->pending_command>=5)return M10V_ERROR_BUSY;
  if(r->command!=M10V_BACKEND_READ_STATE&&!r->patch)return M10V_ERROR_INVALID_RECIPE;
  if(r->command==M10V_BACKEND_SUBMIT&&(!equal(r->patch->boot_id,t->config.nonce,16)||!equal(r->patch->catalog_hash,t->config.catalog,32)||!equal(r->patch->renderer_hash,t->config.renderer,32)))return M10V_ERROR_INCOMPATIBLE_RENDERER;
  if(!t->pending_command){

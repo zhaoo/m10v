@@ -6,8 +6,8 @@ The pairing file and executable are private artifacts, never source commits.
 import argparse,hashlib,json,os,re,secrets,shutil,struct,subprocess,tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-SOURCES=['auth.c','http_parser.c','json.c','operations.c','http_server.c','linux_io.c','runtime.c','film_upload.c','../gr3/m10v_sd_library.c']
-HEADERS=['auth.h','http_parser.h','json.h','operations.h','http_server.h','linux_io.h','generated_contract.h','film_upload.h','transaction.h','../gr3/m10v_sd_contract.h','../gr3/m10v_sd_library.h']
+SOURCES=['auth.c','http_parser.c','json.c','operations.c','extensions.c','extensions_json.c','http_server.c','linux_io.c','runtime.c','film_upload.c','../gr3/m10v_sd_library.c']
+HEADERS=['auth.h','http_parser.h','json.h','operations.h','extensions.h','http_server.h','linux_io.h','generated_contract.h','film_upload.h','transaction.h','../gr3/m10v_sd_contract.h','../gr3/m10v_sd_library.h']
 def _hash(value):return hashlib.sha256(value).hexdigest()
 def _metadata(value):
  if type(value)is not str or not re.fullmatch('[a-f0-9]{64}',value):raise ValueError('expected lowercase SHA256 metadata')
@@ -50,6 +50,7 @@ def _stack_audit(elf,path,linker,frames):
   'm10v_auth_accept':{random},'m10v_companion_server_init':{random},
   'm10v_companion_tick':{exchange,'m10v_linux_now_ms'},
   'route_authenticated':{exchange,'m10v_linux_now_ms'},
+  'route_extensions':{exchange,'m10v_linux_now_ms'},
   'route_upload':{exchange,random,'m10v_linux_now_ms'},
   'm10v_companion_serve':{'m10v_linux_now_ms'},'write_all':{'m10v_linux_now_ms'},
   'm10v_linux_target_init':{'physical_read','bind'},'read_mem':{'physical_read'},
@@ -120,7 +121,7 @@ def build_service(output,*,catalog_hash,renderer_hash,key=None,instance_id=None,
  if not clang or not linker:raise RuntimeError('Clang and LLD are required')
  sources=SOURCES+(['linux_target.c','resident_bridge.c','linux_wifi.c'] if target else [])
  headers=HEADERS+(['linux_target.h','resident_bridge.h','linux_wifi.h','../gr3/m10v_companion_owner.h'] if target else [])
- paths=[Path('native/companion')/name for name in sources+headers]+[Path('native/gr3/m10v_library.h'),Path('contracts/companion-v1.json'),Path('scripts/build_companion_service.py')]
+ paths=[Path('native/companion')/name for name in sources+headers]+[Path('native/gr3/m10v_library.h'),Path('contracts/companion-v1.json'),Path('contracts/extensions-v1.json'),Path('scripts/build_companion_service.py')]
  source_fingerprint=_hash(json.dumps([[str(p),_hash((ROOT/p).read_bytes())] for p in paths],separators=(',',':')).encode())
  # Reject stale generated rules, including metadata-only contract changes.
  check=subprocess.run([os.sys.executable,str(ROOT/'scripts/generate_companion_registry.py'),'--check'],capture_output=True)

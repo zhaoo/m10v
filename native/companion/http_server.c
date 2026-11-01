@@ -30,22 +30,31 @@ static void snapshot_json(m10v_companion_server*s,writer*w,const m10v_companion_
  for(unsigned slot=0;slot<M10V_SLOT_COUNT;slot++){if(slot)text(w,",");unsigned id=snap->state.slots[slot].film;text(w,"{\"filmId\":");number(w,id);text(w,",\"parameters\":{");unsigned count=0;for(unsigned key=1;key<M10V_FIELD_COUNT;key++)if(m10v_field_supported(key,id)||m10v_field_readonly(key)){if(count++)text(w,",");quoted(w,m10v_field_names[key]);text(w,":");number(w,field(&snap->state,slot,key));}text(w,"},\"customHash\":");if(M10V_CUSTOM(id))hex(w,snap->custom_hashes[slot],32);else text(w,"null");text(w,"}");}
  text(w,"],\"globals\":{\"stamp\":");number(w,snap->state.stamp);text(w,",\"format\":");number(w,snap->state.format);text(w,",\"corner\":");number(w,snap->state.corner);text(w,",\"color\":");number(w,snap->state.color);text(w,",\"filmNameStamp\":");number(w,snap->state.reserved&1u);text(w,"}}}");
 }
+static void extension_json(m10v_companion_server*s,writer*w,const m10v_extension_snapshot*snap){
+ text(w,"{\"schema\":\"" M10V_EXTENSIONS_SCHEMA "\",\"contractHash\":\"" M10V_EXTENSIONS_HASH "\",\"instanceId\":");hex(w,s->config->instance_id,16);text(w,",\"buildId\":");hex(w,s->config->build_id,32);text(w,",\"bootId\":");hex(w,s->auth.boot,16);text(w,",\"revision\":");hex(w,snap->revision,32);text(w,",\"busy\":");text(w,snap->busy?"true":"false");text(w,",\"supported\":[");unsigned count=0;
+ for(unsigned i=0;i<M10V_EXTENSION_FIELDS;i++)if(snap->available&(1u<<i)){if(count++)text(w,",");quoted(w,m10v_extension_names[i]);}text(w,"],\"values\":{");count=0;
+ for(unsigned i=0;i<M10V_EXTENSION_FIELDS;i++)if(snap->available&(1u<<i)){if(count++)text(w,",");quoted(w,m10v_extension_names[i]);text(w,":");number(w,snap->values[i]);}text(w,"}}");
+}
 static int receipt_json(m10v_companion_server*s,const m10v_operation_receipt*r){
  writer w=begin(s,r->status==M10V_OPERATION_QUEUED||r->status==M10V_OPERATION_APPLYING?202:200);static const char*states[]={"queued","applying","committed","rejected","unknown"};text(&w,"{\"requestId\":");hex(&w,r->request_id,16);text(&w,",\"bootId\":");hex(&w,s->auth.boot,16);text(&w,",\"status\":");quoted(&w,states[r->status]);
- if(r->error){text(&w,",\"error\":{\"code\":");quoted(&w,m10v_error_name(r->error));text(&w,"}");}
- if(r->status==M10V_OPERATION_COMMITTED&&r->has_snapshot){text(&w,",\"snapshot\":");snapshot_json(s,&w,&r->snapshot);}text(&w,"}");return finish(s,&w);
+ if(r->error){if(r->extension){text(&w,",\"code\":");quoted(&w,m10v_error_name(r->error));}else {text(&w,",\"error\":{\"code\":");quoted(&w,m10v_error_name(r->error));text(&w,"}");}}
+ if(r->status==M10V_OPERATION_COMMITTED&&r->has_snapshot){text(&w,",\"snapshot\":");if(r->extension)extension_json(s,&w,&r->extension_snapshot);else snapshot_json(s,&w,&r->snapshot);}text(&w,"}");return finish(s,&w);
 }
 int m10v_companion_server_init(m10v_companion_server*s,const m10v_companion_server_config*cfg,const m10v_companion_backend*backend){
  if(!s||!cfg||!backend||!backend->exchange||!cfg->random||!cfg->now_ms||!cfg->operation_timeout_ms)return 1;for(unsigned i=0;i<sizeof(*s);i++)((uint8_t*)s)[i]=0;s->config=cfg;s->backend=*backend;s->pending_index=-1;uint8_t boot[16];if(!cfg->random(cfg->random_ctx,boot,16))return 1;return m10v_auth_init(&s->auth,cfg->key,cfg->key_id,boot,cfg->random,cfg->random_ctx);
 }
 void m10v_companion_tick(m10v_companion_server*s){
  if(s->pending_index<0)return;m10v_operation_receipt*r=&s->receipts[s->pending_index];unsigned command=r->status==M10V_OPERATION_QUEUED?M10V_BACKEND_SUBMIT:M10V_BACKEND_POLL;
- m10v_backend_request request={.command=command,.patch=&s->pending_patch};m10v_backend_response response={M10V_OPERATION_UNKNOWN,0,&r->snapshot};int code=s->backend.exchange(s->backend.ctx,&request,&response);
+ if(r->extension)command=command==M10V_BACKEND_SUBMIT?M10V_BACKEND_SUBMIT_EXTENSIONS:M10V_BACKEND_POLL_EXTENSIONS;
+ m10v_backend_request request={.command=command,.patch=r->extension?(const void*)&s->pending_extension:&s->pending_patch};m10v_backend_response response={M10V_OPERATION_UNKNOWN,0,r->extension?(void*)&r->extension_snapshot:&r->snapshot};int code=s->backend.exchange(s->backend.ctx,&request,&response);
  /* A READ already in flight must finish before SUBMIT. Retain QUEUED:
   * POLL is never a substitute for an unsubmitted APPLY. */
- if(code==M10V_ERROR_BUSY&&command==M10V_BACKEND_SUBMIT){
-  m10v_backend_request read={.command=M10V_BACKEND_READ_STATE};m10v_backend_response discard={M10V_OPERATION_UNKNOWN,0,&r->snapshot};
+ if(code==M10V_ERROR_BUSY&&(command==M10V_BACKEND_SUBMIT||command==M10V_BACKEND_SUBMIT_EXTENSIONS)){
+  m10v_backend_request read={.command=r->extension?M10V_BACKEND_READ_EXTENSIONS:M10V_BACKEND_READ_STATE};m10v_backend_response discard={M10V_OPERATION_UNKNOWN,0,&r->snapshot};
   int drained=s->backend.exchange(s->backend.ctx,&read,&discard);
+  /* Drain the actual read domain when a tab switched while a read was pending.
+   * This never publishes an APPLY and cannot replay an uncertain mutation. */
+  if(drained==M10V_ERROR_BUSY){read.command=read.command==M10V_BACKEND_READ_STATE?M10V_BACKEND_READ_EXTENSIONS:M10V_BACKEND_READ_STATE;drained=s->backend.exchange(s->backend.ctx,&read,&discard);}
   uint64_t now=s->config->now_ms(s->config->clock_ctx);
   if(drained==M10V_ERROR_BRIDGE_UNAVAILABLE||now<s->pending_since||now-s->pending_since>=s->config->operation_timeout_ms){r->status=M10V_OPERATION_UNKNOWN;r->error=M10V_ERROR_RESULT_UNKNOWN;}
   return;
@@ -103,6 +112,32 @@ const char*chunks="/chunks/";unsigned n=text_length(chunks);match=text_length(su
  return error(s,404,M10V_ERROR_INVALID_RECIPE);
 }
 
+static __attribute__((noinline)) int route_extensions(m10v_companion_server*s,const uint8_t*body,uint32_t body_bytes){
+ const char*method=s->request.method,*path=s->request.path;
+ if(equal(method,"GET")&&(equal(path,"/m10v/v1/extensions/state")||equal(path,"/m10v/v1/extensions/capabilities"))){
+  if(body_bytes)return error(s,400,M10V_ERROR_INVALID_RECIPE);if(!s->config->read_state)return error(s,503,M10V_ERROR_BRIDGE_UNAVAILABLE);
+  m10v_extension_snapshot snap;m10v_backend_request request={.command=M10V_BACKEND_READ_EXTENSIONS};m10v_backend_response response={M10V_OPERATION_UNKNOWN,0,(void*)&snap};int code=s->backend.exchange(s->backend.ctx,&request,&response);
+  if(code||!response.has_snapshot)return error(s,503,code?code:response.status==M10V_OPERATION_APPLYING?M10V_ERROR_BUSY:M10V_ERROR_BRIDGE_UNAVAILABLE);
+  if(!m10v_extensions_valid(&snap))return error(s,503,M10V_ERROR_BRIDGE_UNAVAILABLE);writer w=begin(s,200);
+  if(equal(path,"/m10v/v1/extensions/state")){extension_json(s,&w,&snap);return finish(s,&w);}
+  text(&w,"{\"schema\":\"" M10V_EXTENSIONS_SCHEMA "\",\"contractHash\":\"" M10V_EXTENSIONS_HASH "\",\"fields\":[");
+  for(unsigned i=0;i<M10V_EXTENSION_FIELDS;i++){if(i)text(&w,",");text(&w,"{\"key\":");quoted(&w,m10v_extension_names[i]);text(&w,",\"min\":");number(&w,m10v_extension_min[i]);text(&w,",\"max\":");number(&w,m10v_extension_max[i]);text(&w,",\"supported\":");text(&w,snap.available&(1u<<i)?"true":"false");text(&w,",\"persistence\":");quoted(&w,m10v_extension_persistent[i]?"persistent":"runtime");text(&w,"}");}
+  text(&w,"],\"powerImages\":{\"supported\":false,\"reason\":\"firmwareBuildRequired\"}}");return finish(s,&w);
+ }
+ const char*prefix="/m10v/v1/extensions/operations/";unsigned len=text_length(prefix),n=text_length(path),match=n>=len;for(unsigned i=0;i<len&&match;i++)if(path[i]!=prefix[i])match=0;
+ if(equal(method,"GET")&&match){uint8_t id[16];if(body_bytes||n!=len+32||!m10v_unhex(path+len,16,id))return error(s,400,M10V_ERROR_INVALID_RECIPE);for(unsigned i=0;i<32;i++)if(s->receipts[i].occupied&&s->receipts[i].extension&&m10v_constant_equal(id,s->receipts[i].request_id,16))return receipt_json(s,&s->receipts[i]);return error(s,404,M10V_ERROR_RESULT_UNKNOWN);}
+ if(equal(method,"POST")&&equal(path,"/m10v/v1/extensions/operations")){
+  m10v_extension_patch patch;int code=m10v_extensions_parse(body,body_bytes,s->output.tokens,&patch);if(code)return error(s,400,(unsigned)code);
+  uint8_t hash[32];m10v_unhex(M10V_EXTENSIONS_HASH,32,hash);if(!m10v_constant_equal(hash,patch.contract_hash,32))return error(s,409,M10V_ERROR_INCOMPATIBLE_RENDERER);if(!m10v_constant_equal(patch.boot_id,s->auth.boot,16))return error(s,409,M10V_ERROR_REVISION_CONFLICT);
+  if(!s->config->write_state)return error(s,503,M10V_ERROR_BRIDGE_UNAVAILABLE);uint8_t digest[32];m10v_sha256((const uint8_t*)&patch,sizeof(patch),digest);
+  for(unsigned i=0;i<32;i++)if(s->receipts[i].occupied&&m10v_constant_equal(patch.request_id,s->receipts[i].request_id,16)){if(!s->receipts[i].extension||!m10v_constant_equal(digest,s->receipts[i].digest,32))return error(s,409,M10V_ERROR_INVALID_RECIPE);return receipt_json(s,&s->receipts[i]);}
+  if(seen(s,patch.request_id,0))return error(s,409,M10V_ERROR_RESULT_UNKNOWN);
+  if(s->pending_index>=0||s->film.upload.state==M10V_UPLOAD_VERIFYING||s->film.upload.state==M10V_UPLOAD_UNKNOWN)return error(s,409,M10V_ERROR_BUSY);
+  unsigned index=s->receipt_cursor++%32;m10v_operation_receipt*r=&s->receipts[index];for(unsigned i=0;i<sizeof(*r);i++)((uint8_t*)r)[i]=0;copy(r->request_id,patch.request_id,16);copy(r->digest,digest,32);r->occupied=r->extension=1;r->status=M10V_OPERATION_QUEUED;s->pending_extension=patch;s->pending_index=(int)index;s->pending_since=s->config->now_ms(s->config->clock_ctx);seen(s,patch.request_id,1);return receipt_json(s,r);
+ }
+ return route_upload(s,body,body_bytes);
+}
+
 static __attribute__((noinline)) int route_authenticated(m10v_companion_server*s,const uint8_t*body,uint32_t body_bytes){
  const char*method=s->request.method,*path=s->request.path;
  if(equal(method,"GET")&&equal(path,"/m10v/v1/capabilities")){
@@ -113,18 +148,18 @@ static __attribute__((noinline)) int route_authenticated(m10v_companion_server*s
   if(!s->config->read_state)return error(s,503,M10V_ERROR_BRIDGE_UNAVAILABLE);m10v_companion_snapshot snapshot;m10v_backend_request request={.command=M10V_BACKEND_READ_STATE};m10v_backend_response response={M10V_OPERATION_UNKNOWN,0,&snapshot};int code=s->backend.exchange(s->backend.ctx,&request,&response);if(code||!response.has_snapshot)return error(s,503,code?code:response.status==M10V_OPERATION_APPLYING?M10V_ERROR_BUSY:M10V_ERROR_BRIDGE_UNAVAILABLE);writer w=begin(s,200);snapshot_json(s,&w,&snapshot);return finish(s,&w);
  }
  const char *prefix="/m10v/v1/operations/";unsigned prefix_bytes=text_length(prefix),path_bytes=text_length(path);unsigned prefix_match=path_bytes>=prefix_bytes;for(unsigned i=0;i<prefix_bytes&&prefix_match;i++)if(path[i]!=prefix[i])prefix_match=0;
- if(equal(method,"GET")&&prefix_match){uint8_t id[16];if(path_bytes!=prefix_bytes+32||!m10v_unhex(path+prefix_bytes,16,id))return error(s,400,M10V_ERROR_INVALID_RECIPE);for(unsigned i=0;i<32;i++)if(s->receipts[i].occupied&&m10v_constant_equal(id,s->receipts[i].request_id,16))return receipt_json(s,&s->receipts[i]);return error(s,404,M10V_ERROR_RESULT_UNKNOWN);}
+ if(equal(method,"GET")&&prefix_match){uint8_t id[16];if(path_bytes!=prefix_bytes+32||!m10v_unhex(path+prefix_bytes,16,id))return error(s,400,M10V_ERROR_INVALID_RECIPE);for(unsigned i=0;i<32;i++)if(s->receipts[i].occupied&&!s->receipts[i].extension&&m10v_constant_equal(id,s->receipts[i].request_id,16))return receipt_json(s,&s->receipts[i]);return error(s,404,M10V_ERROR_RESULT_UNKNOWN);}
  if(equal(method,"POST")&&equal(path,"/m10v/v1/operations")){
   m10v_companion_patch patch;int code=m10v_operation_parse_tokens(body,body_bytes,s->output.tokens,&patch);if(code)return error(s,400,(unsigned)code);
   if(!m10v_constant_equal(patch.boot_id,s->auth.boot,16))return error(s,409,M10V_ERROR_REVISION_CONFLICT);
   if(!m10v_constant_equal(patch.catalog_hash,s->config->catalog_hash,32)||!m10v_constant_equal(patch.renderer_hash,s->config->renderer_hash,32))return error(s,409,M10V_ERROR_INCOMPATIBLE_RENDERER);
   if(!s->config->write_state)return error(s,503,M10V_ERROR_BRIDGE_UNAVAILABLE);uint8_t digest[32];m10v_operation_digest(&patch,digest);
-  for(unsigned i=0;i<32;i++)if(s->receipts[i].occupied&&m10v_constant_equal(s->receipts[i].request_id,patch.request_id,16)){if(!m10v_constant_equal(s->receipts[i].digest,digest,32))return error(s,409,M10V_ERROR_INVALID_RECIPE);return receipt_json(s,&s->receipts[i]);}
+  for(unsigned i=0;i<32;i++)if(s->receipts[i].occupied&&m10v_constant_equal(s->receipts[i].request_id,patch.request_id,16)){if(s->receipts[i].extension||!m10v_constant_equal(s->receipts[i].digest,digest,32))return error(s,409,M10V_ERROR_INVALID_RECIPE);return receipt_json(s,&s->receipts[i]);}
   if(seen(s,patch.request_id,0))return error(s,409,M10V_ERROR_RESULT_UNKNOWN);
   if(s->pending_index>=0||s->film.upload.state==M10V_UPLOAD_VERIFYING||s->film.upload.state==M10V_UPLOAD_UNKNOWN)return error(s,409,M10V_ERROR_BUSY);
   unsigned index=s->receipt_cursor++%32;m10v_operation_receipt*r=&s->receipts[index];for(unsigned i=0;i<sizeof(*r);i++)((uint8_t*)r)[i]=0;copy(r->request_id,patch.request_id,16);copy(r->digest,digest,32);r->status=M10V_OPERATION_QUEUED;r->occupied=1;s->pending_patch=patch;s->pending_index=(int)index;s->pending_since=s->config->now_ms(s->config->clock_ctx);seen(s,patch.request_id,1);return receipt_json(s,r);
  }
- return route_upload(s,body,body_bytes);
+ return route_extensions(s,body,body_bytes);
 }
 
 int m10v_companion_process_parsed(m10v_companion_server*s,const uint8_t*body,uint32_t body_bytes){

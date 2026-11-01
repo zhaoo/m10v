@@ -1,11 +1,14 @@
 #ifndef M10V_COMPANION_HTTP_SERVER_H
 #define M10V_COMPANION_HTTP_SERVER_H
 #include "auth.h"
+#include "extensions.h"
 #define M10V_HTTP_RESPONSE_BYTES 4096u
 #include "operations.h"
 #include "film_upload.h"
-enum {M10V_BACKEND_READ_STATE=1,M10V_BACKEND_SUBMIT,M10V_BACKEND_POLL,M10V_BACKEND_FILM_VERIFY,M10V_BACKEND_FILM_POLL};
+enum {M10V_BACKEND_READ_STATE=1,M10V_BACKEND_SUBMIT,M10V_BACKEND_POLL,M10V_BACKEND_FILM_VERIFY,M10V_BACKEND_FILM_POLL,M10V_BACKEND_READ_EXTENSIONS,M10V_BACKEND_SUBMIT_EXTENSIONS,M10V_BACKEND_POLL_EXTENSIONS};
 typedef struct {m10v_film_upload *upload;const uint8_t *data;} m10v_film_backend_request;
+/* Extension commands use patch/snapshot pointers to m10v_extension_* via void
+ * casts. Preserve the original backend ABI and its positional initializers. */
 typedef struct {unsigned command;const m10v_companion_patch *patch;const m10v_film_backend_request *film;} m10v_backend_request;
 typedef struct {unsigned status,has_snapshot;m10v_companion_snapshot *snapshot;} m10v_backend_response;
 /* exchange is one NONBLOCKING owner-mailbox turn. Never retain output pointers
@@ -19,12 +22,12 @@ typedef struct {
  uint8_t read_state,write_state,upload_film,capture_evidence,wifi_verified;
  uint8_t wifi_address[4];char wifi_interface[16];
 } m10v_companion_server_config;
-typedef struct {uint8_t request_id[16],digest[32];m10v_companion_snapshot snapshot;uint8_t status,error,has_snapshot,occupied;} m10v_operation_receipt;
+typedef struct {uint8_t request_id[16],digest[32];union {m10v_companion_snapshot snapshot;m10v_extension_snapshot extension_snapshot;};uint8_t status,error,has_snapshot,occupied,extension;} m10v_operation_receipt;
 typedef struct {
  const m10v_companion_server_config *config;m10v_companion_backend backend;m10v_auth_state auth;
  uint8_t input[M10V_HTTP_MAX_BODY];union {uint8_t bytes[M10V_HTTP_RESPONSE_BYTES];m10v_json_token tokens[M10V_JSON_TOKENS];} output;
  uint8_t staging[12288];union {uint8_t reserved[128];m10v_film_upload upload;} film;uint8_t seen_operations[256];
- m10v_operation_receipt receipts[32];m10v_companion_patch pending_patch;
+ m10v_operation_receipt receipts[32];union {m10v_companion_patch pending_patch;m10v_extension_patch pending_extension;};
  m10v_http_request request;uint64_t pending_since;int pending_index;
  uint32_t receipt_cursor,output_bytes,status;char session[33],response_signature[65];uint8_t authenticated;
 } m10v_companion_server;
