@@ -109,7 +109,19 @@ int m10v_zoom_camera_save(m10v_zoom_state *s,const m10v_zoom_editor *e){
 #if M10V_COMPANION_ENABLED
 int m10v_zoom_camera_snapshot(m10v_zoom_state *s){
  uint32_t fs=filesystem();if(!s||!fs)return -1;
- m10v_zoom_io io={(void*)(uintptr_t)fs,read_page,write_page};
- return m10v_zoom_load(s,&io)<0?-1:0;
+ m10v_settings_controller *p=cache();
+ if(!p||(p->zoom_flags&~7u)!=MAGIC||(p->zoom_flags&PENDING)||(p->zoom_flags&3u)>2u)return -1;
+ m10v_zoom_io io={(void*)(uintptr_t)fs,read_page,write_page};m10v_zoom_state durable;
+ if(m10v_zoom_load(&durable,&io)<0||durable.mm[0]!=p->zoom_mm[0]||durable.mm[1]!=p->zoom_mm[1])return -1;
+ uint32_t root=((uint32_t(*)(void))0x53525d5cu)();
+ if(!ram(root,4)||!ram(*(uint32_t*)(uintptr_t)root,4))return -1;
+ uint32_t expected=m10v_zoom_native_back_bits(*(uint32_t*)(uintptr_t)root);
+ if(expected!=0x3f800000u&&expected!=m10v_zoom_bits(durable.mm[0])&&expected!=m10v_zoom_bits(durable.mm[1]))return -1;
+ extern uint32_t m10v_zoom_native_front_bits(uint32_t);
+ root=((uint32_t(*)(void))0x5320ad88u)();
+ uint32_t front=root?((uint32_t(*)(uint32_t))0x5320b31cu)(root):0;
+ if(!ram(front,4)||m10v_zoom_native_front_bits(front)!=expected)return -1;
+ /* No lazy cache load, seed application, setters or cache publication. */
+ *s=durable;return 0;
 }
 #endif

@@ -475,6 +475,11 @@ int m10v_settings_controller_remote_ab_write(uint32_t field,uint32_t value){
  }
  if(field>2||value>=M10V_TONE_CHOICES||p->ab.enabled)return 1;
  v[field]=value;if(v[1]==v[2])return 1;
+ m10v_library_state fresh;if(m10v_camera_library_read_current(&fresh))return 1;
+ uint32_t a=m10v_ab_slot(v[1]),b=m10v_ab_slot(v[2]);
+ if((a<M10V_SLOT_COUNT&&!fresh.slots[a].film)||(b<M10V_SLOT_COUNT&&!fresh.slots[b].film))return 1;
+ /* Recheck the owner session after the current-state read, before storage. */
+ if(p!=ab_owner()||p->ab.enabled||m10v_settings_controller_remote_busy())return 1;
  if(ab_save(v[1],v[2]))return 2;
  p->ab.a=v[1];p->ab.b=v[2];return 0;
 }

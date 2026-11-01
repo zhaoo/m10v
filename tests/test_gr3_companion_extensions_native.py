@@ -41,6 +41,13 @@ class RemoteNativeAdapters(unittest.TestCase):
   before=self.count('m10v_ab_mapper_original');self.call(u,'ab_mapper',0,0x22);self.assertEqual(self.count('m10v_ab_mapper_original'),before+1)
   self.assertEqual(self.call(u,'remote_ab_write',0,0),0)
   self.route=0x0200f100;self.assertEqual(self.call(u,'remote_ab_write',0,1),1)
+ def test_disabled_pair_rejects_empty_slot_before_any_journal_write(self):
+  u=self.machine();owner=0x55040000;self.call(u,'top_ctor',owner)
+  u.mem_write(0x55063910,struct.pack('<I',1));u.mem_write(0x55063988,struct.pack('<I',owner));self.route=0x08000000
+  before=self.count('m10v_camera_library_read_current')
+  self.assertEqual(self.call(u,'remote_ab_write',1,21),1)
+  self.assertGreater(self.count('m10v_camera_library_read_current'),before);self.assertEqual(self.ab_files,{})
+
  def test_remote_aspect_uses_half_session_wrapper_and_rejects_editor(self):
   u=self.machine();owner=0x55040000;self.call(u,'top_ctor',owner)
   u.mem_write(0x55063910,struct.pack('<I',1));u.mem_write(0x55063988,struct.pack('<I',owner));self.route=0x08000000
