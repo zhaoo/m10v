@@ -106,3 +106,10 @@ int m10v_zoom_camera_save(m10v_zoom_state *s,const m10v_zoom_editor *e){
  if(!applied&&p)p->zoom_flags=MAGIC|current;
  return applied;
 }
+#if M10V_COMPANION_ENABLED
+int m10v_zoom_camera_snapshot(m10v_zoom_state *s){
+ uint32_t fs=filesystem();if(!s||!fs)return -1;
+ m10v_zoom_io io={(void*)(uintptr_t)fs,read_page,write_page};
+ return m10v_zoom_load(s,&io)<0?-1:0;
+}
+#endif

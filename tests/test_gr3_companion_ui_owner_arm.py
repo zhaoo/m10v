@@ -13,10 +13,10 @@ class ProductionOwner(unittest.TestCase):
   if not cls.ready:return
   cls.tmp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.tmp.cleanup);d=Path(cls.tmp.name)
   identity=d/'identity.h';identity.write_text('\n'.join('#define M10V_COMPANION_'+k+'_BYTES {'+','.join(['1']*32)+'}' for k in ['BUILD','CATALOG','RENDERER']))
-  files=[cls.source,*[ROOT/'native/companion'/f for f in ['resident_bridge.c','auth.c','operations.c','json.c','transaction.c','runtime.c']],ROOT/'native/gr3/m10v_library.c'];objects=[]
+  files=[cls.source,*[ROOT/'native/companion'/f for f in ['resident_bridge.c','auth.c','operations.c','json.c','transaction.c','extensions.c','runtime.c']],ROOT/'native/gr3/m10v_library.c'];objects=[]
   for i,p in enumerate(files):
    obj=d/f'{i}.o';subprocess.run(['clang','--target=armv7-none-eabi','-mcpu=cortex-a9','-marm','-mfloat-abi=soft','-Os','-ffreestanding','-fno-builtin','-ffunction-sections','-fdata-sections','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-Wall','-Wextra','-Werror','-DM10V_COMPANION_ENABLED=1','-DM10V_APPENDED_SLOTS=1','-DM10V_LIVE_COLOR=1','-include',str(identity),'-c',str(p),'-o',str(obj)],check=True,capture_output=True);objects.append(obj)
-  cls.ports={name:0x54010000+i*64 for i,name in enumerate(['m10v_camera_library_read_current','m10v_camera_library_mutation_begin','m10v_camera_library_mutation_end','m10v_camera_library_mutation_busy','m10v_camera_library_commit_snapshot','m10v_sd_camera_custom_record','m10v_camera_library_shooting_count'])}
+  cls.ports={name:0x54010000+i*64 for i,name in enumerate(['m10v_camera_library_read_current','m10v_camera_library_mutation_begin','m10v_camera_library_mutation_end','m10v_camera_library_mutation_busy','m10v_camera_library_commit_snapshot','m10v_sd_camera_custom_record','m10v_camera_library_shooting_count','m10v_settings_controller_remote_busy'])}
   elf=d/'owner.elf';subprocess.run(['ld.lld','-m','armelf_linux_eabi','--gc-sections','--entry=m10v_companion_ui_init','--undefined=m10v_companion_ui_stop','--undefined=m10v_companion_ui_storage_enter','--undefined=m10v_companion_ui_storage_leave','-Ttext=0x540c0000',*[f'--defsym={k}={v}' for k,v in cls.ports.items()],*[str(p) for p in objects],'-o',str(elf)],check=True,capture_output=True)
   cls.elf=elf.read_bytes();nm=subprocess.check_output(['/opt/homebrew/opt/llvm/bin/llvm-nm','--defined-only',str(elf)],text=True);cls.symbols={line.split()[2]:int(line.split()[0],16) for line in nm.splitlines() if len(line.split())==3}
   path=Path(os.environ.get('M10V_GR3_ORIGINAL_RTOS','/Users/zhaoo/.codex/worktrees/film-companion/diagnostic-20261101/source/builds/gr3-extension-validation/official-rtos.bin'));cls.firmware=path.read_bytes();assert hashlib.sha256(cls.firmware).hexdigest()=='8a4eafcad2716e0b21e9909264e1242e534f0e39e05cba82a53546ceb4070b67'
@@ -28,7 +28,7 @@ class ProductionOwner(unittest.TestCase):
     if not (0x53000000<=at<0x56000000):m.u.mem_map(at&~4095,((at%4096+n+4095)//4096)*4096)
     m.u.mem_write(at,b[off:off+n])
   m.set(0x55063910,1);m.set(0x55063988,0x55860000);m.saves=0;m.allocations=0;m.native_callback_locks=[];m.mutation=0;m.tone=25
-  m.load_result=0;m.pause_on_load=False;m.state=bytearray(184);struct.pack_into('<IHHI',m.state,0,0x5630314d,5,184,17)
+  m.load_result=0;m.pause_on_load=False;m.fail_after_commit=False;m.state=bytearray(184);struct.pack_into('<IHHI',m.state,0,0x5630314d,5,184,17)
   for i in range(10):struct.pack_into('<HBBBBBB',m.state,12+8*i,34+i,0,0,0,3,5,6)
   struct.pack_into('<I',m.state,180,zlib.crc32(m.state[:180]))
   for guard in [0x55064398,0x55063ecc,0x55063dcc]:m.set(guard,1)
@@ -52,6 +52,8 @@ class ProductionOwner(unittest.TestCase):
    elif pc==self.ports['m10v_camera_library_mutation_busy']:result=m.mutation
    elif pc==self.ports['m10v_camera_library_commit_snapshot']:
     self.assertEqual(m.mutation,1);m.saves+=1;m.state=bytearray(u.mem_read(args[0],184));result=0
+    if m.fail_after_commit:m.load_result=-1;result=-1
+   elif pc==self.ports['m10v_settings_controller_remote_busy']:result=0
    elif pc==0x532bd6b4:result=m.tone
    elif pc==0x532bd6d4:result=0
    elif pc in self.ports.values():self.fail('unexpected settings service in HELLO lifecycle test')
@@ -131,3 +133,34 @@ class ProductionOwner(unittest.TestCase):
   m.pause_on_load=False;u.emu_start(u.reg_read(UC_ARM_REG_PC),STOP,count=1000000);self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x53228c20)
   response=wire+128+1152;self.assertEqual(m.word(response),4);self.assertEqual(m.word(response+20),6);self.assertEqual(m.word(response+128+8),0)
   self.assertEqual(self.exchange(m,wire,6,2)[0],0)
+
+ def test_extensions_stamp_single_commit_shared_revision_and_unsupported_gate(self):
+  m=self.machine();owner=0x55860000;m.run(self.symbols['m10v_companion_ui_init'],owner);wire=m.word(owner+0x6400+16);m.run(self.symbols['m10v_companion_ui_start'],owner)
+  self.assertEqual(self.exchange(m,wire,2,1,bytes([7]*16))[0],0)
+  code,read=self.exchange(m,wire,4,5);self.assertEqual(code,0)
+  self.assertEqual(struct.unpack_from('<I',read,12)[0],31<<12)
+  before=bytes(m.state);contract=bytes.fromhex('9df047418574e23fd399a0c59491aecc9ea212dbf119a79ff29532aec6493628')
+  def patch(ident,field,value,revision):return bytes([ident]*16)+bytes([7]*16)+contract+revision+struct.pack('<II',field,value)
+  p=patch(9,12,2,read[-32:]);code,result=self.exchange(m,wire,6,6,p)
+  self.assertEqual(code,0);self.assertEqual(struct.unpack_from('<III',result),(2,0,1));self.assertEqual(m.saves,1);self.assertEqual(m.state[92],2)
+  self.assertEqual(m.state[12:92],before[12:92]);self.assertEqual(m.state[93:180],before[93:180])
+  self.exchange(m,wire,8,6,p);self.assertEqual(m.saves,1)
+  # Earlier extension revision is invalid after the shared journal commit.
+  self.assertEqual(self.exchange(m,wire,10,6,patch(10,13,1,read[-32:]))[0],7)
+  self.assertEqual(self.exchange(m,wire,12,6,patch(11,3,1,result[-32:]))[0],5)
+  self.assertEqual(m.saves,1)
+
+ def test_extension_uncertainty_blocks_local_film_store_until_poll_readback(self):
+  m=self.machine();owner=0x55860000;m.run(self.symbols['m10v_companion_ui_init'],owner);wire=m.word(owner+0x6400+16);m.run(self.symbols['m10v_companion_ui_start'],owner)
+  self.exchange(m,wire,2,1,bytes([7]*16));_,read=self.exchange(m,wire,4,5)
+  ident=bytes([22]*16);contract=bytes.fromhex('9df047418574e23fd399a0c59491aecc9ea212dbf119a79ff29532aec6493628')
+  payload=ident+bytes([7]*16)+contract+read[-32:]+struct.pack('<II',16,1)
+  m.fail_after_commit=True;code,result=self.exchange(m,wire,6,6,payload)
+  self.assertEqual(struct.unpack_from('<I',result)[0],4);self.assertEqual(m.saves,1)
+  m.run(self.symbols['m10v_companion_ui_storage_enter'],0)
+  from unicorn.arm_const import UC_ARM_REG_R0
+  self.assertEqual(m.u.reg_read(UC_ARM_REG_R0),0)
+  m.load_result=0;m.fail_after_commit=False;code,result=self.exchange(m,wire,8,7,ident)
+  self.assertEqual(code,0);self.assertEqual(struct.unpack_from('<III',result),(2,0,1));self.assertEqual(m.saves,1)
+  m.run(self.symbols['m10v_companion_ui_storage_enter'],0);token=m.u.reg_read(UC_ARM_REG_R0);self.assertNotEqual(token,0)
+  m.run(self.symbols['m10v_companion_ui_storage_leave'],token)

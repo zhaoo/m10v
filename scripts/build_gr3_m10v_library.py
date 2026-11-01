@@ -129,6 +129,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_operation_': {'m10v_operation_parse','m10v_operation_parse_tokens','m10v_operation_digest'},
         'm10v_companion_': {'m10v_companion_owner_init','m10v_companion_state_seal','m10v_companion_snapshot_identity','m10v_companion_apply','m10v_companion_apply_local','m10v_companion_owner_poll'},
         'm10v_resident_': {'m10v_resident_crc','m10v_resident_consume'},
+        'm10v_extensions_': {'m10v_extensions_valid','m10v_extensions_owner_init','m10v_extensions_apply','m10v_extensions_poll'},
         'm10v_companion_ui_': {'m10v_companion_ui_init','m10v_companion_ui_start','m10v_companion_ui_stop','m10v_companion_ui_timer','m10v_companion_ui_storage_enter','m10v_companion_ui_storage_leave','m10v_companion_ui_storage_current'},
         'm10v_zoom_': set(),  # Checked against the zoom module's explicit ABI registry.
         'm10v_border_': {'m10v_border_camera_refresh','m10v_border_camera_save','m10v_border_camera_cached','m10v_border_camera_snapshot'},
@@ -414,7 +415,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             border_obj=folder/'border-camera.o'
             subprocess.run([compiler,*compile_flags,*border_flags,'-c',str(ROOT/'native/gr3/m10v_border_camera.c'),'-o',str(border_obj)],check=True,capture_output=True)
             border_base=(base+len(image)+15)&~15
-            border_code,border_symbols=link_object(border_obj.read_bytes(),border_base,symbols,'m10v_border_')
+            border_code,border_symbols=link_object(border_obj.read_bytes(),border_base,symbols,'m10v_border_',additional_exports=('m10v_border_camera_sequence',) if companion else ())
             image+=bytes(border_base-base-len(image))+border_code;symbols.update(border_symbols)
             if recipe_snapshot:
                 shot_obj=folder/'border-shot.o'
@@ -428,7 +429,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             hdf_owner_offset=(0x613c if owner_cache else 0x213c) if film_library else 0x13bc
             subprocess.run([compiler,*compile_flags,'-DM10V_HDF_DEFAULT='+str(hdf_default),'-DM10V_HDF_SHARED_RECIPE='+str(int(lifecycle_trace)),'-DM10V_HDF_UI_CACHE='+str(int(sd_library)),'-DM10V_HDF_OWNER_OFFSET='+hex(hdf_owner_offset),'-c',str(ROOT/'native/gr3/m10v_digital_hdf.c'),'-o',str(hdf_obj)],check=True,capture_output=True)
             hdf_base=(base+len(image)+15)&~15
-            hdf_code,hdf_symbols=link_object(hdf_obj.read_bytes(),hdf_base,symbols,'m10v_hdf_',omitted_exports=('m10v_hdf_alloc',) if lifecycle_trace else ())
+            hdf_code,hdf_symbols=link_object(hdf_obj.read_bytes(),hdf_base,symbols,'m10v_hdf_',omitted_exports=('m10v_hdf_alloc',) if lifecycle_trace else (),additional_exports=('m10v_hdf_remote_snapshot',) if companion else ())
             image+=bytes(hdf_base-base-len(image))+hdf_code;symbols.update(hdf_symbols)
             from scripts.build_gr3_digital_hdf import build as build_digital_hdf
             hdf_base=(base+len(image)+15)&~15
@@ -540,8 +541,12 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         companion_report=None
         if companion:
             from scripts.build_gr3_companion_owner import build_companion_owner
+            companion_features={'ab':ab_enabled,'hdf':bool(hdf_enabled),'border':border_enabled,'isp':pure_isp_effects,'zoom':custom_zoom,'aspect':base>=0x540be000}
+            remote_names=['m10v_settings_controller_remote_'+n for n in ['busy','ab_read','ab_write','aspect_read','aspect_write']]
+            remote_names+=['m10v_zoom_camera_snapshot','m10v_zoom_camera_save','m10v_zoom_live_slot','m10v_zoom_live_apply'] if custom_zoom else []
+            companion_imports={**symbols,**dict.fromkeys(remote_names,base)}
             companion_base=(base+len(image)+127)&~127
-            companion_code,companion_report=build_companion_owner(companion_base,symbols,companion_identity,folder)
+            companion_code,companion_report=build_companion_owner(companion_base,companion_imports,companion_identity,folder,extensions=companion_features)
             image+=bytes(companion_base-base-len(image))+companion_code;symbols.update(companion_report['symbols'])
             # Resolve the shared local/remote store gates after their owner
             # module exists. No placeholder is left in a published image.
@@ -553,7 +558,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         if sd_library:
             from scripts.build_gr3_zoom import build as build_zoom
             zoom_base=(base+len(image)+15)&~15
-            zoom_code,zoom_report=build_zoom(zoom_base,capture_stock_rtos(),aspect=base>=0x540be000,seed=zoom_seed,debug_log=symbols['m10v_debug_log'] if debug_mode else None,camera_model=camera_model)
+            zoom_code,zoom_report=build_zoom(zoom_base,capture_stock_rtos(),aspect=base>=0x540be000,seed=zoom_seed,debug_log=symbols['m10v_debug_log'] if debug_mode else None,camera_model=camera_model,companion=companion)
             zoom_report['enabled']=custom_zoom
             image+=bytes(zoom_base-base-len(image))+zoom_code
             symbols.update(zoom_report['symbols'])
@@ -570,13 +575,18 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             subprocess.run([compiler,*compile_flags,*debug_flags,*border_flags,*pair_flags,f'-DM10V_AB_ENABLED={int(ab_enabled)}','-DM10V_LIVE_COLOR='+str(int(owner_cache)),'-c',str(ROOT/'native/gr3/m10v_settings_controller.c'),'-o',str(controller_obj)],check=True,capture_output=True)
             start=(base+len(image)+15)&~15
             placeholders={name:start for name in ['m10v_settings_factory_original','m10v_settings_top_dtor_original','m10v_settings_controller_vtable',*[f'm10v_ab_{n}_original' for n in ['selector','mapper','live_enter','live_leave','live_destroy','live_event','adj_event','adj_refresh','adj_exit','adj_destroy','adj_changed','dispatch']]]}
-            provisional,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**placeholders},'m10v_settings_controller_',additional_exports=AB_CONTROLLER_EXPORTS)
+            provisional,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**placeholders},'m10v_settings_controller_',additional_exports=AB_CONTROLLER_EXPORTS+(tuple(remote_names[:5]) if companion else ()))
             from scripts.build_gr3_settings_hooks import build_settings_hooks
             hook_start=(start+len(provisional)+15)&~15
             hook_code,settings_report=build_settings_hooks(hook_start,{**symbols,**entries},live_color=owner_cache,appended_slots=appended_slots,custom_zoom=custom_zoom,companion=companion)
-            code,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**settings_report['exports']},'m10v_settings_controller_',additional_exports=AB_CONTROLLER_EXPORTS)
+            code,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**settings_report['exports']},'m10v_settings_controller_',additional_exports=AB_CONTROLLER_EXPORTS+(tuple(remote_names[:5]) if companion else ()))
             image+=bytes(start-base-len(image))+code
             image+=bytes(hook_start-base-len(image))+hook_code;symbols.update(entries)
+        if companion:
+            companion_final,companion_final_report=build_companion_owner(companion_base,symbols,companion_identity,folder,extensions=companion_features)
+            if len(companion_final)!=len(companion_code):raise ValueError('companion final relink changed layout')
+            image[companion_base-base:companion_base-base+len(companion_final)]=companion_final
+            companion_report=companion_final_report
         hdf_menu_report=None
         hdf_adj_report=None
         if sd_library and (hdf_enabled or border_enabled):

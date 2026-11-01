@@ -173,3 +173,11 @@ void m10v_hdf_done(uint32_t context,uint32_t params,uint32_t result){
     if(!ram(values,12))return;
     s->ready|=result==1&&((const int16_t *)(uintptr_t)values)[1]==(int16_t)(4+s->strength)?8u:16u;
 }
+#if M10V_COMPANION_ENABLED
+int m10v_hdf_remote_snapshot(uint32_t *strength,uint32_t *sequence){
+ uint32_t fs=filesystem();if(!fs||!strength||!sequence)return -1;
+ hdf_record r;if(latest(fs,&r)){*strength=r.strength;*sequence=r.sequence;return 0;}
+ /* Retain the existing no-record default, with generation zero. */
+ *strength=M10V_HDF_DEFAULT;*sequence=0;return 0;
+}
+#endif

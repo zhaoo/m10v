@@ -8,6 +8,7 @@
 #include "../companion/resident_bridge.h"
 #include "../companion/transaction.h"
 #include "../companion/auth.h"
+#include "../companion/extensions.h"
 #include <stddef.h>
 #if !M10V_COMPANION_ENABLED || !M10V_LIVE_COLOR || !M10V_APPENDED_SLOTS
 #error Companion owner requires explicit opt-in, live cache and ten appended slots
@@ -24,6 +25,7 @@ typedef struct {
  _Alignas(128) m10v_resident_wire wire;
  m10v_resident_consumer consumer;
  m10v_companion_owner transaction;
+ m10v_extension_owner extensions;
  m10v_companion_owner_services services;
  m10v_companion_snapshot base;
 } ui_context;
@@ -51,6 +53,7 @@ uint32_t m10v_companion_ui_storage_enter(uint32_t remote){
  ui_context*c=0;
  if(*(const volatile uint32_t*)0x55063910u&1u)c=context(*(const volatile uint32_t*)0x55063988u);
  if(!c)return remote?0:1;
+ if(!remote&&(c->extensions.pending.present||c->transaction.pending.present))return 0;
  if(c->store_generation==0xffffffffu||c->store_depth||(remote?!c->locked:c->locked))return 0;
  if(remote&&!current(c))return 0;
  c->store_depth=1;c->store_generation++;return (uint32_t)(uintptr_t)c;
@@ -121,6 +124,8 @@ static int set_tone(void*v,unsigned slot){
 }
 static int cache_in(void*v,void*p,uint32_t n){ui_context*c=v;if(p!=&c->wire.request||n!=sizeof(c->wire.request))return 0;((cache_fn)0x5383c834u)(p,n);return 1;}
 static int cache_out(void*v,void*p,uint32_t n){ui_context*c=v;if(p!=&c->wire.response||n>sizeof(c->wire.response))return 0;((cache_fn)0x5383c870u)(p,n);return 1;}
+static int film_enter(void*v){ui_context*c=v;return !c->extensions.pending.present&&enter(v);}
+#include "m10v_companion_extensions.inc"
 static int execute(void*v,uint32_t command,const uint8_t*in,uint32_t bytes,uint8_t*out,uint32_t*length){
  ui_context*c=v;
  if(command==1){
@@ -128,6 +133,15 @@ static int execute(void*v,uint32_t command,const uint8_t*in,uint32_t bytes,uint8
   if(c->session_bound&&!m10v_constant_equal(c->services.metadata.boot_id,in,16))return M10V_ERROR_BRIDGE_UNAVAILABLE;
   copy(c->services.metadata.boot_id,in,16);c->session_bound=1;
   copy(out,in,16);copy(out+16,c->wire.build,32);*length=48;return 0;
+ }
+ if(command>=M10V_READ_EXTENSIONS&&command<=M10V_POLL_EXTENSIONS){
+  *length=sizeof(m10v_extension_result);m10v_extension_result*r=(void*)out;zero(r,sizeof(*r));r->status=M10V_OPERATION_REJECTED;
+  if(!c->session_bound||!current(c)){r->code=M10V_ERROR_BRIDGE_UNAVAILABLE;return (int)r->code;}
+  m10v_extension_services s=extension_services(c);
+  if(command==M10V_READ_EXTENSIONS&&!bytes){r->code=(uint32_t)extension_read(c,&r->snapshot);r->has_snapshot=!r->code;r->status=r->code?M10V_OPERATION_REJECTED:M10V_OPERATION_COMMITTED;return (int)r->code;}
+  if(command==M10V_APPLY_EXTENSIONS&&bytes==sizeof(m10v_extension_patch))return m10v_extensions_apply((const void*)in,&s,r);
+  if(command==M10V_POLL_EXTENSIONS&&bytes==16)return m10v_extensions_poll(in,&s,r);
+  r->code=M10V_ERROR_INVALID_RECIPE;return (int)r->code;
  }
  *length=sizeof(m10v_companion_result);m10v_companion_result*r=(void*)out;zero(r,sizeof(*r));r->status=M10V_OPERATION_REJECTED;
  if(!c->session_bound||!current(c)){r->code=M10V_ERROR_BRIDGE_UNAVAILABLE;return (int)r->code;}
@@ -149,7 +163,7 @@ void m10v_companion_ui_init(uint32_t owner){
  c->wire.magic=M10V_RESIDENT_MAGIC;c->wire.version=2;c->wire.bytes=sizeof(c->wire);c->wire.owner=owner;c->wire.epoch=address;c->services.metadata.owner_generation=address;
  const uint8_t build[32]=M10V_COMPANION_BUILD_BYTES,catalog[32]=M10V_COMPANION_CATALOG_BYTES,renderer[32]=M10V_COMPANION_RENDERER_BYTES;
  copy(c->wire.build,build,32);copy(c->services.metadata.build_id,build,32);copy(c->services.metadata.catalog_hash,catalog,32);copy(c->services.metadata.renderer_hash,renderer,32);
- c->services.ctx=c;c->services.owner=&c->transaction;c->services.is_current=current;c->services.enter=enter;c->services.leave=leave;c->services.is_busy=busy;c->services.snapshot=snapshot;c->services.persist_once=persist;c->services.set_tone=set_tone;
+ c->services.ctx=c;c->services.owner=&c->transaction;c->services.is_current=current;c->services.enter=film_enter;c->services.leave=leave;c->services.is_busy=busy;c->services.snapshot=snapshot;c->services.persist_once=persist;c->services.set_tone=set_tone;
  ((cache_fn)0x5383c870u)(&c->wire,sizeof(c->wire));
  d->version=2;d->bytes=sizeof(*d);d->context=address;d->wire=(uint32_t)(uintptr_t)&c->wire;d->wire_bytes=sizeof(c->wire);d->epoch=address;d->magic=M10V_COMPANION_DESCRIPTOR_MAGIC;
  ((cache_fn)0x5383c870u)(d,sizeof(*d));
