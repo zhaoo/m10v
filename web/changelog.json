@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.01.4",
+      "date": "2026-11-01",
+      "title": "恢复 FN 光晕与 LUT 槽位并保留发布历史",
+      "changes": [
+        "GR III / IIIx 恢复默认写入胶卷 FN 光晕菜单，保留 800T 和蓝凤凰专属渲染及参数转换。",
+        "新网页选卷配置首次启动覆盖旧自定义 LUT 槽位，之后保留机内调整；显式清理可移除当前 SD 目录外的 LUT。",
+        "沿用原 SD 渲染契约，保留失败发布的历史记录。"
+      ],
+      "notice": "按用户要求跳过本地测试和实机验收，部署继续执行既有构建与保护检查。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.01.3",
       "date": "2026-11-01",
       "title": "恢复胶卷 FN 光晕入口并修复自定义 LUT 占槽",
@@ -11,9 +25,19 @@
         "胶卷库显式清理同时移除当前 SD 目录已不存在的自定义 LUT，释放占用槽位，读取失败时停止清理。"
       ],
       "notice": "按用户明确要求跳过本地验证及实机验收，直接合并发布；部署流水线仍执行既有构建与保护。涉及 GR III / IIIx 共享胶卷运行时，未宣称设备验证通过。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "10ba1ba2edc31c609de7f198484fa3c03a90c3b3",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/10ba1ba2edc31c609de7f198484fa3c03a90c3b3"
+    },
+    {
+      "version": "2026.11.01.2",
+      "date": "2026-11-01",
+      "title": "恢复胶卷 FN 光晕入口并修复自定义 LUT 占槽",
+      "changes": ["恢复光晕入口并增加重新导出选卷的一次性应用和目录外 LUT 清理。"],
+      "notice": "本次部署因 SD 渲染契约指纹变化失败，生产自动回滚，未上线。",
+      "commit": "d9b9b7a570646988cb1a38744dfb3bbdb09dbe3c",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/d9b9b7a570646988cb1a38744dfb3bbdb09dbe3c"
     },
     {
       "version": "2026.11.01.1",
