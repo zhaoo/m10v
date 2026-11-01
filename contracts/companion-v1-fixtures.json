@@ -1,0 +1,24 @@
+{
+  "validRecipe": {
+    "schemaVersion": 1,
+    "filmId": 33,
+    "catalogHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rendererHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "parameters": {
+      "grain": 2,
+      "haloGain": 2
+    },
+    "customHash": null,
+    "name": "雨后散步"
+  },
+  "canonicalJson": "{\"catalogHash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"customHash\":null,\"filmId\":33,\"parameters\":{\"grain\":2,\"haloGain\":2},\"rendererHash\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"schemaVersion\":1}",
+  "recipeSha256": "5dfcd4d888ba8c55b314d266cbe61a2715d1f17fa45e8c6da5aeaf3a3643dd7b",
+  "authentication": {
+    "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "canonical": "GET\n/m10v/v1/capabilities\n\n\n0\n00000000000000000000000000000001\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "signatureHex": "18f745b64896ff7051fa334d74846a080a2b1b8a1157cfcc5733b511c58a6147",
+    "testOnly": true,
+    "responseCanonical": "RESPONSE\nGET\n/m10v/v1/capabilities\n01000000000000000000000000000000\n000102030405060708090a0b0c0d0e0f\n0\n00000000000000000000000000000001\n200\n44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "responseSignatureHex": "a9402d60413c87bba7b096a79a616af60818cb7c69d4862bf07c3ba5a52557f8"
+  }
+}
