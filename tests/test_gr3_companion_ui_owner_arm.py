@@ -16,7 +16,7 @@ class ProductionOwner(unittest.TestCase):
   files=[cls.source,*[ROOT/'native/companion'/f for f in ['resident_bridge.c','auth.c','operations.c','json.c','transaction.c','runtime.c']],ROOT/'native/gr3/m10v_library.c'];objects=[]
   for i,p in enumerate(files):
    obj=d/f'{i}.o';subprocess.run(['clang','--target=armv7-none-eabi','-mcpu=cortex-a9','-marm','-mfloat-abi=soft','-Os','-ffreestanding','-fno-builtin','-ffunction-sections','-fdata-sections','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-Wall','-Wextra','-Werror','-DM10V_COMPANION_ENABLED=1','-DM10V_APPENDED_SLOTS=1','-DM10V_LIVE_COLOR=1','-include',str(identity),'-c',str(p),'-o',str(obj)],check=True,capture_output=True);objects.append(obj)
-  cls.ports={name:0x54010000+i*64 for i,name in enumerate(['m10v_camera_library_load','m10v_camera_library_mutation_begin','m10v_camera_library_mutation_end','m10v_camera_library_mutation_busy','m10v_camera_library_commit_snapshot','m10v_sd_camera_custom_record','m10v_camera_library_shooting_count'])}
+  cls.ports={name:0x54010000+i*64 for i,name in enumerate(['m10v_camera_library_read_current','m10v_camera_library_mutation_begin','m10v_camera_library_mutation_end','m10v_camera_library_mutation_busy','m10v_camera_library_commit_snapshot','m10v_sd_camera_custom_record','m10v_camera_library_shooting_count'])}
   elf=d/'owner.elf';subprocess.run(['ld.lld','-m','armelf_linux_eabi','--gc-sections','--entry=m10v_companion_ui_init','--undefined=m10v_companion_ui_stop','--undefined=m10v_companion_ui_storage_enter','--undefined=m10v_companion_ui_storage_leave','-Ttext=0x540c0000',*[f'--defsym={k}={v}' for k,v in cls.ports.items()],*[str(p) for p in objects],'-o',str(elf)],check=True,capture_output=True)
   cls.elf=elf.read_bytes();nm=subprocess.check_output(['/opt/homebrew/opt/llvm/bin/llvm-nm','--defined-only',str(elf)],text=True);cls.symbols={line.split()[2]:int(line.split()[0],16) for line in nm.splitlines() if len(line.split())==3}
   path=Path(os.environ.get('M10V_GR3_ORIGINAL_RTOS','/Users/zhaoo/.codex/worktrees/film-companion/diagnostic-20261101/source/builds/gr3-extension-validation/official-rtos.bin'));cls.firmware=path.read_bytes();assert hashlib.sha256(cls.firmware).hexdigest()=='8a4eafcad2716e0b21e9909264e1242e534f0e39e05cba82a53546ceb4070b67'
@@ -28,7 +28,7 @@ class ProductionOwner(unittest.TestCase):
     if not (0x53000000<=at<0x56000000):m.u.mem_map(at&~4095,((at%4096+n+4095)//4096)*4096)
     m.u.mem_write(at,b[off:off+n])
   m.set(0x55063910,1);m.set(0x55063988,0x55860000);m.saves=0;m.allocations=0;m.native_callback_locks=[];m.mutation=0;m.tone=25
-  m.state=bytearray(184);struct.pack_into('<IHHI',m.state,0,0x5630314d,5,184,17)
+  m.load_result=0;m.pause_on_load=False;m.state=bytearray(184);struct.pack_into('<IHHI',m.state,0,0x5630314d,5,184,17)
   for i in range(10):struct.pack_into('<HBBBBBB',m.state,12+8*i,34+i,0,0,0,3,5,6)
   struct.pack_into('<I',m.state,180,zlib.crc32(m.state[:180]))
   for guard in [0x55064398,0x55063ecc,0x55063dcc]:m.set(guard,1)
@@ -43,7 +43,9 @@ class ProductionOwner(unittest.TestCase):
    elif pc in [0x5383c834,0x5383c870]:result=0
    elif pc==0x53228a90:result=0x56006000
    elif pc==self.symbols['m10v_companion_ui_timer']:m.native_callback_locks.append((m.locks.get(0x550645f0+0x38,0),m.locks.get(0x550645f0+0x24,0)))
-   elif pc==self.ports['m10v_camera_library_load']:u.mem_write(args[0],bytes(m.state));result=0
+   elif pc==self.ports['m10v_camera_library_read_current']:
+    u.mem_write(args[0],bytes(m.state));result=m.load_result
+    if m.pause_on_load:u.emu_stop();return
    elif pc==self.ports['m10v_camera_library_mutation_begin']:
     result=int(not m.mutation);m.mutation=1
    elif pc==self.ports['m10v_camera_library_mutation_end']:m.mutation=0;result=0
@@ -99,3 +101,33 @@ class ProductionOwner(unittest.TestCase):
   token=m.run(enter,0);self.assertGreater(token,1);self.assertEqual(m.run(enter,0),0);self.assertEqual(m.run(enter,1),0);self.assertEqual(m.run(leave,token),1)
   self.assertEqual(m.run(enter,1),0)
   token=m.run(enter,0);m.run(self.symbols['m10v_companion_ui_stop'],owner);self.assertEqual(m.run(leave,token),0)
+
+ def test_migrated_or_default_state_is_never_a_current_remote_snapshot(self):
+  for load_result in [1,2,3,4]:
+   with self.subTest(load_result=load_result):
+    m=self.machine();m.load_result=load_result;m.run(self.symbols['m10v_companion_ui_init'],0x55860000);wire=m.word(0x55860000+0x6400+16);m.run(self.symbols['m10v_companion_ui_start'],0x55860000)
+    self.assertEqual(self.exchange(m,wire,2,1,bytes([7]*16))[0],0)
+    code,result=self.exchange(m,wire,4,2);self.assertNotEqual(code,0);self.assertEqual(struct.unpack_from('<I',result,8)[0],0);self.assertEqual(m.saves,0)
+ def test_read_during_local_store_or_mutation_is_busy_and_has_no_snapshot(self):
+  for with_store in [False,True]:
+   with self.subTest(with_store=with_store):
+    m=self.machine();m.run(self.symbols['m10v_companion_ui_init'],0x55860000);wire=m.word(0x55860000+0x6400+16);m.run(self.symbols['m10v_companion_ui_start'],0x55860000)
+    self.exchange(m,wire,2,1,bytes([7]*16));token=m.run(self.symbols['m10v_companion_ui_storage_enter'],0) if with_store else 0;m.mutation=1
+    code,result=self.exchange(m,wire,4,2);self.assertEqual(code,6);self.assertEqual(struct.unpack_from('<I',result,8)[0],0);self.assertEqual(m.saves,0)
+    m.mutation=0
+    if token:self.assertEqual(m.run(self.symbols['m10v_companion_ui_storage_leave'],token),1)
+    self.assertEqual(self.exchange(m,wire,6,2)[0],0)
+
+ def test_local_store_completing_during_read_invalidates_snapshot(self):
+  m=self.machine();m.run(self.symbols['m10v_companion_ui_init'],0x55860000);wire=m.word(0x55860000+0x6400+16);m.run(self.symbols['m10v_companion_ui_start'],0x55860000);self.exchange(m,wire,2,1,bytes([7]*16))
+  m.pause_on_load=True
+  with self.assertRaisesRegex(AssertionError,'ARM did not reach boundary'):self.exchange(m,wire,4,2)
+  self.assertEqual(m.u.reg_read(UC_ARM_REG_PC),self.ports['m10v_camera_library_read_current'])
+  u=m.u;saved=u.context_save()
+  try:
+   u.reg_write(UC_ARM_REG_SP,0x56008000);u.reg_write(UC_ARM_REG_LR,STOP);u.reg_write(UC_ARM_REG_R0,0);u.emu_start(self.symbols['m10v_companion_ui_storage_enter'],STOP,count=10000);token=u.reg_read(UC_ARM_REG_R0);self.assertGreater(token,1)
+   u.reg_write(UC_ARM_REG_LR,STOP);u.reg_write(UC_ARM_REG_R0,token);u.emu_start(self.symbols['m10v_companion_ui_storage_leave'],STOP,count=10000);self.assertEqual(u.reg_read(UC_ARM_REG_R0),1)
+  finally:u.context_restore(saved)
+  m.pause_on_load=False;u.emu_start(u.reg_read(UC_ARM_REG_PC),STOP,count=1000000);self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x53228c20)
+  response=wire+128+1152;self.assertEqual(m.word(response),4);self.assertEqual(m.word(response+20),6);self.assertEqual(m.word(response+128+8),0)
+  self.assertEqual(self.exchange(m,wire,6,2)[0],0)

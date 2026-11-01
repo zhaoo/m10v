@@ -165,16 +165,30 @@ static int store_guarded(void *context, const m10v_library_state *next,uint32_t 
     (void)remote;
 #endif
     uint32_t fs = (uint32_t)(uintptr_t)context;
+#if M10V_LIVE_COLOR && M10V_COMPANION_ENABLED
+    preview_cache *origin=preview_owner();
+#endif
     const char *name = state_names[next->sequence & 1];
     m10v_library_state readback;int result=-1;
     for (uint32_t i = 0; i < sizeof(readback); ++i) ((uint8_t *)&readback)[i] = 0;
-    if (!((write_fn)0x53825fa8u)(fs, name, sizeof(*next), next) ||
-        !((read_fn)0x53825648u)(fs, name, sizeof(readback), &readback) ||
+    if (!((write_fn)0x53825fa8u)(fs, name, sizeof(*next), next))goto finish;
+#if M10V_COMPANION_ENABLED
+    if(!m10v_companion_ui_storage_current(token))goto finish;
+#endif
+    if (!((read_fn)0x53825648u)(fs, name, sizeof(readback), &readback) ||
         !m10v_library_valid(&readback)) goto finish;
     for (uint32_t i = 0; i < sizeof(readback); ++i)
         if (((const uint8_t *)&readback)[i] != ((const uint8_t *)next)[i]) goto finish;
+#if M10V_COMPANION_ENABLED
+    if(!m10v_companion_ui_storage_current(token))goto finish;
+#endif
 #if M10V_LIVE_COLOR
+#if M10V_COMPANION_ENABLED
+    if(preview_owner()!=origin)goto finish;
+    publish_preview(origin,next);
+#else
     publish_preview(preview_owner(),next);
+#endif
 #endif
     result=0;
 finish:
@@ -185,11 +199,24 @@ finish:
 }
 static int store(void *context,const m10v_library_state *next){return store_guarded(context,next,0);}
 #if M10V_COMPANION_ENABLED
-static int load_library(m10v_library_state *state);
+/* Remote observations never migrate, synthesize defaults or publish UI caches.
+ * Keep the original local loader and its migration behavior unchanged. */
+int m10v_camera_library_read_current(m10v_library_state *state){
+    if(!ram(state,sizeof(*state)))return M10V_LIBRARY_INVALID;
+    uint32_t fs=filesystem();if(!fs)return M10V_LIBRARY_INVALID;
+    m10v_library_state records[2];int good[2]={0,0};
+    for(uint32_t k=0;k<2;k++){
+        for(uint32_t i=0;i<sizeof(*state);i++)((uint8_t*)&records[k])[i]=0;
+        good[k]=((read_fn)0x53825648u)(fs,state_names[k],sizeof(*state),&records[k])&&m10v_library_valid(&records[k]);
+    }
+    if(!good[0]&&!good[1])return M10V_LIBRARY_INVALID;
+    uint32_t selected=!good[0]||(good[1]&&records[1].sequence>records[0].sequence);
+    copy(state,&records[selected]);return M10V_LIBRARY_OK;
+}
 int m10v_camera_library_commit_snapshot(const m10v_library_state *next){
     if(!m10v_library_valid(next)||!m10v_camera_library_mutation_busy())return M10V_LIBRARY_INVALID;
     m10v_library_state prior;
-    if(load_library(&prior)<0||prior.sequence==0xffffffffu||next->sequence!=prior.sequence+1u)return M10V_LIBRARY_INVALID;
+    if(m10v_camera_library_read_current(&prior)!=0||prior.sequence==0xffffffffu||next->sequence!=prior.sequence+1u)return M10V_LIBRARY_INVALID;
     uint32_t fs=filesystem();
     return fs&&store_guarded((void*)(uintptr_t)fs,next,1)==0?M10V_LIBRARY_OK:M10V_LIBRARY_STORE_FAILED;
 }

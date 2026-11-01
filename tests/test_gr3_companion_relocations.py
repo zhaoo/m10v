@@ -4,7 +4,7 @@ from scripts.build_gr3_m10v_library import link_object
 class ConditionalRelocation(unittest.TestCase):
  def test_conditional_call_preserves_condition_link_and_target(self):
   with tempfile.TemporaryDirectory()as tmp:
-   p=Path(tmp);source=p/'call.S';source.write_text('.syntax unified\n.arm\n.text\n'+''.join('.global m10v_companion_ui_'+n+'\n.type m10v_companion_ui_'+n+',%function\nm10v_companion_ui_'+n+':\n'+body+'\n' for n,body in [('init','push {r4,lr}\ncmp r0,#0\nblne m10v_companion_ui_start\npop {r4,pc}'),('start','mov r0,#7\nbx lr'),('stop','bx lr'),('timer','bx lr'),('storage_enter','bx lr'),('storage_leave','bx lr')]))
+   p=Path(tmp);source=p/'call.S';source.write_text('.syntax unified\n.arm\n.text\n'+''.join('.global m10v_companion_ui_'+n+'\n.type m10v_companion_ui_'+n+',%function\nm10v_companion_ui_'+n+':\n'+body+'\n' for n,body in [('init','push {r4,lr}\ncmp r0,#0\nblne m10v_companion_ui_start\npop {r4,pc}'),('start','mov r0,#7\nbx lr'),('stop','bx lr'),('timer','bx lr'),('storage_enter','bx lr'),('storage_leave','bx lr'),('storage_current','bx lr')]))
    subprocess.run(['clang','--target=armv7-none-eabi','-marm','-c',str(source),'-o',str(p/'call.o')],check=True,capture_output=True)
    data=(p/'call.o').read_bytes();code,symbols=link_object(data,0x54100000,prefix='m10v_companion_ui_');word=struct.unpack_from('<I',code,8)[0]
    self.assertEqual(word>>24,0x1b);delta=(word&0xffffff)<<2

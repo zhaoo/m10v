@@ -12,12 +12,15 @@ class NativeStore(unittest.TestCase):
    obj=d/f'{i}.o';r=subprocess.run(['clang','--target=armv7-none-eabi','-mcpu=cortex-a9','-marm','-mfloat-abi=soft','-Os','-ffreestanding','-fno-builtin','-ffunction-sections','-fdata-sections','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-DM10V_COMPANION_ENABLED=1','-DM10V_LIVE_COLOR=1','-DM10V_APPENDED_SLOTS=1','-DM10V_SD_LIBRARY=1','-c',str(ROOT/name),'-o',str(obj)],capture_output=True,text=True)
    if r.returncode:raise AssertionError(r.stderr)
    objects.append(obj)
-  out=d/'store.elf';r=subprocess.run(['ld.lld','-m','armelf_linux_eabi','--gc-sections','--entry=m10v_camera_library_commit_snapshot','-Ttext=0x540c0000','--defsym=m10v_sd_camera_custom_record=0x54010000','--defsym=m10v_companion_ui_storage_enter=0x54010040','--defsym=m10v_companion_ui_storage_leave=0x54010080',*[str(p) for p in objects],'-o',str(out)],capture_output=True,text=True)
+  out=d/'store.elf';r=subprocess.run(['ld.lld','-m','armelf_linux_eabi','--gc-sections','--entry=m10v_camera_library_commit_snapshot','-Ttext=0x540c0000','--defsym=m10v_sd_camera_custom_record=0x54010000','--defsym=m10v_companion_ui_storage_enter=0x54010040','--defsym=m10v_companion_ui_storage_leave=0x54010080','--defsym=m10v_companion_ui_storage_current=0x540100c0',*[str(p) for p in objects],'-o',str(out)],capture_output=True,text=True)
   if r.returncode:raise AssertionError(r.stderr)
   cls.elf=out.read_bytes();nm=subprocess.check_output(['/opt/homebrew/opt/llvm/bin/llvm-nm','--defined-only',str(out)],text=True);cls.symbols={line.split()[2]:int(line.split()[0],16) for line in nm.splitlines() if len(line.split())==3}
  def test_real_store_single_write_full_readback_and_failure_paths(self):
   self.assertIn('m10v_camera_library_commit_snapshot',self.symbols,'native single-commit API is missing')
-  for fault in [None,'crc','sequence','readback','write','unlocked']:
+  for fault in [None,'crc','sequence','readback','write','unlocked','owner_write','owner_read']:
+   with self.subTest(fault=fault):self.run_case(fault)
+ def test_current_reader_never_migrates_or_publishes_preview(self):
+  for fault in ['read_current','read_one_good','read_corrupt','read_only_legacy','read_empty']:
    with self.subTest(fault=fault):self.run_case(fault)
  def run_case(self,fault):
   u=Uc(UC_ARCH_ARM,UC_MODE_ARM);u.mem_map(0x53000000,0x3000000);u.mem_map(0x56000000,0x20000)
@@ -35,24 +38,42 @@ class NativeStore(unittest.TestCase):
   struct.pack_into('<I',old,180,zlib.crc32(old[:180]));new=bytearray(old);new[86]=2;struct.pack_into('<I',new,8,17 if fault=='sequence' else 18);struct.pack_into('<I',new,180,zlib.crc32(new[:180]))
   if fault=='crc':new[86]^=1
   address=0x558f0000;u.mem_write(address,bytes(new));files={'M10V6B.bin':bytes(old)};writes=[]
+  if fault=='read_current':files['M10V6A.bin']=bytes(new)
+  if fault in ['read_one_good','read_corrupt']:
+   bad=bytearray(new);bad[-1]^=1;files['M10V6A.bin']=bytes(bad)
+   if fault=='read_corrupt':files['M10V6B.bin']=bytes(bad)
+  if fault in ['read_empty','read_only_legacy']:files={}
+  if fault=='read_only_legacy':
+   legacy=bytearray(old[:12]+old[12:52]+old[92:96]+old[96:136]+old[176:180]);struct.pack_into('<HH',legacy,4,4,104)
+   for i in range(5):legacy[12+i*8+7]=2
+   legacy+=struct.pack('<I',zlib.crc32(legacy));files['M10V5B.bin']=bytes(legacy)
   def hook(cpu,pc,n,ctx):
    regs=[cpu.reg_read(r) for r in [UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3]];result=None
    if pc==0x54010040:self.assertEqual(regs[0],1);result=1
-   elif pc==0x54010080:self.assertEqual(regs[0],1);result=1
+   elif pc in [0x54010080,0x540100c0]:self.assertEqual(regs[0],1);result=int(struct.unpack('<I',cpu.mem_read(0x55063988,4))[0]==owner)
    elif pc==0x53828014:result=0x558e0000
    elif pc in [0x53825648,0x53825fa8]:
     name=bytes(cpu.mem_read(regs[1],12)).split(b'\0')[0].decode();self.assertIn(name,['M10V6A.bin','M10V6B.bin']);self.assertEqual(regs[2],184)
     if pc==0x53825fa8:
      writes.append(name);data=bytes(cpu.mem_read(regs[3],184))
      if fault!='write':files[name]=data if fault!='readback' else bytes(old)
+     if fault=='owner_write':put(0x55063988,0x55870000);put(0x55870000+0x213c,0x3856504d,2)
      result=int(fault!='write')
-    elif name in files:cpu.mem_write(regs[3],files[name]);result=1
+    elif name in files:
+     cpu.mem_write(regs[3],files[name]);result=1
+     if fault=='owner_read' and name=='M10V6A.bin':put(0x55063988,0x55870000);put(0x55870000+0x213c,0x3856504d,2)
     else:result=0
    if result is not None:cpu.reg_write(UC_ARM_REG_R0,result);cpu.reg_write(UC_ARM_REG_PC,cpu.reg_read(UC_ARM_REG_LR))
-  u.hook_add(UC_HOOK_CODE,hook);u.reg_write(UC_ARM_REG_SP,0x5600f000);u.reg_write(UC_ARM_REG_LR,0x56010000);u.reg_write(UC_ARM_REG_R0,address);u.emu_start(self.symbols['m10v_camera_library_commit_snapshot'],0x56010000,count=1000000)
+  u.hook_add(UC_HOOK_CODE,hook);u.reg_write(UC_ARM_REG_SP,0x5600f000);u.reg_write(UC_ARM_REG_LR,0x56010000);u.reg_write(UC_ARM_REG_R0,address);u.emu_start(self.symbols['m10v_camera_library_read_current' if str(fault).startswith('read_') else 'm10v_camera_library_commit_snapshot'],0x56010000,count=1000000)
   self.assertEqual(u.reg_read(UC_ARM_REG_PC),0x56010000)
+  if str(fault).startswith('read_'):
+   self.assertEqual(writes,[]);self.assertEqual(u.reg_read(UC_ARM_REG_R0)==0,fault in ['read_current','read_one_good']);self.assertEqual(struct.unpack('<I',u.mem_read(owner+0x2140,4))[0],3)
+   if fault in ['read_current','read_one_good']:self.assertEqual(bytes(u.mem_read(address,184)),bytes(new if fault=='read_current' else old))
+   return
   if fault in ['crc','sequence','unlocked']:self.assertEqual(writes,[])
   else:self.assertEqual(writes,['M10V6A.bin'])
   self.assertEqual(u.reg_read(UC_ARM_REG_R0)==0,fault is None)
   self.assertEqual(files['M10V6B.bin'],bytes(old))
+  if fault in ['owner_write','owner_read']:
+   self.assertEqual(struct.unpack('<I',u.mem_read(0x55870000+0x2140,4))[0],2,'old request published into successor preview')
   if fault is None:self.assertEqual(files['M10V6A.bin'],bytes(new))

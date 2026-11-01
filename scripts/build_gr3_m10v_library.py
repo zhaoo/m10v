@@ -129,7 +129,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_operation_': {'m10v_operation_parse','m10v_operation_parse_tokens','m10v_operation_digest'},
         'm10v_companion_': {'m10v_companion_owner_init','m10v_companion_state_seal','m10v_companion_snapshot_identity','m10v_companion_apply','m10v_companion_apply_local','m10v_companion_owner_poll'},
         'm10v_resident_': {'m10v_resident_crc','m10v_resident_consume'},
-        'm10v_companion_ui_': {'m10v_companion_ui_init','m10v_companion_ui_start','m10v_companion_ui_stop','m10v_companion_ui_timer','m10v_companion_ui_storage_enter','m10v_companion_ui_storage_leave'},
+        'm10v_companion_ui_': {'m10v_companion_ui_init','m10v_companion_ui_start','m10v_companion_ui_stop','m10v_companion_ui_timer','m10v_companion_ui_storage_enter','m10v_companion_ui_storage_leave','m10v_companion_ui_storage_current'},
         'm10v_zoom_': set(),  # Checked against the zoom module's explicit ABI registry.
         'm10v_border_': {'m10v_border_camera_refresh','m10v_border_camera_save','m10v_border_camera_cached','m10v_border_camera_snapshot'},
         'm10v_border_shot_': {'m10v_border_shot_freeze','m10v_border_shot_read','m10v_border_shot_orientation','m10v_border_shot_phase','m10v_border_shot_transition'},
@@ -383,8 +383,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         camera_base = (base + len(image) + 15) & ~15
         # Forward-only veneers occupy the final reserved16 bytes; the SD
         # module itself consumes camera APIs and is linked afterward.
-        camera_externals={**symbols,**({'m10v_companion_ui_storage_enter':base+0x100,'m10v_companion_ui_storage_leave':base+0x104} if companion else {}),**({'m10v_sd_camera_custom_record':base+0xf0,'m10v_sd_u32':base+0xf4} if sd_library else {})}
-        camera, camera_symbols = link_object(camera_obj.read_bytes(), camera_base, camera_externals, 'm10v_camera_library_',additional_exports=('m10v_camera_library_commit_snapshot',) if companion else ())
+        camera_externals={**symbols,**({'m10v_companion_ui_storage_enter':base+0x100,'m10v_companion_ui_storage_leave':base+0x104,'m10v_companion_ui_storage_current':base+0x108} if companion else {}),**({'m10v_sd_camera_custom_record':base+0xf0,'m10v_sd_u32':base+0xf4} if sd_library else {})}
+        camera, camera_symbols = link_object(camera_obj.read_bytes(), camera_base, camera_externals, 'm10v_camera_library_',additional_exports=('m10v_camera_library_commit_snapshot','m10v_camera_library_read_current') if companion else ())
         image += bytes(camera_base - base - len(image)) + camera
         symbols.update(camera_symbols)
         (out / 'm10v-library-camera-arm.o').write_bytes(camera_obj.read_bytes())
@@ -545,7 +545,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             image+=bytes(companion_base-base-len(image))+companion_code;symbols.update(companion_report['symbols'])
             # Resolve the shared local/remote store gates after their owner
             # module exists. No placeholder is left in a published image.
-            camera_final,_=link_object(camera_obj.read_bytes(),camera_base,{**camera_externals,**{n:symbols[n] for n in ['m10v_companion_ui_storage_enter','m10v_companion_ui_storage_leave']}},'m10v_camera_library_',additional_exports=('m10v_camera_library_commit_snapshot',))
+            camera_final,_=link_object(camera_obj.read_bytes(),camera_base,{**camera_externals,**{n:symbols[n] for n in ['m10v_companion_ui_storage_enter','m10v_companion_ui_storage_leave','m10v_companion_ui_storage_current']}},'m10v_camera_library_',additional_exports=('m10v_camera_library_commit_snapshot','m10v_camera_library_read_current'))
             if len(camera_final)!=len(camera):raise ValueError('companion camera relink changed layout')
             image[camera_base-base:camera_base-base+len(camera_final)]=camera_final
         settings_report = None

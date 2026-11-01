@@ -20,7 +20,7 @@ typedef uint32_t (*fn2)(uint32_t,uint32_t);
 typedef uint32_t (*fn3)(uint32_t,uint32_t,uint32_t);
 typedef void (*cache_fn)(void*,uint32_t);
 typedef struct {
- uint32_t vtable,ui_owner,timer_id,session_bound,vtable_words[3],locked,store_depth;
+ uint32_t vtable,ui_owner,timer_id,session_bound,vtable_words[3],locked,store_depth,store_generation;
  _Alignas(128) m10v_resident_wire wire;
  m10v_resident_consumer consumer;
  m10v_companion_owner transaction;
@@ -51,17 +51,22 @@ uint32_t m10v_companion_ui_storage_enter(uint32_t remote){
  ui_context*c=0;
  if(*(const volatile uint32_t*)0x55063910u&1u)c=context(*(const volatile uint32_t*)0x55063988u);
  if(!c)return remote?0:1;
- if(c->store_depth||(remote?!c->locked:c->locked))return 0;
+ if(c->store_generation==0xffffffffu||c->store_depth||(remote?!c->locked:c->locked))return 0;
  if(remote&&!current(c))return 0;
- c->store_depth=1;return (uint32_t)(uintptr_t)c;
+ c->store_depth=1;c->store_generation++;return (uint32_t)(uintptr_t)c;
+}
+uint32_t m10v_companion_ui_storage_current(uint32_t token){
+ if(token==1)return 1;
+ if(!ram(token,sizeof(ui_context))||(token&127u))return 0;
+ ui_context*c=(void*)(uintptr_t)token;
+ return c->wire.magic==M10V_RESIDENT_MAGIC&&c->store_depth&&c->ui_owner&&(*(const volatile uint32_t*)0x55063910u&1u)&&*(const volatile uint32_t*)0x55063988u==c->ui_owner&&context(c->ui_owner)==c;
 }
 uint32_t m10v_companion_ui_storage_leave(uint32_t token){
  if(token==1)return 1;
  if(!ram(token,sizeof(ui_context))||(token&127u))return 0;
  ui_context*c=(void*)(uintptr_t)token;
  if(c->wire.magic!=M10V_RESIDENT_MAGIC||!c->store_depth)return 0;
- c->store_depth=0;
- return c->ui_owner&&(*(const volatile uint32_t*)0x55063910u&1u)&&*(const volatile uint32_t*)0x55063988u==c->ui_owner&&context(c->ui_owner)==c;
+ uint32_t valid=m10v_companion_ui_storage_current(token);c->store_depth=0;return valid;
 }
 static int busy(void*v){
  (void)v;
@@ -73,8 +78,8 @@ static int enter(void*v){ui_context*c=v;if(c->locked||!current(c)||busy(c)||!m10
 static void leave(void*v){
  ui_context*c=v;if(!c->locked)return;c->locked=0;
  if(current(c)){
-  int loaded=m10v_camera_library_load(&c->base.state);
-  if(current(c))m10v_camera_library_mutation_end(loaded>=0?&c->base.state:0);
+  int loaded=m10v_camera_library_read_current(&c->base.state);
+  if(current(c))m10v_camera_library_mutation_end(loaded==0?&c->base.state:0);
  }
 }
 static uint32_t model(void){
@@ -84,8 +89,13 @@ static uint32_t model(void){
 static int active(void){uint32_t m=model();if(!m)return -1;if(((fn1)0x532bd6d4u)(m))return -1;uint32_t n=m10v_tone_slot(((fn1)0x532bd6b4u)(m));return n<M10V_SLOT_COUNT?(int)n:-1;}
 static int snapshot(void*v,m10v_companion_snapshot*out){
  ui_context*c=v;if(!current(c))return M10V_ERROR_BRIDGE_UNAVAILABLE;
+ if(c->store_depth||(!c->locked&&m10v_camera_library_mutation_busy()))return M10V_ERROR_BUSY;
+ uint32_t generation=c->store_generation;
  zero(out,sizeof(*out));
- if(m10v_camera_library_load(&out->state)<0||!current(c))return M10V_ERROR_BRIDGE_UNAVAILABLE;
+ int loaded=m10v_camera_library_read_current(&out->state);
+ if(!current(c))return M10V_ERROR_BRIDGE_UNAVAILABLE;
+ if(generation!=c->store_generation||c->store_depth||(!c->locked&&m10v_camera_library_mutation_busy()))return M10V_ERROR_BUSY;
+ if(loaded!=0)return M10V_ERROR_BRIDGE_UNAVAILABLE;
  out->active_slot=(int8_t)active();out->busy=(uint8_t)busy(c);
  uint8_t*record=0;int code=0;
  for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)if(M10V_CUSTOM(out->state.slots[i].film)){
@@ -95,6 +105,7 @@ static int snapshot(void*v,m10v_companion_snapshot*out){
  }
  if(record)((void(*)(void*))0x536af2e4u)(record);
  if(code||!current(c))return M10V_ERROR_BRIDGE_UNAVAILABLE;
+ if(generation!=c->store_generation||c->store_depth||(!c->locked&&m10v_camera_library_mutation_busy())||active()!=out->active_slot)return M10V_ERROR_BUSY;
  return m10v_companion_snapshot_identity(&c->services.metadata,out);
 }
 static int persist(void*v,const m10v_library_state*state){
