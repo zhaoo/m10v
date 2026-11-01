@@ -42,7 +42,20 @@ void m10v_settings_key(m10v_settings *p,const m10v_settings_ops *o,uint32_t key)
     if(o->load(o->context,&fresh)<0||!m10v_library_valid(&fresh)){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
     for(uint32_t b=0;b<sizeof(fresh);b++)((uint8_t *)&p->saved)[b]=((const uint8_t *)&fresh)[b];
     uint32_t count=m10v_library_count(&fresh),slot=0;
-    while(slot<count&&(m10v_directory_name(fresh.slots[slot].film)||M10V_CUSTOM(fresh.slots[slot].film)))slot++;
+    while(slot<count){
+     uint32_t id=fresh.slots[slot].film,found=!!m10v_directory_name(id);
+     if(M10V_CUSTOM(id)){
+      uint32_t extent=o->extent?o->extent(o->context):p->group;
+      if(extent<M10V_DIRECTORY_COUNT||extent>M10V_SD_DIRECTORY_LIMIT){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
+      for(uint32_t i=M10V_DIRECTORY_COUNT;i<extent;i++){
+       uint32_t available=item(o,i);
+       if(!available){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
+       if(available==id){found=1;break;}
+      }
+     }
+     if(!found)break;
+     slot++;
+    }
     if(slot==count){p->error=0;return;}
     if(o->remove(o->context,slot)!=0){p->error=M10V_SETTINGS_SAVE_FAILED;return;}
    }

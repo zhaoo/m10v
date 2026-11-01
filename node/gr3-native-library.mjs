@@ -95,7 +95,7 @@ export function prepareNative(source,value,{debug_mode=false,extensions:requeste
  if(typeof live_color!=='boolean'||(live_color&&!film_library))throw Error('原生色调预览仅支持 GR III 胶卷方案');
  if(border_enabled&&!live_color&&!pure_isp_effects)throw Error('边框需要原生 ISP 成片与预览管线');
  if(typeof halation_enabled!=='boolean'||(halation_enabled&&(!film_library||!live_color)))throw Error('通用光晕仅支持 GR III 原生胶卷库，写入开关必须为布尔值');
- if(halation_enabled)configuration.slots.forEach(s=>{s.halo.gain=0;s.halo.profile=2;});
+ if(halation_enabled)configuration.slots.forEach(s=>{if(![33,67].includes(s.film)){s.halo.gain=0;s.halo.profile=2;}});
  // Capture ISP preparation is independent of the optional live colour preview.
  const four_looks=film_library&&configuration.slots.some(s=>s.film>=318&&s.film<=321);
  const capture_pipeline=pure_isp_effects||live_color?'gr3-native-v8':four_looks&&camera_model==='gr3'?'gr3-native-v7':hdf_enabled?'gr3-native-hdf':debug_mode?'gr3-native-v7':'software';
@@ -113,7 +113,7 @@ export function prepareNative(source,value,{debug_mode=false,extensions:requeste
   stock_detail:{ids:[18,19,20,...(native_grain?[21]:[]),...(halation_enabled?[22]:[]),28,29],fields:['gain','spread','threshold',...(native_grain?['grain']:[]),...(halation_enabled?['halationMode']:[]),'filmExposure','charmeraColor'],films:'all',halation_films:halation_enabled?'all':[33,67],halation_modes:halation_enabled?['off','spill','streak']:null,charmera_color:{film:289,colors:['红','黄','蓝','灰']},film_exposure:{films:{67:[200,120],68:[125,64,250]}},slots:appended_slots?10:5,lifecycle:'stock immediate callback'},
   initial_state_hex:initialState(configuration).toString('hex'),film_5207_reference:{table_sha256:reference.table_sha256,table_size:reference.table_size,table_bits:reference.table_bits,input:reference.input,camera_calibrated:false,film_calibrated:false,halation:false},visible_film_count:film_library?FILM_DIRECTORY.length:0,film_count:film_library?107:0,active_slots:film_library?configuration.slots.length:0,camera_tested:false,external_film_pack:film_library,
   scope:film_library&&live_color?'原厂 ISP 胶卷色彩、取景色调预览、颗粒与静态照片效果；光晕与 HDF 不提供实时取景。':film_library?(hdf_enabled?'静态 JPEG 胶卷与时间戳；HDF 使用独立机内菜单。取景与 RAW 再开发未接入。':'静态 JPEG 胶卷与时间戳；取景与 RAW 再开发未接入。'):'独立数字 HDF 菜单与静态 JPEG 柔焦；原厂影像控制、名称、图标及 RAW 像素保持原样。',
-  initial_settings_policy:'首次无有效 M10V 记录时使用网页默认值；已有机内 M10V 记录优先。'};
+  initial_settings_policy:'网页胶卷配置变化后首次启动写入选卷（可覆盖自定义 LUT）；同配置后续启动保留机内调整，全局设置保持原存档。'};
 }
 let building=false;
 export function validatePureIspEffectsManifest(manifest,enabled=false,runtime){

@@ -49,7 +49,8 @@ static uint32_t root_rows(const uint8_t *m,uint32_t index){
     uint32_t rows[5],n=0;
     if(M10V_ISP_NATIVE_GRAIN_MODE&&film!=M10V_CHAR_ID&&film!=M10V_PIXEL_ID)rows[n++]=130;
     rows[n++]=132;
-    if(film==33||film==67||film==68||film==M10V_CHAR_ID)rows[n++]=film==M10V_CHAR_ID?359:film==68?340:film==67?339:214;
+    if(M10V_UNIVERSAL_HALATION||film==33||film==67)rows[n++]=film==67?339:214;
+    if(film==68||film==M10V_CHAR_ID)rows[n++]=film==M10V_CHAR_ID?359:340;
     return index==0xffffffffu?n:index<n?rows[index]:0;
 }
 static uint32_t group_count(uint32_t group,const uint8_t *m){

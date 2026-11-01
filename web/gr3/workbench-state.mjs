@@ -15,6 +15,8 @@ export function updateWorkbenchFeature(selected,id,enabled,model='gr3'){
 export function normalizeWorkbenchDraft(draft={},catalog=[],current=defaultConfiguration(),model=draft.model||'gr3') {
  const hdfOnly=draft.profile==='native'&&draft.features?.includes('digitalHdf')&&!draft.features.includes('film');
  const selected=new Set(draft.features||[]);
+ // Restore FN capability once; preserve subsequent explicit opt-outs.
+ if(draft.halationMenuSchema!==1&&!hdfOnly&&model!=='gr4')selected.add('halation');
  if(!selected.has('film')||!selected.has('digitalHdf')||!selected.has('border')||!modelCapabilities(model).ispEffects)selected.delete('ispEffects');
  if(draft.imagingSchema!==1&&Object.keys(draft.powerImages||{}).length)selected.add('powerImages');
  const features=[...(hdfOnly?[]:['film']),...extensionFeatures.filter(id=>selected.has(id)&&!(hdfOnly&&['halation','border','timestamp','abCompare'].includes(id)))];
@@ -26,7 +28,7 @@ export function normalizeWorkbenchDraft(draft={},catalog=[],current=defaultConfi
  if(!features.includes('timestamp'))configuration.filmNameStamp=false;
  if(!features.includes('digitalHdf'))configuration.hdf=0;
  let rawNr;try{rawNr=normalizeRawNr(draft.rawNr);}catch{rawNr={mode:'stock'};}
- return {...draft,profile:'native',features,nativeConfiguration:configuration,unresolvedSlots:unresolved,recipes:[],stockPresets:[],toolFeaturesDraft:[],rawNr};
+ return {...draft,halationMenuSchema:1,profile:'native',features,nativeConfiguration:configuration,unresolvedSlots:unresolved,recipes:[],stockPresets:[],toolFeaturesDraft:[],rawNr};
 }
 export function preserveLegacyDraft(storage,key,raw,draft){
  if(draft.profile==='native'&&!draft.features?.some(id=>['recipes','presets'].includes(id)))return;

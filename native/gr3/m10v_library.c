@@ -564,7 +564,7 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     uint32_t use_halo = !(completed&M10V_NATIVE_HALO) && m10v_halo_enabled(choice->film,choice->halo_gain,choice->halo_profile);
     uint32_t special_halo=use_halo;
 #if M10V_UNIVERSAL_HALATION
-    special_halo=use_halo && choice->halo_profile==M10V_HALO_SPILL && (choice->film==33||choice->film==67);
+    special_halo=use_halo && (choice->halo_profile==M10V_HALO_SPILL||choice->halo_profile<=3) && (choice->film==33||choice->film==67);
 #endif
     /* Legacy per-film soft is retired, including imported SD/journal values.
      * Digital HDF runs upstream in the original native Clarity owner. */

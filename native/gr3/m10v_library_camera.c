@@ -417,6 +417,30 @@ int m10v_camera_library_reconcile_legacy_selection(uint32_t model){
   state.reserved&=1u;state.sequence++;state.crc=state_crc(&state,offsetof(m10v_library_state,crc));
   if(store((void *)(uintptr_t)fs,&state))return M10V_LIBRARY_STORE_FAILED;
  }
+ /* Apply a changed exported film selection once, in the safe UI lifecycle.
+  * The journal alone cannot distinguish a reflash from an ordinary restart.
+  * Keep globals, but let the new selection replace custom as well as builtin
+  * slots. Persist state before the receipt; interrupted writes retry safely. */
+ m10v_library_state defaults;m10v_library_init(&defaults);
+ uint32_t receipt[4]={0x31474643u,defaults.crc,~defaults.crc,0x31474643u^defaults.crc};
+ uint32_t seen[4]={0,0,0,0};
+ int applied=((read_fn)0x53825648u)(fs,"M10VCFG.bin",sizeof(seen),seen);
+ for(uint32_t i=0;i<4;i++)if(seen[i]!=receipt[i])applied=0;
+ if(!applied){
+  if(state.sequence==0xffffffffu)return M10V_LIBRARY_INVALID;
+  bank=((get_tone_fn)0x532bd6d4u)(model);tone=((get_tone_fn)0x532bd6b4u)(model);
+  uint32_t selected=bank?M10V_SLOT_COUNT:m10v_tone_slot(tone);
+  if(selected<M10V_SLOT_COUNT&&state.slots[selected].film!=defaults.slots[selected].film){
+   ((set_tone_fn)0x532c26c0u)(model,11u);
+   if(((get_tone_fn)0x532bd6b4u)(model)!=11u)return M10V_LIBRARY_STORE_FAILED;
+  }
+  for(uint32_t i=0;i<M10V_SLOT_COUNT;i++){state.slots[i]=defaults.slots[i];state.effects[i]=defaults.effects[i];}
+  state.reserved&=1u;state.sequence++;state.crc=state_crc(&state,offsetof(m10v_library_state,crc));
+  if(store((void *)(uintptr_t)fs,&state))return M10V_LIBRARY_STORE_FAILED;
+  if(!((write_fn)0x53825fa8u)(fs,"M10VCFG.bin",sizeof(receipt),receipt)||
+     !((read_fn)0x53825648u)(fs,"M10VCFG.bin",sizeof(seen),seen))return M10V_LIBRARY_STORE_FAILED;
+  for(uint32_t i=0;i<4;i++)if(seen[i]!=receipt[i])return M10V_LIBRARY_STORE_FAILED;
+ }
  /* Retire the three removed styles only at the existing safe UI migration
   * gate. Preserve every other slot/effect and the journal ABI. Reads never
   * write. A surviving active film follows its compacted slot using the

@@ -66,7 +66,7 @@ const initial = { features: new Set(), recipes: new Map(), projectId: '', source
   openFilmGroups: new Set(['内置胶片']), pendingLut: null, community: [],
   modalSlot: null, runtime: false, experiment: null };
 const state = initial;
-state.profile='native';state.features=new Set(['film']);state.nativeConfig=defaultConfiguration();state.nativeCatalog=[];state.unresolvedSlots=[];state.toolFeaturesDraft=[];
+state.profile='native';state.features=new Set(['film','halation']);state.nativeConfig=defaultConfiguration();state.nativeCatalog=[];state.unresolvedSlots=[];state.toolFeaturesDraft=[];
 state.filmTexture = {}; state.stockPresets = []; state.stockCapabilities = []; state.rawNr = {mode:'stock'}; state.revision = 0;
 let filmPreview = createFilmPreview();
 window.addEventListener('pageshow',event=>{if(event.persisted)filmPreview=createFilmPreview();});
@@ -131,7 +131,7 @@ function saveDraft() {
   if(!draftPersistenceAllowed)return;
   try {
     localStorage.setItem(draftKey, JSON.stringify({
-      imagingSchema:1,powerImages:powerImages?.getConfiguration()||{},profile:state.profile,toolFeaturesDraft:state.toolFeaturesDraft,unresolvedSlots:state.unresolvedSlots, features: [...state.features], recipes: [...state.recipes.values()],
+      imagingSchema:1,halationMenuSchema:1,powerImages:powerImages?.getConfiguration()||{},profile:state.profile,toolFeaturesDraft:state.toolFeaturesDraft,unresolvedSlots:state.unresolvedSlots, features: [...state.features], recipes: [...state.recipes.values()],
       filmIds: state.filmIds, filmLibrary: state.filmLibrary,
       filmTexture: state.filmTexture, nativeConfiguration:state.nativeConfig, stockPresets:state.stockPresets, rawNr:state.rawNr,
     }));
