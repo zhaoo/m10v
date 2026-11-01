@@ -14,7 +14,7 @@ static m10v_companion_owner owner;
 static m10v_companion_owner_services io;
 static uint8_t banks[M10V_SLOT_COUNT][2][12288],bank_hashes[M10V_SLOT_COUNT][2][32];
 static uint8_t bank_present[M10V_SLOT_COUNT][2];
-static unsigned polls,random_calls,locked;
+static unsigned polls,random_calls,locked,read_turn,submit_attempted,submitted;
 static int8_t active;
 static int random_bytes(void*c,uint8_t*out,uint32_t bytes){int ok=m10v_linux_random(c,out,bytes);if(ok&&random_calls++==0&&bytes==16)memcpy(io.metadata.boot_id,out,16);return ok;}
 static int is_current(void*c){(void)c;return 1;}
@@ -31,8 +31,9 @@ static int tone(void*c,unsigned slot){(void)c;active=(int8_t)slot;return 0;}
 static int settled(void*c){(void)c;return 0;}
 static int exchange(void*ctx,const m10v_backend_request*r,m10v_backend_response*out){(void)ctx;
  if(r->command==M10V_BACKEND_FILM_VERIFY||r->command==M10V_BACKEND_FILM_POLL){m10v_film_bank_services storage={0,is_current,enter,leave,busy,references,store_bank,read_bank};return m10v_companion_stage_verify(r->film->upload,r->film->data,r->film->upload->id,&storage);}
- if(r->command==M10V_BACKEND_READ_STATE){int code=snapshot(0,out->snapshot);out->has_snapshot=code==0;return code;}
- if(r->command==M10V_BACKEND_SUBMIT){polls=0;out->status=M10V_OPERATION_APPLYING;return 0;}
+ if(r->command==M10V_BACKEND_READ_STATE){if(getenv("M10V_TEST_ASYNC_READ")&&read_turn++==0){out->status=M10V_OPERATION_APPLYING;return 0;}int code=snapshot(0,out->snapshot);out->has_snapshot=code==0;return code;}
+ if(r->command==M10V_BACKEND_SUBMIT){if(getenv("M10V_TEST_ASYNC_READ")&&!submit_attempted++){out->status=M10V_OPERATION_UNKNOWN;return M10V_ERROR_BUSY;}submitted=1;polls=0;out->status=M10V_OPERATION_APPLYING;return 0;}
+ if(getenv("M10V_TEST_ASYNC_READ")&&!submitted){out->status=M10V_OPERATION_UNKNOWN;return M10V_ERROR_RESULT_UNKNOWN;}
  if(getenv("M10V_TEST_STALL")||++polls<3){out->status=M10V_OPERATION_APPLYING;return 0;}
  m10v_companion_result result;int code;
  if(owner.pending.present)code=m10v_companion_owner_poll(&io,r->patch->request_id,&result);
@@ -40,6 +41,8 @@ static int exchange(void*ctx,const m10v_backend_request*r,m10v_backend_response*
  out->status=result.status;out->has_snapshot=result.has_snapshot;if(result.has_snapshot)*out->snapshot=result.snapshot;return code;
 }
 int main(void){
- m10v_companion_server_config cfg={0};for(unsigned i=0;i<32;i++){cfg.key[i]=(uint8_t)i;cfg.build_id[i]=2;cfg.catalog_hash[i]=3;cfg.renderer_hash[i]=4;}for(unsigned i=0;i<16;i++)cfg.instance_id[i]=1;strcpy(cfg.key_id,"fixture-key");cfg.random=random_bytes;cfg.now_ms=m10v_linux_now_ms;cfg.operation_timeout_ms=getenv("M10V_TEST_MISMATCH")?10000:100;cfg.read_state=1;cfg.write_state=1;if(getenv("M10V_TEST_UPLOAD")){cfg.upload_film=1;memcpy(cfg.renderer_hash,m10v_sd_renderer_hash,32);}
- m10v_library_init(&current);m10v_companion_owner_init(&owner);io.owner=&owner;io.is_current=is_current;io.enter=enter;io.leave=leave;io.is_busy=busy;io.snapshot=snapshot;io.persist_once=persist;io.set_tone=tone;io.commit_settled=settled;io.resolve_custom=resolve;memcpy(io.metadata.build_id,cfg.build_id,32);memcpy(io.metadata.catalog_hash,cfg.catalog_hash,32);memcpy(io.metadata.renderer_hash,cfg.renderer_hash,32);m10v_companion_backend backend={0,exchange};int code=m10v_companion_serve(&cfg,&backend);fprintf(stderr,"Host fixture service exited: code=%d errno=%d\n",code,errno);return code;
+ m10v_companion_server_config cfg={0};for(unsigned i=0;i<32;i++){cfg.key[i]=(uint8_t)i;cfg.build_id[i]=2;cfg.catalog_hash[i]=3;cfg.renderer_hash[i]=4;}for(unsigned i=0;i<16;i++)cfg.instance_id[i]=1;strcpy(cfg.key_id,"fixture-key");cfg.random=random_bytes;cfg.now_ms=m10v_linux_now_ms;cfg.operation_timeout_ms=getenv("M10V_TEST_MISMATCH")?10000:100;cfg.read_state=1;cfg.write_state=1;if(getenv("M10V_TEST_CURRENT")){m10v_unhex("653acf3c1b04db0ea2dd10114a1306b78bb4b584534945be8f9de9da25ebab4a",32,cfg.catalog_hash);m10v_unhex("80a4d357be06ff0e9510a20bef1035dc3e848ec585bd5d5cdee466c3980506a4",32,cfg.renderer_hash);}
+ if(getenv("M10V_TEST_UPLOAD")){cfg.upload_film=1;memcpy(cfg.renderer_hash,m10v_sd_renderer_hash,32);}
+ m10v_library_init(&current);if(getenv("M10V_TEST_FULL_TEN")){for(unsigned i=0;i<10;i++){current.slots[i].film=(uint16_t)(34+i);current.slots[i].grain=3;current.slots[i].halo_profile=6;current.slots[i].halo_spread=3;current.slots[i].halo_threshold=5;}m10v_companion_state_seal(&current,7);}
+ m10v_companion_owner_init(&owner);io.owner=&owner;io.is_current=is_current;io.enter=enter;io.leave=leave;io.is_busy=busy;io.snapshot=snapshot;io.persist_once=persist;io.set_tone=tone;io.commit_settled=settled;io.resolve_custom=resolve;memcpy(io.metadata.build_id,cfg.build_id,32);memcpy(io.metadata.catalog_hash,cfg.catalog_hash,32);memcpy(io.metadata.renderer_hash,cfg.renderer_hash,32);m10v_companion_backend backend={0,exchange};int code=m10v_companion_serve(&cfg,&backend);fprintf(stderr,"Host fixture service exited: code=%d errno=%d\n",code,errno);return code;
 }

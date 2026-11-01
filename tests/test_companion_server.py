@@ -12,6 +12,8 @@ class Server(unittest.TestCase):
  def setUp(self):
   env=dict(os.environ)
   if self._testMethodName=='test_upload_chunks_verified_then_install_is_separate':env['M10V_TEST_UPLOAD']='1'
+  if self._testMethodName=='test_full_ten_slot_snapshot_and_receipt_fit_response_budget':env['M10V_TEST_FULL_TEN']='1'
+  if self._testMethodName=='test_async_read_busy_and_submit_waits_for_read_turn':env['M10V_TEST_ASYNC_READ']='1'
   if self._testMethodName=='test_timeout_keeps_unknown_write_locked_but_reads_remain_available':env['M10V_TEST_STALL']='1'
   if 'mismatch' in self._testMethodName:env['M10V_TEST_MISMATCH']='1'
   self.process=subprocess.Popen([str(self.exe)],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);self.addCleanup(self.stop)
@@ -38,6 +40,12 @@ class Server(unittest.TestCase):
    signed='\n'.join(['RESPONSE',method,path,out_headers['x-m10v-boot'],out_headers['x-m10v-session'],str(self.sequence),nonce,str(status),hashlib.sha256(raw).hexdigest()]);self.assertEqual(out_headers['x-m10v-response-signature'],hmac.digest(KEY,signed.encode(),'sha256').hex())
   return status,json.loads(raw)
  def envelope(self,state,request_id='a'*32):return {'protocol':1,'requestId':request_id,'bootId':self.boot,'baseRevision':state['revision'],'catalogHash':state['catalogHash'],'rendererHash':state['rendererHash'],'patch':[{'slot':0,'grain':2}],'activateSlot':None}
+ def test_capabilities_publish_ten_slot_state_and_retired_fields(self):
+  code,value=self.request('GET','/m10v/v1/capabilities')
+  self.assertEqual(code,200)
+  self.assertEqual(value['stateSchema'],2)
+  self.assertEqual(value['slotCount'],10)
+  self.assertEqual(value['readOnlyParameters'],['grainSize','leakGain','leakPosition','leakSpread','leakVariation'])
  def test_duplicate_operation_commits_once_and_returns_verified_snapshot(self):
   status,state=self.request('GET','/m10v/v1/state');self.assertEqual(status,200);operation=self.envelope(state)
   status,queued=self.request('POST','/m10v/v1/operations',operation);self.assertEqual(status,202);self.assertEqual(queued['status'],'queued')
@@ -111,3 +119,22 @@ class Server(unittest.TestCase):
   code,caps=self.request('GET','/m10v/v1/capabilities');self.assertEqual(code,200);self.assertEqual(caps['slotCount'],10)
   code,state=self.request('GET','/m10v/v1/state');self.assertEqual(code,200);self.assertEqual(state['schemaVersion'],2);self.assertEqual(len(state['config']['slots']),10)
   self.assertEqual(state['config']['slots'][9]['filmId'],0)
+
+ def test_async_read_busy_and_submit_waits_for_read_turn(self):
+  code,value=self.request('GET','/m10v/v1/state');self.assertEqual(code,503);self.assertEqual(value['error']['code'],'busy')
+  code,state=self.request('GET','/m10v/v1/state');self.assertEqual(code,200)
+  self.assertEqual(self.request('POST','/m10v/v1/operations',self.envelope(state))[0],202)
+  for _ in range(10):
+   _,receipt=self.request('GET','/m10v/v1/operations/'+'a'*32)
+   if receipt['status']=='committed':break
+  self.assertEqual(receipt['status'],'committed')
+
+ def test_full_ten_slot_snapshot_and_receipt_fit_response_budget(self):
+  code,state=self.request('GET','/m10v/v1/state');self.assertEqual(code,200);self.assertEqual(len(state['config']['slots']),10)
+  for slot in state['config']['slots']:self.assertIn('leakVariation',slot['parameters'])
+  operation=self.envelope(state);operation['patch']=[{'slot':9,'grain':2}]
+  self.assertEqual(self.request('POST','/m10v/v1/operations',operation)[0],202)
+  for _ in range(8):
+   code,receipt=self.request('GET','/m10v/v1/operations/'+'a'*32)
+   if receipt['status']=='committed':break
+  self.assertEqual(code,200);self.assertEqual(receipt['snapshot']['config']['slots'][9]['parameters']['grain'],2)

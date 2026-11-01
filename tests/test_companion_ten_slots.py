@@ -10,7 +10,7 @@ class TenSlots(unittest.TestCase):
   if result.returncode:raise AssertionError(result.stderr[:2500])
   cls.lib=C.CDLL(str(out));cls.lib.test_ten_case.argtypes=[C.c_uint];cls.lib.parse_ten.argtypes=[C.c_char_p,C.c_uint]
  def test_last_slot_changes_revision_and_single_commit_preserves_others(self):
-  for case in range(5):
+  for case in range(11):
    with self.subTest(case=case):self.assertEqual(self.lib.test_ten_case(case),0)
  def test_parse_slot_nine_and_reject_out_of_range(self):
   p={'protocol':1,'requestId':'11'*16,'bootId':'22'*16,'baseRevision':'33'*32,'catalogHash':'44'*32,'rendererHash':'55'*32,'patch':[{'slot':9,'filmId':321,'grain':2}],'activateSlot':None}
@@ -18,6 +18,12 @@ class TenSlots(unittest.TestCase):
   p['patch'][0]['slot']=10;raw=json.dumps(p).encode();self.assertNotEqual(self.lib.parse_ten(raw,len(raw)),0)
 
  def test_full_ten_slot_envelope_fits_bounded_parser(self):
-  params={'grain':2,'grainSize':0,'haloGain':1,'haloSpread':3,'haloThreshold':5,'haloProfile':4,'leakGain':0,'leakPosition':0,'leakSpread':0,'leakVariation':0,'filmExposure':0,'charmeraColor':0}
+  params={'grain':2,'haloGain':1,'haloSpread':3,'haloThreshold':5,'haloProfile':4,'filmExposure':0,'charmeraColor':0}
   p={'protocol':1,'requestId':'11'*16,'bootId':'22'*16,'baseRevision':'33'*32,'catalogHash':'44'*32,'rendererHash':'55'*32,'patch':[{'slot':i,'filmId':321,**params} for i in range(10)],'activateSlot':None}
   raw=json.dumps(p).encode();self.assertEqual(self.lib.parse_ten_full(raw,len(raw)),0)
+
+ def test_readonly_fields_rejected_by_parser(self):
+  p={'protocol':1,'requestId':'11'*16,'bootId':'22'*16,'baseRevision':'33'*32,'catalogHash':'44'*32,'rendererHash':'55'*32,'activateSlot':None}
+  for field in ['grainSize','leakGain','leakPosition','leakSpread','leakVariation']:
+   p['patch']=[{'slot':9,'filmId':321,field:0}];raw=json.dumps(p).encode()
+   with self.subTest(field=field):self.assertNotEqual(self.lib.parse_ten(raw,len(raw)),0)

@@ -3,7 +3,7 @@
 #define M10V_COMPANION_GENERATED_CONTRACT_H
 #include <stdint.h>
 #define M10V_FIELD_COUNT 13u
-#define M10V_CONTRACT_SHA256 "b9faa7da42d8bf6709cfd258b1ab66f60df9e2e9d2b8fe85066db1239d6408be"
+#define M10V_CONTRACT_SHA256 "e049d08db6e80a167ea935357d4a4dae885c1c06347d134522ee147ff9736929"
 enum {M10V_FIELD_FILMID,M10V_FIELD_GRAIN,M10V_FIELD_GRAINSIZE,M10V_FIELD_HALOGAIN,M10V_FIELD_HALOSPREAD,M10V_FIELD_HALOTHRESHOLD,M10V_FIELD_HALOPROFILE,M10V_FIELD_LEAKGAIN,M10V_FIELD_LEAKPOSITION,M10V_FIELD_LEAKSPREAD,M10V_FIELD_LEAKVARIATION,M10V_FIELD_FILMEXPOSURE,M10V_FIELD_CHARMERACOLOR};
 static const char *const m10v_field_names[M10V_FIELD_COUNT]={"filmId","grain","grainSize","haloGain","haloSpread","haloThreshold","haloProfile","leakGain","leakPosition","leakSpread","leakVariation","filmExposure","charmeraColor"};
 static inline unsigned m10v_field_max(unsigned field,unsigned film){switch(field){case M10V_FIELD_FILMID:return 321;
@@ -30,6 +30,9 @@ case M10V_FIELD_LEAKVARIATION:return film!=289;
 case M10V_FIELD_FILMEXPOSURE:return film==67||film==68;
 case M10V_FIELD_CHARMERACOLOR:return film==289;
 default:return 1;}}
+#define M10V_READONLY_MASK 1924u
+static inline int m10v_field_readonly(unsigned field){return field==M10V_FIELD_GRAINSIZE||field==M10V_FIELD_LEAKGAIN||field==M10V_FIELD_LEAKPOSITION||field==M10V_FIELD_LEAKSPREAD||field==M10V_FIELD_LEAKVARIATION;}
 #define M10V_PARAMETERS_JSON "{\"grain\":{\"min\":0,\"max\":3,\"default\":0,\"label\":\"颗粒\",\"excludeFilmIds\":[289]},\"grainSize\":{\"min\":0,\"max\":2,\"default\":1,\"label\":\"颗粒尺寸\",\"excludeFilmIds\":[289]},\"haloGain\":{\"min\":0,\"max\":8,\"default\":0,\"label\":\"光晕强度\"},\"haloSpread\":{\"min\":0,\"max\":8,\"default\":3,\"label\":\"扩散范围\"},\"haloThreshold\":{\"min\":0,\"max\":8,\"default\":5,\"label\":\"高光阈值\"},\"haloProfile\":{\"min\":0,\"max\":6,\"default\":6,\"label\":\"光晕模式\"},\"leakGain\":{\"min\":0,\"max\":8,\"default\":0,\"label\":\"漏光强度\",\"excludeFilmIds\":[289]},\"leakPosition\":{\"min\":0,\"max\":5,\"default\":0,\"label\":\"漏光位置\",\"excludeFilmIds\":[289]},\"leakSpread\":{\"min\":0,\"max\":8,\"default\":4,\"label\":\"漏光范围\",\"excludeFilmIds\":[289]},\"leakVariation\":{\"min\":0,\"max\":1,\"default\":0,\"label\":\"漏光变化\",\"excludeFilmIds\":[289]},\"filmExposure\":{\"min\":0,\"max\":2,\"default\":0,\"label\":\"模拟曝光\",\"filmIds\":[67,68],\"overrides\":{\"67\":1}},\"charmeraColor\":{\"min\":0,\"max\":3,\"default\":0,\"label\":\"机身颜色\",\"filmIds\":[289]}}"
+#define M10V_READONLY_JSON "[\"grainSize\",\"leakGain\",\"leakPosition\",\"leakSpread\",\"leakVariation\"]"
 #define M10V_LIMITS_JSON "{\"jsonBytes\":16384,\"chunkBytes\":16384,\"recordBytes\":12288,\"stagingBytes\":65536,\"pollMilliseconds\":2000,\"previewEdge\":960,\"previewFallbackEdge\":640,\"previewCacheBytes\":50331648,\"contactSheetPageSize\":24,\"filmChunkBytes\":4096}"
 #endif

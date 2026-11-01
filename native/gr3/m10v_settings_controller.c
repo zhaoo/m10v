@@ -2,6 +2,9 @@
  * separately audited root/factory patches and key mapping are installed. */
 #include "m10v_tone.h"
 #include "m10v_settings_controller.h"
+#if M10V_COMPANION_ENABLED
+#include "m10v_companion_owner.h"
+#endif
 #include "m10v_debug.h"
 #include "m10v_sd_library.h"
 #include "m10v_film_card.h"
@@ -71,7 +74,13 @@ static m10v_settings_controller *page(uint32_t owner,uint32_t i){
  return (m10v_settings_controller *)(uintptr_t)(owner+M10V_SETTINGS_OWNER_BYTES+i*M10V_SETTINGS_CONTROLLER_BYTES);
 }
 #include "m10v_ab_camera.inc"
-uint32_t m10v_settings_controller_owner_size(void){return M10V_SETTINGS_OWNER_BYTES+2*M10V_SETTINGS_CONTROLLER_BYTES+(M10V_LIVE_COLOR?0x4000u:0u);}
+uint32_t m10v_settings_controller_owner_size(void){
+#if M10V_COMPANION_ENABLED
+ return M10V_COMPANION_DESCRIPTOR_OFFSET+M10V_COMPANION_DESCRIPTOR_BYTES;
+#else
+ return M10V_SETTINGS_OWNER_BYTES+2*M10V_SETTINGS_CONTROLLER_BYTES+(M10V_LIVE_COLOR?0x4000u:0u);
+#endif
+}
 uint32_t m10v_settings_controller_top_ctor(uint32_t owner){
  ((fn1)0x5319aa68u)(owner);
  for(uint32_t i=0;i<2;i++){
@@ -85,6 +94,9 @@ uint32_t m10v_settings_controller_top_ctor(uint32_t owner){
 #if M10V_LIVE_COLOR
  m10v_camera_library_preview_init(owner);
 #endif
+#if M10V_COMPANION_ENABLED
+ m10v_companion_ui_init(owner);
+#endif
  #if M10V_HALF_PAIR_ENABLED
  m10v_half_pair_init(owner);
  #endif
@@ -97,6 +109,9 @@ uint32_t m10v_settings_controller_destroy(m10v_settings_controller *p){
  return (uint32_t)(uintptr_t)p;
 }
 uint32_t m10v_settings_controller_top_dtor(uint32_t owner){
+#if M10V_COMPANION_ENABLED
+ m10v_companion_ui_stop(owner);
+#endif
 #if M10V_HALF_PAIR_ENABLED
  m10v_half_pair_destroy(owner);
 #endif

@@ -27,7 +27,7 @@ static void snapshot_json(m10v_companion_server*s,writer*w,const m10v_companion_
  text(w,",\"catalogHash\":");hex(w,s->config->catalog_hash,32);text(w,",\"rendererHash\":");hex(w,s->config->renderer_hash,32);text(w,",\"revision\":");hex(w,snap->revision,32);text(w,",\"configHash\":");hex(w,snap->config_hash,32);text(w,",\"journalSequence\":");number(w,snap->state.sequence);
  text(w,",\"activeSlot\":");if(snap->active_slot<0)text(w,"null");else number(w,(unsigned)snap->active_slot);
  text(w,",\"busy\":");text(w,snap->busy?"true":"false");text(w,",\"fresh\":true,\"config\":{\"slots\":[");
- for(unsigned slot=0;slot<M10V_SLOT_COUNT;slot++){if(slot)text(w,",");unsigned id=snap->state.slots[slot].film;text(w,"{\"filmId\":");number(w,id);text(w,",\"parameters\":{");unsigned count=0;for(unsigned key=1;key<M10V_FIELD_COUNT;key++)if(m10v_field_supported(key,id)){if(count++)text(w,",");quoted(w,m10v_field_names[key]);text(w,":");number(w,field(&snap->state,slot,key));}text(w,"},\"customHash\":");if(M10V_CUSTOM(id))hex(w,snap->custom_hashes[slot],32);else text(w,"null");text(w,"}");}
+ for(unsigned slot=0;slot<M10V_SLOT_COUNT;slot++){if(slot)text(w,",");unsigned id=snap->state.slots[slot].film;text(w,"{\"filmId\":");number(w,id);text(w,",\"parameters\":{");unsigned count=0;for(unsigned key=1;key<M10V_FIELD_COUNT;key++)if(m10v_field_supported(key,id)||m10v_field_readonly(key)){if(count++)text(w,",");quoted(w,m10v_field_names[key]);text(w,":");number(w,field(&snap->state,slot,key));}text(w,"},\"customHash\":");if(M10V_CUSTOM(id))hex(w,snap->custom_hashes[slot],32);else text(w,"null");text(w,"}");}
  text(w,"],\"globals\":{\"stamp\":");number(w,snap->state.stamp);text(w,",\"format\":");number(w,snap->state.format);text(w,",\"corner\":");number(w,snap->state.corner);text(w,",\"color\":");number(w,snap->state.color);text(w,",\"filmNameStamp\":");number(w,snap->state.reserved&1u);text(w,"}}}");
 }
 static int receipt_json(m10v_companion_server*s,const m10v_operation_receipt*r){
@@ -41,6 +41,15 @@ int m10v_companion_server_init(m10v_companion_server*s,const m10v_companion_serv
 void m10v_companion_tick(m10v_companion_server*s){
  if(s->pending_index<0)return;m10v_operation_receipt*r=&s->receipts[s->pending_index];unsigned command=r->status==M10V_OPERATION_QUEUED?M10V_BACKEND_SUBMIT:M10V_BACKEND_POLL;
  m10v_backend_request request={.command=command,.patch=&s->pending_patch};m10v_backend_response response={M10V_OPERATION_UNKNOWN,0,&r->snapshot};int code=s->backend.exchange(s->backend.ctx,&request,&response);
+ /* A READ already in flight must finish before SUBMIT. Retain QUEUED:
+  * POLL is never a substitute for an unsubmitted APPLY. */
+ if(code==M10V_ERROR_BUSY&&command==M10V_BACKEND_SUBMIT){
+  m10v_backend_request read={.command=M10V_BACKEND_READ_STATE};m10v_backend_response discard={M10V_OPERATION_UNKNOWN,0,&r->snapshot};
+  int drained=s->backend.exchange(s->backend.ctx,&read,&discard);
+  uint64_t now=s->config->now_ms(s->config->clock_ctx);
+  if(drained==M10V_ERROR_BRIDGE_UNAVAILABLE||now<s->pending_since||now-s->pending_since>=s->config->operation_timeout_ms){r->status=M10V_OPERATION_UNKNOWN;r->error=M10V_ERROR_RESULT_UNKNOWN;}
+  return;
+ }
  if(code==M10V_ERROR_NONE&&response.status==M10V_OPERATION_COMMITTED&&response.has_snapshot){r->status=M10V_OPERATION_COMMITTED;r->has_snapshot=1;r->error=0;s->pending_index=-1;return;}
  if(response.status==M10V_OPERATION_REJECTED&&code>=M10V_ERROR_UNAUTHORIZED&&code<=M10V_ERROR_RESULT_UNKNOWN){r->status=M10V_OPERATION_REJECTED;r->error=(uint8_t)code;s->pending_index=-1;return;}
  uint64_t now=s->config->now_ms(s->config->clock_ctx);
@@ -97,11 +106,11 @@ const char*chunks="/chunks/";unsigned n=text_length(chunks);match=text_length(su
 static __attribute__((noinline)) int route_authenticated(m10v_companion_server*s,const uint8_t*body,uint32_t body_bytes){
  const char*method=s->request.method,*path=s->request.path;
  if(equal(method,"GET")&&equal(path,"/m10v/v1/capabilities")){
-  writer w=begin(s,200);text(&w,"{\"protocol\":1,\"model\":\"GR III\",\"recipeSchema\":1,\"slotCount\":10,\"firmwareIdentity\":\"d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4\",\"bootId\":");hex(&w,s->auth.boot,16);text(&w,",\"sessionId\":");quoted(&w,s->session);text(&w,",\"instanceId\":");hex(&w,s->config->instance_id,16);text(&w,",\"buildId\":");hex(&w,s->config->build_id,32);text(&w,",\"catalogHash\":");hex(&w,s->config->catalog_hash,32);text(&w,",\"rendererHash\":");hex(&w,s->config->renderer_hash,32);
-  text(&w,",\"capabilities\":{\"readState\":");text(&w,s->config->read_state?"true":"false");text(&w,",\"writeState\":");text(&w,s->config->write_state?"true":"false");text(&w,",\"uploadFilm\":");text(&w,s->config->upload_film?"true":"false");text(&w,",\"captureEvidence\":");text(&w,s->config->capture_evidence?"true":"false");text(&w,"},\"parameters\":");text(&w,M10V_PARAMETERS_JSON);text(&w,",\"limits\":");text(&w,M10V_LIMITS_JSON);text(&w,"}");return finish(s,&w);
+  writer w=begin(s,200);text(&w,"{\"protocol\":1,\"model\":\"GR III\",\"recipeSchema\":1,\"stateSchema\":2,\"slotCount\":10,\"firmwareIdentity\":\"d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4\",\"bootId\":");hex(&w,s->auth.boot,16);text(&w,",\"sessionId\":");quoted(&w,s->session);text(&w,",\"instanceId\":");hex(&w,s->config->instance_id,16);text(&w,",\"buildId\":");hex(&w,s->config->build_id,32);text(&w,",\"catalogHash\":");hex(&w,s->config->catalog_hash,32);text(&w,",\"rendererHash\":");hex(&w,s->config->renderer_hash,32);
+  text(&w,",\"capabilities\":{\"readState\":");text(&w,s->config->read_state?"true":"false");text(&w,",\"writeState\":");text(&w,s->config->write_state?"true":"false");text(&w,",\"uploadFilm\":");text(&w,s->config->upload_film?"true":"false");text(&w,",\"captureEvidence\":");text(&w,s->config->capture_evidence?"true":"false");text(&w,"},\"parameters\":");text(&w,M10V_PARAMETERS_JSON);text(&w,",\"readOnlyParameters\":");text(&w,M10V_READONLY_JSON);text(&w,",\"limits\":");text(&w,M10V_LIMITS_JSON);text(&w,"}");return finish(s,&w);
  }
  if(equal(method,"GET")&&equal(path,"/m10v/v1/state")){
-  if(!s->config->read_state)return error(s,503,M10V_ERROR_BRIDGE_UNAVAILABLE);m10v_companion_snapshot snapshot;m10v_backend_request request={.command=M10V_BACKEND_READ_STATE};m10v_backend_response response={M10V_OPERATION_UNKNOWN,0,&snapshot};int code=s->backend.exchange(s->backend.ctx,&request,&response);if(code||!response.has_snapshot)return error(s,503,code?code:M10V_ERROR_BRIDGE_UNAVAILABLE);writer w=begin(s,200);snapshot_json(s,&w,&snapshot);return finish(s,&w);
+  if(!s->config->read_state)return error(s,503,M10V_ERROR_BRIDGE_UNAVAILABLE);m10v_companion_snapshot snapshot;m10v_backend_request request={.command=M10V_BACKEND_READ_STATE};m10v_backend_response response={M10V_OPERATION_UNKNOWN,0,&snapshot};int code=s->backend.exchange(s->backend.ctx,&request,&response);if(code||!response.has_snapshot)return error(s,503,code?code:response.status==M10V_OPERATION_APPLYING?M10V_ERROR_BUSY:M10V_ERROR_BRIDGE_UNAVAILABLE);writer w=begin(s,200);snapshot_json(s,&w,&snapshot);return finish(s,&w);
  }
  const char *prefix="/m10v/v1/operations/";unsigned prefix_bytes=text_length(prefix),path_bytes=text_length(path);unsigned prefix_match=path_bytes>=prefix_bytes;for(unsigned i=0;i<prefix_bytes&&prefix_match;i++)if(path[i]!=prefix[i])prefix_match=0;
  if(equal(method,"GET")&&prefix_match){uint8_t id[16];if(path_bytes!=prefix_bytes+32||!m10v_unhex(path+prefix_bytes,16,id))return error(s,400,M10V_ERROR_INVALID_RECIPE);for(unsigned i=0;i<32;i++)if(s->receipts[i].occupied&&m10v_constant_equal(id,s->receipts[i].request_id,16))return receipt_json(s,&s->receipts[i]);return error(s,404,M10V_ERROR_RESULT_UNKNOWN);}

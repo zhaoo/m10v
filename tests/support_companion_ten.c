@@ -21,13 +21,15 @@ static void init(fixture*f){
 int parse_ten(const uint8_t*text,unsigned bytes){m10v_companion_patch p;int c=m10v_operation_parse(text,bytes,&p);if(c)return c;return p.slots_mask!=(1u<<9)||p.values[9][M10V_FIELD_FILMID]!=321;}
 int test_ten_case(unsigned mode){
  fixture f;init(&f);if(!m10v_library_valid(&f.snapshot.state))return 100;
+ if(mode==5){m10v_companion_metadata other=f.services.metadata;other.owner_generation++;m10v_companion_snapshot after=f.snapshot;if(m10v_companion_snapshot_identity(&other,&after))return 110;return memcmp(after.config_hash,f.snapshot.config_hash,32)||!memcmp(after.revision,f.snapshot.revision,32);}
  if(mode==0){m10v_companion_snapshot b=f.snapshot;b.state.slots[9].grain=1;m10v_companion_state_seal(&b.state,b.state.sequence);if(m10v_companion_snapshot_identity(&f.services.metadata,&b))return 101;return !memcmp(f.snapshot.config_hash,b.config_hash,32)||!memcmp(f.snapshot.revision,b.revision,32);}
  m10v_companion_snapshot before=f.snapshot;m10v_companion_patch p;memset(&p,0,sizeof(p));memcpy(p.boot_id,f.services.metadata.boot_id,16);memcpy(p.catalog_hash,f.services.metadata.catalog_hash,32);memcpy(p.renderer_hash,f.services.metadata.renderer_hash,32);memcpy(p.base_revision,before.revision,32);memset(p.request_id,0x77,16);p.activate_slot=-1;p.slots_mask=1u<<9;p.fields[9]=1u<<M10V_FIELD_GRAIN;p.values[9][M10V_FIELD_GRAIN]=2;
  if(mode==2)f.busy=1;
  if(mode==3){p.fields[9]=1u<<M10V_FIELD_FILMID;p.values[9][M10V_FIELD_FILMID]=321;}
  if(mode==4){p.fields[9]=1u<<M10V_FIELD_GRAIN;p.values[9][M10V_FIELD_GRAIN]=99;}
+ if(mode>=6&&mode<=10){const unsigned keys[5]={M10V_FIELD_GRAINSIZE,M10V_FIELD_LEAKGAIN,M10V_FIELD_LEAKPOSITION,M10V_FIELD_LEAKSPREAD,M10V_FIELD_LEAKVARIATION};p.fields[9]=(uint16_t)(1u<<keys[mode-6]);p.values[9][keys[mode-6]]=1;}
  m10v_companion_result result;int code=m10v_companion_apply(&before,&p,&f.services,&result);
- if(mode==2||mode==4)return !code||f.saves||memcmp(&before.state,&f.snapshot.state,sizeof(before.state));
+ if(mode==2||mode==4||(mode>=6&&mode<=10))return !code||f.saves||memcmp(&before.state,&f.snapshot.state,sizeof(before.state));
  if(code||f.saves!=1||result.status!=M10V_OPERATION_COMMITTED||!result.has_snapshot)return 102;
  for(unsigned i=0;i<9;i++)if(memcmp(&before.state.slots[i],&f.snapshot.state.slots[i],sizeof(m10v_slot))||memcmp(&before.state.effects[i],&f.snapshot.state.effects[i],sizeof(m10v_film_effects)))return 103;
  if(before.state.stamp!=f.snapshot.state.stamp||before.state.reserved!=f.snapshot.state.reserved)return 104;

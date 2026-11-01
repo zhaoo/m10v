@@ -1,3 +1,4 @@
+import {companionOwnerBytes,companionNativeSources} from './gr3-companion-owner.mjs';
 import {FILM_DIRECTORY} from './gr3-film-directory.mjs';
 import {MAX_NATIVE_RTOS_GROWTH} from './gr3-native-budget.mjs';
 // M10V's original runtime is injected into the exact official GR III source.
@@ -190,7 +191,7 @@ function checkRuntime(runtime, manifest) {
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');
   need(manifest.film_count === 107 && manifest.slots === 10 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
-  const expectedSources=[...new Set([...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[]),...(manifest.border?.enabled?borderSources:[]),...(manifest.half_pair?.enabled?halfPairSources:[]),...(manifest.pure_isp_effects?.enabled?pureIspEffectSources:[])])];
+  const expectedSources=[...new Set([...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[]),...(manifest.border?.enabled?borderSources:[]),...(manifest.half_pair?.enabled?halfPairSources:[]),...(manifest.pure_isp_effects?.enabled?pureIspEffectSources:[]),...(manifest.companion?companionNativeSources:[])])];
   borderPatches(runtime,manifest);
   halfPairIipPatches(runtime,manifest);
   pureIspEffectPatches(runtime,manifest);
@@ -585,7 +586,7 @@ function lifecyclePatches(manifest,runtime){
   }
  }
  if(m.snapshot?.live_color){
-  need(manifest.sd_library&&manifest.settings_menu?.owner_bytes===0x613c,'preview requires owned parameter cache');
+  need(manifest.sd_library&&manifest.settings_menu?.owner_bytes===companionOwnerBytes(manifest,0x613c),'preview requires owned parameter cache');
   const row=m.snapshot.patches.at(-1);need(row.address===0x53dbd954&&inRuntime(row.entry),'invalid Live Make entry');
   expected.push({address:0x53dbd954,expected:0x536ddecc,replacement:row.entry,name:'native Live Make color'});
   const at=row.entry,ex=m.snapshot.exports;

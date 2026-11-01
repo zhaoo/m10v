@@ -1,6 +1,8 @@
 #include "operations.h"
 #include "auth.h"
 uint32_t m10v_patch_size(void){return sizeof(m10v_companion_patch);}
+
+#if !M10V_COMPANION_RTOS_ONLY
 const char*m10v_error_name(unsigned code){static const char*names[]={"none","unauthorized","unsupportedProtocol","unsupportedModel","incompatibleRenderer","invalidRecipe","busy","revisionConflict","storeFailed","readbackMismatch","bridgeUnavailable","resultUnknown"};return code<=M10V_ERROR_RESULT_UNKNOWN?names[code]:"bridgeUnavailable";}
 static int name(const uint8_t*text,const m10v_json_token*t,const char*key){if(t->type!=M10V_JSON_STRING)return 0;unsigned i=0;for(;i<(unsigned)(t->end-t->start);i++)if(!key[i]||(uint8_t)key[i]!=text[t->start+i])return 0;return !key[i];}
 static int hex(const uint8_t*text,const m10v_json_token*t,unsigned bytes,uint8_t*out){if(t->type!=M10V_JSON_STRING||t->end-t->start!=bytes*2)return 0;return m10v_unhex((const char*)text+t->start,bytes,out);}
@@ -20,7 +22,7 @@ int m10v_operation_parse_tokens(const uint8_t*text,uint32_t bytes,m10v_json_toke
    if(name(text,&t[key],"slot")){key=t[key+1].next;continue;}
    if(name(text,&t[key],"customHash")){if(!hex(text,&t[key+1],32,out->custom_hashes[slot]))return M10V_ERROR_INVALID_RECIPE;out->fields[slot]|=M10V_CUSTOM_HASH_FIELD;key=t[key+1].next;continue;}
    unsigned field;for(field=0;field<M10V_FIELD_COUNT;field++)if(name(text,&t[key],m10v_field_names[field]))break;uint32_t value;
-   if(field==M10V_FIELD_COUNT||!m10v_json_uint(text,&t[key+1],&value)||value>m10v_field_max(field,0)||(field==M10V_FIELD_FILMID&&!value))return M10V_ERROR_INVALID_RECIPE;
+   if(field==M10V_FIELD_COUNT||m10v_field_readonly(field)||!m10v_json_uint(text,&t[key+1],&value)||value>m10v_field_max(field,0)||(field==M10V_FIELD_FILMID&&!value))return M10V_ERROR_INVALID_RECIPE;
    out->fields[slot]|=(uint16_t)(1u<<field);out->values[slot][field]=(uint16_t)value;key=t[key+1].next;
   }
   if(!out->fields[slot])return M10V_ERROR_INVALID_RECIPE;at=t[at].next;
@@ -29,6 +31,8 @@ int m10v_operation_parse_tokens(const uint8_t*text,uint32_t bytes,m10v_json_toke
  return M10V_ERROR_NONE;
 }
 int m10v_operation_parse(const uint8_t*text,uint32_t bytes,m10v_companion_patch*out){m10v_json_token tokens[M10V_JSON_TOKENS];return m10v_operation_parse_tokens(text,bytes,tokens,out);}
+
+#endif
 void m10v_operation_digest(const m10v_companion_patch*p,uint8_t out[32]){
  uint8_t data[1024];unsigned n=0;const uint8_t*identity[]={p->request_id,p->boot_id,p->base_revision,p->catalog_hash,p->renderer_hash};const unsigned lengths[]={16,16,32,32,32};
  for(unsigned k=0;k<5;k++)for(unsigned i=0;i<lengths[k];i++)data[n++]=identity[k][i];

@@ -13,7 +13,7 @@ def generate(check=False):
   allowed=spec.get('filmIds');excluded=spec.get('excludeFilmIds')
   if allowed:lines.append('case M10V_FIELD_'+key.upper()+':return '+'||'.join(f'film=={n}' for n in allowed)+';')
   elif excluded:lines.append('case M10V_FIELD_'+key.upper()+':return '+'&&'.join(f'film!={n}' for n in excluded)+';')
- lines+=['default:return 1;}}', '#define M10V_PARAMETERS_JSON '+json.dumps(json.dumps(parameters,separators=(',',':'),ensure_ascii=False),ensure_ascii=False), '#define M10V_LIMITS_JSON '+json.dumps(json.dumps(contract['limits'],separators=(',',':')),ensure_ascii=False), '#endif','']
+ lines+=['default:return 1;}}', '#define M10V_READONLY_MASK '+str(sum(1<<names.index(name) for name in contract['readOnlyParameters']))+'u', 'static inline int m10v_field_readonly(unsigned field){return '+ '||'.join('field==M10V_FIELD_'+name.upper() for name in contract['readOnlyParameters'])+';}', '#define M10V_PARAMETERS_JSON '+json.dumps(json.dumps(parameters,separators=(',',':'),ensure_ascii=False),ensure_ascii=False), '#define M10V_READONLY_JSON '+json.dumps(json.dumps(contract['readOnlyParameters'],separators=(',',':'))), '#define M10V_LIMITS_JSON '+json.dumps(json.dumps(contract['limits'],separators=(',',':')),ensure_ascii=False), '#endif','']
  result='\n'.join(lines);output=ROOT/'native/companion/generated_contract.h'
  if check:
   if not output.exists() or output.read_text()!=result:raise ValueError('companion generated registry is stale')

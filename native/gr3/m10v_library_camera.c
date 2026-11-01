@@ -3,6 +3,9 @@
  * M10V's two private journal names never overwrite an APData setting record.
  */
 #include "m10v_library.h"
+#if M10V_COMPANION_ENABLED
+#include "m10v_companion_owner.h"
+#endif
 #include "m10v_tone.h"
 #include <stddef.h>
 #include "m10v_custom_isp.h"
@@ -155,21 +158,42 @@ void m10v_camera_library_preview_clear(uint32_t owner){
     (void)owner;
 #endif
 }
-static int store(void *context, const m10v_library_state *next) {
+static int store_guarded(void *context, const m10v_library_state *next,uint32_t remote) {
+#if M10V_COMPANION_ENABLED
+    uint32_t token=m10v_companion_ui_storage_enter(remote);if(!token)return -1;
+#else
+    (void)remote;
+#endif
     uint32_t fs = (uint32_t)(uintptr_t)context;
     const char *name = state_names[next->sequence & 1];
-    m10v_library_state readback;
+    m10v_library_state readback;int result=-1;
     for (uint32_t i = 0; i < sizeof(readback); ++i) ((uint8_t *)&readback)[i] = 0;
     if (!((write_fn)0x53825fa8u)(fs, name, sizeof(*next), next) ||
         !((read_fn)0x53825648u)(fs, name, sizeof(readback), &readback) ||
-        !m10v_library_valid(&readback)) return -1;
+        !m10v_library_valid(&readback)) goto finish;
     for (uint32_t i = 0; i < sizeof(readback); ++i)
-        if (((const uint8_t *)&readback)[i] != ((const uint8_t *)next)[i]) return -1;
+        if (((const uint8_t *)&readback)[i] != ((const uint8_t *)next)[i]) goto finish;
 #if M10V_LIVE_COLOR
     publish_preview(preview_owner(),next);
 #endif
-    return 0;
+    result=0;
+finish:
+#if M10V_COMPANION_ENABLED
+    if(!m10v_companion_ui_storage_leave(token))result=-1;
+#endif
+    return result;
 }
+static int store(void *context,const m10v_library_state *next){return store_guarded(context,next,0);}
+#if M10V_COMPANION_ENABLED
+static int load_library(m10v_library_state *state);
+int m10v_camera_library_commit_snapshot(const m10v_library_state *next){
+    if(!m10v_library_valid(next)||!m10v_camera_library_mutation_busy())return M10V_LIBRARY_INVALID;
+    m10v_library_state prior;
+    if(load_library(&prior)<0||prior.sequence==0xffffffffu||next->sequence!=prior.sequence+1u)return M10V_LIBRARY_INVALID;
+    uint32_t fs=filesystem();
+    return fs&&store_guarded((void*)(uintptr_t)fs,next,1)==0?M10V_LIBRARY_OK:M10V_LIBRARY_STORE_FAILED;
+}
+#endif
 typedef struct {uint32_t magic;uint16_t version,size;uint32_t sequence;m10v_slot slots[5];uint8_t stamp,format,corner,color;m10v_film_effects effects[5];uint32_t reserved,crc;} legacy_state;
 static const char legacy_names[2][12]={"M10V5A.bin","M10V5B.bin"};
 static uint32_t state_crc(const void *v,uint32_t bytes){uint32_t crc=0xffffffffu;const uint8_t *p=v;for(uint32_t i=0;i<bytes;i++){crc^=p[i];for(uint32_t b=0;b<8;b++)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));}return ~crc;}

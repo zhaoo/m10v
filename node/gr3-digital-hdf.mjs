@@ -1,3 +1,4 @@
+import {companionOwnerBytes} from './gr3-companion-owner.mjs';
 // Independent ARM byte/readback contract. Never trust the builder patch list.
 import {borderPatches} from './gr3-border.mjs';
 export const hdfSources=['native/gr3/m10v_digital_hdf.c','scripts/build_gr3_digital_hdf.py','native/gr3/m10v_hdf_menu.c','scripts/build_gr3_hdf_menu.py','native/gr3/m10v_hdf_state.h','native/gr3/m10v_hdf_adj.c','native/gr3/m10v_hdf_adj.rgba','scripts/build_gr3_hdf_adj.py'];
@@ -58,7 +59,7 @@ export function hdfMenuPatches(runtime,m){
  const d=m.hdf_menu;if(!d)return [];
  const pure=m.pure_isp_effects?.enabled===true;
  const full=m.film_library_enabled!==false,offset=full?(m.capture_lifecycle?.snapshot?.snapshot_ingress_installed?0x613c:0x213c):0x13bc;
- need(d.schema==='m10v-gr3-hdf-menu/v1'&&d.film_library===full&&d.owner_offset===offset&&d.owner_bytes===offset+(pure?0x22c:0x1c0)&&d.controller_bytes===(pure?0x200:0x1c0)&&d.route===0x0200f102&&typeof m.zoom?.enabled==='boolean'&&d.rows.length===(full?3:1),'independent menu ownership differs');
+ need(d.schema==='m10v-gr3-hdf-menu/v1'&&d.film_library===full&&d.owner_offset===offset&&d.owner_bytes===companionOwnerBytes(m,offset+(pure?0x22c:0x1c0))&&d.controller_bytes===(pure?0x200:0x1c0)&&d.route===0x0200f102&&typeof m.zoom?.enabled==='boolean'&&d.rows.length===(full?3:1),'independent menu ownership differs');
  if(pure)need(JSON.stringify(d.effects_children)==='["HDF","Border","Light leak","Grain","Blur"]','pure ISP effects menu inventory differs');
  if(pure)need(full&&d.effects_cache_owner_offset===offset+0x200&&d.effects_cache_bytes===44,'effects cache ownership differs');
  const s=m.symbols,base=m.base;

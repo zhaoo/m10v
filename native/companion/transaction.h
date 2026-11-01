@@ -2,7 +2,7 @@
 #define M10V_COMPANION_TRANSACTION_H
 #include "operations.h"
 enum {M10V_IO_OK=0,M10V_IO_NOT_WRITTEN=1,M10V_IO_UNCERTAIN=2};
-typedef struct {uint8_t boot_id[16],build_id[32],catalog_hash[32],renderer_hash[32];} m10v_companion_metadata;
+typedef struct {uint8_t boot_id[16],build_id[32],catalog_hash[32],renderer_hash[32];uint32_t owner_generation;} m10v_companion_metadata;
 typedef struct {unsigned status,code,has_snapshot;m10v_companion_snapshot snapshot;} m10v_companion_result;
 typedef struct {uint8_t id[16],digest[32];m10v_companion_result result;m10v_companion_snapshot expected;unsigned present,remote;} m10v_companion_owner_record;
 typedef struct {m10v_companion_owner_record remote_cache,pending;} m10v_companion_owner;

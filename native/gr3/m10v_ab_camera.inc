@@ -343,7 +343,13 @@ uint32_t m10v_settings_controller_ab_live_enter(uint32_t live,uint32_t route,uin
   M10V_EXIT_LOG(268,live,p->ab.enabled,p->ab.selected,p->library_initialized);
   if(p->ab.enabled&&(ab_current()!=p->ab.selected||!ab_live_films_match(&p->ab)))ab_stop(&p->ab);
   M10V_EXIT_LOG(269,live,p->ab.enabled,0,0);
- }M10V_EXIT_LOG(247,live,r,0,route);return r;
+ }M10V_EXIT_LOG(247,live,r,0,route);
+#if M10V_COMPANION_ENABLED
+ p=ab_owner();
+ if(route==0x08000000u&&p&&p->library_initialized&&!p->power_off_pending)
+  m10v_companion_ui_start((uint32_t)(uintptr_t)p-M10V_SETTINGS_OWNER_BYTES);
+#endif
+ return r;
 }
 uint32_t m10v_settings_controller_ab_live_leave(uint32_t live){
  M10V_EXIT_LOG(255,live,0,0,0);

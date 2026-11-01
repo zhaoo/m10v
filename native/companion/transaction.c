@@ -15,7 +15,7 @@ int m10v_companion_snapshot_identity(const m10v_companion_metadata*meta,m10v_com
  uint8_t bytes[512];unsigned n=0;const char *prefix="m10v-config/v2";for(unsigned i=0;prefix[i];i++)bytes[n++]=(uint8_t)prefix[i];
  for(unsigned i=12;i<offsetof(m10v_library_state,crc);i++)bytes[n++]=((const uint8_t*)&s->state)[i];
  for(unsigned slot=0;slot<M10V_SLOT_COUNT;slot++){if(M10V_BUILTIN(s->state.slots[slot].film))zero(s->custom_hashes[slot],32);for(unsigned i=0;i<32;i++)bytes[n++]=s->custom_hashes[slot][i];}bytes[n++]=(uint8_t)s->active_slot;m10v_sha256(bytes,n,s->config_hash);
- n=0;prefix="m10v-revision/v2";for(unsigned i=0;prefix[i];i++)bytes[n++]=(uint8_t)prefix[i];const uint8_t*parts[]={meta->boot_id,meta->build_id,meta->catalog_hash,meta->renderer_hash,s->config_hash};const unsigned sizes[]={16,32,32,32,32};for(unsigned p=0;p<5;p++)for(unsigned i=0;i<sizes[p];i++)bytes[n++]=parts[p][i];for(unsigned i=0;i<4;i++)bytes[n++]=(uint8_t)(s->state.sequence>>(8*i));m10v_sha256(bytes,n,s->revision);return 0;
+ n=0;prefix="m10v-revision/v2";for(unsigned i=0;prefix[i];i++)bytes[n++]=(uint8_t)prefix[i];const uint8_t*parts[]={meta->boot_id,meta->build_id,meta->catalog_hash,meta->renderer_hash,s->config_hash};const unsigned sizes[]={16,32,32,32,32};for(unsigned p=0;p<5;p++)for(unsigned i=0;i<sizes[p];i++)bytes[n++]=parts[p][i];for(unsigned i=0;i<4;i++)bytes[n++]=(uint8_t)(s->state.sequence>>(8*i));for(unsigned i=0;i<4;i++)bytes[n++]=(uint8_t)(meta->owner_generation>>(8*i));m10v_sha256(bytes,n,s->revision);return 0;
 }
 static int rejected(m10v_companion_result*out,unsigned code){zero(out,sizeof(*out));out->status=M10V_OPERATION_REJECTED;out->code=code;return (int)code;}
 static int acquire(const m10v_companion_owner_services*io,m10v_companion_result*out){
@@ -38,7 +38,7 @@ static int set_field(m10v_companion_snapshot*next,unsigned slot,unsigned key,uns
 static int prepare(const m10v_companion_patch*p,const m10v_companion_owner_services*io,m10v_companion_snapshot*next){
  if(p->slots_mask&~((1u<<M10V_SLOT_COUNT)-1u)||p->activate_slot < -1||p->activate_slot>=(int)M10V_SLOT_COUNT||(p->slots_mask&&p->activate_slot>=0)||(!p->slots_mask&&p->activate_slot<0))return M10V_ERROR_INVALID_RECIPE;
  for(unsigned slot=0;slot<M10V_SLOT_COUNT;slot++){
-  unsigned mask=p->fields[slot];if((mask&~((1u<<(M10V_FIELD_COUNT+1))-1))||(!(p->slots_mask&(1u<<slot))&&mask)||((p->slots_mask&(1u<<slot))&&!mask))return M10V_ERROR_INVALID_RECIPE;if(!mask)continue;
+  unsigned mask=p->fields[slot];if((mask&~((1u<<(M10V_FIELD_COUNT+1))-1))||(!(p->slots_mask&(1u<<slot))&&mask)||((p->slots_mask&(1u<<slot))&&!mask))return M10V_ERROR_INVALID_RECIPE;if(!mask)continue;if(mask&M10V_READONLY_MASK)return M10V_ERROR_INVALID_RECIPE;
   m10v_slot*v=&next->state.slots[slot];m10v_film_effects*e=&next->state.effects[slot];unsigned previous=v->film;
   if(mask&(1u<<M10V_FIELD_FILMID)){unsigned id=p->values[slot][M10V_FIELD_FILMID];if(!id||(!M10V_BUILTIN(id)&&!M10V_CUSTOM(id)))return M10V_ERROR_INVALID_RECIPE;v->film=(uint16_t)id;}
   if(M10V_CUSTOM(v->film)){

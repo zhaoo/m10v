@@ -111,7 +111,7 @@ class TimerMachine:
         self.u.reg_write(UC_ARM_REG_LR, STOP)
         for reg, value in zip((UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3), args):
             self.u.reg_write(reg, value)
-        self.u.emu_start(address, STOP, count=100000)
+        self.u.emu_start(address, STOP, count=getattr(self, "instruction_budget", 100000))
         expected = stop if stop is not None else STOP
         if self.u.reg_read(UC_ARM_REG_PC) != expected:
             raise AssertionError(f'ARM did not reach boundary {expected:#x}')
