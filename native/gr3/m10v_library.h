@@ -11,8 +11,7 @@
 #define M10V_HALO_STREAK 5u
 static inline uint32_t m10v_halo_enabled(uint32_t film,uint32_t gain,uint32_t profile){
 #if M10V_UNIVERSAL_HALATION
-    return gain && (profile==M10V_HALO_SPILL||profile==M10V_HALO_STREAK||
-                    ((film==33||film==67)&&profile<=3));
+    (void)film;return gain && (profile==M10V_HALO_SPILL||profile==M10V_HALO_STREAK);
 #else
     return gain && profile<=3 && (film==33||film==67);
 #endif

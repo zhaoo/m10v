@@ -33,7 +33,7 @@ uint32_t m10v_detail_table(uint32_t ui){
 }
 static uint32_t value(const m10v_library_state *s,uint32_t target,uint32_t field){
  const m10v_slot *v=&s->slots[target];
- if(field==4)return v->halo_profile==M10V_HALO_SPILL||((v->film==33||v->film==67)&&v->halo_gain&&v->halo_profile<=3)?1:v->halo_profile==M10V_HALO_STREAK?2:0;
+ if(field==4)return v->halo_profile==M10V_HALO_SPILL?1:v->halo_profile==M10V_HALO_STREAK?2:0;
  if(field==11)return s->effects[target].reserved[1];
  if(field==0)return v->halo_gain;if(field==1)return v->halo_spread;
  if(field==2)return v->halo_threshold;if(field==3)return v->grain;

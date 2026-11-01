@@ -2,7 +2,7 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
-      "version": "2026.11.01.2",
+      "version": "2026.11.01.3",
       "date": "2026-11-01",
       "title": "恢复胶卷 FN 光晕入口并修复自定义 LUT 占槽",
       "changes": [
