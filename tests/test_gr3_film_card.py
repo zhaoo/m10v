@@ -15,7 +15,7 @@ class FilmCardTests(unittest.TestCase):
   cls.draw.argtypes=[C.POINTER(C.c_uint32),C.c_uint32,C.c_uint32,C.c_uint32];cls.draw.restype=C.c_int
  def test_all_films_fit_the_owned_buffer_and_emit_rgba(self):
   count=128*128;buffer=(C.c_uint32*(count+2))();pixels=C.cast(C.byref(buffer,4),C.POINTER(C.c_uint32))
-  for film in list(range(1,79))+list(range(289,318)):
+  for film in list(range(1,79))+list(range(289,327)):
    for slot in range(10):
     buffer[0]=buffer[-1]=0x12345678
     self.assertEqual(self.draw(pixels,film,slot,slot==2),0)

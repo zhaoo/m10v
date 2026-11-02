@@ -23,8 +23,8 @@ const precedingGroups=[
 ];
 test('four ISP looks append to existing groups without rebinding any preceding identity',async()=>{
  const catalog=await nativeCatalog();
- assert.equal(FILM_DIRECTORY.length,51);assert.equal(catalog.film_count,51);
- assert.equal(new Set(catalog.films.map(f=>f.id)).size,51);
+ assert.equal(FILM_DIRECTORY.length,56);assert.equal(catalog.film_count,56);
+ assert.equal(new Set(catalog.films.map(f=>f.id)).size,56);
  assert.deepEqual(FILM_GROUPS.map(g=>g.name),precedingGroups.map(([name])=>name));
  for(const [name,ids] of precedingGroups){const group=FILM_GROUPS.find(g=>g.name===name);assert.deepEqual(group.films.filter(f=>f.id<318).map(f=>f.id),ids);}
  for(const [id,name,group] of additions){const film=catalog.films.find(f=>f.id===id);assert.equal(film?.name,name);assert.equal(film.group,group);assert.equal(film.camera_calibrated,false);assert.equal(film.approximation,true);assert.match(film.icon_url,new RegExp(`/${id}-large\\.png\\?`));assert.match(film.icon_compact_url,new RegExp(`/${id}\\.png\\?`));}

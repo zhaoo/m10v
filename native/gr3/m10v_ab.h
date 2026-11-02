@@ -34,7 +34,7 @@ static inline uint32_t m10v_ab_caption(uint32_t choice,uint32_t film){
  if(m10v_ab_slot(choice)>=M10V_SLOT_COUNT)return choice<12?stock[choice]:4;
  if(M10V_FOUR_LOOKS(film))return M10V_FOUR_LOOKS_NAME(film);
  if(M10V_EXTRA_FILM(film))return M10V_EXTRA_FILM_NAME(film);
- if(M10V_C41(film))return M10V_C41_NAME_FIRST+film-312;
+ if(M10V_C41(film))return M10V_C41_NAME(film);
  if(M10V_ANIME_E6(film))return 1142+film-M10V_ANIME_FIRST;
  if(M10V_D76(film))return 1130+film-M10V_D76_FIRST;
  if(film==M10V_5213_ID)return 1128;

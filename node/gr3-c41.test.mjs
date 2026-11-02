@@ -9,7 +9,7 @@ import {defaultConfiguration} from '../web/gr3/native-library-state.mjs';
 import {normalizeGr4Request} from './gr4-m10v-native-build.mjs';
 test('C41 exposes independent OptiColour 200 and NC500 identities',async()=>{
  const c=await nativeCatalog();
- assert.deepEqual(FILM_GROUPS.find(g=>g.name==='C41').films.slice(-2),[{id:312,name:'OptiColour 200'},{id:313,name:'NC500'}]);
+ assert.deepEqual(FILM_GROUPS.find(g=>g.name==='C41').films.filter(f=>f.id===312||f.id===313),[{id:312,name:'OptiColour 200'},{id:313,name:'NC500'}]);
  for(const id of [312,313]){const f=c.films.find(f=>f.id===id);assert.ok(f);assert.equal(f.group,'C41');assert.equal(f.film_calibrated,false);assert.equal(f.approximation,true);}
 });
 test('C41 serializes new IDs for both GR3 and GR3x with native ISP required',async()=>{

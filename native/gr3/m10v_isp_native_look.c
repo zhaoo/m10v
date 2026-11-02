@@ -5,7 +5,17 @@
 #include "m10v_spectral_native_profiles.h"
 #include "m10v_d76_native_profiles.h"
 #include "m10v_anime_e6_native_profiles.h"
+#if M10V_C41_EXTERNAL_DATA
+const void *m10v_c41_native_data(uint32_t,uint32_t);
+#define C41_FRAME(i) m10v_c41_native_data(0,(i))
+#define C41_STREAM m10v_c41_native_data(1,0)
+#define C41_HUE(i) m10v_c41_native_data(2,(i))
+#else
 #include "m10v_c41_native_profiles.h"
+#define C41_FRAME(i) (&native_c41_frame[(i)])
+#define C41_STREAM native_c41_curve_stream
+#define C41_HUE(i) native_c41_hue[(i)]
+#endif
 #include "m10v_extra_films_native_profiles.h"
 #include "m10v_four_looks_native_profiles.h"
 #include <stddef.h>
@@ -59,7 +69,7 @@ int m10v_isp_native_look_prepare(m10v_isp_native_look *s,uint32_t film,uint32_t 
   for(uint32_t c=0;c<3;c++)for(uint32_t i=0;i<256;i++)s->target.curves[c][i]=t->curves[c][i];
  }
  else if(M10V_C41(film)){
-  unpack_frame(&s->target,&native_c41_frame[film-312],native_c41_curve_stream);
+  unpack_frame(&s->target,C41_FRAME(M10V_C41_INDEX(film)),C41_STREAM);
  }
  else if(M10V_E6(film)){
   unpack_frame(&s->target,&native_anime_e6_frame[film-309],native_anime_e6_curve_stream);
@@ -86,7 +96,7 @@ int m10v_isp_native_look_prepare(m10v_isp_native_look *s,uint32_t film,uint32_t 
 /* Keep the sector workspace out of the frame gamma packer call chain. */
 static __attribute__((noinline)) void apply_native_sectors(void *frame,uint32_t film,uint32_t exposure){
   m10v_isp_multiaxis_target t;
-  const int16_t *h=M10V_FOUR_LOOKS(film)?native_four_looks_hue[film-318]:M10V_EXTRA_FILM(film)?native_extra_films_hue[film-314]:M10V_C41(film)?native_c41_hue[film-312]:M10V_E6(film)?native_anime_e6_hue[film-309]:M10V_D76(film)?native_d76_hue[film-M10V_D76_FIRST]:film==77||film==M10V_5213_ID?native_spectral_hue[film==77?0:1]:M10V_STYLE(film)?native_style_filters_hue[film-M10V_STYLE_FIRST]:film>=73?native_newstocks_hue[film-73]:film>=69?native_curated_hue[film-69]:film==66?native_5207_hue:exposure?native_phoenix120_hue:native_phoenix_hue;
+  const int16_t *h=M10V_FOUR_LOOKS(film)?native_four_looks_hue[film-318]:M10V_EXTRA_FILM(film)?native_extra_films_hue[film-314]:M10V_C41(film)?C41_HUE(M10V_C41_INDEX(film)):M10V_E6(film)?native_anime_e6_hue[film-309]:M10V_D76(film)?native_d76_hue[film-M10V_D76_FIRST]:film==77||film==M10V_5213_ID?native_spectral_hue[film==77?0:1]:M10V_STYLE(film)?native_style_filters_hue[film-M10V_STYLE_FIRST]:film>=73?native_newstocks_hue[film-73]:film>=69?native_curated_hue[film-69]:film==66?native_5207_hue:exposure?native_phoenix120_hue:native_phoenix_hue;
   const uint16_t boundaries[16]={1298,750,0,0,1448,843,0,0,1298,750,0,0,1205,843,0,0};
   const uint8_t selectors[20]={0,1,2,2,2,3,4,5,5,5,6,7,8,8,8,9,10,11,11,11};
   const uint16_t controls[21]={32,328,328,328,293,800,1600,2400,3200,32,1024,1024,1024,1024,0,0,0,0,0,640,1280};

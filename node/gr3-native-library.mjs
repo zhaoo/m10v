@@ -105,7 +105,7 @@ export function prepareNative(source,value,{debug_mode=false,extensions:requeste
  const native_grain=capabilities.nativeGrain&&film_library&&['gr3-native-v7','gr3-native-v8'].includes(capture_pipeline);
  if(configuration.slots.some(s=>s.grain>0)&&!native_grain)throw Error('颗粒仅支持 GR III 原厂原生成像管线，请关闭颗粒后导出此方案');
  if(configuration.slots.some(s=>s.grain>0&&[289,290].includes(s.film)))throw Error('Charmera / 方块世界暂不支持原厂颗粒，请关闭该槽位颗粒');
- if(configuration.slots.some(s=>s.film===294||(s.film>=306&&s.film<=317))&&!['gr3-native-v7','gr3-native-v8'].includes(capture_pipeline))throw Error('新滤镜需要 GR III 已接入的 ISP 成片管线');
+ if(configuration.slots.some(s=>s.film===294||(s.film>=306&&s.film<=317)||(s.film>=322&&s.film<=326))&&!['gr3-native-v7','gr3-native-v8'].includes(capture_pipeline))throw Error('新滤镜需要 GR III 已接入的 ISP 成片管线');
  if(four_looks&&(camera_model!=='gr3'||!['gr3-native-v7','gr3-native-v8'].includes(capture_pipeline)))throw Error('四款新增滤镜需要 GR III 已验证的原生 ISP 成片管线');
  const runtime_source_sha256=nativeSourceFingerprint(),configuration_sha256=hash(JSON.stringify({source:report.sha256,configuration,film_library,appended_slots,hdf_enabled,halation_enabled,border_enabled,ab_enabled,extensions,debug_mode,version_unlock,runtime_source_sha256,integration_source_sha256,capture_pipeline,live_color,...(pure_isp_effects?{pure_isp_effects:true}:{})}));
  const zoom_seed=configuration.zoom.write?{id:hash(JSON.stringify({source:report.sha256,zoom:configuration.zoom,runtime_source_sha256})).slice(0,16),slots:configuration.zoom.slots}:null;

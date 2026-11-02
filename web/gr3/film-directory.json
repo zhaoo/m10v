@@ -100,6 +100,26 @@
         {
           "id": 313,
           "name": "NC500"
+        },
+        {
+          "id": 322,
+          "name": "Harman Phoenix 200"
+        },
+        {
+          "id": 323,
+          "name": "Kodak ColorPlus 200"
+        },
+        {
+          "id": 324,
+          "name": "Fujifilm Natura 1600"
+        },
+        {
+          "id": 325,
+          "name": "Lomo Redscale XR"
+        },
+        {
+          "id": 326,
+          "name": "Agfa Vista 200"
         }
       ]
     },

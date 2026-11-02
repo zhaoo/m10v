@@ -51,7 +51,10 @@ static inline uint32_t m10v_halo_workspace_planes(uint32_t film,uint32_t profile
 #define M10V_EXTRA_FILM_NAME(id) ((id)==317u?1158u:M10V_EXTRA_FILM_NAME_FIRST+(id)-314u)
 #define M10V_EXTRA_FILM_ICON_FIRST 871u
 #define M10V_EXTRA_FILM_NAME_FIRST 1152u
-#define M10V_C41(id) ((id)>=312u && (id)<=313u)
+#define M10V_C41(id) (((id)>=312u && (id)<=313u)||((id)>=322u && (id)<=326u))
+#define M10V_C41_INDEX(id) ((id)>=322u?(id)-322u+2u:(id)-312u)
+#define M10V_C41_ICON(id) ((id)>=322u?882u+(id)-322u:M10V_C41_ICON_FIRST+(id)-312u)
+#define M10V_C41_NAME(id) ((id)>=322u?1186u+(id)-322u:M10V_C41_NAME_FIRST+(id)-312u)
 #define M10V_C41_ICON_FIRST 869u
 #define M10V_C41_NAME_FIRST 1150u
 #define M10V_ANIME_E6(id) ((id)>=306u && (id)<=311u)

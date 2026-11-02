@@ -23,11 +23,12 @@ def generate():
  styles=json.loads((ROOT/'web/gr3/style-filters-luts.json').read_text())['stocks']
  specs=[(i,name,None) for i,name in enumerate(names,1)]+[(289,'Kodak Charmera',None),(290,'方块世界',None)]+[(v['id'],v['name'],v) for v in styles]+[(298,'5213',None)]+[(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/d76-luts.json').read_text())['stocks']]
  specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/anime-e6-luts.json').read_text())['stocks'] if v['id']>=309]
- specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/c41-luts.json').read_text())['stocks']]
+ specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/c41-luts.json').read_text())['stocks'] if v['id']<322]
  specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/extra-films-luts.json').read_text())['stocks']]
  # Retired catalog entries remain valid in an already configured library.
  specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/anime-e6-luts.json').read_text())['stocks'] if v['id']<309]
  specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/four-looks-luts.json').read_text())['stocks']]
+ specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/c41-luts.json').read_text())['stocks'] if v['id']>=322]
  rows=['static const struct { uint8_t brand,main,sub,header,color,ink,accent,motif; } box_cards[]={'];palette=[];words=[]
  for i,name,spec in specs:
   brand,title,code,paper,ink,accent,motif=artwork(name,i,spec)

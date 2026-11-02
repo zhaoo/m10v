@@ -1100,6 +1100,61 @@
     "artwork_revision": "classic-square-v1"
   },
   {
+    "id": 322,
+    "name": "Harman Phoenix 200",
+    "title": "PHOENIX",
+    "code": "200",
+    "color": "#d7672f",
+    "icon_url": "/gr3/film-icons/322-large.png?v=99dc0d5bf22d",
+    "sha256": "209643cd8d6143b434dbe744dac34e821cd83796e7e605330b1d4e6afbaf65cb",
+    "icon_compact_url": "/gr3/film-icons/322.png?v=209643cd8d61",
+    "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 323,
+    "name": "Kodak ColorPlus 200",
+    "title": "COLORPLUS",
+    "code": "200",
+    "color": "#d3a837",
+    "icon_url": "/gr3/film-icons/323-large.png?v=184ef4327b35",
+    "sha256": "1cc9b29707dfe5d34b31d548a4ddc309cc007783417cf4b449c9a6f24a12c775",
+    "icon_compact_url": "/gr3/film-icons/323.png?v=1cc9b29707df",
+    "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 324,
+    "name": "Fujifilm Natura 1600",
+    "title": "NATURA",
+    "code": "1600",
+    "color": "#66a67e",
+    "icon_url": "/gr3/film-icons/324-large.png?v=fb72ee7db0df",
+    "sha256": "cb806013109cc31d84d303e45ee7898cf4963ab4ccdd805c98be40bc3da91873",
+    "icon_compact_url": "/gr3/film-icons/324.png?v=cb806013109c",
+    "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 325,
+    "name": "Lomo Redscale XR",
+    "title": "REDSCALE",
+    "code": "XR 200",
+    "color": "#bb492e",
+    "icon_url": "/gr3/film-icons/325-large.png?v=ec7e48e716ff",
+    "sha256": "9c634fed01fd9b077dfc0dc78eae4ae643bc798444c143d318ca0edc9159e3f5",
+    "icon_compact_url": "/gr3/film-icons/325.png?v=9c634fed01fd",
+    "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 326,
+    "name": "Agfa Vista 200",
+    "title": "VISTA",
+    "code": "200",
+    "color": "#c34555",
+    "icon_url": "/gr3/film-icons/326-large.png?v=de203b08ee22",
+    "sha256": "105f9a34fc710945198d5d1cb8da1d798c2a2fddc10794b9311aec38aa3477c8",
+    "icon_compact_url": "/gr3/film-icons/326.png?v=105f9a34fc71",
+    "artwork_revision": "classic-square-v1"
+  },
+  {
     "id": 314,
     "name": "ACROS II 100",
     "title": "ACROS II",

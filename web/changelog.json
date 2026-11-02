@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.02.1",
+      "date": "2026-11-02",
+      "title": "C41 新增五款胶卷",
+      "changes": [
+        "GR III / IIIx 新增 Harman Phoenix 200（初代）、Kodak ColorPlus 200、Fujifilm Natura 1600、Lomo Redscale XR、Agfa Vista 200；保留全部旧胶卷编号及 Phoenix II。",
+        "新增独立设计 LUT、离线拟合的原生 ISP 配方、网页预览及方形胶卷图标；保留上一版 SD 胶卷包和自定义 LUT。"
+      ],
+      "notice": "参考厂家资料设计近似效果，Natura 使用 MIT 光谱数字化模型；ColorPlus 未取得官方色彩数据，其他非光谱数值也为设计假设，不能保证真实胶卷100%一致，Natura 拟合精度低于其余四款。Redscale 采用 EI200 方向，Vista 采用原版 Agfa。按用户要求跳过完整本地测试及实机验收，仅做专项轻量检查；部署保留既有服务器构建保护。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.01.4",
       "date": "2026-11-01",
       "title": "恢复 FN 光晕与 LUT 槽位并保留发布历史",
@@ -11,9 +24,9 @@
         "沿用原 SD 渲染契约，保留失败发布的历史记录。"
       ],
       "notice": "按用户要求跳过本地测试和实机验收，部署继续执行既有构建与保护检查。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "a24ccc2618aff06baf9359808120ce6a4e881ab0",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/41267470266"
     },
     {
       "version": "2026.11.01.3",
@@ -33,7 +46,9 @@
       "version": "2026.11.01.2",
       "date": "2026-11-01",
       "title": "恢复胶卷 FN 光晕入口并修复自定义 LUT 占槽",
-      "changes": ["恢复光晕入口并增加重新导出选卷的一次性应用和目录外 LUT 清理。"],
+      "changes": [
+        "恢复光晕入口并增加重新导出选卷的一次性应用和目录外 LUT 清理。"
+      ],
       "notice": "本次部署因 SD 渲染契约指纹变化失败，生产自动回滚，未上线。",
       "commit": "d9b9b7a570646988cb1a38744dfb3bbdb09dbe3c",
       "evidence": "source",

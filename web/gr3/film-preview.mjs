@@ -83,7 +83,7 @@ export async function renderPreviewPixels(source, look, width, height) {
     extraFilmsTablesPromise??=fetch(new URL('./extra-films-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('Film LUT unavailable');return r.json();}).catch(e=>{extraFilmsTablesPromise=undefined;throw e;});
     const lut=await extraFilmsTablesPromise;return previewRgbLutPixels(source,lut,lut.stocks.find(s=>s.id===film)?.native_values);
   }
-  if(Number.isInteger(film)&&film>=312&&film<=313){
+  if(Number.isInteger(film)&&((film>=312&&film<=313)||(film>=322&&film<=326))){
     c41TablesPromise??=fetch(new URL('./c41-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('C41 LUT unavailable');return r.json();}).catch(e=>{c41TablesPromise=undefined;throw e;});
     const lut=await c41TablesPromise;return previewRgbLutPixels(source,lut,lut.stocks.find(s=>s.id===film)?.native_values);
   }

@@ -152,7 +152,12 @@ def artwork(name,i,spec=None):
  318:('KODAK','2383','PRINT','#d6b348','#282d28','#9d4635',7),
  319:('FUJIFILM','CLASSIC','NEGATIVE','#d5d7bc','#203e32','#a3654a',8),
  320:('FUJIFILM','CLASSIC','CHROME','#a6b3ae','#263c43','#ba8d58',9),
- 321:('LOMOGRAPHY','LOMOCHROME','PURPLE','#543250','#f6e6cb','#b978af',5)}
+ 321:('LOMOGRAPHY','LOMOCHROME','PURPLE','#543250','#f6e6cb','#b978af',5),
+ 322:('HARMAN','PHOENIX','200','#d8642d','#fff0c4','#343239',6),
+ 323:('KODAK','COLORPLUS','200','#f0c534','#9d2828','#dc5c28',1),
+ 324:('FUJIFILM','NATURA','1600','#eee8d6','#245f41','#69a46f',8),
+ 325:('LOMOGRAPHY','REDSCALE','XR 50-200','#bd472b','#f4dcaa','#772a24',6),
+ 326:('AGFA','VISTA','200','#c83c4c','#f1e4c8','#507594',5)}
  if i in curated:brand,title,code,paper,ink,accent,motif=curated[i]
  return brand,title,code,paper,ink,accent,motif
 

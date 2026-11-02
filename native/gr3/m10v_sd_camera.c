@@ -109,7 +109,7 @@ static int persist(const uint8_t *record,uint32_t id){
  char name[]="M10VS00.bin",primary[]="F:\\M10VS00.bin";
  if(M10V_FOUR_LOOKS(id))id=id-318+29;
  if(M10V_EXTRA_FILM(id))id=id-314+25;
- if(M10V_C41(id))id=id-312+23;
+ if(M10V_C41(id))id=id>=322?id-322+79:id-312+23;
  if(M10V_ANIME_E6(id))id=id-306+17;
  if(M10V_D76(id))id=id-M10V_D76_FIRST+10;
  if(id==M10V_5213_ID)id=9;
