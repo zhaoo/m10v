@@ -1,9 +1,10 @@
 import {sendFirmwareDownload} from './firmware-download.mjs';
+import {firmwareReleasePolicy,releaseRequestLocked,requireReleaseBaseline} from './firmware-release-policy.mjs';
 import {handleGr2NativeRequest} from './gr2-native-routes.mjs';
 import {bindPowerPreparation,applyPowerImages,previewPowerImages} from './gr3-power-images.mjs';
 import {createHash} from 'node:crypto';
 import {handleGr4CustomizationRequest} from './gr4-customization.mjs';
-import {handleGr4NativeRequest,gr4WorkbenchHtml,gr4SdLibraryHtml} from './gr4-native-routes.mjs';
+import {handleGr4NativeRequest,gr4SdLibraryHtml} from './gr4-native-routes.mjs';
 import {prepareGr3Bridge,exportGr3Bridge} from './gr3-bridge.mjs';
 import {exportSdFilms} from './gr3-sd-film-export.mjs';
 import {renderChangelog} from './changelog.mjs';
@@ -96,7 +97,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
   const server = http.createServer(async (request, response) => {
     let buildSource;
     const readBuildOriginal=async id=>{
-      const resolved=await resolveBuildSource(await store.readOriginal(id));
+      const resolved=await resolveBuildSource(requireReleaseBaseline(await store.readOriginal(id)));
       buildSource=resolved.report.build_source;
       response.setHeader('X-M10V-Build-Source',Buffer.from(JSON.stringify(buildSource)).toString('base64'));
       return resolved.source;
@@ -110,6 +111,13 @@ export function createServer(store = new Store(path.join(root, 'data')),
     const origin=configuredOrigin||localOrigin;
     const allowedHosts=[new URL(localOrigin).host,new URL(origin).host];
     if (!allowedHosts.includes(request.headers.host)) return send(response, 403, { error: 'invalid host' });
+    // Apply before model handlers or body reads, including cached projects and
+    // old browser tabs. A hidden upload control is not an export restriction.
+    if(releaseRequestLocked(request.url||'')){
+      if(request.method==='POST'&&(request.headers['x-m10v-token']!==token||
+        (request.headers.origin&&request.headers.origin!==origin)))return send(response,403,{error:'authorization failed'});
+      return send(response,423,{code:'FIRMWARE_RELEASE_LOCKED',error:firmwareReleasePolicy.message});
+    }
     if (await handleGr4CustomizationRequest({request,response,runtime:gr4,token,readBody,send,origin})) return;
     if (await handleGr2NativeRequest({request,response,runtime:gr4,token,readBody,send,origin})) return;
     if (await handleGr4NativeRequest({request,response,runtime:gr4,token,readBody,send,origin})) return;
@@ -133,9 +141,8 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }catch{return send(response,503,{error:'deployment receiver unavailable'});}
     }
     if (request.method === 'GET') {
-      if(['/gr2','/gr2/'].includes(pathname))return send(response,200,await readFile(path.join(web,'gr2/workbench.html')),'text/html; charset=utf-8');
+      if(['/gr2','/gr2/','/gr2/workbench.html','/gr4','/gr4/'].includes(pathname))return send(response,200,await readFile(path.join(web,'firmware-locked.html')),'text/html; charset=utf-8');
       if(pathname==='/gr2/inspect/')return send(response,200,await readFile(path.join(web,'gr2/index.html')),'text/html; charset=utf-8');
-      if(['/gr4','/gr4/'].includes(pathname))return send(response,200,Buffer.from(gr4WorkbenchHtml(await readFile(path.join(web,'gr3/index.html'),'utf8'))),'text/html; charset=utf-8');
       if(pathname==='/gr4/sd-library.html')return send(response,200,Buffer.from(gr4SdLibraryHtml(await readFile(path.join(web,'gr3/sd-library.html'),'utf8'))),'text/html; charset=utf-8');
       if(pathname==='/gr4/sd-library.js')return send(response,200,await readFile(path.join(web,'gr3/sd-library.js')),'text/javascript; charset=utf-8');
       if(pathname==='/gr4/sd-library.css')return send(response,200,await readFile(path.join(web,'gr3/sd-library.css')),'text/css; charset=utf-8');
@@ -156,6 +163,7 @@ export function createServer(store = new Store(path.join(root, 'data')),
         active_workspace: 'gr3', release_models:['gr3','gr3x'], inspection_models:['gr3','gr3x','gr4','gr2'], gr4_evidence: 'reference_verified', hardware: 'not_tested',
       });
       if (pathname === '/api/status') return send(response, 200, {
+        firmware_release_policy:firmwareReleasePolicy,
         session_token: token, can_generate: true, model: 'GR III / GR IIIx', hardware: 'not_tested',
         official_sd_supported: process.platform === 'darwin', candidate_sd_blocked: true,
         candidate_offline_analysis: true, candidate_export_allowed: true,
@@ -242,7 +250,8 @@ export function createServer(store = new Store(path.join(root, 'data')),
         return send(response,200,await inspectModelFirmware(bytes));
       }
       if(pathname === '/api/gr3/native-library/import-official') {
-        const original=await readNativeOfficial(JSON.parse(body.toString('utf8')).model||'gr3'),record=await store.importOfficial(original);
+        const model=JSON.parse(body.toString('utf8')).model||'gr3';
+        const original=requireReleaseBaseline(await readNativeOfficial(model),model),record=await store.importOfficial(original);
         return send(response,200,{project_id:record.id,source_sha256:record.sha256});
       }
       if(bridgeMatch) {

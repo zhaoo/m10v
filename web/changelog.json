@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.02.2",
+      "date": "2026-11-02",
+      "title": "紧急限制固件导出与导入版本",
+      "changes": [
+        "暂停 GR IV / GR II 的网站固件生成与下载，后端接口同步锁定。",
+        "关闭 GR III / IIIx 官方固件上传与备份恢复导入，仅保留站内 GR III 2.10 / GR IIIx 1.60 内置基线。",
+        "阻止旧页面和已缓存的 2.20 / 1.70 项目继续调用导出；已升级机身请勿使用旧基线尝试降级。"
+      ],
+      "notice": "针对无法启动反馈的紧急入口限制；不代表已查清全部故障原因或已验证恢复方案。本次不修改相机运行体。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.02.1",
       "date": "2026-11-02",
       "title": "C41 新增五款胶卷",
@@ -10,9 +24,9 @@
         "新增独立设计 LUT、离线拟合的原生 ISP 配方、网页预览及方形胶卷图标；保留上一版 SD 胶卷包和自定义 LUT。"
       ],
       "notice": "参考厂家资料设计近似效果，Natura 使用 MIT 光谱数字化模型；ColorPlus 未取得官方色彩数据，其他非光谱数值也为设计假设，不能保证真实胶卷100%一致，Natura 拟合精度低于其余四款。Redscale 采用 EI200 方向，Vista 采用原版 Agfa。按用户要求跳过完整本地测试及实机验收，仅做专项轻量检查；部署保留既有服务器构建保护。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "1e5ab810afea662fea3ad00568df541556928bc1",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/41425448703"
     },
     {
       "version": "2026.11.01.4",

@@ -554,6 +554,7 @@ function renderBuildSummary() {
   }
 }
 async function importSource(file,local=false) {
+  if(!local){notice('官方固件上传已关闭，仅支持内置 GR III 2.10 / GR IIIx 1.60 基线。',true);return;}
   if (!file&&!local) return;
   notice('正在核验官方固件，请稍候…');
   try {

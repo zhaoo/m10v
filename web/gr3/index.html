@@ -14,7 +14,7 @@
   </header>
   <section class="hero"><div class="hero-inner">
     <p class="kicker">GR III / GR IIIx</p><h1>固件工作台</h1>
-    <p>导入官方固件，设置胶卷与扩展功能，保存修改后的固件。</p>
+    <p>仅支持内置基线：GR III 2.10 / GR IIIx 1.60。官方固件上传已关闭。</p>
 
   </div></section>
   <div class="cinematic-scene" aria-hidden="true"></div>
@@ -49,11 +49,11 @@
         <div class="stage-actions"><button class="outline" data-back="source">返回导入固件</button><button class="primary" id="features-next" disabled>继续保存固件 <span>→</span></button></div>
       </section>
       <section class="page" data-page="source">
-        <div class="page-head"><p>固件来源</p><h2>导入官方固件</h2><span>选择对应机型的官方固件。</span></div>
+        <div class="page-head"><p>固件来源</p><h2>选择内置基线</h2><span>仅支持内置基线：GR III 2.10 / GR IIIx 1.60。2.20 / 1.70 不支持；已升级机身请勿尝试降级刷入。</span></div>
         <div class="source-options">
-        <label class="dropzone" id="dropzone" for="firmware-file"><span class="drop-icon">＋</span><strong>选择官方 BIN，或拖到这里</strong><small>支持 GR III 与 GR IIIx · 导入后自动识别机型</small></label>
-        <input type="file" id="firmware-file" accept=".bin,application/octet-stream" hidden>
-        <div class="local-source-picker"><label for="local-source-model">或选择官方样本</label><div><select id="local-source-model"><option value="gr3">GR III · Street 2.10</option><option value="gr3x">GR IIIx · 1.60</option></select><button type="button" class="outline" id="use-local-source">使用官方包 →</button></div></div>
+        <div id="dropzone" hidden></div>
+        <input type="file" id="firmware-file" accept=".bin,application/octet-stream" hidden disabled>
+        <div class="local-source-picker"><label for="local-source-model">选择机型与内置版本</label><div><select id="local-source-model"><option value="gr3">GR III · Street 2.10</option><option value="gr3x">GR IIIx · 1.60</option></select><button type="button" class="outline" id="use-local-source">使用内置基线 →</button></div></div>
         </div>
         <div id="source-report" class="source-report" hidden></div>
         <div class="source-actions"><button class="outline" id="download-backup" disabled>下载官方固件备份</button><span>导出前请保存官方原包与生成记录。</span></div>
