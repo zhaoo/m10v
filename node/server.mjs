@@ -54,6 +54,8 @@ const staticFiles = {
   '/changelog.json': ['changelog.json', 'application/json; charset=utf-8'],
   '/guide/': ['guide.html', 'text/html; charset=utf-8'],
   '/guide': ['guide.html', 'text/html; charset=utf-8'],
+  '/skills/': ['skills.html', 'text/html; charset=utf-8'],
+  '/skills': ['skills.html', 'text/html; charset=utf-8'],
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/styles.css': ['styles.css', 'text/css; charset=utf-8'],
 };

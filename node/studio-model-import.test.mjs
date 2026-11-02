@@ -65,12 +65,13 @@ test('GR IV import uses the shared workflow and isolated native endpoints',async
  assert.ok(!h.calls.some(c=>c.path.endsWith('/stock-presets')));
 });
 
-test('GR IV backup keeps its actual BIN format and model filename',async()=>{
- let callback,filename;
- const node={addEventListener(event,fn){callback=fn;}};
- const ctx=vm.createContext({gr4Workbench:true,state:{projectId:'a'.repeat(64)},$:()=>node,api:async()=>({}),download:async(response,name)=>{filename=name;},notice(){}});
- vm.runInContext(app.slice(app.indexOf("$('download-backup').addEventListener"),app.indexOf("$('prepare-build').addEventListener")),ctx);
- await callback();assert.equal(filename,'fwdc248b-original.bin');
+test('GR IV backup keeps its actual BIN format and model filename after confirmation',async()=>{
+ let options,filename;const state={revision:1,projectId:'a'.repeat(64)},node={addEventListener(){}};
+ const ctx=vm.createContext({gr4Workbench:true,state,$:()=>node,createFirmwareSaveGate:value=>(options=value,{open(){}}),renderLedger(){},api:async()=>({}),download:async(response,name)=>{filename=name;},notice(){}});
+ const block=app.slice(app.indexOf('const firmwareSaveGate='),app.indexOf("$('cancel-build').addEventListener"));
+ vm.runInContext('let saving=false,riskAcceptedRevision=-1,firmwareDownloadAction="backup";'+block,ctx);
+ assert.equal(filename,undefined);
+ await options.save({revision:1,project:state.projectId,action:'backup'});assert.equal(filename,'fwdc248b-original.bin');
 });
 
 test('opening imaging settings preserves an HDF-only selection',()=>{

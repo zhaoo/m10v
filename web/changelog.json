@@ -2,6 +2,21 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.03.2",
+      "date": "2026-11-03",
+      "title": "新增技能导航并固定顶部栏",
+      "changes": [
+        "统一导航新增「技能」入口，提供技能包下载、安装说明与支持版本说明。",
+        "导航固定在视口顶部，正文按导航实际高度留出空间；窄屏链接自动换行，不再横向滚动或被裁切。",
+        "保留胶卷编辑面板在导航上方的遮罩层级，短屏与横屏下仍可关闭；桌面面板避开导航。",
+        "同步派生页面的内置来源标签与备份确认测试，继续保持 GR IV / GR II 导出及纪念固件限制。"
+      ],
+      "notice": "仅网站导航、说明页与相关兼容检查，不修改相机运行体或固件生成逻辑。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.03.1",
       "date": "2026-11-03",
       "title": "限定稳定固件并增加刷入检查与 AI 技能下载",
@@ -12,9 +27,9 @@
         "提供 M10V 固件安全 AI 技能 ZIP，内含只读来源核验脚本与操作指引，不包含固件或自动刷机功能。"
       ],
       "notice": "本次仅调整网站提示、下载门禁及技能下载，不修改已知稳定的相机运行体。2.20 / 1.70 不适配；离线研究不代表查明两起故障原因或证明可救砖。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "491b02cc42fffe72d77363ffedb88da9fa64d046",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/41483482270"
     },
     {
       "version": "2026.11.02.2",

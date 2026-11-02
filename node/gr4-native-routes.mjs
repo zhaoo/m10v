@@ -49,7 +49,7 @@ export function gr4SdInstructions(){return `M10V SD 胶卷库 / GR IV 1.11
 仅接受匹配版本的胶卷，未来新配方需匹配固件。固件与资源包使用同一份渲染合同。
 胶卷效果作用于保存的静态 JPEG，实时取景和机内 RAW 再开发沿用原厂流程。异常时间只跳过日期水印。
 离线验证通过，GR IV 刷入、菜单、拍摄和 SD 换卷仍需真机验收。\n`;}
-export function gr4WorkbenchHtml(shared){return shared.replaceAll('GR III／GR IIIx','GR IV').replace('GR III / GR IIIx','GR IV').replaceAll('GR III / GR IIIx','GR IV').replace('支持 GR III 与 GR IIIx · 导入后自动识别机型','支持 GR IV · 官方固件身份核验').replace('<option value="gr3">GR III · Street 2.10</option><option value="gr3x">GR IIIx · 1.60</option>','<option value="gr4">GR IV · 1.11</option>').replaceAll('/gr3/sd-library.html','/gr4/sd-library.html').replace('<a href="/gr4/">GR IV</a>','<a href="/gr4/reference/">GR IV 参考工具</a>');}
+export function gr4WorkbenchHtml(shared){return shared.replaceAll('GR III／GR IIIx','GR IV').replace('GR III / GR IIIx','GR IV').replaceAll('GR III / GR IIIx','GR IV').replace('支持 GR III 与 GR IIIx · 导入后自动识别机型','支持 GR IV · 官方固件身份核验').replace(/<option value="gr3">GR III · (?:Street )?2\.10<\/option><option value="gr3x">GR IIIx · 1\.60<\/option>/,'<option value="gr4">GR IV · 1.11</option>').replaceAll('/gr3/sd-library.html','/gr4/sd-library.html').replace('<a href="/gr4/">GR IV</a>','<a href="/gr4/reference/">GR IV 参考工具</a>');}
 
 export function gr4SdLibraryHtml(shared){
  return shared.replaceAll('/gr3/','/gr4/').replace('/gr4/styles.css','/gr3/styles.css')
