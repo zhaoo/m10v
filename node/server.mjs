@@ -1,5 +1,6 @@
 import {sendFirmwareDownload} from './firmware-download.mjs';
 import {firmwareReleasePolicy,releaseRequestLocked,requireReleaseBaseline} from './firmware-release-policy.mjs';
+import {firmwareSkillArchive} from './firmware-skill.mjs';
 import {handleGr2NativeRequest} from './gr2-native-routes.mjs';
 import {bindPowerPreparation,applyPowerImages,previewPowerImages} from './gr3-power-images.mjs';
 import {createHash} from 'node:crypto';
@@ -141,6 +142,10 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }catch{return send(response,503,{error:'deployment receiver unavailable'});}
     }
     if (request.method === 'GET') {
+      if(pathname==='/downloads/m10v-firmware-safety-skill.zip'){
+        try{return send(response,200,await firmwareSkillArchive(),'application/zip','m10v-firmware-safety-skill.zip');}
+        catch{return send(response,503,{error:'skill download unavailable'});}
+      }
       if(['/gr2','/gr2/','/gr2/workbench.html','/gr4','/gr4/'].includes(pathname))return send(response,200,await readFile(path.join(web,'firmware-locked.html')),'text/html; charset=utf-8');
       if(pathname==='/gr2/inspect/')return send(response,200,await readFile(path.join(web,'gr2/index.html')),'text/html; charset=utf-8');
       if(pathname==='/gr4/sd-library.html')return send(response,200,Buffer.from(gr4SdLibraryHtml(await readFile(path.join(web,'gr3/sd-library.html'),'utf8'))),'text/html; charset=utf-8');
@@ -250,7 +255,10 @@ export function createServer(store = new Store(path.join(root, 'data')),
         return send(response,200,await inspectModelFirmware(bytes));
       }
       if(pathname === '/api/gr3/native-library/import-official') {
-        const model=JSON.parse(body.toString('utf8')).model||'gr3';
+        const input=JSON.parse(body.toString('utf8'));
+        if(!input||Array.isArray(input)||typeof input!=='object'||Object.keys(input).some(k=>k!=='model')||
+          (input.model!==undefined&&!['gr3','gr3x'].includes(input.model)))throw Error('仅可选择 GR III 2.10 / GR IIIx 1.60 内置来源');
+        const model=input.model||'gr3';
         const original=requireReleaseBaseline(await readNativeOfficial(model),model),record=await store.importOfficial(original);
         return send(response,200,{project_id:record.id,source_sha256:record.sha256});
       }

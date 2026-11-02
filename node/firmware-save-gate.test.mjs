@@ -1,10 +1,10 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createFirmwareSaveGate} from '../web/gr3/firmware-save-gate.mjs';
-function fixture(save){
+function fixture(save,canSave=()=>true){
  const node=()=>({handlers:{},disabled:false,focused:false,addEventListener(k,fn){this.handlers[k]=fn;},focus(){this.focused=true;}});
  const dialog={...node(),open:false,showModal(){this.open=true;},close(){this.open=false;this.handlers.close?.();}};
  const trigger=node(),cancel=node(),confirm=node();let snapshot={revision:1,project:'gr3'};
- const gate=createFirmwareSaveGate({dialog,trigger,cancel,confirm,readSnapshot:()=>snapshot,save});
+ const gate=createFirmwareSaveGate({dialog,trigger,cancel,confirm,readSnapshot:()=>snapshot,save,canSave});
  return {gate,dialog,trigger,cancel,confirm,change:()=>snapshot={revision:2,project:'gr3x'}};
 }
 test('cancel and Escape never invoke save; risk confirmation is required for every attempt',async()=>{
@@ -22,6 +22,27 @@ test('repeated confirmation cannot start concurrent firmware builds',async()=>{
 });
 test('a failed save requires fresh confirmation on the next attempt',async()=>{
  let calls=0;const f=fixture(async()=>{calls++;throw Error('failed build');});f.gate.open();await assert.rejects(f.confirm.handlers.click(),/failed build/);f.gate.open();assert.ok(f.dialog.open);assert.equal(calls,1);
+});
+test('camera mismatch blocks download even if confirmation is triggered programmatically',async()=>{
+ let ready=false,calls=0;const f=fixture(async()=>calls++,()=>ready);
+ f.gate.open();assert.equal(f.confirm.disabled,true);
+ await f.confirm.handlers.click();assert.equal(calls,0);
+ ready=true;f.gate.refresh();assert.equal(f.confirm.disabled,false);
+ ready=false;await f.confirm.handlers.click();assert.equal(calls,0);
+ ready=true;f.gate.refresh();await f.confirm.handlers.click();assert.equal(calls,1);
+});
+test('a second download trigger uses the same confirmation and receives focus back',async()=>{
+ let calls=0;const f=fixture(async()=>calls++),backup={disabled:false,focused:false,focus(){this.focused=true;}};
+ f.trigger.disabled=true;f.gate.open(backup);assert.equal(f.dialog.open,true);
+ f.cancel.handlers.click();assert.equal(calls,0);assert.equal(backup.focused,true);
+});
+test('the real official-backup button requests confirmation before making any download',async()=>{
+ const {readFile}=await import('node:fs/promises'),{default:vm}=await import('node:vm');
+ const source=await readFile(new URL('../web/gr3/studio.js',import.meta.url),'utf8');
+ const block=source.slice(source.indexOf("$('download-backup').addEventListener"),source.indexOf("$('prepare-build').addEventListener"));
+ const node={addEventListener(type,handler){this[type]=handler;}},events=[];
+ vm.runInNewContext(block,{$:()=>node,state:{projectId:'official'},gr4Workbench:false,notice(){},api:async()=>{events.push('api');throw Error('unexpected direct download');},download:async()=>events.push('download'),requestFirmwareDownload:(kind,trigger)=>events.push({kind,correctTrigger:trigger===node})});
+ await node.click();assert.deepEqual(events,[{kind:'backup',correctTrigger:true}]);
 });
 
 test('the real studio save callback authorizes after preflight and revokes acceptance afterward',async()=>{

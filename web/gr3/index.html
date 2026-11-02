@@ -49,11 +49,11 @@
         <div class="stage-actions"><button class="outline" data-back="source">返回导入固件</button><button class="primary" id="features-next" disabled>继续保存固件 <span>→</span></button></div>
       </section>
       <section class="page" data-page="source">
-        <div class="page-head"><p>固件来源</p><h2>选择内置基线</h2><span>仅支持内置基线：GR III 2.10 / GR IIIx 1.60。2.20 / 1.70 不支持；已升级机身请勿尝试降级刷入。</span></div>
+        <div class="page-head"><p>固件来源</p><h2>选择内置基线</h2><span>仅支持内置基线：GR III 2.10 / GR IIIx 1.60。安装官方 30 周年纪念固件（GR III 2.20 / GR IIIx 1.70）的机身不能使用当前 M10V 刷机；不提供适配、降级或自定义 BIN 上传。</span></div>
         <div class="source-options">
         <div id="dropzone" hidden></div>
         <input type="file" id="firmware-file" accept=".bin,application/octet-stream" hidden disabled>
-        <div class="local-source-picker"><label for="local-source-model">选择机型与内置版本</label><div><select id="local-source-model"><option value="gr3">GR III · Street 2.10</option><option value="gr3x">GR IIIx · 1.60</option></select><button type="button" class="outline" id="use-local-source">使用内置基线 →</button></div></div>
+        <div class="local-source-picker"><label for="local-source-model">选择机型与内置版本</label><div><select id="local-source-model"><option value="gr3">GR III · 2.10</option><option value="gr3x">GR IIIx · 1.60</option></select><button type="button" class="outline" id="use-local-source">使用内置基线 →</button></div></div>
         </div>
         <div id="source-report" class="source-report" hidden></div>
         <div class="source-actions"><button class="outline" id="download-backup" disabled>下载官方固件备份</button><span>导出前请保存官方原包与生成记录。</span></div>
@@ -113,10 +113,15 @@
     <p class="disclaimer-kicker">保存前，请了解风险</p>
     <h2 id="disclaimer-title">刷入修改固件可能导致变砖。</h2>
     <p id="disclaimer-summary">这是非官方修改固件。刷入后可能出现无法启动、功能异常、数据丢失或设备损坏，可能需要维修，且无法保证恢复。</p>
-    <p>当前固件通过离线校验，尚未完成 GR III／GR IIIx 的实机验证。生成成功不代表相机能够安全刷入或正常工作。</p>
-    <ul><li>备份照片、设置和官方固件。</li><li>确认固件与相机型号、版本匹配，并保持充足电量。</li><li>自行评估并决定是否刷入，M10V 不保证刷入成功或无风险。</li></ul>
+    <p>官网仅提供已知稳定基线 GR III 2.10 / GR IIIx 1.60。安装官方 30 周年纪念固件（2.20 / 1.70）的机身不能使用当前 M10V 刷机，不提供适配或降级。生成成功不能保证每台相机、每种组合都安全。</p>
+    <label class="install-field" for="install-camera-model">我在机身上确认的型号<select id="install-camera-model"><option value="">请选择机身型号</option><option value="gr3">GR III</option><option value="gr3x">GR IIIx</option></select></label>
+    <label class="install-field" for="install-camera-version">我在「固件信息/选项」看到的版本<select id="install-camera-version"><option value="">请选择实际版本</option><option value="2.10">2.10</option><option value="1.60">1.60</option><option value="2.20">2.20（30 周年纪念固件，不支持）</option><option value="1.70">1.70（30 周年纪念固件，不支持）</option><option value="other">其他 / 无法确认</option></select></label>
+    <p id="install-camera-status" role="status" aria-live="polite"></p>
+    <ol><li>先备份照片、机内设置和官方原包。用相机格式化一张可靠的空 SD 卡；不要格式化唯一的照片或设置副本。</li><li>使用充满电的 DB-110，或理光指定的 K-AC166J 电源适配器。更新期间不要开关机、拔电池、拔卡或打开卡盖。</li><li>GR III 使用 <code>fwdc239b.bin</code>，GR IIIx 使用 <code>fwdc243b.bin</code>。将对应 BIN 放在卡根目录；不要混放其他机型的更新包，不要把胶卷资源包当固件。</li><li>相机关机、插卡并关好卡盖。按住 MENU 开机，核对更新界面后选择 Execute / 执行。等待屏幕明确显示 Update completed / 更新完成，再关机取卡。</li><li>重启后检查版本、拍摄与回放，备份本次配置和校验记录。删除卡上的更新 BIN，再按说明复制配套胶卷资源，保留已有机内设置文件。</li></ol>
+    <p>如更新被拒绝，请停止，不要改名、改版本号或反复强刷。如已黑屏、镜头不回收，且 MENU / 回放均无法启动，请保留原包与故障信息并联系维修；不能保证通过 SD 卡恢复。</p>
+    <p><a href="/guide/#safe-install" target="_blank" rel="noopener">查看完整刷入指引与理光官方步骤 ↗</a></p>
     <div class="disclaimer-target" id="disclaimer-target"></div>
-    <div class="disclaimer-actions"><button type="button" class="outline" id="disclaimer-cancel" autofocus>返回检查</button><button type="button" class="primary" id="disclaimer-confirm">我理解风险，继续保存</button></div>
+    <div class="disclaimer-actions"><button type="button" class="outline" id="disclaimer-cancel" autofocus>返回检查</button><button type="button" class="primary" id="disclaimer-confirm" disabled>确认匹配，继续保存</button></div>
   </dialog>
 </body>
 </html>

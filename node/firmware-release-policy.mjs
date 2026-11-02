@@ -6,11 +6,13 @@ export const RELEASE_BASELINES=Object.freeze({
 });
 export const firmwareReleasePolicy=Object.freeze({
  uploads_allowed:false,locked_models:['gr4','gr2'],baselines:{gr3:'2.10',gr3x:'1.60'},
- message:'GR IV / GR II 固件导出已暂停；GR III / IIIx 仅支持内置基线 2.10 / 1.60，官方固件上传已关闭。2.20 / 1.70 不支持。',
+ blocked_firmware:{gr3:['2.20'],gr3x:['1.70']},
+ message:'GR IV / GR II 固件导出已暂停；GR III / IIIx 仅支持内置基线 2.10 / 1.60，官方固件上传已关闭。安装官方 30 周年纪念固件（GR III 2.20 / GR IIIx 1.70）的机身不能使用当前 M10V 刷机；不提供适配或降级，禁止改版本号或自定义上传绕过。',
 });
 export function releaseRequestLocked(url){
  if(/^\/api\/gr[24](?:\/|$)/.test(url))return true;
  if(['/api/import','/api/backup/restore'].includes(url))return true;
+ if(/^\/api\/projects\/[^/]+\/bridge(?:\/|$)/.test(url))return true;
  const project=/^\/api\/projects\/([^/]+)/.exec(url);
  return !!project&&!Object.values(RELEASE_BASELINES).includes(project[1]);
 }

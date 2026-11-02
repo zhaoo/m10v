@@ -1,4 +1,5 @@
 import {unwrapFirmwareDownload} from './firmware-download.mjs';
+import {checkCameraForInstall} from './firmware-install-guide.mjs';
 import {mountCinematicStudio} from './cinematic-studio.mjs';
 import {mountBuildCompletion} from './full-library.mjs';
 import {focusWorkbenchHeading} from '/shared/workbench-focus.mjs';
@@ -730,28 +731,41 @@ dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragging
 dropzone.addEventListener('drop', (event) => {
   event.preventDefault(); dropzone.classList.remove('dragging'); importSource(event.dataTransfer.files[0]);
 });
-$('download-backup').addEventListener('click', async () => {
-  try { await download(await api(`/api/projects/${state.projectId}/backup`, { method: 'POST', body: '' }),
-    gr4Workbench?'fwdc248b-original.bin':'m10v-gr3-official-backup.zip'); notice('官方固件备份已下载。'); }
-  catch (error) { notice(error.message, true); }
-});
+$('download-backup').addEventListener('click',()=>requestFirmwareDownload('backup',$('download-backup')));
 $('prepare-build').addEventListener('click', prepare);
 $('undo-edit').addEventListener('click',()=>restoreHistory('undo'));
 $('redo-edit').addEventListener('click',()=>restoreHistory('redo'));
+let firmwareDownloadAction='build';
 const firmwareSaveGate=createFirmwareSaveGate({
  dialog:$('firmware-disclaimer'),trigger:$('build-firmware'),cancel:$('disclaimer-cancel'),confirm:$('disclaimer-confirm'),
- readSnapshot:()=>({revision:state.revision,project:state.projectId}),
+ canSave:()=>installConfirmation().ready,
+ onOpen:()=>{for(const id of ['install-camera-model','install-camera-version'])$(id).value='';installConfirmation();},
+ readSnapshot:()=>({revision:state.revision,project:state.projectId,action:firmwareDownloadAction}),
  save:async accepted=>{
   if(saving||accepted.revision!==state.revision||accepted.project!==state.projectId)return;
   saving=true;renderLedger();
-  try{const preparedRevision=await prepare();if(state.preparation&&preparedRevision===state.revision&&accepted.project===state.projectId){riskAcceptedRevision=preparedRevision;await build();}}
+  try{
+   if(accepted.action==='backup'){
+    await download(await api(`/api/projects/${accepted.project}/backup`,{method:'POST',body:''}),gr4Workbench?'fwdc248b-original.bin':'m10v-gr3-official-backup.zip');
+    notice('官方固件备份已下载；备份不代表可以降级或修复变砖。');return;
+   }
+   const preparedRevision=await prepare();if(state.preparation&&preparedRevision===state.revision&&accepted.project===state.projectId){riskAcceptedRevision=preparedRevision;await build();}
+  }catch(error){notice(error.message,true);}
   finally{riskAcceptedRevision=-1;saving=false;renderLedger();}
  }
 });
-$('build-firmware').addEventListener('click',()=>{
- $('disclaimer-target').textContent=state.source?`本次保存：${state.source.model} · 输出基线 ${state.source.build_source?.public_version||state.source.public_version}（上传 ${state.source.public_version}）`:'';
- firmwareSaveGate.open();
-});
+function installConfirmation(){
+ const result=checkCameraForInstall(state.source,{model:$('install-camera-model').value,version:$('install-camera-version').value});
+ $('install-camera-status').textContent=result.message;return result;
+}
+for(const id of ['install-camera-model','install-camera-version'])$(id).addEventListener('change',()=>{installConfirmation();firmwareSaveGate.refresh();});
+function requestFirmwareDownload(action,trigger){
+ firmwareDownloadAction=action;
+ $('disclaimer-confirm').textContent=action==='backup'?'确认匹配，下载备份':'确认匹配，继续保存';
+ $('disclaimer-target').textContent=state.source?`本次${action==='backup'?'下载官方原包备份':'保存修改固件'}：${state.source.model} · 内置基线 ${state.source.public_version}`:'';
+ firmwareSaveGate.open(trigger);
+}
+$('build-firmware').addEventListener('click',()=>requestFirmwareDownload('build',$('build-firmware')));
 $('cancel-build').addEventListener('click',()=>{activeBuildController?.abort();$('build-result').textContent='已取消构建，后台处理与临时文件会随请求清理。';});
 try {
   const [status, film, community, nativeCatalog, nativeMarkup] = await Promise.all([
