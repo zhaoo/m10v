@@ -61,7 +61,7 @@ class DeliveredPureIspTests(unittest.TestCase):
     make = current.CurrentFilmPipelineTests.make
     capture = current.CurrentFilmPipelineTests.capture
 
-    def fixture(self, settings=(0, 0, 0, 1, 0, 0, 0, 0), width=640, height=480, cold=False):
+    def fixture(self, settings=(0, 0, 0, 1, 0, 0, 0, 0), width=640, height=480, cold=False, film=66):
         e = StockISP(self.image)
         e.events, e.files, e.writes, e.filesystem_online = [], {}, [], True
         e.hold_expected, e.held, e.forbid_files = False, False, False
@@ -129,7 +129,7 @@ class DeliveredPureIspTests(unittest.TestCase):
             e.filesystem_online = True
         state = bytearray(184)
         struct.pack_into('<IHHI', state, 0, 0x5630314D, 5, 184, 7)
-        struct.pack_into('<H6B', state, 12, 66, 0, 0, 0, 3, 5, 2)
+        struct.pack_into('<H6B', state, 12, film, 0, 0, 0, 3, 5, 2)
         struct.pack_into('<I', state, 180, zlib.crc32(state[:180]))
         state_pointer = e.alloc(184)
         e.u.mem_write(state_pointer, bytes(state))
@@ -522,6 +522,21 @@ class DeliveredPureIspTests(unittest.TestCase):
         self.assertEqual(self.at(e, 0x53503AB4, digital, native, execution, 0), 1)
         self.assertEqual(e.events, [])
         self.jpeg(e, recipe, si, request)
+
+    def test_new_c41_films_keep_real_24mp_zero_pixel_capture_path(self):
+        for film in range(322,327):
+            with self.subTest(film=film):
+                e, recipe, obj, frame, si, request, owner, setting, digital, native, state = self.fixture(width=6000,height=4000,film=film)
+                planning, _ = e.params()
+                self.at(e, 0x535033D8, digital, planning, si, 1)
+                queried = e.alloc(4)
+                self.assertEqual(self.at(e, 0x535033E8, digital, native, planning, queried), 1)
+                self.assertEqual(int.from_bytes(e.u.mem_read(queried, 4), 'little'), 0)
+                execution, _ = e.params()
+                self.at(e, 0x53503AA0, digital, execution, si, 1)
+                self.assertEqual(self.at(e, 0x53503AB4, digital, native, execution, 0), 1)
+                self.assertEqual(e.events, [])
+                self.jpeg(e, recipe, si, request)
 
     def test_queued_ui_update_cannot_retarget_combined_effects_or48mb_query(self):
         settings = (2, 1, 2, 3, 1, 2, 1, 0)

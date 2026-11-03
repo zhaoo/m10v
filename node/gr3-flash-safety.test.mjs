@@ -60,6 +60,18 @@ for(const [env,model,version,name] of [['M10V_GR3_SAFETY_CANDIDATE','gr3','2.10'
   const swapped=await auditFlashInputs({...input,expectedSha256:'0'.repeat(64)});assert.equal(swapped.status,'rejected');
   const counterfeit=await auditFlashInputs({...input,receipt:{...receipt,source_sha256:'0'.repeat(64)}});
   assert.equal(counterfeit.status,'rejected');
+  if(receipt.companion_identity){
+   for(const altered of [
+    {...receipt,companion_identity:undefined},
+    {...receipt,companion_identity:{...receipt.companion_identity,buildId:'12'.repeat(32)}},
+    {...receipt,preserve_existing:false},
+    {...receipt,features:receipt.features.filter(f=>f!=='companion')}
+   ]){
+    const rejected=await auditFlashInputs({...input,receipt:altered});
+    assert.equal(rejected.status,'rejected');
+    assert.match(rejected.reasons.join(' '),/companion identity|fingerprint/);
+   }
+  }
   if(model==='gr3'){
    // Simulate an altered RTOS instruction with all structural checksums and
    // supplied receipt/digest repaired. It must still fail exact reproduction.
