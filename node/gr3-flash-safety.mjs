@@ -43,7 +43,9 @@ export async function auditFlashInputs({source,candidate,receipt,expectedSha256,
   need(decoded.model===official.model&&decoded.internal_version===official.internal_version,'candidate: component versions differ from the pinned source; version spoofing is blocked');
   report.checks.strict_candidate_decode=true;
   need(receipt.configuration&&typeof receipt.configuration==='object','candidate receipt: configuration missing');
-  const options={extensions:receipt.extensions,version_unlock:{enabled:false},
+  need(!!receipt.features?.includes('companion')===!!receipt.companion_identity,'candidate receipt: companion identity missing or inconsistent');
+  need(receipt.preserve_existing===undefined||typeof receipt.preserve_existing==='boolean','candidate receipt: preserve_existing must be boolean');
+  const options={companion_identity:receipt.companion_identity,preserve_existing:receipt.preserve_existing??false,extensions:receipt.extensions,version_unlock:{enabled:false},
    film_library:receipt.film_library_enabled!==false,hdf_enabled:!!receipt.digital_hdf,
    live_color:receipt.live_color,appended_slots:!!receipt.appended_slots,
    halation_enabled:receipt.halation_enabled,border_enabled:receipt.border_enabled,

@@ -7,18 +7,19 @@ ROOT=pathlib.Path(__file__).resolve().parents[1];RAM=0x60000000;OWNER=RAM+0x2000
 class CameraZoom(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
-  cls.symbols={'m10v_zoom_bits':0x540b0000,'m10v_zoom_live_apply':0x540b0004,'m10v_zoom_native_back_bits':0x540b0008};cls.blobs=[]
+  cls.symbols={'m10v_zoom_bits':0x540b0000,'m10v_zoom_live_apply':0x540b0004,'m10v_zoom_native_back_bits':0x540b0008,'m10v_zoom_native_front_bits':0x540b000c};cls.blobs=[]
   with tempfile.TemporaryDirectory() as tmp:
    for name,addr in [('m10v_zoom.c',0x540c0000),('m10v_zoom_camera.c',0x540d0000)]:
-    obj=pathlib.Path(tmp)/'a.o';subprocess.run(['clang',*FLAGS,*getattr(cls,'seed_flags',[]),'-c',str(ROOT/'native/gr3'/name),'-o',str(obj)],check=True,capture_output=True)
+    obj=pathlib.Path(tmp)/'a.o';subprocess.run(['clang',*FLAGS,*getattr(cls,'seed_flags',[]),*getattr(cls,'companion_flags',[]),'-c',str(ROOT/'native/gr3'/name),'-o',str(obj)],check=True,capture_output=True)
     exports=['m10v_zoom_'+n for n in (['load','open','adjust','save','replace'] if name=='m10v_zoom.c' else ['camera_load','camera_save','camera_bits','camera_slot','camera_select'])]
+    if name=='m10v_zoom_camera.c' and getattr(cls,'companion_flags',[]):exports+=['m10v_zoom_camera_snapshot']
     b,s=link_object(obj.read_bytes(),addr,cls.symbols,prefix='m10v_settings_',omitted_exports=('m10v_settings_open','m10v_settings_key'),additional_exports=exports);cls.symbols.update(s);cls.blobs.append((addr,b))
  def setUp(self):
   self.u=Uc(UC_ARCH_ARM,UC_MODE_ARM);u=self.u
   for a,n in [(0x53000000,0x2000000),(0x55000000,0x1000000),(RAM,0x100000)]:u.mem_map(a,n)
   for a,b in self.blobs:u.mem_write(a,b)
   self.word(0x55063910,1);self.word(0x55063988,OWNER);self.word(RAM+0x108,RAM+0x120);self.word(RAM+0x120,RAM+0x140);u.mem_write(RAM+0x160,b'\x01')
-  self.files={};self.reads=0;self.writes=0;self.apply=[];self.fail_write=False;self.fail_marker=False;self.fail_apply=False;self.actual_bits=struct.unpack('<I',struct.pack('<f',35/28))[0]
+  self.files={};self.fail_next_read=False;self.fail_verify_once=False;self.reads=0;self.writes=0;self.apply=[];self.fail_write=False;self.fail_marker=False;self.fail_apply=False;self.actual_bits=struct.unpack('<I',struct.pack('<f',35/28))[0]
   u.reg_write(UC_ARM_REG_SP,RAM+0xe0000)
   def hook(uc,a,size,data):
    r=[uc.reg_read(reg) for reg in [UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3]];v=0
@@ -27,13 +28,16 @@ class CameraZoom(unittest.TestCase):
     name=bytes(uc.mem_read(r[1],12)).split(b'\0')[0]
     if a==0x53825648:
      self.reads+=1
-     if name in self.files:uc.mem_write(r[3],self.files[name]);v=1
+     if self.fail_next_read:self.fail_next_read=False
+     elif name in self.files:uc.mem_write(r[3],self.files[name]);v=1
     else:
      self.writes+=1
      if not self.fail_write and not (self.fail_marker and name==b'M10VZW.bin'):self.files[name]=bytes(uc.mem_read(r[3],r[2]));v=1
+     if self.fail_verify_once:self.fail_verify_once=False;self.fail_next_read=True
    elif a==0x540b0000:v=struct.unpack('<I',struct.pack('<f',r[0]/28))[0]
    elif a==0x53525d5c:self.word(RAM+0x180,RAM+0x190);v=RAM+0x180
-   elif a==0x540b0008:v=self.actual_bits
+   elif a in (0x540b0008,0x540b000c):v=self.actual_bits
+   elif a in (0x5320ad88,0x5320b31c):v=RAM+0x1c0
    elif a==0x540b0004:self.apply.append(r[0]);v=0xffffffff if self.fail_apply else 0
    else:return
    uc.reg_write(UC_ARM_REG_R0,v);uc.reg_write(UC_ARM_REG_PC,uc.reg_read(UC_ARM_REG_LR))
@@ -107,3 +111,30 @@ class SeedZoom(CameraZoom):
 for _name in list(CameraZoom.__dict__):
  if _name.startswith('test_'):setattr(SeedZoom,_name,None)
 if __name__=='__main__':unittest.main()
+
+class CompanionZoomSnapshot(CameraZoom):
+ companion_flags=['-DM10V_COMPANION_ENABLED=1']
+ def test_failed_verify_cannot_report_durable_value_as_effective_without_repair(self):
+  s=RAM+0x800;e=RAM+0x900;out=RAM+0xa00
+  self.call('camera_load',s);self.call('camera_select',0);self.fail_verify_once=True
+  self.u.mem_write(e,struct.pack('<III',0,0,36));self.assertEqual(self.call('camera_save',s,e),0xffffffff)
+  self.assertEqual(self.writes,1);self.assertEqual(self.apply,[])
+  self.assertEqual(struct.unpack('<HH',self.u.mem_read(PAGE+844,4)),(35,50))
+  self.u.mem_write(out,b'KEEPDATA');before=self.reads
+  self.assertEqual(self.call('camera_snapshot',out),0xffffffff)
+  self.assertEqual(bytes(self.u.mem_read(out,8)),b'KEEPDATA')
+  self.assertEqual(self.writes,1);self.assertEqual(self.apply,[]);self.assertGreater(self.reads,before)
+ def test_published_slots_with_failed_live_apply_remain_unavailable(self):
+  s=RAM+0x800;e=RAM+0x900;out=RAM+0xa00
+  self.call('camera_load',s);self.call('camera_select',0);self.fail_apply=True
+  self.u.mem_write(e,struct.pack('<III',0,0,36));self.assertEqual(self.call('camera_save',s,e),0xffffffff)
+  self.assertEqual(struct.unpack('<HH',self.u.mem_read(PAGE+844,4)),(36,50));self.assertEqual(self.apply,[0])
+  self.assertEqual(self.call('camera_snapshot',out),0xffffffff);self.assertEqual(self.writes,1);self.assertEqual(self.apply,[0])
+
+ def test_consistent_snapshot_is_read_only_and_preserves_outputs_on_backend_divergence(self):
+  s=RAM+0x800;out=RAM+0xa00
+  self.call('camera_load',s);self.call('camera_select',0)
+  self.assertEqual(self.call('camera_snapshot',out),0);self.assertEqual(struct.unpack('<IHH',self.u.mem_read(out,8)),(0,35,50))
+  self.actual_bits=struct.unpack('<I',struct.pack('<f',39/28))[0];self.u.mem_write(out,b'KEEPDATA')
+  self.assertEqual(self.call('camera_snapshot',out),0xffffffff);self.assertEqual(bytes(self.u.mem_read(out,8)),b'KEEPDATA')
+  self.assertEqual(self.writes,0);self.assertEqual(self.apply,[])

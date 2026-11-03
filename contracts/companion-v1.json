@@ -1,0 +1,180 @@
+{
+  "protocol": 1,
+  "recipeSchema": 1,
+  "slotCount": 10,
+  "port": 18743,
+  "officialFirmwareSha256": "d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4",
+  "limits": {
+    "jsonBytes": 16384,
+    "chunkBytes": 16384,
+    "recordBytes": 12288,
+    "stagingBytes": 65536,
+    "pollMilliseconds": 2000,
+    "previewEdge": 960,
+    "previewFallbackEdge": 640,
+    "previewCacheBytes": 50331648,
+    "contactSheetPageSize": 24,
+    "filmChunkBytes": 4096
+  },
+  "errors": [
+    "unauthorized",
+    "unsupportedProtocol",
+    "unsupportedModel",
+    "incompatibleRenderer",
+    "invalidRecipe",
+    "busy",
+    "revisionConflict",
+    "storeFailed",
+    "readbackMismatch",
+    "bridgeUnavailable",
+    "resultUnknown"
+  ],
+  "parameters": {
+    "grain": {
+      "min": 0,
+      "max": 3,
+      "default": 0,
+      "label": "颗粒",
+      "excludeFilmIds": [
+        289
+      ]
+    },
+    "grainSize": {
+      "min": 0,
+      "max": 2,
+      "default": 1,
+      "label": "颗粒尺寸",
+      "excludeFilmIds": [
+        289
+      ]
+    },
+    "haloGain": {
+      "min": 0,
+      "max": 8,
+      "default": 0,
+      "label": "光晕强度"
+    },
+    "haloSpread": {
+      "min": 0,
+      "max": 8,
+      "default": 3,
+      "label": "扩散范围"
+    },
+    "haloThreshold": {
+      "min": 0,
+      "max": 8,
+      "default": 5,
+      "label": "高光阈值"
+    },
+    "haloProfile": {
+      "min": 0,
+      "max": 6,
+      "default": 6,
+      "label": "光晕模式"
+    },
+    "leakGain": {
+      "min": 0,
+      "max": 8,
+      "default": 0,
+      "label": "漏光强度",
+      "excludeFilmIds": [
+        289
+      ]
+    },
+    "leakPosition": {
+      "min": 0,
+      "max": 5,
+      "default": 0,
+      "label": "漏光位置",
+      "excludeFilmIds": [
+        289
+      ]
+    },
+    "leakSpread": {
+      "min": 0,
+      "max": 8,
+      "default": 4,
+      "label": "漏光范围",
+      "excludeFilmIds": [
+        289
+      ]
+    },
+    "leakVariation": {
+      "min": 0,
+      "max": 1,
+      "default": 0,
+      "label": "漏光变化",
+      "excludeFilmIds": [
+        289
+      ]
+    },
+    "filmExposure": {
+      "min": 0,
+      "max": 2,
+      "default": 0,
+      "label": "模拟曝光",
+      "filmIds": [
+        67,
+        68
+      ],
+      "overrides": {
+        "67": 1
+      }
+    },
+    "charmeraColor": {
+      "min": 0,
+      "max": 3,
+      "default": 0,
+      "label": "机身颜色",
+      "filmIds": [
+        289
+      ]
+    }
+  },
+  "capabilities": {
+    "readState": false,
+    "writeState": false,
+    "uploadFilm": false,
+    "captureEvidence": false
+  },
+  "routes": {
+    "capabilities": "/m10v/v1/capabilities",
+    "state": "/m10v/v1/state",
+    "operations": "/m10v/v1/operations",
+    "filmStage": "/m10v/v1/films/stage"
+  },
+  "authentication": {
+    "algorithm": "HMAC-SHA256",
+    "maxSessions": 8,
+    "sequenceWindow": 64,
+    "bootstrapNonces": 128,
+    "receiptCount": 32,
+    "requestCanonical": "method\\npath\\nbootId\\nsessionId\\nsequence\\nnonce\\nhex(SHA256(body))",
+    "responseCanonical": "RESPONSE\\nmethod\\npath\\nbootId\\nsessionId\\nsequence\\nnonce\\nstatus\\nhex(SHA256(body))",
+    "responseSignatureHeader": "X-M10V-Response-Signature"
+  },
+  "filmTransfer": {
+    "schema": "m10v.film-transfer/v1",
+    "model": "GR III",
+    "recordBytes": 12288,
+    "chunkBytes": 4096,
+    "stageTargetSlotRequired": true,
+    "bankScope": "per-slot",
+    "chunkHashHeader": "X-M10V-Chunk-Hash",
+    "readOnlyStatusRoute": "/m10v/v1/films/stage/{uploadId}"
+  },
+  "stateSchema": 2,
+  "journal": {
+    "version": 5,
+    "bytes": 184,
+    "crcOffset": 180
+  },
+  "maximumFilmId": 326,
+  "readOnlyParameters": [
+    "grainSize",
+    "leakGain",
+    "leakPosition",
+    "leakSpread",
+    "leakVariation"
+  ]
+}

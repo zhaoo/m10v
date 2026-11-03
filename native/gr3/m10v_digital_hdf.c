@@ -173,3 +173,18 @@ void m10v_hdf_done(uint32_t context,uint32_t params,uint32_t result){
     if(!ram(values,12))return;
     s->ready|=result==1&&((const int16_t *)(uintptr_t)values)[1]==(int16_t)(4+s->strength)?8u:16u;
 }
+#if M10V_COMPANION_ENABLED
+int m10v_hdf_remote_snapshot(uint32_t *strength,uint32_t *sequence){
+ uint32_t fs=filesystem();if(!fs||!strength||!sequence)return -1;
+ hdf_record r;uint32_t actual,generation=0,effective;
+ if(latest(fs,&r)){actual=r.strength;generation=r.sequence;}else actual=M10V_HDF_DEFAULT;
+#if M10V_HDF_UI_CACHE
+ /* A durable write can precede failed verification/publication. A read must
+  * never repair that divergence or claim the capture cache adopted it. */
+ if(m10v_hdf_cached(&effective)||effective!=actual)return -1;
+#else
+ return -1; /* Companion requires the independently owned capture cache. */
+#endif
+ *strength=actual;*sequence=generation;return 0;
+}
+#endif

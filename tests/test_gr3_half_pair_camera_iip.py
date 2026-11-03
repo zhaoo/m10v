@@ -114,9 +114,13 @@ int main(void){printf("%u %u %u %u %u %u",(unsigned)(M10V_SETTINGS_OWNER_BYTES+o
  def capture(self,exposure):return self.call('m10v_half_pair_camera',exposure[1])
  def test_clock_native_output_abi_and_low_word_used_without_retaining_stack(self):
   a=self.expose();self.assertEqual(self.capture(a),1)
-  self.assertEqual(len(self.clock_calls),2)
+  # Source-built fallback enables debug; exact delivered builds follow their
+  # manifest. M10V_LOG removes the second clock call when diagnostics are off.
+  debug=bool(self.manifest['debug_mode']) if os.environ.get('M10V_HALF_IIP_FINAL') else True
+  self.assertEqual(len(self.clock_calls),2 if debug else 1)
   timings=[e for e in self.events if e[0]==222]
-  self.assertEqual(timings[-1][1:4],(a[0],1,1))
+  if debug:self.assertEqual(timings[-1][1:4],(a[0],1,1))
+  else:self.assertEqual(timings,[])
  def test_clock_failure_does_not_abort_first_or_second_jpeg(self):
   self.fail_clock=True
   self.assertEqual(self.capture(self.expose(0)),1)

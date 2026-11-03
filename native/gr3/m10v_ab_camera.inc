@@ -343,7 +343,13 @@ uint32_t m10v_settings_controller_ab_live_enter(uint32_t live,uint32_t route,uin
   M10V_EXIT_LOG(268,live,p->ab.enabled,p->ab.selected,p->library_initialized);
   if(p->ab.enabled&&(ab_current()!=p->ab.selected||!ab_live_films_match(&p->ab)))ab_stop(&p->ab);
   M10V_EXIT_LOG(269,live,p->ab.enabled,0,0);
- }M10V_EXIT_LOG(247,live,r,0,route);return r;
+ }M10V_EXIT_LOG(247,live,r,0,route);
+#if M10V_COMPANION_ENABLED
+ p=ab_owner();
+ if(route==0x08000000u&&p&&p->library_initialized&&!p->power_off_pending)
+  m10v_companion_ui_start((uint32_t)(uintptr_t)p-M10V_SETTINGS_OWNER_BYTES);
+#endif
+ return r;
 }
 uint32_t m10v_settings_controller_ab_live_leave(uint32_t live){
  M10V_EXIT_LOG(255,live,0,0,0);
@@ -443,5 +449,55 @@ uint32_t m10v_settings_controller_ab_dispatch(uint32_t c,uint32_t event){
  if(raw==1||raw==4||raw==5||raw==8)M10V_EXIT_LOG(251,c,raw,phase,value);
  uint32_t r=ab_trace_dispatch_impl(c,event);
  if(raw==1||raw==4||raw==5||raw==8)M10V_EXIT_LOG(252,c,raw,r,0);return r;
+}
+#endif
+#if M10V_COMPANION_ENABLED
+/* AppMain-only narrow adapters. No event injection or alternate DISP path. */
+uint32_t m10v_settings_controller_remote_busy(void){
+ m10v_settings_controller *p=ab_owner();
+ return !p||p->power_off_pending||p->ab_exit_source||ab_route()!=0x08000000u;
+}
+int m10v_settings_controller_remote_ab_read(uint32_t *v,uint32_t *sequence){
+ m10v_settings_controller *p=ab_owner();if(!p||!v||!sequence||!M10V_AB_ENABLED)return -1;
+ m10v_ab pair=p->ab;ab_pair(&pair);ab_record r;uint32_t fs=ab_fs();if(!fs)return -1;
+ *sequence=ab_latest(fs,&r)?r.sequence:0;v[0]=p->ab.enabled;v[1]=pair.a;v[2]=pair.b;return 0;
+}
+int m10v_settings_controller_remote_ab_write(uint32_t field,uint32_t value){
+ m10v_settings_controller *p=ab_owner();uint32_t v[3],seq;
+ if(m10v_settings_controller_remote_busy()||m10v_settings_controller_remote_ab_read(v,&seq))return 1;
+ if(!field){
+  if(value>1)return 1;if(!value){ab_stop(&p->ab);return 0;}
+  m10v_library_state fresh;if(m10v_camera_library_read_current(&fresh))return 1;
+  uint32_t a=m10v_ab_slot(v[1]),b=m10v_ab_slot(v[2]);
+  if((a<M10V_SLOT_COUNT&&!fresh.slots[a].film)||(b<M10V_SLOT_COUNT&&!fresh.slots[b].film))return 1;
+  if(ab_apply(v[1]))return 2;
+  return m10v_ab_start(&p->ab,v[1],v[2],v[1],a<M10V_SLOT_COUNT?fresh.slots[a].film:0,b<M10V_SLOT_COUNT?fresh.slots[b].film:0)?2:0;
+ }
+ if(field>2||value>=M10V_TONE_CHOICES||p->ab.enabled)return 1;
+ v[field]=value;if(v[1]==v[2])return 1;
+ m10v_library_state fresh;if(m10v_camera_library_read_current(&fresh))return 1;
+ uint32_t a=m10v_ab_slot(v[1]),b=m10v_ab_slot(v[2]);
+ if((a<M10V_SLOT_COUNT&&!fresh.slots[a].film)||(b<M10V_SLOT_COUNT&&!fresh.slots[b].film))return 1;
+ /* Recheck the owner session after the current-state read, before storage. */
+ if(p!=ab_owner()||p->ab.enabled||m10v_settings_controller_remote_busy())return 1;
+ if(ab_save(v[1],v[2]))return 2;
+ p->ab.a=v[1];p->ab.b=v[2];return 0;
+}
+int m10v_settings_controller_remote_aspect_read(uint32_t *value){
+ uint32_t root=((uint32_t(*)(void))0x5320ad88u)();
+ uint32_t model=root?((fn1)0x5320b31cu)(root):0;
+ if(!model||!value)return -1;uint32_t v=((fn1)0x53245260u)(model);
+ if(v>6)return -1;*value=v;return 0;
+}
+int m10v_settings_controller_remote_aspect_write(uint32_t value){
+ if(value>6||m10v_settings_controller_remote_busy())return 1;
+ uint32_t root=((uint32_t(*)(void))0x5320ad88u)(),model=root?((fn1)0x5320b31cu)(root):0;
+ if(!model)return 1;
+#if M10V_HALF_PAIR_ENABLED
+ (void)m10v_half_pair_select(model,value);
+#else
+ if(value==6)return 1;((fn2)0x532525a4u)(model,value);
+#endif
+ uint32_t actual;return !m10v_settings_controller_remote_aspect_read(&actual)&&actual==value?0:2;
 }
 #endif

@@ -34,6 +34,8 @@ class ControllerLifetimeTests(unittest.TestCase):
  appended_slots=False
  owner_cache=False
  exit_trace=False
+ companion=False
+ half_pair=False
  @classmethod
  def setUpClass(cls):
   p=Path(os.environ.get('M10V_GR3_ORIGINAL_RTOS','/tmp/m10v-sd-research/rtos.bin'))
@@ -49,6 +51,8 @@ class ControllerLifetimeTests(unittest.TestCase):
   names += ['m10v_library_valid','m10v_library_count','m10v_sd_camera_directory_item','m10v_sd_camera_directory_extent','m10v_sd_camera_directory_install','m10v_camera_library_remove','m10v_camera_library_shooting_count']
   names += ['m10v_camera_library_reconcile_legacy_selection','m10v_camera_library_preview_init','m10v_camera_library_preview_clear','m10v_camera_library_mutation_begin','m10v_camera_library_mutation_end']
   names += ['m10v_camera_library_preview']
+  if cls.companion:names+=['m10v_companion_ui_init','m10v_companion_ui_start','m10v_companion_ui_stop','m10v_camera_library_read_current']
+  if cls.half_pair:names+=['m10v_half_pair_init','m10v_half_pair_destroy','m10v_half_pair_select']
   cls.externals={n:STUB+i*4 for i,n in enumerate(names)}
   cc=os.environ.get('M10V_LLVM_CLANG') or '/opt/homebrew/opt/llvm/bin/clang'
   if not Path(cc).exists():cc=shutil.which('clang')
@@ -56,8 +60,8 @@ class ControllerLifetimeTests(unittest.TestCase):
    blobs=[]
    for file,addr in [('m10v_settings.c',STATE),('m10v_settings_controller.c',CODE)]:
     obj=Path(d)/'module.o'
-    subprocess.run([cc,*FLAGS,f'-DM10V_AB_ENABLED={int(cls.ab_enabled)}',f'-DM10V_DEBUG_MODE={int(cls.debug)}',f'-DM10V_ADJ_EXIT_TRACE={int(cls.exit_trace)}',f'-DM10V_AB_NATIVE_HOST={int(cls.native_host)}',f'-DM10V_APPENDED_SLOTS={int(cls.appended_slots)}',f'-DM10V_LIVE_COLOR={int(cls.owner_cache)}','-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
-    blob,symbols=link_object(obj.read_bytes(),addr,cls.externals,prefix='m10v_settings_controller_' if 'controller' in file else 'm10v_settings_',additional_exports=AB_CONTROLLER_EXPORTS if 'controller' in file else ())
+    subprocess.run([cc,*FLAGS,f'-DM10V_COMPANION_ENABLED={int(cls.companion)}',f'-DM10V_HALF_PAIR_ENABLED={int(cls.half_pair)}',f'-DM10V_AB_ENABLED={int(cls.ab_enabled)}',f'-DM10V_DEBUG_MODE={int(cls.debug)}',f'-DM10V_ADJ_EXIT_TRACE={int(cls.exit_trace)}',f'-DM10V_AB_NATIVE_HOST={int(cls.native_host)}',f'-DM10V_APPENDED_SLOTS={int(cls.appended_slots)}',f'-DM10V_LIVE_COLOR={int(cls.owner_cache)}','-c',str(ROOT/'native/gr3'/file),'-o',str(obj)],check=True,capture_output=True)
+    blob,symbols=link_object(obj.read_bytes(),addr,cls.externals,prefix='m10v_settings_controller_' if 'controller' in file else 'm10v_settings_',additional_exports=AB_CONTROLLER_EXPORTS+(tuple('m10v_settings_controller_remote_'+n for n in ['busy','ab_read','ab_write','aspect_read','aspect_write']) if cls.companion else ()) if 'controller' in file else ())
     cls.externals.update(symbols);blobs.append((addr,blob))
    cls.blobs=blobs
 

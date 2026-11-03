@@ -154,7 +154,7 @@ BINDINGS={'m10v_zoom_native_icon_alloc':0x536af2a8,'m10v_zoom_native_icon_free':
  'm10v_zoom_native_raw_mag': 1395144364,
  'm10v_zoom_native_summary_write': 1398530152}
 
-def build(base, stock, aspect=False, seed=None, debug_log=None, camera_model='gr3'):
+def build(base, stock, aspect=False, seed=None, debug_log=None, camera_model='gr3',companion=False):
     if camera_model not in ('gr3','gr3x'):raise ValueError('invalid zoom camera model')
     lens_base,max_mm,defaults=(40,71,[50,71]) if camera_model=='gr3x' else (28,50,[35,50])
     if seed is not None:
@@ -164,6 +164,7 @@ def build(base, stock, aspect=False, seed=None, debug_log=None, camera_model='gr
     flags=[] if seed is None else [f'-DM10V_ZOOM_SEED_LO=0x{seed["id"][:8]}u',f'-DM10V_ZOOM_SEED_HI=0x{seed["id"][8:]}u',f'-DM10V_ZOOM_SEED_FIRST={seed["slots"][0]}u',f'-DM10V_ZOOM_SEED_SECOND={seed["slots"][1]}u']
     max_bits=0x3fe49249  # Shared stock enum6, nominal50 (III) /71 (IIIx).
     flags+=[f'-DM10V_DEBUG_MODE={int(debug_log is not None)}',f'-DM10V_CAMERA_GR3X={int(camera_model=="gr3x")}',f'-DM10V_ZOOM_MAX_BITS_LO={max_bits&65535}',f'-DM10V_ZOOM_MAX_BITS_HI={max_bits>>16}']
+    flags+=[f'-DM10V_COMPANION_ENABLED={int(companion)}']
     flags+=[f'-DM10V_HALF_FRAME={int(camera_model=="gr3" and aspect)}']
     extra_hooks=[] if debug_log is None else [{'address':0x536b93d0,'preimage':0xe1a0c00d,'symbol':'m10v_zoom_assert_trace','link':False}]
     from scripts.build_gr3_m10v_library import FLAGS,link_object
@@ -211,7 +212,7 @@ def build(base, stock, aspect=False, seed=None, debug_log=None, camera_model='gr
         linked=folder/'zoom.o'
         subprocess.run([lld,'-r',*objects,'-o',str(linked)],check=True,capture_output=True)
         image+=bytes(-len(image)&15)
-        code,symbols=link_object(linked.read_bytes(),base+len(image),bindings,'m10v_zoom_',additional_exports=EXPORTS+(['m10v_zoom_assert_trace'] if debug_log is not None else []))
+        code,symbols=link_object(linked.read_bytes(),base+len(image),bindings,'m10v_zoom_',additional_exports=EXPORTS+(['m10v_zoom_camera_snapshot'] if companion else [])+(['m10v_zoom_assert_trace'] if debug_log is not None else []))
         image+=code
     from scripts.gr3_target_relocations import relocations
     # The fixed prefix consists only of displaced-instruction trampolines;

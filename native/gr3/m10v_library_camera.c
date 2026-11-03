@@ -3,6 +3,9 @@
  * M10V's two private journal names never overwrite an APData setting record.
  */
 #include "m10v_library.h"
+#if M10V_COMPANION_ENABLED
+#include "m10v_companion_owner.h"
+#endif
 #include "m10v_tone.h"
 #include <stddef.h>
 #include "m10v_custom_isp.h"
@@ -155,21 +158,69 @@ void m10v_camera_library_preview_clear(uint32_t owner){
     (void)owner;
 #endif
 }
-static int store(void *context, const m10v_library_state *next) {
+static int store_guarded(void *context, const m10v_library_state *next,uint32_t remote) {
+#if M10V_COMPANION_ENABLED
+    uint32_t token=m10v_companion_ui_storage_enter(remote);if(!token)return -1;
+#else
+    (void)remote;
+#endif
     uint32_t fs = (uint32_t)(uintptr_t)context;
+#if M10V_LIVE_COLOR && M10V_COMPANION_ENABLED
+    preview_cache *origin=preview_owner();
+#endif
     const char *name = state_names[next->sequence & 1];
-    m10v_library_state readback;
+    m10v_library_state readback;int result=-1;
     for (uint32_t i = 0; i < sizeof(readback); ++i) ((uint8_t *)&readback)[i] = 0;
-    if (!((write_fn)0x53825fa8u)(fs, name, sizeof(*next), next) ||
-        !((read_fn)0x53825648u)(fs, name, sizeof(readback), &readback) ||
-        !m10v_library_valid(&readback)) return -1;
+    if (!((write_fn)0x53825fa8u)(fs, name, sizeof(*next), next))goto finish;
+#if M10V_COMPANION_ENABLED
+    if(!m10v_companion_ui_storage_current(token))goto finish;
+#endif
+    if (!((read_fn)0x53825648u)(fs, name, sizeof(readback), &readback) ||
+        !m10v_library_valid(&readback)) goto finish;
     for (uint32_t i = 0; i < sizeof(readback); ++i)
-        if (((const uint8_t *)&readback)[i] != ((const uint8_t *)next)[i]) return -1;
+        if (((const uint8_t *)&readback)[i] != ((const uint8_t *)next)[i]) goto finish;
+#if M10V_COMPANION_ENABLED
+    if(!m10v_companion_ui_storage_current(token))goto finish;
+#endif
 #if M10V_LIVE_COLOR
+#if M10V_COMPANION_ENABLED
+    if(preview_owner()!=origin)goto finish;
+    publish_preview(origin,next);
+#else
     publish_preview(preview_owner(),next);
 #endif
-    return 0;
+#endif
+    result=0;
+finish:
+#if M10V_COMPANION_ENABLED
+    if(!m10v_companion_ui_storage_leave(token))result=-1;
+#endif
+    return result;
 }
+static int store(void *context,const m10v_library_state *next){return store_guarded(context,next,0);}
+#if M10V_COMPANION_ENABLED
+/* Remote observations never migrate, synthesize defaults or publish UI caches.
+ * Keep the original local loader and its migration behavior unchanged. */
+int m10v_camera_library_read_current(m10v_library_state *state){
+    if(!ram(state,sizeof(*state)))return M10V_LIBRARY_INVALID;
+    uint32_t fs=filesystem();if(!fs)return M10V_LIBRARY_INVALID;
+    m10v_library_state records[2];int good[2]={0,0};
+    for(uint32_t k=0;k<2;k++){
+        for(uint32_t i=0;i<sizeof(*state);i++)((uint8_t*)&records[k])[i]=0;
+        good[k]=((read_fn)0x53825648u)(fs,state_names[k],sizeof(*state),&records[k])&&m10v_library_valid(&records[k]);
+    }
+    if(!good[0]&&!good[1])return M10V_LIBRARY_INVALID;
+    uint32_t selected=!good[0]||(good[1]&&records[1].sequence>records[0].sequence);
+    copy(state,&records[selected]);return M10V_LIBRARY_OK;
+}
+int m10v_camera_library_commit_snapshot(const m10v_library_state *next){
+    if(!m10v_library_valid(next)||!m10v_camera_library_mutation_busy())return M10V_LIBRARY_INVALID;
+    m10v_library_state prior;
+    if(m10v_camera_library_read_current(&prior)!=0||prior.sequence==0xffffffffu||next->sequence!=prior.sequence+1u)return M10V_LIBRARY_INVALID;
+    uint32_t fs=filesystem();
+    return fs&&store_guarded((void*)(uintptr_t)fs,next,1)==0?M10V_LIBRARY_OK:M10V_LIBRARY_STORE_FAILED;
+}
+#endif
 typedef struct {uint32_t magic;uint16_t version,size;uint32_t sequence;m10v_slot slots[5];uint8_t stamp,format,corner,color;m10v_film_effects effects[5];uint32_t reserved,crc;} legacy_state;
 static const char legacy_names[2][12]={"M10V5A.bin","M10V5B.bin"};
 static uint32_t state_crc(const void *v,uint32_t bytes){uint32_t crc=0xffffffffu;const uint8_t *p=v;for(uint32_t i=0;i<bytes;i++){crc^=p[i];for(uint32_t b=0;b<8;b++)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));}return ~crc;}
@@ -417,6 +468,12 @@ int m10v_camera_library_reconcile_legacy_selection(uint32_t model){
   state.reserved&=1u;state.sequence++;state.crc=state_crc(&state,offsetof(m10v_library_state,crc));
   if(store((void *)(uintptr_t)fs,&state))return M10V_LIBRARY_STORE_FAILED;
  }
+#if M10V_PRESERVE_EXISTING
+ /* Upgrade-only opt-in: a valid existing current journal owns the user's
+  * selection even if an old compiled-seed receipt is absent or unreadable.
+  * Keep normal exports' one-time selection semantics below unchanged. */
+ if(provenance!=0){
+#endif
  /* Apply a changed exported film selection once, in the safe UI lifecycle.
   * The journal alone cannot distinguish a reflash from an ordinary restart.
   * Keep globals, but let the new selection replace custom as well as builtin
@@ -441,6 +498,9 @@ int m10v_camera_library_reconcile_legacy_selection(uint32_t model){
      !((read_fn)0x53825648u)(fs,"M10VCFG.bin",sizeof(seen),seen))return M10V_LIBRARY_STORE_FAILED;
   for(uint32_t i=0;i<4;i++)if(seen[i]!=receipt[i])return M10V_LIBRARY_STORE_FAILED;
  }
+#if M10V_PRESERVE_EXISTING
+ }
+#endif
  /* Retire the three removed styles only at the existing safe UI migration
   * gate. Preserve every other slot/effect and the journal ABI. Reads never
   * write. A surviving active film follows its compacted slot using the

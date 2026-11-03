@@ -77,3 +77,13 @@ int m10v_border_camera_snapshot(uint32_t *out){
 uint32_t m10v_border_camera_cached(void){
  uint32_t style=M10V_BORDER_OFF;(void)m10v_border_camera_snapshot(&style);return style;
 }
+#if M10V_COMPANION_ENABLED
+int m10v_border_camera_sequence(uint32_t *sequence){
+ if(!sequence||!(*(const volatile uint32_t*)0x55063910u&1u))return -1;
+ m10v_border_cache*c=cache(*(const volatile uint32_t*)0x55063988u);if(!c)return -1;
+ uint32_t before=__atomic_load_n(&c->version,__ATOMIC_ACQUIRE),seq=c->sequence;
+ if(!before||(before&1u)||c->magic!=CACHE_MAGIC)return -1;
+ __atomic_thread_fence(__ATOMIC_ACQUIRE);if(before!=__atomic_load_n(&c->version,__ATOMIC_RELAXED))return -1;
+ *sequence=seq;return 0;
+}
+#endif

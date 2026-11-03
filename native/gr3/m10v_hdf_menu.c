@@ -375,9 +375,17 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
 #if M10V_DEBUG_MODE
 uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
  uint32_t key=*(const uint16_t*)(uintptr_t)event;
- M10V_LOG(36,ptr(p),key,p->root,(p->focus<<16)|p->child);
+ uint32_t navigation=0;
+#if M10V_BORDER_ENABLED
+ navigation=(p->focus<<16)|p->child;
+#endif
+ M10V_LOG(36,ptr(p),key,p->root,navigation);
  uint32_t result=key_impl(p,event);
- M10V_LOG(39,ptr(p),result,p->root,(p->parameter_index<<16)|p->value);
+ uint32_t parameter=0;
+#if M10V_PURE_ISP_EFFECTS
+ parameter=p->parameter_index;
+#endif
+ M10V_LOG(39,ptr(p),result,p->root,(parameter<<16)|p->value);
  return result;
 }
 #endif

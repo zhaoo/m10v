@@ -1,3 +1,4 @@
+import {companionOwnerBytes} from './gr3-companion-owner.mjs';
 import {zoomSources} from './gr3-zoom.mjs';
 // Independent readback contract for the two owned settings controllers.
 export const settingsSources=[...zoomSources,'native/gr3/m10v_film_card.c','native/gr3/m10v_film_card.h','native/gr3/m10v_film_card_data.h','native/gr3/m10v_film_font_raster.json','native/gr3/m10v_card_captions.json','scripts/generate_m10v_card_captions.py','third_party/noto-cjk/OFL.txt','native/gr3/m10v_custom_icon.rgba','scripts/generate_m10v_film_cards.py','third_party/noto-sans/NotoSans-Bold.ttf','third_party/noto-sans/OFL.txt','native/gr3/m10v_settings.c','native/gr3/m10v_settings.h','native/gr3/m10v_settings_view.c','native/gr3/m10v_settings_view.h','native/gr3/m10v_settings_controller.c','native/gr3/m10v_settings_controller.h','native/gr3/m10v_ab.h','native/gr3/m10v_ab_camera.inc','native/gr3/m10v_ab_host.inc','scripts/build_gr3_settings_hooks.py'];
@@ -10,7 +11,7 @@ export function settingsPatches(m){
  if(!m.sd_library)return [];
  need(typeof m.zoom?.enabled==='boolean','explicit zoom enabled contract');
  const zoom=m.zoom.enabled,count=2;
- const d=m.settings_menu,s=m.symbols,ownerBytes=m.capture_lifecycle?.snapshot?.snapshot_ingress_installed?0x613c:0x213c;
+ const d=m.settings_menu,s=m.symbols,ownerBytes=companionOwnerBytes(m,m.capture_lifecycle?.snapshot?.snapshot_ingress_installed?0x613c:0x213c);
  need(d&&d.owner_bytes===ownerBytes&&JSON.stringify(d.private_routes)===JSON.stringify([33616128,33616129,33616131,33616132,...(zoom?[33616133]:[])])&&d.rows?.length===count,'missing route/owner contract');
  const patches=[];
  for(const [a,e,n,l] of [[0x5316f3b8,0xe300313b,'factory',false],[0x5319667c,0xe1a0c00d,'top_dtor',false],[0x5316fcf8,0xeb00ab5a,'top_ctor',true],[0x53221a4c,0xeb001c7e,'key_route',true]])patches.push({address:a,expected:e,replacement:branch(a,s['m10v_settings_controller_'+n],l),name:'settings '+n});

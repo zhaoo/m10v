@@ -104,8 +104,11 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
                     raise ValueError(f'absolute switch relocation leaves local ARM text: {name} value={value:#x} addend={word:#x} place={place:#x}')
                 word = target_address
             elif kind in (28, 29):  # R_ARM_CALL / R_ARM_JUMP24
-                if word & 0x0f000000 != (0x0b000000 if kind == 28 else 0x0a000000):
-                    raise ValueError('branch relocation is not ARM B/BL')
+                # AAELF32: BL<cond> uses JUMP24, not CALL. Keep the
+                # predicate and link bit, while still rejecting BLX/Thumb.
+                opcode,condition=word&0x0f000000,word>>28
+                valid=(kind==28 and opcode==0x0b000000 and condition==14) or (kind==29 and condition!=15 and (opcode==0x0a000000 or (opcode==0x0b000000 and condition!=14)))
+                if not valid:raise ValueError('branch relocation is not supported ARM B/BL')
                 addend = (word & 0xffffff) << 2
                 if addend & 0x02000000: addend -= 0x04000000
                 delta = value + addend - place
@@ -121,6 +124,14 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
             struct.pack_into('<I', image, out_at, word)
     required = {
         'm10v_c41_': {'m10v_c41_native_data'},
+        '__aeabi_': {'__aeabi_'+n for n in ['memcpy','memcpy4','memcpy8','memset','memset4','memclr','memclr4','memclr8']},
+        'm10v_auth_': {'m10v_auth_init','m10v_auth_accept','m10v_auth_sign_response'},
+        'm10v_json_': {'m10v_json_parse','m10v_json_get','m10v_json_string','m10v_json_uint'},
+        'm10v_operation_': {'m10v_operation_parse','m10v_operation_parse_tokens','m10v_operation_digest'},
+        'm10v_companion_': {'m10v_companion_owner_init','m10v_companion_state_seal','m10v_companion_snapshot_identity','m10v_companion_apply','m10v_companion_apply_local','m10v_companion_owner_poll'},
+        'm10v_resident_': {'m10v_resident_crc','m10v_resident_consume'},
+        'm10v_extensions_': {'m10v_extensions_valid','m10v_extensions_owner_init','m10v_extensions_apply','m10v_extensions_poll'},
+        'm10v_companion_ui_': {'m10v_companion_ui_init','m10v_companion_ui_start','m10v_companion_ui_stop','m10v_companion_ui_timer','m10v_companion_ui_storage_enter','m10v_companion_ui_storage_leave','m10v_companion_ui_storage_current'},
         'm10v_zoom_': set(),  # Checked against the zoom module's explicit ABI registry.
         'm10v_border_': {'m10v_border_camera_refresh','m10v_border_camera_save','m10v_border_camera_cached','m10v_border_camera_snapshot'},
         'm10v_border_shot_': {'m10v_border_shot_freeze','m10v_border_shot_read','m10v_border_shot_orientation','m10v_border_shot_phase','m10v_border_shot_transition'},
@@ -178,7 +189,15 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
     return bytes(image), symbols
 
 
-def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None,live_color=False,appended_slots=False,custom_zoom=True,zoom_seed=None,universal_halation=False,camera_model='gr3',adj_exit_trace=False,border_enabled=False,border_hardware=False,pure_isp_effects=False,ab_enabled=True):
+def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, debug_build_id=0, sd_library=False, profile_mode=False, candidate_color=False, spatial_neon=False, lifecycle_trace=False, recipe_snapshot=False, texture_neon=False, save_chain_trace=False,native_color=False,native_grain=False,view_deferred=False,film_library=True,hdf_default=0,hdf_enabled=None,live_color=False,appended_slots=False,custom_zoom=True,zoom_seed=None,universal_halation=False,camera_model='gr3',adj_exit_trace=False,border_enabled=False,border_hardware=False,pure_isp_effects=False,ab_enabled=True,companion_identity=None,preserve_existing=False):
+    if type(preserve_existing)is not bool or (preserve_existing and not(camera_model=='gr3' and sd_library and film_library and appended_slots)):
+        raise ValueError('preserve_existing requires explicit GR III ten-slot SD library')
+    companion=companion_identity is not None
+    companion_flags=[]
+    if companion:
+        from scripts.build_gr3_companion_owner import identity_flags
+        companion_flags=identity_flags(companion_identity)
+        if not (camera_model=='gr3' and sd_library and film_library and live_color and appended_slots and native_color and native_grain and recipe_snapshot and lifecycle_trace):raise ValueError('companion requires GR III ten-slot native owned pipeline')
     if type(pure_isp_effects)is not bool or (pure_isp_effects and not all((sd_library,film_library,native_color,native_grain,recipe_snapshot,lifecycle_trace,save_chain_trace,view_deferred,border_enabled,border_hardware,hdf_enabled))):
         raise ValueError('pure ISP effects require the complete native owned pipeline, HDF and guarded border component')
     if type(border_enabled)is not bool or (border_enabled and not(sd_library and film_library)):raise ValueError('border requires boolean opt-in and the owned film/SD UI lifecycle')
@@ -190,7 +209,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     if type(appended_slots)is not bool or (appended_slots and (not film_library or not sd_library)):raise ValueError('appended slots require the film/SD library')
     if type(universal_halation)is not bool or (universal_halation and (not film_library or not sd_library or not live_color)):raise ValueError('universal halation requires GR III live-color film library')
     halo_flags=['-DM10V_UNIVERSAL_HALATION=1'] if universal_halation else []
-    compile_flags=FLAGS+halo_flags+(['-DM10V_APPENDED_SLOTS=1'] if appended_slots else [])
+    compile_flags=FLAGS+companion_flags+(['-DM10V_PRESERVE_EXISTING=1'] if preserve_existing else [])+halo_flags+(['-DM10V_APPENDED_SLOTS=1'] if appended_slots else [])
     render_flags=RENDER_FLAGS+halo_flags+(['-DM10V_APPENDED_SLOTS=1'] if appended_slots else [])
     half_pair_enabled=bool(camera_model=='gr3' and base>=0x540be000 and film_library and sd_library and recipe_snapshot and lifecycle_trace)
     pair_flags=[f'-DM10V_HALF_PAIR_ENABLED={int(half_pair_enabled)}']
@@ -373,8 +392,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         camera_base = (base + len(image) + 15) & ~15
         # Forward-only veneers occupy the final reserved16 bytes; the SD
         # module itself consumes camera APIs and is linked afterward.
-        camera_externals={**symbols,**({'m10v_sd_camera_custom_record':base+0xf0,'m10v_sd_u32':base+0xf4} if sd_library else {})}
-        camera, camera_symbols = link_object(camera_obj.read_bytes(), camera_base, camera_externals, 'm10v_camera_library_')
+        camera_externals={**symbols,**({'m10v_companion_ui_storage_enter':base+0x100,'m10v_companion_ui_storage_leave':base+0x104,'m10v_companion_ui_storage_current':base+0x108} if companion else {}),**({'m10v_sd_camera_custom_record':base+0xf0,'m10v_sd_u32':base+0xf4} if sd_library else {})}
+        camera, camera_symbols = link_object(camera_obj.read_bytes(), camera_base, camera_externals, 'm10v_camera_library_',additional_exports=('m10v_camera_library_commit_snapshot','m10v_camera_library_read_current') if companion else ())
         image += bytes(camera_base - base - len(image)) + camera
         symbols.update(camera_symbols)
         (out / 'm10v-library-camera-arm.o').write_bytes(camera_obj.read_bytes())
@@ -404,7 +423,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             border_obj=folder/'border-camera.o'
             subprocess.run([compiler,*compile_flags,*border_flags,'-c',str(ROOT/'native/gr3/m10v_border_camera.c'),'-o',str(border_obj)],check=True,capture_output=True)
             border_base=(base+len(image)+15)&~15
-            border_code,border_symbols=link_object(border_obj.read_bytes(),border_base,symbols,'m10v_border_')
+            border_code,border_symbols=link_object(border_obj.read_bytes(),border_base,symbols,'m10v_border_',additional_exports=('m10v_border_camera_sequence',) if companion else ())
             image+=bytes(border_base-base-len(image))+border_code;symbols.update(border_symbols)
             if recipe_snapshot:
                 shot_obj=folder/'border-shot.o'
@@ -418,7 +437,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             hdf_owner_offset=(0x613c if owner_cache else 0x213c) if film_library else 0x13bc
             subprocess.run([compiler,*compile_flags,'-DM10V_HDF_DEFAULT='+str(hdf_default),'-DM10V_HDF_SHARED_RECIPE='+str(int(lifecycle_trace)),'-DM10V_HDF_UI_CACHE='+str(int(sd_library)),'-DM10V_HDF_OWNER_OFFSET='+hex(hdf_owner_offset),'-c',str(ROOT/'native/gr3/m10v_digital_hdf.c'),'-o',str(hdf_obj)],check=True,capture_output=True)
             hdf_base=(base+len(image)+15)&~15
-            hdf_code,hdf_symbols=link_object(hdf_obj.read_bytes(),hdf_base,symbols,'m10v_hdf_',omitted_exports=('m10v_hdf_alloc',) if lifecycle_trace else ())
+            hdf_code,hdf_symbols=link_object(hdf_obj.read_bytes(),hdf_base,symbols,'m10v_hdf_',omitted_exports=('m10v_hdf_alloc',) if lifecycle_trace else (),additional_exports=('m10v_hdf_remote_snapshot',) if companion else ())
             image+=bytes(hdf_base-base-len(image))+hdf_code;symbols.update(hdf_symbols)
             from scripts.build_gr3_digital_hdf import build as build_digital_hdf
             hdf_base=(base+len(image)+15)&~15
@@ -527,12 +546,27 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 if prefix=='m10v_half_pair_iip_':
                     iip_object=pair_obj.read_bytes();iip_start=pair_start;iip_size=len(pair_code);iip_symbols=pair_symbols
                 image+=bytes(pair_start-base-len(image))+pair_code;symbols.update(pair_symbols)
+        companion_report=None
+        if companion:
+            from scripts.build_gr3_companion_owner import build_companion_owner
+            companion_features={'ab':ab_enabled,'hdf':bool(hdf_enabled),'border':border_enabled,'isp':pure_isp_effects,'zoom':custom_zoom,'aspect':base>=0x540be000}
+            remote_names=['m10v_settings_controller_remote_'+n for n in ['busy','ab_read','ab_write','aspect_read','aspect_write']]
+            remote_names+=['m10v_zoom_camera_snapshot','m10v_zoom_camera_save','m10v_zoom_live_slot','m10v_zoom_live_apply'] if custom_zoom else []
+            companion_imports={**symbols,**dict.fromkeys(remote_names,base)}
+            companion_base=(base+len(image)+127)&~127
+            companion_code,companion_report=build_companion_owner(companion_base,companion_imports,companion_identity,folder,extensions=companion_features)
+            image+=bytes(companion_base-base-len(image))+companion_code;symbols.update(companion_report['symbols'])
+            # Resolve the shared local/remote store gates after their owner
+            # module exists. No placeholder is left in a published image.
+            camera_final,_=link_object(camera_obj.read_bytes(),camera_base,{**camera_externals,**{n:symbols[n] for n in ['m10v_companion_ui_storage_enter','m10v_companion_ui_storage_leave','m10v_companion_ui_storage_current']}},'m10v_camera_library_',additional_exports=('m10v_camera_library_commit_snapshot','m10v_camera_library_read_current'))
+            if len(camera_final)!=len(camera):raise ValueError('companion camera relink changed layout')
+            image[camera_base-base:camera_base-base+len(camera_final)]=camera_final
         settings_report = None
         zoom_report = None
         if sd_library:
             from scripts.build_gr3_zoom import build as build_zoom
             zoom_base=(base+len(image)+15)&~15
-            zoom_code,zoom_report=build_zoom(zoom_base,capture_stock_rtos(),aspect=base>=0x540be000,seed=zoom_seed,debug_log=symbols['m10v_debug_log'] if debug_mode else None,camera_model=camera_model)
+            zoom_code,zoom_report=build_zoom(zoom_base,capture_stock_rtos(),aspect=base>=0x540be000,seed=zoom_seed,debug_log=symbols['m10v_debug_log'] if debug_mode else None,camera_model=camera_model,companion=companion)
             zoom_report['enabled']=custom_zoom
             image+=bytes(zoom_base-base-len(image))+zoom_code
             symbols.update(zoom_report['symbols'])
@@ -549,13 +583,18 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             subprocess.run([compiler,*compile_flags,*debug_flags,*border_flags,*pair_flags,f'-DM10V_AB_ENABLED={int(ab_enabled)}','-DM10V_LIVE_COLOR='+str(int(owner_cache)),'-c',str(ROOT/'native/gr3/m10v_settings_controller.c'),'-o',str(controller_obj)],check=True,capture_output=True)
             start=(base+len(image)+15)&~15
             placeholders={name:start for name in ['m10v_settings_factory_original','m10v_settings_top_dtor_original','m10v_settings_controller_vtable',*[f'm10v_ab_{n}_original' for n in ['selector','mapper','live_enter','live_leave','live_destroy','live_event','adj_event','adj_refresh','adj_exit','adj_destroy','adj_changed','dispatch']]]}
-            provisional,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**placeholders},'m10v_settings_controller_',additional_exports=AB_CONTROLLER_EXPORTS)
+            provisional,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**placeholders},'m10v_settings_controller_',additional_exports=AB_CONTROLLER_EXPORTS+(tuple(remote_names[:5]) if companion else ()))
             from scripts.build_gr3_settings_hooks import build_settings_hooks
             hook_start=(start+len(provisional)+15)&~15
-            hook_code,settings_report=build_settings_hooks(hook_start,{**symbols,**entries},live_color=owner_cache,appended_slots=appended_slots,custom_zoom=custom_zoom)
-            code,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**settings_report['exports']},'m10v_settings_controller_',additional_exports=AB_CONTROLLER_EXPORTS)
+            hook_code,settings_report=build_settings_hooks(hook_start,{**symbols,**entries},live_color=owner_cache,appended_slots=appended_slots,custom_zoom=custom_zoom,companion=companion)
+            code,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**settings_report['exports']},'m10v_settings_controller_',additional_exports=AB_CONTROLLER_EXPORTS+(tuple(remote_names[:5]) if companion else ()))
             image+=bytes(start-base-len(image))+code
             image+=bytes(hook_start-base-len(image))+hook_code;symbols.update(entries)
+        if companion:
+            companion_final,companion_final_report=build_companion_owner(companion_base,symbols,companion_identity,folder,extensions=companion_features)
+            if len(companion_final)!=len(companion_code):raise ValueError('companion final relink changed layout')
+            image[companion_base-base:companion_base-base+len(companion_final)]=companion_final
+            companion_report=companion_final_report
         hdf_menu_report=None
         hdf_adj_report=None
         if sd_library and (hdf_enabled or border_enabled):
@@ -565,7 +604,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             provisional,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**dict.fromkeys(names,start)},'m10v_hdf_menu_')
             from scripts.build_gr3_hdf_menu import build_hooks as build_hdf_menu
             hook_start=(start+len(provisional)+15)&~15
-            hook,hdf_menu_report=build_hdf_menu(hook_start,{**symbols,**entries},settings_report,film_library,live_color=owner_cache,custom_zoom=custom_zoom,pure_isp_effects=pure_isp_effects)
+            hook,hdf_menu_report=build_hdf_menu(hook_start,{**symbols,**entries},settings_report,film_library,live_color=owner_cache,custom_zoom=custom_zoom,pure_isp_effects=pure_isp_effects,companion=companion)
             if border_enabled:hdf_menu_report.update(border_enabled=True,hdf_enabled=hdf_enabled,border_resource_ids=[1155,1156,1157],effects_children=(['HDF'] if hdf_enabled else [])+['Border']+(['Light leak','Grain','Blur'] if pure_isp_effects else []))
             code,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**hdf_menu_report['exports']},'m10v_hdf_menu_')
             image+=bytes(start-base-len(image))+code+bytes(hook_start-start-len(code))+hook;symbols.update(entries)
@@ -1139,6 +1178,9 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 'flags': compile_flags, 'render_flags': render_flags, 'debug_compile_flags': debug_flags, 'firmware_artifact': False, 'camera_tested': False,
                 'abi': 'M10V state184 + explicit semiplanar CbCr422 image + date6',
                 'dependencies': [], 'scratch_max_bytes': 589824}
+    if preserve_existing:manifest['preserve_existing']=True
+    if companion_report:
+        manifest['companion']=companion_report;manifest['sources'].update(companion_report['sources'])
     if half_pair_report:manifest['half_pair']=half_pair_report
     if half_pair_enabled:
         from scripts.build_gr3_border_wait_guard import SOURCES as PAIR_GUARD_SOURCES
@@ -1328,5 +1370,7 @@ if __name__ == '__main__':
     parser.add_argument('--zoom-seed',help='Validated one-time two-slot preset JSON')
     parser.add_argument('--camera-model',choices=['gr3','gr3x'],default='gr3')
     parser.add_argument('--no-ab-compare',action='store_true',help='Disable A/B selection and DISP switching while preserving shared film lifecycle hooks')
+    parser.add_argument('--preserve-existing',action='store_true',help='Preserve valid existing ten-slot journal, independent of compiled selection receipt')
+    parser.add_argument('--companion-identity-file',help='Private explicit companion candidate identity JSON')
     parser.add_argument('--no-custom-zoom',action='store_true',help='Keep original focal crop hooks and hide custom zoom menu (GR IIIx)')
-    args = parser.parse_args(); print(json.dumps(build(args.out, base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,adj_exit_trace=args.adj_exit_trace,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,live_color=args.live_color,appended_slots=args.appended_slots,custom_zoom=not args.no_custom_zoom,zoom_seed=json.loads(args.zoom_seed) if args.zoom_seed else None,universal_halation=args.universal_halation,camera_model=args.camera_model,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else True if args.with_hdf else None,border_enabled=args.border_enabled,border_hardware=args.border_hardware,pure_isp_effects=args.pure_isp_effects,ab_enabled=not args.no_ab_compare), indent=2))
+    args = parser.parse_args(); print(json.dumps(build(args.out, preserve_existing=args.preserve_existing,companion_identity=json.loads(Path(args.companion_identity_file).read_text()) if args.companion_identity_file else None,base=args.base, initial_state_hex=args.initial_state_hex,debug_mode=args.debug,adj_exit_trace=args.adj_exit_trace,debug_build_id=args.debug_build_id,sd_library=args.sd_library,profile_mode=args.profile,candidate_color=args.candidate_color,spatial_neon=args.spatial_neon,lifecycle_trace=args.lifecycle_trace,recipe_snapshot=args.recipe_snapshot,texture_neon=args.texture_neon,save_chain_trace=args.save_chain_trace,native_color=args.native_color,live_color=args.live_color,appended_slots=args.appended_slots,custom_zoom=not args.no_custom_zoom,zoom_seed=json.loads(args.zoom_seed) if args.zoom_seed else None,universal_halation=args.universal_halation,camera_model=args.camera_model,native_grain=args.native_grain,view_deferred=args.view_deferred,film_library=not args.hdf_only,hdf_default=args.hdf_default,hdf_enabled=False if args.no_hdf else True if args.with_hdf else None,border_enabled=args.border_enabled,border_hardware=args.border_hardware,pure_isp_effects=args.pure_isp_effects,ab_enabled=not args.no_ab_compare), indent=2))

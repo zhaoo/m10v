@@ -1,0 +1,156 @@
+{
+  "schema": "m10v.extensions/v1",
+  "fields": [
+    {
+      "id": 0,
+      "key": "quickSwitch",
+      "min": 0,
+      "max": 1,
+      "persistence": "runtime"
+    },
+    {
+      "id": 1,
+      "key": "quickSwitchA",
+      "min": 0,
+      "max": 21,
+      "persistence": "persistent"
+    },
+    {
+      "id": 2,
+      "key": "quickSwitchB",
+      "min": 0,
+      "max": 21,
+      "persistence": "persistent"
+    },
+    {
+      "id": 3,
+      "key": "hdf",
+      "min": 0,
+      "max": 3,
+      "persistence": "persistent"
+    },
+    {
+      "id": 4,
+      "key": "border",
+      "min": 0,
+      "max": 2,
+      "persistence": "persistent"
+    },
+    {
+      "id": 5,
+      "key": "grainMode",
+      "min": 0,
+      "max": 4,
+      "persistence": "persistent"
+    },
+    {
+      "id": 6,
+      "key": "grainSize",
+      "min": 0,
+      "max": 2,
+      "persistence": "persistent"
+    },
+    {
+      "id": 7,
+      "key": "leakGain",
+      "min": 0,
+      "max": 3,
+      "persistence": "persistent"
+    },
+    {
+      "id": 8,
+      "key": "leakPosition",
+      "min": 0,
+      "max": 2,
+      "persistence": "persistent"
+    },
+    {
+      "id": 9,
+      "key": "leakSpread",
+      "min": 0,
+      "max": 2,
+      "persistence": "persistent"
+    },
+    {
+      "id": 10,
+      "key": "blurGain",
+      "min": 0,
+      "max": 3,
+      "persistence": "persistent"
+    },
+    {
+      "id": 11,
+      "key": "blurRange",
+      "min": 0,
+      "max": 2,
+      "persistence": "persistent"
+    },
+    {
+      "id": 12,
+      "key": "stamp",
+      "min": 0,
+      "max": 2,
+      "persistence": "persistent"
+    },
+    {
+      "id": 13,
+      "key": "stampFormat",
+      "min": 0,
+      "max": 3,
+      "persistence": "persistent"
+    },
+    {
+      "id": 14,
+      "key": "stampCorner",
+      "min": 0,
+      "max": 3,
+      "persistence": "persistent"
+    },
+    {
+      "id": 15,
+      "key": "stampColor",
+      "min": 0,
+      "max": 3,
+      "persistence": "persistent"
+    },
+    {
+      "id": 16,
+      "key": "filmNameStamp",
+      "min": 0,
+      "max": 1,
+      "persistence": "persistent"
+    },
+    {
+      "id": 17,
+      "key": "focalA",
+      "min": 28,
+      "max": 50,
+      "persistence": "persistent"
+    },
+    {
+      "id": 18,
+      "key": "focalB",
+      "min": 28,
+      "max": 50,
+      "persistence": "persistent"
+    },
+    {
+      "id": 19,
+      "key": "focalSlot",
+      "min": 0,
+      "max": 2,
+      "persistence": "runtime"
+    },
+    {
+      "id": 20,
+      "key": "aspect",
+      "min": 0,
+      "max": 6,
+      "persistence": "runtime"
+    }
+  ],
+  "powerImages": {
+    "supported": false,
+    "reason": "firmwareBuildRequired"
+  }
+}
