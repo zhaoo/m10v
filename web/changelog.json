@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.04.1",
+      "date": "2026-11-04",
+      "title": "增加 GRemote 官网入口",
+      "changes": [
+        "官网「更多」菜单增加 GRemote 入口，桌面与手机版统一展示。",
+        "GRemote 官网同步上线新版 App 功能介绍、Android 1.2.0 下载与 M10V 入口。"
+      ],
+      "notice": "本次仅更新网站导流菜单与发布记录，不修改固件、胶卷配置或生成逻辑；新的 GRemote 固件连接开关仍在独立候选验证中。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.03.4",
       "date": "2026-11-03",
       "title": "修正确认弹窗与小屏操作细节",
@@ -10,9 +23,9 @@
         "完善确认、生成进度、配方和 LUT 弹窗的短屏滚动，保证底部操作可到达；统一配方表单和操作区样式。"
       ],
       "notice": "仅调整网页弹窗样式，不改变固件生成、版本检查或相机运行体。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "6e77769619ee9dc952e6b3993d052d53e0807a94",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/41616219019"
     },
     {
       "version": "2026.11.03.3",
