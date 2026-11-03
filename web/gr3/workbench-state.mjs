@@ -31,7 +31,8 @@ export function normalizeWorkbenchDraft(draft={},catalog=[],current=defaultConfi
  if(!features.includes('timestamp'))configuration.filmNameStamp=false;
  if(!features.includes('digitalHdf'))configuration.hdf=0;
  let rawNr;try{rawNr=normalizeRawNr(draft.rawNr);}catch{rawNr={mode:'stock'};}
- return {...draft,halationMenuSchema:1,profile:'native',features,nativeConfiguration:configuration,unresolvedSlots:unresolved,recipes:[],stockPresets:[],toolFeaturesDraft:[],rawNr};
+ const gremotePreserveSettings=modelCapabilities(model).gremote&&typeof draft.gremotePreserveSettings==='boolean'?draft.gremotePreserveSettings:true;
+ return {...draft,halationMenuSchema:1,profile:'native',features,nativeConfiguration:configuration,unresolvedSlots:unresolved,recipes:[],stockPresets:[],toolFeaturesDraft:[],rawNr,gremotePreserveSettings};
 }
 export function preserveLegacyDraft(storage,key,raw,draft){
  if(draft.profile==='native'&&!draft.features?.some(id=>['recipes','presets'].includes(id)))return;

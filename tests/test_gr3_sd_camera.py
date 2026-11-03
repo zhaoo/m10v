@@ -12,7 +12,10 @@ class SdCameraTests(unittest.TestCase):
   cls.code=(Path(cls.tmp.name)/'m10v-library-arm.bin').read_bytes()
   cls.pack=subprocess.check_output(['node','--input-type=module','-e',"import {buildSdFilmPack} from './node/gr3-sd-film-pack.mjs';process.stdout.write(buildSdFilmPack());"],cwd=ROOT)
  def setUp(self):
-  self.u=Uc(UC_ARCH_ARM,UC_MODE_ARM);u=self.u;u.mem_map(0x53000000,0x1200000);u.mem_map(0x55000000,0x100000)
+  rom_bytes=getattr(self,'rom_bytes',0x1200000)
+  self.assertLessEqual(self.manifest['base']+len(self.code),0x53000000+rom_bytes)
+  self.assertLessEqual(0x53000000+rom_bytes,0x55000000)
+  self.u=Uc(UC_ARCH_ARM,UC_MODE_ARM);u=self.u;u.mem_map(0x53000000,rom_bytes);u.mem_map(0x55000000,0x100000)
   u.mem_write(self.manifest['base'],self.code);u.mem_protect(self.manifest['base'],(len(self.code)+4095)&~4095,UC_PROT_READ|UC_PROT_EXEC)
   self.position=0;self.card=self.pack;self.short=False;self.fail_save=False;self.fail_close=False;self.fail_allocate=False;self.fail_open=False;self.fail_stat=False;self.fail_state=False;self.bad_snapshot=False;self.raw_loads=0;self.calls=[];self.files={};self.opened=0;self.allocated=0
   self.w(0x55001014,0x55002000);self.w(0x55002000,0x53900000)

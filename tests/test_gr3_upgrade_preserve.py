@@ -1,5 +1,5 @@
 """Real linked ARM upgrade path; never touches camera or user files."""
-import inspect,struct,tempfile,unittest,zlib
+import inspect,struct,tempfile,unittest,zlib,os,json,hashlib,subprocess
 from pathlib import Path
 from unicorn import UC_HOOK_CODE
 from unicorn.arm_const import UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_PC,UC_ARM_REG_LR
@@ -11,6 +11,20 @@ class UpgradePreserve(unittest.TestCase):
  def setUpClass(cls):
   cls.ready='preserve_existing' in inspect.signature(build).parameters
   if not cls.ready:return
+  delivery=os.environ.get('M10V_UPGRADE_DELIVERY')
+  if delivery:
+   folder=Path(delivery);cls.manifest=json.loads((folder/'M10V-runtime-manifest.json').read_text())
+   receipt=json.loads((folder/'M10V-build-receipt.json').read_text());binary=folder/receipt['filename']
+   assert cls.manifest.get('preserve_existing')is True and receipt.get('preserve_existing')is True,'delivered firmware does not preserve existing settings'
+   assert hashlib.sha256(binary.read_bytes()).hexdigest()==receipt['candidate_sha256'],'delivered BIN differs from receipt'
+   root=Path(__file__).resolve().parents[1]
+   command="import{readFileSync}from'node:fs';import{decodeFrameMap}from'./node/gr3-frames.mjs';let b=readFileSync(process.argv[1]),d=decodeFrameMap(b,b.readUInt32LE(b.length-8)).decoded;process.stdout.write(d.subarray(0x10870,0x10870+d.readUInt32LE(0x1086c)));"
+   image=subprocess.check_output(['node','--input-type=module','-e',command,str(binary.resolve())],cwd=root)
+   start=cls.manifest['base']-0x53000000;cls.code=image[start:start+cls.manifest['code_bytes']]
+   assert hashlib.sha256(cls.code).hexdigest()==cls.manifest['code_sha256'],'delivered runtime differs from manifest'
+   cls.rom_bytes=(max(0x1200000,start+len(cls.code))+4095)&~4095
+   assert 0x53000000+cls.rom_bytes<=0x55000000,'delivered runtime overlaps RTOS RAM'
+   cls.pack=b'';return
   cls.tmp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.tmp.cleanup)
   cls.manifest=build(Path(cls.tmp.name),sd_library=True,appended_slots=True,preserve_existing=True)
   cls.code=(Path(cls.tmp.name)/'m10v-library-arm.bin').read_bytes();cls.pack=b''

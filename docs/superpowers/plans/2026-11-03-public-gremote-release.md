@@ -16,7 +16,7 @@
 - Exact GR IIIx 1.60 source `708e79f3b7b96a7e1581b4acf4c412233050a1832718ef7f06c8397db1b431c7`.
 - Never reuse GR III bridge addresses on IIIx. Default OFF adds no identity or journal-policy fields to ordinary planner inputs.
 - Each connection package has a new private key and instance. No private candidate ZIP, pairing, official BIN or key enters public source/release assets.
-- Keep normal website configuration-seeding behavior. Do not couple connection with private `preserve_existing` upgrade policy.
+- Keep ordinary OFF website configuration-seeding behavior. For enabled connection, expose a separate `gremote_preserve_settings` choice (default true), bind it into identity and map it to the existing preservation policy; reject raw private policy injection.
 - Never automatically flash, write SD, enable persistent scripts or clear settings.
 - New firmware candidate remains `WAITING_FOR_USER_VALIDATION`; exact-candidate acceptance precedes M10V main/GitHub/production publication.
 
@@ -35,9 +35,9 @@
 - [x] Create and obtain approval for the website visual draft; implement with reciprocal M10V navigation.
 - [x] Implement strict default-off switch and deterministic public identity, plus draft/model/option tests.
 - [x] Implement private per-download service ZIP and proof/abort/identity tests.
-- [ ] Integrate checked worker → parent-owned package proof → queue → browser ZIP verification, retaining ordinary BIN path.
-- [ ] Build exact GR III OFF/ON and IIIx OFF; compare ordinary outputs to base, run applicable Node/ARM/package checks and fresh review.
-- [ ] Deliver identified private test candidate and record hardware acceptance limits; do not claim IIIx bridge support.
+- [x] Integrate checked worker → parent-owned package proof → queue → browser ZIP verification, retaining ordinary BIN path.
+- [x] Build exact GR III OFF/ON and IIIx OFF; compare ordinary outputs to base, run applicable Node/ARM/package checks and fresh review.
+- [x] Deliver identified private RC2 test candidate with settings preservation and record hardware acceptance limits; do not claim IIIx bridge support.
 - [ ] After candidate acceptance, update changelog, fetch/reconcile main, push main/develop and follow Baota deployment to terminal proof.
 
 GRemote publication is independent: its release and approved static site may proceed while new M10V firmware awaits exact-candidate device evidence.

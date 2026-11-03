@@ -19,13 +19,15 @@ export const gremoteCameraMetadata=Object.freeze({catalogHash:sha256(cameraCatal
 export function resolveGRemoteOptions(source,input={},sourceModel){
  for(const field of ['companion_identity','preserve_existing'])if(Object.hasOwn(input,field))throw Error('公开 GRemote 构建不接受私有身份或升级存档策略。');
  if(input.gremote_enabled!==undefined&&typeof input.gremote_enabled!=='boolean')throw Error('GRemote 连接开关必须为布尔值');
+ if(input.gremote_preserve_settings!==undefined&&typeof input.gremote_preserve_settings!=='boolean')throw Error('GRemote 保留机内设置开关必须为布尔值');
  if(input.gremote_enabled!==true)return {};
  if(sourceModel!=='GR III'||sha256(source)!==officialHash)throw Error('GRemote 连接仅支持精确官方 GR III 2.10；GR IIIx 暂不支持。');
  if((input.film_library??true)!==true||(input.appended_slots??true)!==true||(input.live_color??true)!==true)throw Error('GRemote 连接需要 GR III 十槽胶卷库与原生色调预览管线。');
  const names=['debug_mode','extensions','version_unlock','film_library','hdf_enabled','live_color','appended_slots','halation_enabled','border_enabled','ab_enabled','pure_isp_effects'];
  const ordinaryOptions=Object.fromEntries(names.filter(name=>input[name]!==undefined).map(name=>[name,input[name]]));
  const base=prepareNative(source,input.configuration,ordinaryOptions);
- const buildId=sha256({schema:'m10v-public-companion-build/v1',configurationSha256:base.configuration_sha256,
-  companionSourceSha256:companionSourceFingerprint(),...gremoteCameraMetadata,powerImages:input.power_images??{}});
- return {companion_identity:{buildId,...gremoteCameraMetadata}};
+ const preserve_existing=input.gremote_preserve_settings??true;
+ const buildId=sha256({schema:'m10v-public-companion-build/v2',configurationSha256:base.configuration_sha256,
+  preserveExisting:preserve_existing,companionSourceSha256:companionSourceFingerprint(),...gremoteCameraMetadata,powerImages:input.power_images??{}});
+ return {companion_identity:{buildId,...gremoteCameraMetadata},...(preserve_existing?{preserve_existing:true}:{})};
 }

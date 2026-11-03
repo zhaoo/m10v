@@ -46,9 +46,10 @@ test('GR IIIx import preserves all selected native extensions',async()=>{
 });
 
 test('switching to IIIx clears GR III-only GRemote without removing other choices',async()=>{
- const h=harness();h.state.features=new Set(['film','gremote','aspect','border']);
+ const h=harness();h.state.features=new Set(['film','gremote','aspect','border']);h.state.gremotePreserveSettings=false;
  await h.run(h.report('GR IIIx','a'));
  assert.deepEqual([...h.state.features],['film','aspect','border']);
+ assert.equal(h.state.gremotePreserveSettings,true);
 });
 
 test('GR IIIx native workflow does not fetch retired stock customization resources',async()=>{

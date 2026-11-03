@@ -27,7 +27,7 @@ test('public GR III connection build downloads a verified matched private ZIP',{
   // This declaration is an offline test fixture, not a claim about a device.
   const input={configuration:defaultConfiguration('gr3'),film_library:true,
    hdf_enabled:true,border_enabled:true,pure_isp_effects:true,ab_enabled:true,
-   extensions:{...defaultExtensions(),aspect:true},gremote_enabled:true,
+   extensions:{...defaultExtensions(),aspect:true},gremote_enabled:true,gremote_preserve_settings:true,
    camera:{model:'gr3',version:'2.10',origin:'official'}};
   const preflight=await post(route+'prepare',input);assert.equal(preflight.status,200,await preflight.clone().text());
   const plan=await preflight.json();assert.equal(plan.ready,true);
@@ -50,7 +50,7 @@ test('public GR III connection build downloads a verified matched private ZIP',{
   assert.equal(audit.installation_allowed,false);assert.equal(audit.camera_tested,false);
   assert.equal(audit.firmware.candidate_sha256,receipt.candidate_sha256);
   assert.notEqual(audit.candidate_sha256,receipt.candidate_sha256);
-  assert.equal(receipt.preserve_existing,undefined);
+  assert.equal(receipt.preserve_existing,true);
   await assert.rejects(()=>verifyGRemotePackageBlob(blob,{...verification,model:'gr3x'}),/型号|机型|GR III/);
   if(process.env.M10V_GREMOTE_DELIVERY_OUTPUT){
    const out=path.resolve(process.env.M10V_GREMOTE_DELIVERY_OUTPUT);await mkdir(out,{recursive:true,mode:0o700});

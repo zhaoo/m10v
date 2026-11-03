@@ -76,11 +76,12 @@ const initial = { features: new Set(), recipes: new Map(), projectId: '', source
   modalSlot: null, runtime: false, experiment: null };
 const state = initial;
 state.profile='native';state.features=new Set(['film','halation']);state.nativeConfig=defaultConfiguration();state.nativeCatalog=[];state.unresolvedSlots=[];state.toolFeaturesDraft=[];
+state.gremotePreserveSettings=true;
 state.filmTexture = {}; state.stockPresets = []; state.stockCapabilities = []; state.rawNr = {mode:'stock'}; state.revision = 0;
 let filmPreview = createFilmPreview();
 window.addEventListener('pageshow',event=>{if(event.persisted)filmPreview=createFilmPreview();});
 let restoringHistory=false;
-function historyConfiguration(){return {imagingSchema:1,powerImages:powerImages?.getConfiguration()||{},...selection(),features:[...state.features],profile:state.profile,nativeConfiguration:state.nativeConfig,unresolvedSlots:state.unresolvedSlots,toolFeaturesDraft:state.toolFeaturesDraft};}
+function historyConfiguration(){return {imagingSchema:1,powerImages:powerImages?.getConfiguration()||{},...selection(),features:[...state.features],profile:state.profile,gremotePreserveSettings:state.gremotePreserveSettings,nativeConfiguration:state.nativeConfig,unresolvedSlots:state.unresolvedSlots,toolFeaturesDraft:state.toolFeaturesDraft};}
 const editHistory=createEditorState(historyConfiguration());
 powerImages=mountPowerImages(powerImagesRoot,{api,onChange:()=>invalidate(),model:()=>chosenModel});powerImages.setModel();
 const iconImports=createImportGate();
@@ -97,7 +98,7 @@ function updateHistoryButtons(){const snapshot=editHistory.snapshot();$('undo-ed
 function restoreHistory(direction){
   editHistory[direction]();const saved=normalizeWorkbenchDraft(editHistory.snapshot().config,state.nativeCatalog,state.nativeConfig,chosenModel);
   powerImages?.setConfiguration(saved.powerImages);
-  state.profile='native';state.unresolvedSlots=saved.unresolvedSlots||[];state.toolFeaturesDraft=saved.toolFeaturesDraft||[];
+  state.profile='native';state.unresolvedSlots=saved.unresolvedSlots||[];state.toolFeaturesDraft=saved.toolFeaturesDraft||[];state.gremotePreserveSettings=saved.gremotePreserveSettings;
   restoringHistory=true;if(saved.nativeConfiguration)nativeEditor?.setConfiguration(saved.nativeConfiguration);restoringHistory=false;nativeEditor?.setUnresolved(state.unresolvedSlots);
   state.features=new Set(saved.features);state.recipes=new Map((saved.recipes||[]).map(r=>[r.slotId,r]));
   state.filmIds=[...saved.filmIds];state.filmLibrary=saved.filmLibrary||[];
@@ -149,7 +150,7 @@ function saveDraft() {
   if(!draftPersistenceAllowed)return;
   try {
     localStorage.setItem(draftKey, JSON.stringify({
-      imagingSchema:1,halationMenuSchema:1,powerImages:powerImages?.getConfiguration()||{},profile:state.profile,toolFeaturesDraft:state.toolFeaturesDraft,unresolvedSlots:state.unresolvedSlots, features: [...state.features], recipes: [...state.recipes.values()],
+      imagingSchema:1,halationMenuSchema:1,powerImages:powerImages?.getConfiguration()||{},profile:state.profile,gremotePreserveSettings:state.gremotePreserveSettings,toolFeaturesDraft:state.toolFeaturesDraft,unresolvedSlots:state.unresolvedSlots, features: [...state.features], recipes: [...state.recipes.values()],
       filmIds: state.filmIds, filmLibrary: state.filmLibrary,
       filmTexture: state.filmTexture, nativeConfiguration:state.nativeConfig, stockPresets:state.stockPresets, rawNr:state.rawNr,
     }));
@@ -164,7 +165,7 @@ function restoreDraft() {
       const previous=JSON.parse(raw);
       preserveLegacyDraft(localStorage,draftKey,raw,previous);
       const draft=normalizeWorkbenchDraft(previous,state.nativeCatalog,state.nativeConfig,chosenModel);
-      state.profile='native';state.features=new Set(draft.features);state.recipes=new Map();state.stockPresets=[];
+      state.profile='native';state.features=new Set(draft.features);state.recipes=new Map();state.stockPresets=[];state.gremotePreserveSettings=draft.gremotePreserveSettings;
       powerImages?.setConfiguration(draft.powerImages);
       state.rawNr=draft.rawNr;state.unresolvedSlots=draft.unresolvedSlots;state.toolFeaturesDraft=[];
       restoringHistory=true;
@@ -277,7 +278,7 @@ function renderFeatures() {
   if(!modelCapabilities(chosenModel).ispEffects)target.querySelector('[data-feature="ispEffects"]')?.remove();
   for (const [index, [id, name, description, tag]] of definitions.filter(([id])=>id!=='ispEffects'||modelCapabilities(chosenModel).ispEffects).entries()) {
     const active = state.features.has(id);
-    const signature=JSON.stringify([chosenModel,active,state.features.has('film'),id==='ispEffects'?ispEffectsAvailable():id==='gremote'?gremoteAvailable():null,id==='film'?[state.nativeConfig,state.nativeCatalog.length,state.unresolvedSlots]:id==='recipes'?[...state.recipes]:id==='presets'?[state.stockPresets,state.stockCapabilities.length]:id==='rawNr'?state.rawNr:id==='digitalHdf'?state.nativeConfig.hdf:id==='timestamp'?[state.nativeConfig.stamp,state.nativeConfig.format,state.nativeConfig.corner,state.nativeConfig.color,state.nativeConfig.filmNameStamp]:null]);
+    const signature=JSON.stringify([chosenModel,active,state.features.has('film'),id==='ispEffects'?ispEffectsAvailable():id==='gremote'?[gremoteAvailable(),state.gremotePreserveSettings]:null,id==='film'?[state.nativeConfig,state.nativeCatalog.length,state.unresolvedSlots]:id==='recipes'?[...state.recipes]:id==='presets'?[state.stockPresets,state.stockCapabilities.length]:id==='rawNr'?state.rawNr:id==='digitalHdf'?state.nativeConfig.hdf:id==='timestamp'?[state.nativeConfig.stamp,state.nativeConfig.format,state.nativeConfig.corner,state.nativeConfig.color,state.nativeConfig.filmNameStamp]:null]);
     const existing=target.querySelector(`[data-feature="${id}"]`);
     if(existing?.dataset.signature===signature)continue;
     const row = document.createElement('article');row.dataset.feature=id;row.dataset.signature=signature;
@@ -318,6 +319,13 @@ function renderFeatures() {
         const filmToggle=textNode('button',state.features.has('film')?'关闭胶卷库，仅使用 HDF':'同时启用胶卷库','outline');filmToggle.type='button';filmToggle.onclick=()=>{if(state.features.has('film')){for(const id of ['film','halation','border','timestamp','abCompare','ispEffects','gremote'])state.features.delete(id);nativeEditor.setConfiguration({...state.nativeConfig,stamp:0,filmNameStamp:false,zoom:{...state.nativeConfig.zoom,write:false}},{globalHdf:true});}else{state.features.add('film');invalidate();}renderFeatures();};
         detail.append(levels,filmToggle,textNode('p','这是固件初始档位。机内 HDF 菜单独立保存设置，换卷与重置胶卷不会改变它。'));
       } else if (id === 'ispEffects') detail.append(textNode('p','MENU → 设置 → 效果：漏光、颗粒和模糊分别设有开关与强度；同时保留 HDF 模拟和边框菜单及其已保存设置。关闭此项后，HDF 和边框功能仍按各自开关保留。'));
+      else if (id === 'gremote') {
+        const label=document.createElement('label'),preserve=document.createElement('input');
+        preserve.type='checkbox';preserve.checked=state.gremotePreserveSettings!==false;preserve.disabled=!gremoteAvailable();preserve.dataset.imagingField='gremote-preserve-settings';
+        preserve.addEventListener('change',()=>{state.gremotePreserveSettings=preserve.checked;invalidate();renderFeatures();});
+        label.append(preserve,' 保留机内设置');
+        detail.append(label,textNode('p','保留机内胶卷与参数；关闭后应用网页选卷。'));
+      }
       else if (id === 'border') detail.append(textNode('p','机内效果菜单中选择关闭、拍立得或 135 胶卷边框。该开关只决定是否加入功能，安装后按需选择样式。'));
       else if (id === 'abCompare') detail.append(textNode('p','OK 确认 A，再确认 B 后返回取景。MENU 取消选择；在普通影像控制中按 OK 选风格可退出快切。配对会保存，重启后快切仍关闭；Fn 保留原功能。'));
       else if (id === 'powerImages') detail.append(powerImagesRoot,textNode('p','支持 JPEG、PNG、WebP；调整为 720 × 480。关闭此项会保留图片草稿，但生成固件时使用原厂画面。相机显示时机仍需实机验证。'));
@@ -587,7 +595,7 @@ async function importSource(file,local=false) {
     $('build-model').textContent=`${report.model} · 输出基线 ${report.build_source?.public_version||report.public_version}`;
     document.title=`m10v · GR固件工作台 · ${report.model}`;
     document.querySelector('.hero .kicker').textContent=`${report.model} · ${report.public_version}`;
-    state.projectId = report.sha256; state.source = report;if(chosenModel==='gr4'||report.proof?.identity===false)state.features.delete('ispEffects');if(chosenModel!=='gr3')state.features.delete('gremote');invalidate();
+    state.projectId = report.sha256; state.source = report;if(chosenModel==='gr4'||report.proof?.identity===false)state.features.delete('ispEffects');if(chosenModel!=='gr3'){state.features.delete('gremote');state.gremotePreserveSettings=true;}invalidate();
     // Legacy recipe resources are not needed by the film-library workbench.
     renderFeatures();
 
@@ -617,7 +625,7 @@ async function download(response, filename, verification, isCurrent=()=>true) {
 }
 async function prepare() {
   if (!state.projectId) return;
-  let request;try{validateZoomControls($('studio-zoom-controls'));validateZoomControls($('native-editor'));if(state.profile==='native'){if(state.nativeConfig.zoom?.write&&!state.features.has('film'))throw Error('写入裁切焦距需要启用胶卷库');const configuration=prepareZoomConfigurationForBuild(state.nativeConfig,chosenModel);if(configuration.zoom.write){state.nativeConfig=configuration;nativeEditor?.setConfiguration(configuration);}}request=state.profile==='native'?{configuration:structuredClone(state.nativeConfig),film_library:state.features.has('film'),hdf_enabled:state.features.has('digitalHdf'),halation_enabled:state.features.has('halation'),border_enabled:state.features.has('border'),...(chosenModel!=='gr4'?{pure_isp_effects:state.features.has('ispEffects'),gremote_enabled:state.features.has('gremote')}:{}),ab_enabled:state.features.has('abCompare'),extensions:nativeExtensions(),debug_mode:debugEnabled(),version_unlock:versionUnlockSnapshot(),...(chosenModel!=='gr4'?{power_images:selectedPowerImages()}:{})}:{selection:selection()};}catch(e){$('preflight-result').textContent=e.message;return;}
+  let request;try{validateZoomControls($('studio-zoom-controls'));validateZoomControls($('native-editor'));if(state.profile==='native'){if(state.nativeConfig.zoom?.write&&!state.features.has('film'))throw Error('写入裁切焦距需要启用胶卷库');const configuration=prepareZoomConfigurationForBuild(state.nativeConfig,chosenModel);if(configuration.zoom.write){state.nativeConfig=configuration;nativeEditor?.setConfiguration(configuration);}}request=state.profile==='native'?{configuration:structuredClone(state.nativeConfig),film_library:state.features.has('film'),hdf_enabled:state.features.has('digitalHdf'),halation_enabled:state.features.has('halation'),border_enabled:state.features.has('border'),...(chosenModel!=='gr4'?{pure_isp_effects:state.features.has('ispEffects'),gremote_enabled:state.features.has('gremote'),...(state.features.has('gremote')?{gremote_preserve_settings:state.gremotePreserveSettings!==false}:{})}:{}),ab_enabled:state.features.has('abCompare'),extensions:nativeExtensions(),debug_mode:debugEnabled(),version_unlock:versionUnlockSnapshot(),...(chosenModel!=='gr4'?{power_images:selectedPowerImages()}:{})}:{selection:selection()};}catch(e){$('preflight-result').textContent=e.message;return;}
   if(request.version_unlock?.enabled){state.preparation=null;state.preparationRequest=null;$('preflight-result').textContent='网页已禁止版本适配，请保持官方基线版本。';return;}
   activeBuildController?.abort();const controller=new AbortController();activeBuildController=controller;
   const revision=state.revision;state.preparation=null;renderLedger();
