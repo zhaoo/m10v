@@ -5,11 +5,11 @@ import {navigationItems,renderNavigation} from '../web/shared/navigation.js';
 import {gr4WorkbenchHtml} from './gr4-native-routes.mjs';
 import {renderChangelog} from './changelog.mjs';
 test('all public locations use one ordered navigation and at most one current page',()=>{
- for(const path of ['/','/gr3/','/gr3/index.html','/gr4/','/gr4/reference/','/gr2/','/gr3/sd-library.html','/gr4/sd-library.html','/guide/','/skills/','/changelog/','/support/']){
+ for(const path of ['/','/gr3/','/gr3/index.html','/gr4/','/gr4/reference/','/gr2/','/gr3/sd-library.html','/gr4/sd-library.html','/gr3/downgrade.html','/guide/','/skills/','/changelog/','/support/']){
   const items=navigationItems(path);
-  assert.deepEqual(items.map(i=>i.id),['gr3','gr4','gr2','sd','guide','skills','changelog','support']);
-  assert.equal(items.filter(i=>i.active).length,path==='/'?0:1);
-  assert.equal((renderNavigation(path).match(/aria-current="page"/g)||[]).length,path==='/'?0:1);
+  assert.deepEqual(items.map(i=>i.id),['gr3','gr4','gr2','sd','downgrade','guide','skills','changelog','support']);
+  assert.equal(items.filter(i=>i.active).length,1);
+  assert.equal((renderNavigation(path).match(/aria-current="page"/g)||[]).length,1);
  }
 });
 test('the shared skills entry opens installation instructions with the public ZIP download',async()=>{
@@ -35,7 +35,7 @@ test('derived GR IV and generated changelog include the same shared navigation a
  const source=readFileSync(new URL('../web/gr3/index.html',import.meta.url),'utf8');
  for(const html of [gr4WorkbenchHtml(source),renderChangelog()]){
   assert.match(html,/src="\/shared\/navigation.js"/);
-  assert.match(html,/href="\/shared\/navigation.css"/);
+  assert.match(html,/href="\/shared\/(?:navigation|visual-v5).css"/);
  }
  const gr4=gr4WorkbenchHtml(source);
  assert.match(gr4,/<option value="gr4">GR IV · 1.11<\/option>/);
@@ -44,4 +44,14 @@ test('derived GR IV and generated changelog include the same shared navigation a
 test('GR II SD navigation stays in its own experimental workbench',()=>{
  assert.equal(navigationItems('/gr2/').find(i=>i.id==='sd').href,'/gr2/#sd');
  assert.equal(navigationItems('/gr2/inspect/').find(i=>i.id==='sd').href,'/gr2/#sd');
+});
+
+test('only workbench and film library are primary; utilities and downgrade are collapsed in More',()=>{
+ const html=renderNavigation('/gr3/downgrade.html');
+ const primary=html.match(/<div class="navigation-primary">([\s\S]*?)<\/div>/)[1];
+ assert.deepEqual([...primary.matchAll(/>([^<]+)<\/a>/g)].map(match=>match[1]),['工作台','胶卷库']);
+ assert.match(html,/<details class="navigation-more">/);
+ assert.doesNotMatch(html,/<details class="navigation-more" open/);
+ for(const href of ['/gr3/downgrade.html','/guide/','/skills/','/changelog/','/support/','https://github.com/zhaoo/m10v'])assert.ok(html.slice(html.indexOf('<details class="navigation-more">')).includes(`href="${href}"`));
+ assert.equal((html.match(/aria-current="page"/g)||[]).length,1);
 });

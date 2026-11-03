@@ -1,4 +1,5 @@
 import {supportsNativeFilm} from './model-capabilities.mjs';
+import {verifyFirmwareBlob} from './firmware-verification.mjs';
 export function fullLibraryRequest(model,catalog){
  if(!['gr3','gr3x','gr4'].includes(model))throw Error('此机型暂不支持此胶卷库下载');
  if(!Array.isArray(catalog)||!catalog.length||catalog.some(f=>!Number.isInteger(f.id)||f.id<1))throw Error('配套胶卷目录不可用，请重新读取');
@@ -15,7 +16,13 @@ export function mountBuildCompletion(root,{api}){
   catch(error){if(job===snapshot)status.textContent=`胶卷库下载失败：${error.message}。请重试，已生成的固件不受影响。`;}
   finally{libraryBusy=false;button.disabled=false;}
  };
- root.querySelector('[data-firmware-download]').onclick=()=>{if(snapshot?.firmwareBlob)file(snapshot.firmwareBlob,snapshot.filename);};
+ const firmwareButton=root.querySelector('[data-firmware-download]');
+ firmwareButton.onclick=async()=>{
+  const job=snapshot;if(!job?.firmwareBlob||firmwareButton.disabled)return;firmwareButton.disabled=true;
+  try{await verifyFirmwareBlob(job.firmwareBlob,job.verification);if(job!==snapshot)return;file(job.firmwareBlob,job.filename);}
+  catch(error){if(job===snapshot)status.textContent=`固件下载已拦截：${error.message}`;}
+  finally{firmwareButton.disabled=false;}
+ };
  root.querySelector('[data-record-download]').onclick=()=>{if(snapshot)file(new Blob([JSON.stringify(snapshot.record,null,2)+'\n'],{type:'application/json'}),`M10V-${snapshot.model}-configuration.json`);};
  window.addEventListener('pagehide',()=>{for(const url of urls)URL.revokeObjectURL(url);urls=[];});
  return {show(value){snapshot=structuredClone(value);root.hidden=false;root.querySelector('#completion-title').textContent=value.filmLibrary?'固件已生成，准备装卷。':'固件已生成。';button.hidden=!value.filmLibrary;root.querySelector('[data-library-guide]').hidden=!value.filmLibrary;status.textContent=value.filmLibrary?'固件已生成。接下来下载全量胶卷库，准备机内装卷。':'固件已生成。本方案未启用胶卷库，无需准备胶卷文件。';root.querySelector('[data-completed-model]').textContent=({gr3:'GR III',gr3x:'GR IIIx',gr4:'GR IV'})[value.model];root.querySelector('pre').textContent=`SD 卡根目录\n├─ ${{gr3:'fwdc239b.bin',gr3x:'fwdc243b.bin',gr4:'fwdc248b.bin'}[value.model]}  ← 固件\n├─ M10V/\n│  └─ FILMS.M10\n└─ DCIM/`;},reset(){root.hidden=true;snapshot=null;}};

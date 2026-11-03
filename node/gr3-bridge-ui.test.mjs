@@ -21,9 +21,9 @@ test('GR III ignores retired adaptation in both workbench entries',()=>{
   assert.equal(h.$(standalone?'#native-version-unlock-option':'version-unlock-option').hidden,true);
  }
 });
-test('GR IIIx retains its separate opt-in version adaptation',()=>{
+test('GR IIIx webpage also keeps raised-version adaptation closed under strict checks',()=>{
  const h=controls(studio,'gr3x');assert.equal(h.context.renderVersionUnlock(),true);
- assert.equal(h.$('version-unlock-option').hidden,false);assert.equal(h.context.versionUnlockSnapshot().mode,'dsp-package-only');
+ assert.equal(h.$('version-unlock-option').hidden,true);assert.equal(h.context.versionUnlockSnapshot().enabled,false);
 });
 test('bridge entry and instructions are removed while backend capability remains',async()=>{
  for(const file of ['gr3/index.html','gr3/native-library.html','gr3/native-library-controls.html','gr2/native-library-controls.html','guide.html']){

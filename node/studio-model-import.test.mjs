@@ -13,7 +13,7 @@ function harness(model='gr3'){
  api:async(path,options={})=>{calls.push({path,options});return {json:async()=>path.endsWith('import-official')?(model==='gr4'?{...imported,project_id:imported.sha256}:{project_id:imported.sha256}):path.endsWith('stock-presets')?[]:imported};}});
  vm.runInContext("let chosenModel='gr3';let modelLabel='GR III';"+app.slice(app.indexOf('function enterNativeSelection()'),app.indexOf('function renderFeatures()'))+method,context);
  const report=(model,sha)=>({model,sha256:sha.repeat(64),public_version:model==='GR IIIx'?'1.60':'2.10',internal_version:'test',size:100,sections:[{}]});
- return {state,nodes,node,calls,messages,texts,report,context,run:async(r,local=false)=>{imported=r;await context.importSource(local?null:{},local);}};
+ return {state,nodes,node,calls,messages,texts,report,context,run:async(r,local=true)=>{imported=r;await context.importSource(local?null:{},local);}};
 }
 test('the same import handler accepts both models and updates target labels from official identity',async()=>{
  const h=harness();await h.run(h.report('GR IIIx','a'));
@@ -21,14 +21,12 @@ test('the same import handler accepts both models and updates target labels from
  const config=h.state.nativeConfig;await h.run(h.report('GR III','b'));
  assert.equal(h.state.source.model,'GR III');assert.equal(vm.runInContext('chosenModel',h.context),'gr3');assert.equal(h.node('build-model').textContent,'GR III · 输出基线 2.10');assert.equal(h.state.nativeConfig,config);
 });
-test('2.20 upload shows the uploaded version as its actual build source',async()=>{
- const h=harness(),report={...h.report('GR III','a'),public_version:'2.20',internal_version:'2.20.20.28',
-  build_source:{public_version:'2.20',internal_version:'2.20.20.28',normalized:false}};
- await h.run(report);
- assert.ok(h.texts.some(t=>t.includes('构建使用本次导入的固件')));assert.ok(!h.messages.some(v=>v[1]===true));
- assert.equal(h.state.source,report);assert.equal(h.state.projectId,'a'.repeat(64));
- assert.equal(h.node('studio-model-status').textContent,'GR III · 2.20');
- assert.equal(h.node('build-model').textContent,'GR III · 输出基线 2.20');
+test('2.20 upload stays closed and cannot replace a verified ordinary baseline',async()=>{
+ const h=harness();await h.run(h.report('GR III','b'),true);const previous=h.state.source;
+ await h.run({...h.report('GR III','a'),public_version:'2.20'},false);
+ assert.equal(h.state.source,previous);assert.equal(h.state.projectId,'b'.repeat(64));
+ assert.match(h.messages.at(-1)[0],/上传已关闭/);
+ assert.equal(h.calls.filter(call=>call.path==='/api/import').length,0);
 });
 test('local sample selection does not override the loaded target until import completes',async()=>{
  const h=harness();await h.run(h.report('GR IIIx','a'));h.node('local-source-model').value='gr3';
@@ -52,7 +50,7 @@ test('GR IIIx native workflow does not fetch retired stock customization resourc
  assert.ok(!h.calls.some(c=>c.path.endsWith('/stock-presets')));
 });
 test('GR IIIx extension tab retains the native workflow',()=>{
- const node=()=>({setAttribute(){}}),context=vm.createContext({cinematicEditor:undefined,gr4Workbench:false,state:{profile:'native',features:new Set(['recipes'])},$:node,renderFeatures(){},invalidate(){},notice(){},enterNativeSelection(){}});
+ const node=()=>({setAttribute(){}}),context=vm.createContext({document:{querySelector:()=>({querySelector:()=>({})})},cinematicEditor:undefined,gr4Workbench:false,state:{profile:'native',features:new Set(['recipes'])},$:node,renderFeatures(){},invalidate(){},notice(){},enterNativeSelection(){}});
  vm.runInContext("let chosenModel='gr3x',settingsTab='library';"+app.slice(app.indexOf('function showSettingsTab('),app.indexOf("$('tab-imaging').onclick")),context);
  context.showSettingsTab('imaging');assert.equal(vm.runInContext('state.profile',context),'native');
 });
@@ -65,18 +63,18 @@ test('GR IV import uses the shared workflow and isolated native endpoints',async
  assert.ok(!h.calls.some(c=>c.path.endsWith('/stock-presets')));
 });
 
-test('GR IV backup keeps its actual BIN format and model filename after confirmation',async()=>{
- let options,filename;const state={revision:1,projectId:'a'.repeat(64)},node={addEventListener(){}};
- const ctx=vm.createContext({gr4Workbench:true,state,$:()=>node,createFirmwareSaveGate:value=>(options=value,{open(){}}),renderLedger(){},api:async()=>({}),download:async(response,name)=>{filename=name;},notice(){}});
+test('paused GR IV backup cannot bypass the firmware download gate after confirmation',async()=>{
+ let options,filename,message,calls=0;const state={revision:1,projectId:'a'.repeat(64)},node={addEventListener(){}};
+ const ctx=vm.createContext({gr4Workbench:true,state,$:()=>node,createFirmwareSaveGate:value=>(options=value,{open(){}}),renderLedger(){},api:async()=>{calls++;return {};},download:async(response,name)=>{filename=name;},notice:value=>{message=value;}});
  const block=app.slice(app.indexOf('const firmwareSaveGate='),app.indexOf("$('cancel-build').addEventListener"));
  vm.runInContext('let saving=false,riskAcceptedRevision=-1,firmwareDownloadAction="backup";'+block,ctx);
  assert.equal(filename,undefined);
- await options.save({revision:1,project:state.projectId,action:'backup'});assert.equal(filename,'fwdc248b-original.bin');
+ await options.save({revision:1,project:state.projectId,action:'backup'});assert.equal(filename,undefined);assert.equal(calls,0);assert.match(message,/暂停/);
 });
 
 test('opening imaging settings preserves an HDF-only selection',()=>{
  const node=()=>({setAttribute(){}}),state={profile:'native',features:new Set(['digitalHdf'])};
- const context=vm.createContext({cinematicEditor:undefined,state,$:node,renderFeatures(){}});
+ const context=vm.createContext({document:{querySelector:()=>({querySelector:()=>({})})},cinematicEditor:undefined,state,$:node,renderFeatures(){}});
  vm.runInContext("let settingsTab='library';"+app.slice(app.indexOf('function enterNativeSelection()'),app.indexOf('function renderFeatures()'))+app.slice(app.indexOf('function showSettingsTab('),app.indexOf("$('tab-imaging').onclick")),context);
  context.showSettingsTab('imaging');assert.equal(state.profile,'native');assert.deepEqual([...state.features],['digitalHdf']);
 });

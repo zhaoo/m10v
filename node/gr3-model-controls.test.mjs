@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {renderZoomControls} from '../web/gr3/zoom-controls.mjs';
 import {defaultConfiguration,prepareZoomConfigurationForBuild} from '../web/gr3/native-library-state.mjs';
 class Element{
- constructor(tag,doc){this.tag=tag;this.ownerDocument=doc;this.children=[];this.attributes={};}
+ constructor(tag,doc){this.tag=tag;this.ownerDocument=doc;this.children=[];this.attributes={};this.dataset={};}
  append(...nodes){this.children.push(...nodes);}replaceChildren(...nodes){this.children=[...nodes];}
  setAttribute(k,v){this.attributes[k]=v;}
  all(tag){return this.children.filter(n=>n instanceof Element).flatMap(n=>[...(n.tag===tag?[n]:[]),...n.all(tag)]);}

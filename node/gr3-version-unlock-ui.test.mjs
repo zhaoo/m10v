@@ -3,6 +3,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {normalizeVersionUnlock,assertVersionUnlockReceipt} from '../web/gr3/version-unlock-state.mjs';
+import {runFirmwareJob} from '../web/gr3/firmware-job-client.mjs';
+import {readFirmwareSafety} from '../web/gr3/firmware-verification.mjs';
+import {checkCameraForInstall} from '../web/gr3/firmware-install-guide.mjs';
+import {createHash} from 'node:crypto';
 
 test('unlock defaults off without inventing device versions and requires exact GR III 2.10 four-part input',()=>{
  assert.deepEqual(normalizeVersionUnlock(),{enabled:false});
@@ -40,38 +44,40 @@ import vm from 'node:vm';
 const studio=await readFile(new URL('../web/gr3/studio.js',import.meta.url),'utf8');
 const independent=await readFile(new URL('../web/gr3/native-library.js',import.meta.url),'utf8');
 function nodes(){const map=new Map();return id=>{if(!map.has(id))map.set(id,{checked:false,value:'',hidden:false,disabled:false,textContent:'',className:''});return map.get(id);};}
-function studioHarness({mismatch=false,simple=false,model='gr3',powerConfiguration={},powerEnabled=true,duringBody=()=>{}}={}){
+function studioHarness({mismatch=false,simple=false,advanced=false,model='gr3',powerConfiguration={},powerEnabled=true,duringBody=()=>{}}={}){
  const $=nodes(),calls=[],downloads=[],completed=[],state={projectId:'official',profile:'native',revision:3,features:new Set(['film']),nativeConfig:{...defaultConfiguration(),slots:defaultConfiguration().slots.map((s,i)=>i===0?{...s,film:33}:s)}};
  if(powerEnabled)state.features.add('powerImages');
- const input=simple?{enabled:true,mode:'dsp-package-only'}:model==='gr3x'?{enabled:true,dsp:'1.60.11.18',cpu:'1.60.11.17'}:{enabled:true,dsp:'2.10.21.40',cpu:'2.10.21.27'};
- const audit=simple?{enabled:true,mode:mismatch?'observed-versions':'dsp-package-only',checks:{cpu_payload_unchanged:true}}:{enabled:true,mode:'observed-versions',current_versions:{dsp:input.dsp,cpu:mismatch?'2.10.21.28':input.cpu}};
- const context=vm.createContext({$,state,Response,completion:{show:value=>completed.push(value)},prepareZoomConfigurationForBuild,validateZoomControls(){},nativeEditor:{setConfiguration(c){state.nativeConfig=c;state.revision++;}},AbortController,structuredClone,atob,Uint8Array,TextDecoder,JSON,normalizeVersionUnlock,assertVersionUnlockReceipt,powerImages:{getConfiguration:()=>structuredClone(powerConfiguration),setModel(){}},
+ const input=simple?{enabled:true,mode:'dsp-package-only'}:advanced?(model==='gr3x'?{enabled:true,dsp:'1.60.11.18',cpu:'1.60.11.17'}:{enabled:true,dsp:'2.10.21.40',cpu:'2.10.21.27'}):{enabled:false};
+ const audit=mismatch?{enabled:true}:{enabled:false};
+ const sha=model==='gr3'?'d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4':'708e79f3b7b96a7e1581b4acf4c412233050a1832718ef7f06c8397db1b431c7';
+ const filename=model==='gr3'?'fwdc239b.bin':'fwdc243b.bin';state.projectId=sha;state.source={model:model==='gr3'?'GR III':'GR IIIx',public_version:model==='gr3'?'2.10':'1.60',sha256:sha};
+ const safety={schema:'m10v-web-firmware-safety/v1',status:'offline_verified_camera_unverified',artifact_kind:'firmware',download_allowed:true,installation_allowed:false,camera_tested:false,model,filename,source_sha256:sha,configuration_sha256:'b'.repeat(64),candidate_sha256:createHash('sha256').update('candidate').digest('hex'),candidate_bytes:9,checks:{pinned_source:true,camera_declaration:true,strict_decode:true,receipt_binding:true,exact_rebuild:true}};
+ const context=vm.createContext({$,state,Response,gr4Workbench:false,runFirmwareJob,readFirmwareSafety,checkCameraForInstall,readCameraDeclaration:()=>({model,version:state.source.public_version,origin:'official'}),completion:{show:value=>completed.push(value)},prepareZoomConfigurationForBuild,validateZoomControls(){},nativeEditor:{setConfiguration(c){state.nativeConfig=c;state.revision++;}},AbortController,structuredClone,atob,Uint8Array,TextDecoder,JSON,normalizeVersionUnlock,assertVersionUnlockReceipt,powerImages:{getConfiguration:()=>structuredClone(powerConfiguration),setModel(){}},
   versionUnlockSnapshot:()=>normalizeVersionUnlock(input,model),nativeExtensions:()=>({aspect:false}),debugEnabled:()=>false,renderLedger(){},notice(){},
-  api:async(path,options)=>{calls.push({path,body:JSON.parse(options.body)});return {blob:async()=>{duringBody(state);return new Blob(['candidate']);},json:async()=>({ready:true,configuration_sha256:'hash',filename:'candidate.bin'}),headers:{get:()=>Buffer.from(JSON.stringify({version_unlock:audit})).toString('base64')}};},
+  api:async(path,options={})=>{calls.push({path,body:JSON.parse(options.body||'null')});if(path.endsWith('/prepare'))return new Response(JSON.stringify({ready:true,configuration_sha256:'b'.repeat(64),filename}));if(path.endsWith('/jobs'))return new Response(JSON.stringify({job:{id:'c'.repeat(48),state:'ready'}}));const r=new Response('candidate',{headers:{'X-M10V-Native-Receipt':Buffer.from(JSON.stringify({version_unlock:audit})).toString('base64'),'X-M10V-Firmware-Safety':Buffer.from(JSON.stringify(safety)).toString('base64')}});r.blob=async()=>{duringBody(state);return new Blob(['candidate']);};return r;},
   download:async(...args)=>downloads.push(args)});
  vm.runInContext(`let activeBuildController=null,riskAcceptedRevision=3,chosenModel='${model}';`+studio.slice(studio.indexOf('const selectedPowerImages='),studio.indexOf('\n\nconst $'))+studio.slice(studio.indexOf('async function prepare()'),studio.indexOf('function showSettingsTab(')),context);
  return {context,state,$,calls,downloads,completed,input};
 }
 test('actual studio prepare/build reuse one captured snapshot and validate version receipt before download',async()=>{
  const h=studioHarness();await h.context.prepare();
- h.state.nativeConfig.slots[0].film=68;h.input.cpu='2.10.21.29';
+ h.state.nativeConfig.slots[0].film=68;
  await h.context.build();
- assert.equal(h.calls.length,2);assert.deepEqual(h.calls[0].body.version_unlock,h.calls[1].body.version_unlock);
+ assert.equal(h.calls.length,3);assert.deepEqual(h.calls[0].body.version_unlock,h.calls[1].body.version_unlock);
  assert.deepEqual(h.calls[0].body.configuration,h.calls[1].body.configuration);
  assert.equal(h.calls[1].body.configuration.slots[0].film,33);assert.equal(h.downloads.length,1);
- assert.equal(h.completed.length,1);assert.equal(await h.completed[0].firmwareBlob.text(),'candidate');assert.equal(h.completed[0].filename,'candidate.bin');assert.deepEqual(h.completed[0].record.configuration.version_unlock,h.calls[1].body.version_unlock);
+ assert.equal(h.completed.length,1);assert.equal(await h.completed[0].firmwareBlob.text(),'candidate');assert.equal(h.completed[0].filename,'fwdc239b.bin');assert.deepEqual(h.completed[0].record.configuration.version_unlock,h.calls[1].body.version_unlock);
  const bad=studioHarness({mismatch:true});await bad.context.prepare();await bad.context.build();
- assert.equal(bad.downloads.length,0);assert.match(bad.$('build-result').textContent,/版本回读/);
+ assert.equal(bad.downloads.length,0);assert.match(bad.$('build-result').textContent,/版本.*回读/);
 });
-test('actual studio retires GR III controls and validates the remaining GR IIIx input while busy',()=>{
+test('actual studio keeps version adaptation retired for both stable camera lines',()=>{
  const $=nodes();$('version-unlock').checked=true;$('version-known').checked=true;
  const context=vm.createContext({$,state:{profile:'native'},normalizeVersionUnlock});
  vm.runInContext("let chosenModel='gr3',saving=true,activeBuildController=null;"+studio.slice(studio.indexOf('function versionUnlockSnapshot()'),studio.indexOf('function renderLedger()')),context);
  assert.equal(context.renderVersionUnlock(),true);assert.equal($('version-unlock-option').hidden,true);assert.equal(context.versionUnlockSnapshot().enabled,false);
- vm.runInContext("chosenModel='gr3x'",context);$('version-unlock').checked=true;$('version-known').checked=true;$('version-dsp').value='1.60.11.18';$('version-cpu').value='1.60.11.17';
+ vm.runInContext("chosenModel='gr3x';saving=false",context);$('version-unlock').checked=true;$('version-known').checked=true;
  assert.equal(context.renderVersionUnlock(),true);for(const id of ['version-unlock','version-dsp','version-cpu'])assert.equal($(id).disabled,true);
- vm.runInContext('saving=false',context);$('version-cpu').value='1.60';assert.equal(context.renderVersionUnlock(),false);assert.match($('version-error').textContent,/四段/);
- $('version-cpu').value='1.60.11.17';assert.equal(context.renderVersionUnlock(),true);assert.equal($('version-unlock-option').hidden,false);assert.equal($('version-unlock').checked,true);
+ assert.equal($('version-unlock-option').hidden,true);assert.equal(context.versionUnlockSnapshot().enabled,false);
 });
 test('both entries invalidate previous output when toggle or version inputs change',()=>{
  assert.match(independent,/native-version-known'\)\.onchange=\(\)=>\{invalidate\(\);render\(\);\}/);
@@ -118,6 +124,7 @@ test('GR IIIx control handlers default to DSP package mode and only require know
   const key=s=>prefix+s;
   $(key('version-unlock')).checked=true;
   vm.runInContext(declarations+source.slice(source.indexOf('function versionUnlockSnapshot()'),source.indexOf(end)),context);
+  if(source===studio){assert.equal(context.renderVersionUnlock(),true);assert.equal(context.versionUnlockSnapshot().enabled,false);assert.equal($('version-unlock-option').hidden,true);continue;}
   assert.equal(context.renderVersionUnlock(),true);
   assert.deepEqual(JSON.parse(JSON.stringify(context.versionUnlockSnapshot())),{enabled:true,mode:'dsp-package-only'});
   assert.equal($(key('version-known-fields')).hidden,true);
@@ -130,10 +137,9 @@ test('GR IIIx control handlers default to DSP package mode and only require know
  }
 });
 
-test('actual studio default-mode requests contain no guessed CPU or DSP and reject a receipt from another mode',async()=>{
+test('actual studio blocks DSP package adaptation before submitting a build',async()=>{
  const h=studioHarness({simple:true});await h.context.prepare();await h.context.build();
- assert.deepEqual(h.calls[0].body.version_unlock,{enabled:true,mode:'dsp-package-only'});assert.deepEqual(h.calls[0].body.version_unlock,h.calls[1].body.version_unlock);assert.equal(h.downloads.length,1);
- const bad=studioHarness({simple:true,mismatch:true});await bad.context.prepare();await bad.context.build();assert.equal(bad.downloads.length,0);assert.match(bad.$('build-result').textContent,/模式回读/);
+ assert.equal(h.calls.length,0);assert.equal(h.downloads.length,0);assert.match(h.$('preflight-result').textContent,/禁止版本适配/);
 });
 
 test('advanced receipt rejects a DSP-only or missing mode even with matching forged current_versions',()=>{
@@ -161,10 +167,9 @@ test('GR IIIx ledger exposes debug mode and forwards its enabled state in native
 });
 
 
-test('GR IIIx actual prepare and build preserve the 1.60 advanced snapshot and verify its receipt',async()=>{
- const h=studioHarness({model:'gr3x'});await h.context.prepare();await h.context.build();
- assert.equal(h.calls.length,2);assert.deepEqual(h.calls[0].body.version_unlock,{enabled:true,dsp:'1.60.11.18',cpu:'1.60.11.17'});
- assert.deepEqual(h.calls[1].body.version_unlock,h.calls[0].body.version_unlock);assert.equal(h.downloads.length,1);
+test('GR IIIx webpage blocks raised component versions before submitting a build',async()=>{
+ const h=studioHarness({model:'gr3x',advanced:true});await h.context.prepare();await h.context.build();
+ assert.equal(h.calls.length,0);assert.equal(h.downloads.length,0);assert.match(h.$('preflight-result').textContent,/禁止版本适配/);
 });
 
 test('studio freezes power images with the same preparation snapshot and preserves them for GR IIIx',async()=>{

@@ -36,11 +36,16 @@ def inspect(file, model=None, repo=None):
                 status='supported_source_only' if allowed else 'blocked_new_version')
     if repo:
         module=(Path(repo).resolve()/'node/firmware.mjs').as_uri()
-        code="import{readFileSync}from'node:fs';const{inspectOfficial}=await import(process.argv[1]);process.stdout.write(JSON.stringify(inspectOfficial(readFileSync(process.argv[2]))));"
+        # The full hash above authenticates this read-only inventory. IIIx 1.70
+        # is intentionally outside inspectOfficial's supported ABI; use the
+        # strict structural importer without treating its identity=false as a
+        # reason to lose the already pinned blocked-version classification.
+        code="import{readFileSync}from'node:fs';const{inspectFirmwareImport}=await import(process.argv[1]);process.stdout.write(JSON.stringify(inspectFirmwareImport(readFileSync(process.argv[2]))));"
         checked=subprocess.run(['node','--input-type=module','-e',code,module,str(Path(file).resolve())],
                                capture_output=True,text=True,check=True,timeout=60)
         report=json.loads(checked.stdout)
-        if report['sha256']!=digest or not all(report['proof'].values()):
+        required=('container','decoded','sections','versions','strict_frames')
+        if report['sha256']!=digest or not all(report['proof'].get(key) is True for key in required):
             raise ValueError('Strict project inspection differs.')
         result['full_decode_verified']=True
     return result

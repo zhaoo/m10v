@@ -1,4 +1,11 @@
 import {sendFirmwareDownload} from './firmware-download.mjs';
+import {createFirmwareBuildQueue} from './firmware-build-queue.mjs';
+import {checkWebBuild,verifyWebBackup,requireWebDownload} from './firmware-web-safety.mjs';
+import {prepareCheckedNative,readCheckedProject} from './firmware-checked-build.mjs';
+import {isolatedFirmwareJob} from './firmware-isolated-build.mjs';
+import {ANNIVERSARY_DOWNGRADE_PROFILES,prepareAnniversaryDowngrade} from './gr3-anniversary-downgrade.mjs';
+import {readAnniversarySources} from './anniversary-downgrade-sources.mjs';
+import {checkDowngradeCamera,anniversaryDowngradeJob,requireAnniversaryDownload} from './anniversary-downgrade-jobs.mjs';
 import {firmwareReleasePolicy,releaseRequestLocked,requireReleaseBaseline} from './firmware-release-policy.mjs';
 import {firmwareSkillArchive} from './firmware-skill.mjs';
 import {handleGr2NativeRequest} from './gr2-native-routes.mjs';
@@ -50,7 +57,7 @@ const MAX_UPLOAD = 128 * 1024 * 1024;
 const staticFiles = {
   '/support/': ['index.html', 'text/html; charset=utf-8'],
   '/support': ['index.html', 'text/html; charset=utf-8'],
-  '/': ['index.html', 'text/html; charset=utf-8'],
+  '/': ['gr3/index.html', 'text/html; charset=utf-8'],
   '/changelog.json': ['changelog.json', 'application/json; charset=utf-8'],
   '/guide/': ['guide.html', 'text/html; charset=utf-8'],
   '/guide': ['guide.html', 'text/html; charset=utf-8'],
@@ -89,7 +96,25 @@ async function readBody(request, limit = MAX_UPLOAD) {
 
 export function createServer(store = new Store(path.join(root, 'data')),
   sd = { listSdVolumes, resolveSdVolume, prepareOfficialSd },
-  gr4 = new Gr4Runtime(path.join(root, 'data', 'gr4')), {publicOrigin} = {}) {
+  gr4 = new Gr4Runtime(path.join(root, 'data', 'gr4')), {publicOrigin,queueOptions,downgradeSources=readAnniversarySources} = {}) {
+  const buildQueue=createFirmwareBuildQueue(queueOptions);
+  const downgradePlans=new Map();
+  const readDowngradePlan=async model=>{
+    if(!downgradePlans.has(model)){
+      const pending=(async()=>{
+        const {newSource,oldSource}=await downgradeSources(model);
+        return Object.freeze(prepareAnniversaryDowngrade(newSource,oldSource,model));
+      })();
+      downgradePlans.set(model,pending);
+      pending.catch(()=>{if(downgradePlans.get(model)===pending)downgradePlans.delete(model);});
+    }
+    return downgradePlans.get(model);
+  };
+  const cameraHeader=request=>{
+    const raw=request.headers['x-m10v-camera'];if(!raw)return undefined;
+    if(typeof raw!=='string'||raw.length>2048)throw Error('机身信息格式无效。');
+    return JSON.parse(Buffer.from(raw,'base64').toString('utf8'));
+  };
   let configuredOrigin=null;
   if(publicOrigin){
     const url=new URL(publicOrigin);
@@ -100,15 +125,33 @@ export function createServer(store = new Store(path.join(root, 'data')),
   const server = http.createServer(async (request, response) => {
     let buildSource;
     const readBuildOriginal=async id=>{
-      const resolved=await resolveBuildSource(requireReleaseBaseline(await store.readOriginal(id)));
+      const resolved=await readCheckedProject(store,id);
       buildSource=resolved.report.build_source;
       response.setHeader('X-M10V-Build-Source',Buffer.from(JSON.stringify(buildSource)).toString('base64'));
       return resolved.source;
     };
     // Feature builders must preserve the uploaded component versions. Never
     // disguise a different executable baseline with a raised package version.
-    const sendBuild=(candidate,filename)=>{
+    const sendBuild=(candidate,filename,audit)=>{
+      requireWebDownload(candidate,audit);
+      if(audit.filename!==filename)throw Error('下载文件名与校验记录不同。');
+      response.setHeader('X-M10V-Firmware-Safety',Buffer.from(JSON.stringify(audit)).toString('base64'));
       return sendFirmwareDownload(request,response,candidate,filename);
+    };
+    const sendJobResult=result=>{
+      if(result.audit?.schema==='m10v-anniversary-downgrade-safety/v1'){
+        const audit=requireAnniversaryDownload(result.candidate,result.audit);
+        if(audit.filename!==result.filename)throw Error('降级套件文件名与校验记录不同。');
+        response.setHeader('X-M10V-Downgrade-Safety',Buffer.from(JSON.stringify(audit)).toString('base64'));
+        return send(response,200,result.candidate,'application/zip',result.filename);
+      }
+      for(const [name,value] of Object.entries(result.headers||{}))response.setHeader(name,value);
+      return sendBuild(result.candidate,result.filename,result.audit);
+    };
+    const waitForBuild=async job=>{
+      const cancelled=()=>{if(!response.writableFinished)buildQueue.cancel(job.id);};response.once('close',cancelled);
+      try{const result=await buildQueue.wait(job.id);if(!response.destroyed)return sendJobResult(result);}
+      finally{response.removeListener('close',cancelled);}
     };
     const localOrigin = `http://127.0.0.1:${server.address().port}`;
     const origin=configuredOrigin||localOrigin;
@@ -133,6 +176,17 @@ export function createServer(store = new Store(path.join(root, 'data')),
     const pathname = request.method==='GET'&&/^\/gr3\/film-icons\/\d+(?:-large)?\.png\?v=[a-f0-9]{12}$/.test(request.url||'')?request.url.split('?')[0]:request.url;
     if (!pathname || pathname.includes('?') || pathname.includes('#') || pathname.includes('%') ||
       pathname.includes('\\') || pathname.includes('..')) return send(response, 404, { error: 'not found' });
+    const firmwareJob=/^\/api\/firmware-jobs\/([a-f0-9]{48})(?:\/(download|cancel))?$/.exec(pathname);
+    if(request.method==='GET'&&firmwareJob){
+      try{
+        const job=buildQueue.get(firmwareJob[1]);if(!job)return send(response,404,{error:'构建任务不存在或已清理。'});
+        if(!firmwareJob[2])return send(response,200,{job});
+        if(firmwareJob[2]!=='download')return send(response,405,{error:'POST required'});
+        const result=buildQueue.result(job.id);
+        if(!result)return send(response,job.state==='expired'?410:409,{error:job.error?.message||'构建及校验尚未完成，不能下载。',job});
+        return sendJobResult(result);
+      }catch(error){return send(response,412,{code:error.code||'M10V_FIRMWARE_CHECK_FAILED',error:error.message});}
+    }
     if(pathname==='/hooks/github'){
       if(request.method!=='POST')return send(response,405,{error:'POST required'});
       try{
@@ -144,6 +198,10 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }catch{return send(response,503,{error:'deployment receiver unavailable'});}
     }
     if (request.method === 'GET') {
+      if(pathname==='/api/downgrade/status')return send(response,200,{models:Object.fromEntries(
+        Object.entries(ANNIVERSARY_DOWNGRADE_PROFILES).map(([model,p])=>[model,{available:true,
+          model,from_version:p.from_version,to_version:p.to_version,source_sha256:p.source_sha256,
+          restore_sha256:p.restore_sha256,camera_tested:false}]))});
       if(pathname==='/downloads/m10v-firmware-safety-skill.zip'){
         try{return send(response,200,await firmwareSkillArchive(),'application/zip','m10v-firmware-safety-skill.zip');}
         catch{return send(response,503,{error:'skill download unavailable'});}
@@ -234,22 +292,41 @@ export function createServer(store = new Store(path.join(root, 'data')),
     const candidateExportMatch = /^\/api\/projects\/([0-9a-f]{64})\/candidates\/shutdown\/export$/.exec(pathname);
     const versionMatch = /^\/api\/projects\/([0-9a-f]{64})\/versions\/probe$/.exec(pathname);
     const bridgeMatch = /^\/api\/projects\/([0-9a-f]{64})\/bridge\/(prepare|export)$/.exec(pathname);
-    const nativeMatch = /^\/api\/projects\/([0-9a-f]{64})\/native-library\/(prepare|build)$/.exec(pathname);
+    const downgradeMatch=/^\/api\/downgrade\/(gr3|gr3x)\/(prepare|jobs)$/.exec(pathname);
+    const nativeMatch = /^\/api\/projects\/([0-9a-f]{64})\/native-library\/(prepare|build|jobs)$/.exec(pathname);
     const haloMatch = /^\/api\/projects\/([0-9a-f]{64})\/800t\/(prepare|build)$/.exec(pathname);
     const editMatch = /^\/api\/projects\/([0-9a-f]{64})\/edit\/(prepare|build)$/.exec(pathname);
     if (!['/api/import', '/api/backup/inspect', '/api/backup/restore', '/api/gr3/film/fit',
       '/api/gr3/power-images/preview','/api/gr3/sd-library/export','/api/gr3/film-bay/pack','/api/gr3/native-library/import-official','/api/platform/inspect','/api/platform/inspect-official'].includes(pathname) &&
-      !backupMatch && !sdMatch && !candidateMatch && !candidateExportMatch && !versionMatch && !editMatch && !haloMatch && !nativeMatch && !bridgeMatch)
+      !backupMatch && !sdMatch && !candidateMatch && !candidateExportMatch && !versionMatch && !editMatch && !haloMatch && !nativeMatch && !bridgeMatch && !downgradeMatch && !(firmwareJob?.[2]==='cancel'))
       return send(response, 404, { error: 'not found' });
     if (request.headers['x-m10v-token'] !== token ||
       (request.headers.origin && request.headers.origin !== origin))
       return send(response, 403, { error: 'authorization failed' });
     try {
-      const body = await readBody(request, pathname==='/api/gr3/sd-library/export' ? 24 * 1024 * 1024 : pathname==='/api/gr3/film-bay/pack' ? 2048 :
+      const body = await readBody(request, downgradeMatch||firmwareJob?.[2]==='cancel'?4096:pathname==='/api/gr3/sd-library/export' ? 24 * 1024 * 1024 : pathname==='/api/gr3/film-bay/pack' ? 2048 :
         pathname === '/api/platform/inspect-official' ? 4096 :
         pathname === '/api/gr3/film/fit' ? 8 * 1024 * 1024 :
         nativeMatch || pathname==='/api/gr3/power-images/preview' ? 3*1024*1024 : bridgeMatch || pathname === '/api/gr3/native-library/import-official' ? 4096 : haloMatch ? 4096 : editMatch ? 256 * 1024 : versionMatch ? 0 :
         sdMatch ? 1024 : candidateMatch || candidateExportMatch ? 2 * 1024 * 1024 : MAX_UPLOAD);
+      if(firmwareJob?.[2]==='cancel'){
+        const job=buildQueue.cancel(firmwareJob[1]);return job?send(response,200,{job}):send(response,404,{error:'构建任务不存在。'});
+      }
+      if(downgradeMatch){
+        const model=downgradeMatch[1],input=JSON.parse(body.toString('utf8'));
+        if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!['camera','accepted_plan_id','acknowledge_instructions'].includes(k)))
+          throw Error('降级请求字段无效。');
+        checkDowngradeCamera(model,input.camera);
+        if(downgradeMatch[2]==='prepare'){
+          const plan=await readDowngradePlan(model);
+          return send(response,200,{...plan,ready:true,firmware_filename:plan.filename,filename:plan.zip_filename});
+        }
+        if(!downgradePlans.has(model))throw Error('请先核验对应机型的降级方案。');
+        const plan=await downgradePlans.get(model);
+        if(input.accepted_plan_id!==plan.plan_id||input.acknowledge_instructions!==true)throw Error('降级方案已变化，请重新核验并确认。');
+        const job=buildQueue.submit(anniversaryDowngradeJob(downgradeSources,model,input,plan));
+        return send(response,202,{job});
+      }
       if(pathname==='/api/gr3/power-images/preview')return send(response,200,previewPowerImages(JSON.parse(body.toString('utf8'))));
       if(pathname==='/api/gr3/sd-library/export'){const {zip}=await exportSdFilms(JSON.parse(body.toString('utf8')));return send(response,200,zip,'application/zip','M10V-SD-films.zip');}
       if(pathname==='/api/platform/inspect'||pathname==='/api/platform/inspect-official'){
@@ -275,16 +352,13 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }
       if(nativeMatch) {
         const original=await readBuildOriginal(nativeMatch[1]),input=JSON.parse(body.toString('utf8'));
-        const nativeOptions=resolveIspEffectOptions(original,input,buildSource.model);
-        const basePreparation=prepareNative(original,input.configuration,nativeOptions),powerPreparation=bindPowerPreparation(basePreparation,original,input.power_images);
+        const {plan:powerPreparation}=prepareCheckedNative(original,input);
         if(nativeMatch[2]==='prepare')return send(response,200,{...powerPreparation,build_source:buildSource});
+        input.camera??=cameraHeader(request);checkWebBuild(original,input.camera,input);
         if(input.accepted_configuration_sha256!==powerPreparation.configuration_sha256)throw Error('方案已变化，请重新核验图片与固件');
-        const cancellation=new AbortController();response.once('close',()=>{if(!response.writableFinished)cancellation.abort();});
-        const nativeResult=await generateNative(original,input.configuration,basePreparation.configuration_sha256,{...nativeOptions,signal:cancellation.signal});
-        const powerResult=applyPowerImages(original,nativeResult.candidate,input.power_images),candidate=powerResult.candidate;
-        const receipt={...nativeResult.receipt,build_source:buildSource,...(powerPreparation.power_images?{power_images:powerResult.receipt,configuration_sha256:powerPreparation.configuration_sha256,candidate_sha256:createHash('sha256').update(candidate).digest('hex'),candidate_bytes:candidate.length}: {})};
-        response.setHeader('X-M10V-Native-Receipt',Buffer.from(JSON.stringify(receipt)).toString('base64'));
-        return sendBuild(candidate,receipt.filename);
+        const job=buildQueue.submit(isolatedFirmwareJob(store,nativeMatch[1],input));
+        if(nativeMatch[2]==='jobs')return send(response,202,{job});
+        return await waitForBuild(job);
       }
       if (pathname === '/api/gr3/film-bay/pack') {
         return send(response, 410, { error: '旧 SD 胶片库方案已废弃，不可用。' });
@@ -299,15 +373,8 @@ export function createServer(store = new Store(path.join(root, 'data')),
         const input = JSON.parse(body.toString('utf8'));
         if (haloMatch[2] === 'prepare') return send(response, 200, {...prepare800T(original, input.selection),build_source:buildSource});
         try {
-          const {candidate,receipt} = await build800T(original, input.selection, input.accepted_configuration_sha256);
-          response.setHeader('X-M10V-800T-Receipt', Buffer.from(JSON.stringify({
-            schema:'m10v-gr3-800t-build-download/v1',candidate_sha256:receipt.candidate_sha256,build_source:buildSource,
-            source_sha256:receipt.source_sha256,configuration_sha256:receipt.configuration_sha256,
-            configuration:receipt.configuration,color_provenance:receipt.color_provenance,
-            kernel_sha256:receipt.kernel.codeSha256,adapter_sha256:receipt.adapter_sha256,
-            offline_audit_passed:true,camera_tested:false,dng_preview_may_share_jpeg_effect:true,
-          })).toString('base64'));
-          return sendBuild(candidate,'fwdc239b.bin');
+          input.camera??=cameraHeader(request);checkWebBuild(original,input.camera,input);
+          return await waitForBuild(buildQueue.submit(isolatedFirmwareJob(store,haloMatch[1],input,'800t')));
         } catch (error) {
           if (error.code === 'M10V_800T_EVIDENCE_REQUIRED')
             return send(response, 409, { error: error.message, blockers: error.blockers });
@@ -324,9 +391,8 @@ export function createServer(store = new Store(path.join(root, 'data')),
         if (editMatch[2] === 'prepare') return send(response, 200, {...prepared,build_source:buildSource});
         if (input.accepted_configuration_sha256 !== prepared.configuration_sha256 || !prepared.ready)
           return send(response, 409, { error: '方案已变化或预检未通过，请重新预检并确认风险。' });
-        const { candidate, receipt } = await buildCustomization(original, input.selection, input.accepted_configuration_sha256, options);
-        response.setHeader('X-M10V-Build-Receipt', Buffer.from(JSON.stringify({schema:receipt.schema,source_sha256:receipt.source_sha256,configuration_sha256:receipt.configuration_sha256,candidate_sha256:receipt.candidate_sha256,camera_tested:false,fit_reports:receipt.fit_reports?.map(({id,assessment,report,encoded_curve_form})=>({id,assessment,encoded_curve_form,report_sha256:report?.report_sha256,parameter_sha256:report?.parameter_sha256,source_sha256:report?.source_sha256,model:report?.model})),audit:receipt.audit,build_source:buildSource})).toString('base64'));
-        return sendBuild(candidate,receipt.filename);
+        input.camera??=cameraHeader(request);checkWebBuild(original,input.camera,input);
+        return await waitForBuild(buildQueue.submit(isolatedFirmwareJob(store,editMatch[1],input,'edit')));
       }
       if (versionMatch) {
         const original = await readBuildOriginal(versionMatch[1]);
@@ -338,8 +404,9 @@ export function createServer(store = new Store(path.join(root, 'data')),
       }
       if (candidateExportMatch) {
         const original = await readBuildOriginal(candidateExportMatch[1]);
-        const built = buildStreetCandidate(original, body);
-        return sendBuild(built.candidate,'fwdc239b.bin');
+        const camera=cameraHeader(request);checkWebBuild(original,camera);
+        const accepted_configuration_sha256=createHash('sha256').update(Buffer.concat([Buffer.from(candidateExportMatch[1]),body])).digest('hex');
+        return await waitForBuild(buildQueue.submit(isolatedFirmwareJob(store,candidateExportMatch[1],{jpeg:body,camera,accepted_configuration_sha256},'shutdown')));
       }
       if (sdMatch) {
         const selection = JSON.parse(body.toString('utf8'));
@@ -356,8 +423,10 @@ export function createServer(store = new Store(path.join(root, 'data')),
         return send(response, 200, { project_id: record.id, ...report });
       }
       if (backupMatch) {
-        const original = await store.readOriginal(backupMatch[1]);
-        return send(response, 200, createBackup(original), 'application/zip', 'm10v-gr3-backup.zip');
+        const original = await readBuildOriginal(backupMatch[1]),candidate=createBackup(original);
+        const audit=verifyWebBackup({source:original,candidate,camera:cameraHeader(request)});
+        requireWebDownload(candidate,audit);response.setHeader('X-M10V-Firmware-Safety',Buffer.from(JSON.stringify(audit)).toString('base64'));
+        return send(response, 200, candidate, 'application/zip', audit.filename);
       }
       if (pathname === '/api/backup/inspect') return send(response, 200, inspectBackup(body));
       const original = restoreBytes(body);
@@ -371,9 +440,12 @@ export function createServer(store = new Store(path.join(root, 'data')),
       return send(response, 200, { project_id: actual.id, original_sha256: actual.sha256,
         recovery_scope: 'computer_official_package_only', camera_flash_included: false });
     } catch (error) {
-      return send(response, 400, { error: error.message || 'operation failed' });
+      if(response.destroyed)return;
+      return send(response,error.code==='M10V_BUILD_QUEUE_FULL'?503:error.code==='M10V_FIRMWARE_CHECK_FAILED'?412:400,
+        {code:error.code,error:error.message || 'operation failed'});
     }
   });
+  server.once('close',()=>buildQueue.close());
   return server;
 }
 

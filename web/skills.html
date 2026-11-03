@@ -1,19 +1,24 @@
-<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark">
-  <title>m10v · AI 技能</title>
-  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/shared/guide.css"><link rel="stylesheet" href="/shared/brand.css"><link rel="stylesheet" href="/shared/navigation.css">
-  <link rel="icon" type="image/png" href="/shared/m10v-favicon.png"><script type="module" src="/shared/navigation.js"></script>
-</head>
-<body>
-  <header class="topbar"><a class="wordmark m10v-brand" href="/" aria-label="m10v 首页"><img class="m10v-mark" src="/shared/m10v-logo.png" width="48" height="48" alt=""><span class="m10v-brand-name"><b>m10v</b><span class="brand-dot">·</span>GR固件工作台</span></a><nav class="home-nav" aria-label="主导航"><a href="/gr3/">工作台</a><a href="/guide/">说明</a><a href="/skills/" aria-current="page">技能</a></nav></header>
-  <main class="guide">
-    <section class="hero"><p class="kicker">AI 技能</p><h1>让 AI 帮你核验固件</h1><p class="lead">把 M10V 的来源核验、修改边界和刷入步骤交给 AI，保留每一步的检查记录。</p><a class="return-studio" href="/downloads/m10v-firmware-safety-skill.zip" download>下载 M10V 固件安全技能包 ↓</a></section>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>m10v · AI 技能</title><link rel="icon" type="image/png" href="/shared/m10v-favicon.png"><link rel="stylesheet" href="/shared/visual-v5.css"><link rel="stylesheet" href="/shared/visual-live.css"><script type="module" src="/shared/navigation.js"></script><script type="module" src="/shared/visual-document.mjs"></script></head><body class="visual-v5 visual-document"><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M5 3v5m0 5v8M12 3v10m0 5v3M19 3v2m0 5v11M2 8h6m1 10h6m1-13h6"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 7h4l2-3h6l2 3h4v13H3z"/><circle cx="12" cy="13" r="4"/><path d="M18 10h1"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+<symbol id="i-frame" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M7 8h10v8H7z"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1 1m12 12 1 1M5 19l1-1M18 6l1-1"/></symbol>
+<symbol id="i-type" viewBox="0 0 24 24"><path d="M4 5h16M12 5v15M8 20h8"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6z"/><path d="m8 12 3 3 5-6"/></symbol>
+</defs></svg>
+<header class="topbar"><a class="wordmark" href="/gr3/" aria-label="M10V">m10v<i>.</i></a><nav class="primary-nav" aria-label="一级导航"><a href="/gr3/">工作台</a><a href="/gr3/sd-library.html">胶卷库</a></nav><div class="nav-more"><button class="compact-toggle" id="compact-toggle" aria-label="更多" title="更多" aria-expanded="false" aria-controls="compact-menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></button><nav class="compact-menu" id="compact-menu" aria-label="项目与帮助" hidden><a href="/skills/">技能 <span>↗</span></a><a href="/changelog/">更新日志</a><a href="/guide/">说明</a><a href="/gr3/downgrade.html">二阶降级 <span>↗</span></a><a href="https://github.com/zhaoo/m10v" target="_blank" rel="noopener noreferrer">GitHub <span>↗</span></a><a class="support-link" href="/support/">打赏 <span>↗</span></a></nav></div></header>
+<div class="shell">
+<aside class="sidebar"><div><p class="side-caption">YOUR WORKSPACE</p><nav class="side-menu" aria-label="工作台"><button data-view="films"><svg><use href="#i-grid"/></svg><span>胶卷配置</span><small>01</small></button><button data-view="tools"><svg><use href="#i-sliders"/></svg><span>影像工具</span><small>02</small></button><button data-view="build"><svg><use href="#i-arrow"/></svg><span>生成固件</span><small>03</small></button></nav></div><div class="side-bottom"><span class="saved"><i class="dot"></i>草稿已保存</span><span class="edition">M10V COLOR STUDIO<br><br>MADE FOR YOUR GR.</span></div></aside>
+<main class="workbench">
+<div class="workspace-head"><div><div class="overline"><i></i> MAKE IT YOURS</div><h1 id="page-title">AI 技能<span style="color:var(--accent)">.</span></h1></div></div>
+<section class="visual-prose"><a class="primary" href="/downloads/m10v-firmware-safety-skill.zip" download>下载 M10V 固件安全技能包 <span class="arrow">↓</span></a>
+
     <section class="note"><h2>如何使用</h2><ol><li>下载并解压 ZIP，得到 <code>m10v-firmware-safety</code> 目录。</li><li>将目录安装到你所用 AI 工具的技能目录；也可以直接让 AI 阅读其中的 <code>SKILL.md</code>。</li><li>告诉 AI 你的实际机型、机身固件版本和想修改的功能，先核验官方来源，再检查配置和候选记录。</li><li>阅读<a href="/guide/#safe-install">安全刷入步骤</a>，由你在相机上完成更新。AI 核验不能代替真机验证。</li></ol></section>
     <section class="note"><h2>包含什么</h2><p>技能说明、只读官方源核验脚本、固件审计与刷入指引，以及文件校验清单。技能包不包含任何固件，也不会自动格式化存储卡或刷写相机。</p></section>
-    <section class="note"><h2>支持范围</h2><p>仅支持官网内置的 <strong>GR III 2.10 / GR IIIx 1.60</strong>。不接受自定义 BIN 上传。</p><div class="risk"><p><strong>安装官方 30 周年纪念固件（GR III 2.20 / GR IIIx 1.70）的机身不能使用当前 M10V 刷机，不提供适配或降级包。</strong></p><p>不要改版本号、改名或使用历史二阶包绕过。若机身已黑屏且无法进入 MENU 更新，不能保证通过 SD 卡恢复，请联系维修。</p></div></section>
-  </main>
-  <footer><span>m10v · GR固件工作台</span><a href="/guide/">查看完整使用说明 ↗</a></footer>
-</body>
-</html>
+    <section class="note"><h2>支持范围</h2><p>仅支持官网内置的 <strong>GR III 2.10 / GR IIIx 1.60</strong>。不接受自定义 BIN 上传。</p><div class="risk"><p>官方 GR III 2.20 / GR IIIx 1.70 请先使用<a href="/gr3/downgrade.html">二阶降级</a>，回到 2.10 / 1.60 后再使用普通工作台。</p><p>不要改版本号、改名或使用历史二阶包绕过。若机身已黑屏且无法进入 MENU 更新，不能保证通过 SD 卡恢复，请联系维修。</p></div></section>
+  </section><footer class="app-footer"><span>M10V — COLOR, MADE YOURS.</span><a href="/gr3/">返回工作台 ↗</a></footer></main></div></body></html>

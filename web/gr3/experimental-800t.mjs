@@ -170,6 +170,9 @@ export function initialize800TExperiment({ openSource, request, onState=()=>{} }
       const blob=await response.blob();
       if (ticket!==requestSequence || sha!==sourceSha) return;
       const receipt=JSON.parse(atob(response.headers.get('X-M10V-800T-Receipt')));
+      await verifyFirmwareBlob(blob,{audit:readFirmwareSafety(response),sourceSha256:sha,
+        configurationSha256:preparation.configuration_sha256,model:'gr3',filename:'fwdc239b.bin',receipt});
+      if(ticket!==requestSequence||sha!==sourceSha)return;
       downloadBlob(blob, 'fwdc239b.bin');
       downloadBlob(new Blob([JSON.stringify(receipt,null,2)],{type:'application/json'}),'m10v-800t-build.json');
       $('halation-preflight-result').textContent=`已生成并通过独立回读 · ${receipt.candidate_sha256.slice(0,12)}… · 尚未实机验证。`;
@@ -185,3 +188,4 @@ export function update800TSourceState(sha256) {
   invalidatePreparation();
   $('halation-source-state').textContent = sha256 ? `已核验 · ${sha256.slice(0, 12)}…` : '等待导入并核验';
 }
+import {readFirmwareSafety,verifyFirmwareBlob} from './firmware-verification.mjs';

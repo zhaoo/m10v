@@ -8,9 +8,9 @@ test('product home exposes GR IV native workbench and GR II inspection with trut
   assert.match(html, /class="camera-entry primary-entry"/);
   assert.match(html,/href="\/gr4\/"/);
   assert.match(html,/href="\/gr2\/"/);
-  assert.match(html,/实验固件构建/);
+  assert.match(html,/修改固件生成与下载已锁定/);
   assert.match(html,/原生胶卷工作台/);
-  assert.match(html,/固件 1.11 · 待实机验证/);
+  assert.match(html,/<h3>GR IV <small>已暂停<\/small><\/h3>/);
   assert.match(html, /选择相机型号/);
   assert.doesNotMatch(html, /id="candidate-analyze"/);
   assert.doesNotMatch(html, /fonts\.googleapis\.com/);
@@ -22,7 +22,7 @@ test('GR III and GR IV expose distinct model workspaces', async () => {
     readFile(new URL('../web/gr4/index.html', import.meta.url), 'utf8'),
   ]);
   assert.match(gr3, /class="topbar"/);
-  assert.match(gr3, /class="model-nav"/);
+  assert.match(gr3, /class="primary-nav"/);
   assert.match(gr4, /class="product-topbar"/);
   assert.match(gr4, /class="model-switch"/);
   for (const html of [gr3, gr4]) assert.doesNotMatch(html, /研究中|测试平台|半成品/);
@@ -54,17 +54,19 @@ test('library opens directly and film selection uses its catalog',async()=>{
 test('GR III street editor has slot controls and source-derived film preview', async () => {
   const [html, css] = await Promise.all([
     readFile(new URL('../web/gr3/index.html', import.meta.url), 'utf8'),
-    readFile(new URL('../web/gr3/styles.css', import.meta.url), 'utf8'),
+    readFile(new URL('../web/shared/visual-v5.css', import.meta.url), 'utf8'),
   ]);
   for (const id of ['recipe-dialog', 'community-select', 'recipe-parameters', 'plan-ledger'])
     assert.match(html, new RegExp(`id="${id}"`));
-  assert.match(html, /href="\/"[^>]*>选择机型/);
+  assert.match(html, /id="camera-button"/);
+  assert.match(html, /data-model="gr3x"/);
   assert.match(html, /id="local-source-model"/);
   assert.match(html, /value="gr3x"/);
-  assert.match(css, /gr3-street-photo\.png/);
-  assert.match(css, /#0d0e0e/);
-  assert.match(css, /#d6ad69/);
-  assert.doesNotMatch(css, /border-radius:\s*(?:1[0-9]|[2-9][0-9])px/);
+  assert.match(html, /src="\/gr3\/film-street-source\.png"/);
+  assert.match(css, /#f5f4f0/);
+  assert.match(css, /#222321/);
+  assert.match(css, /#e85332/);
+  assert.doesNotMatch(html, /href="[^"]*(?:cinematic|paper-theme)\.css"/);
 });
 
 test('GR IV product UI uses only namespaced APIs and exposes latest feature surfaces', async () => {
@@ -104,7 +106,7 @@ test('HDF entry is independent of film and preserves the simplified workbench',a
  assert.match(app,/if\(!meta.globalHdf&&!meta.globalZoom\)state.features.add\('film'\)/);
  assert.match(app,/仅使用 HDF/);
  const html=await readFile(new URL('../web/gr3/index.html',import.meta.url),'utf8');
- assert.match(html,/>影像方案<\/button>/);
+ assert.match(html,/>影像工具<\/button>/);
 });
 
 test('HDF-only feature cannot be removed until film is enabled',async()=>{

@@ -52,7 +52,7 @@ test('the real studio save callback authorizes after preflight and revokes accep
  async function run(mode){
   const state={revision:1,projectId:'official',source:{model:'GR IIIx',public_version:'1.60'},preparation:null},events=[];let options;
   const node={textContent:'',addEventListener(){}};
-  const ctx=vm.createContext({state,$:()=>node,renderLedger(){},createFirmwareSaveGate:value=>(options=value,{open(){}}),prepare:async()=>{events.push('prepare');state.preparation=mode==='not-ready'?null:{};if(mode==='seed')state.revision++;const revision=state.revision;if(mode==='changed')state.revision++;return state.preparation?revision:undefined;},build:async()=>{assert.equal(vm.runInContext('riskAcceptedRevision',ctx),state.revision);events.push('build');}});
+  const ctx=vm.createContext({gr4Workbench:false,state,$:()=>node,renderLedger(){},createFirmwareSaveGate:value=>(options=value,{open(){}}),prepare:async()=>{events.push('prepare');state.preparation=mode==='not-ready'?null:{};if(mode==='seed')state.revision++;const revision=state.revision;if(mode==='changed')state.revision++;return state.preparation?revision:undefined;},build:async()=>{assert.equal(vm.runInContext('riskAcceptedRevision',ctx),state.revision);events.push('build');}});
   vm.runInContext('let saving=false,riskAcceptedRevision=-1;'+block,ctx);
   await options.save({revision:1,project:'official'});
   assert.equal(vm.runInContext('riskAcceptedRevision',ctx),-1);assert.equal(vm.runInContext('saving',ctx),false);

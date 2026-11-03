@@ -6,10 +6,12 @@
 | --- | --- | --- | --- |
 | GR III | 2.10 / 2.10.21.27 | d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4 | 仅内置来源 |
 | GR IIIx | 1.60 / 1.60.11.17 | 708e79f3b7b96a7e1581b4acf4c412233050a1832718ef7f06c8397db1b431c7 | 仅内置来源 |
-| GR III | 2.20 / 2.20.20.28 | 5c53760b3b564c87239dbf7f5c94d0f6fd91accd156ec4ba672ebfd6b861793e | 30 周年纪念固件，不支持、不适配、不提供降级 |
-| GR IIIx | 1.70 / 1.70.20.18 | aa8e3ae1349d94e83be381c20530e41d5e57b75c27ef24ba81c7b017d6c11592 | 30 周年纪念固件，不支持、不适配、不提供降级 |
+| GR III | 2.20 / 2.20.20.28 | 5c53760b3b564c87239dbf7f5c94d0f6fd91accd156ec4ba672ebfd6b861793e | 独立二阶降级至官方2.10；普通生成仍以2.10为基线 |
+| GR IIIx | 1.70 / 1.70.20.18 | aa8e3ae1349d94e83be381c20530e41d5e57b75c27ef24ba81c7b017d6c11592 | 独立二阶降级至官方1.60；普通生成仍以1.60为基线 |
 
 这是发布时的快照。执行前同时核对 [官网状态](https://m10v.izhaoo.com/api/status) 与 [更新日志](https://m10v.izhaoo.com/changelog/)，新的公开版本号不能自行扩展支持。2.20 与 1.70 的官方包身份已核验；不得把“官方输入完整”解释为“修改包已验证”。
+
+[二阶降级入口](https://m10v.izhaoo.com/gr3/downgrade.html) 使用独立构建与核查，不放宽普通生成器。只接受对应精确官方来源，第一阶段保留整个CPU并只修改审定的DSP字段与更新分支；第二阶段为精确旧官方原包。完整重建与最终ZIP摘要校验通过才下载，两个阶段文件分别放卡根目录。尚未进行真实擦写、两阶段冷启动与恢复验收，不能将文件核查通过称为设备安全保证；已有正常2.10/1.60无需走此入口。
 
 ## 固件代码审计
 
@@ -22,6 +24,25 @@
 - 使用当前项目的胶卷目录、存储 ABI 和配置合同，不按旧技能快照重排 ID、删卷或覆盖用户设置。host、ARM 仿真、HTTP 下载、真机刷写/启动/拍摄、恢复能力是不同证据，不得互相替代。
 
 ## 刷入步骤
+
+### 本地候选的保守刷前检查
+
+源码仓库内可以运行以下检查。`verify_source.py` 检查官方原包，不是修改后候选的验收工具；新版本身份识别成功仍然拒绝使用。
+
+```sh
+node scripts/check_gr3_flash_safety.mjs \
+  --source /path/to/official-2.10.bin \
+  --candidate /path/to/candidate/fwdc239b.bin \
+  --receipt /path/to/candidate/M10V-build-receipt.json \
+  --expected-sha256 <independent-download-record-sha256> \
+  --model gr3 --camera-version 2.10 --camera-origin official
+```
+
+IIIx 使用对应官方 1.60、`fwdc243b.bin`、`--model gr3x --camera-version 1.60`。命令须在候选对应的已审查源码 checkout 中执行，需要原有编译工具及内置官方基线。使用临时编译目录/编译缓存，输入文件不改动，不导出新 BIN，不写 SD 或相机。网页下载若没有配套完整回执，不能只凭文件名跳过证据要求。
+
+检查来源完整 SHA、组件版本、严格解码、外部下载摘要、配置/源码指纹，然后从当前源码重新构建，要求最终候选逐字节一致。提高版本号、未知作者或来源、周年固件及不一致的输入拒绝。第三方机身固件不会因为菜单显示 2.10 就被放行。已装经验证 M10V 时，使用 `--camera-origin m10v-verified --installed-sha256 <previous-installed-bin-sha256>`，必须有此前实测包的原始记录；此参数仍是人的声明，不能证明相机实际内容。
+
+退出码 1 表示拒绝/验证失败；2 表示离线重建一致但机身信息、存档兼容及完整安装/恢复仍未验证。始终 `installation_allowed=false`、`camera_tested=false`，没有自动许可刷入的成功码。回执及用户输入的 SHA 不是数字签名；未知或恶意源码也能产出自洽文件，必须使用已经审查的源码。此脚本不能通用验证其他作者固件，不能证明机内设置安全或保证不变砖。
 
 以下操作遵循理光官方的 [GR III 更新说明](https://www.ricoh-imaging.co.jp/english/support/digital/gr3_s.html) 与 [GR IIIx 更新说明](https://www.ricoh-imaging.co.jp/english/support/digital/gr3x_s.html)；修改固件仍存在额外风险。
 

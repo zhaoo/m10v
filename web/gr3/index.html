@@ -1,18 +1,31 @@
-<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark">
-  <title>m10v · GR固件工作台</title>
-  <link rel="stylesheet" href="/gr3/styles.css"><link rel="stylesheet" href="/gr3/native-library-embedded.css">
-  <script type="module" src="/gr3/studio.js"></script>
-<link rel="stylesheet" href="/gr3/film-picker.css"><link rel="stylesheet" href="/gr3/cinematic.css"><link rel="stylesheet" href="/gr3/imaging.css">
-<link rel="icon" type="image/png" sizes="128x128" href="/shared/m10v-favicon.png"><link rel="stylesheet" href="/shared/brand.css"><link rel="stylesheet" href="/shared/navigation.css"><script type="module" src="/shared/navigation.js"></script></head>
-<body class="cinematic-studio" data-view="source">
-  <header class="topbar">
-    <a class="brand m10v-brand" href="/" aria-label="m10v · GR固件工作台 首页"><img class="m10v-mark" src="/shared/m10v-logo.png" width="48" height="48" alt=""><span class="m10v-brand-name"><b>m10v</b><span class="brand-dot">·</span>GR固件工作台</span></a>
-    <nav class="model-nav" aria-label="主导航"><a href="/">选择机型</a><span class="current" id="studio-model-status" aria-current="page">GR III / GR IIIx</span><a href="/gr3/sd-library.html">胶卷库</a><a href="/guide/">说明</a><a href="/gr4/">GR IV</a><a href="/gr2/">GR II · 检查</a><a href="/changelog/">更新日志</a><a href="https://github.com/zhaoo/m10v" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目，新窗口打开">GitHub ↗</a></nav>
-  </header>
-  <section class="hero"><div class="hero-inner">
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>m10v · GR固件工作台</title><link rel="icon" type="image/png" href="/shared/m10v-favicon.png"><link rel="stylesheet" href="/shared/visual-v5.css"><link rel="stylesheet" href="/shared/visual-live.css"><script type="module" src="/shared/navigation.js"></script><script type="module" src="/gr3/studio.js"></script></head><body class="visual-v5"><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M5 3v5m0 5v8M12 3v10m0 5v3M19 3v2m0 5v11M2 8h6m1 10h6m1-13h6"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 7h4l2-3h6l2 3h4v13H3z"/><circle cx="12" cy="13" r="4"/><path d="M18 10h1"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+<symbol id="i-frame" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M7 8h10v8H7z"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1 1m12 12 1 1M5 19l1-1M18 6l1-1"/></symbol>
+<symbol id="i-type" viewBox="0 0 24 24"><path d="M4 5h16M12 5v15M8 20h8"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6z"/><path d="m8 12 3 3 5-6"/></symbol>
+</defs></svg>
+<header class="topbar"><a class="wordmark" href="/gr3/" aria-label="M10V">m10v<i>.</i></a><nav class="primary-nav" aria-label="一级导航"><a class="active" href="/gr3/">工作台</a><a href="/gr3/sd-library.html">胶卷库</a></nav><div class="nav-more"><button class="compact-toggle" id="compact-toggle" aria-label="更多" title="更多" aria-expanded="false" aria-controls="compact-menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></button><nav class="compact-menu" id="compact-menu" aria-label="项目与帮助" hidden><a href="/skills/">技能 <span>↗</span></a><a href="/changelog/">更新日志</a><a href="/guide/">说明</a><a href="/gr3/downgrade.html">二阶降级 <span>↗</span></a><a href="https://github.com/zhaoo/m10v" target="_blank" rel="noopener noreferrer">GitHub <span>↗</span></a><a class="support-link" href="/support/">打赏 <span>↗</span></a></nav></div></header>
+<div class="shell">
+<aside class="sidebar"><div><p class="side-caption">YOUR WORKSPACE</p><nav class="side-menu" aria-label="工作台"><button class="active" data-view="films"><svg><use href="#i-grid"/></svg><span>胶卷配置</span><small>01</small></button><button data-view="tools"><svg><use href="#i-sliders"/></svg><span>影像工具</span><small>02</small></button><button data-view="build"><svg><use href="#i-arrow"/></svg><span>生成固件</span><small>03</small></button></nav></div><div class="side-bottom"><span class="saved"><i class="dot"></i>草稿已保存</span><span class="edition">M10V COLOR STUDIO<br><br>MADE FOR YOUR GR.</span></div></aside>
+<main class="workbench">
+<div class="workspace-head"><div><div class="overline"><i></i> MAKE IT YOURS</div><h1 id="page-title">胶卷工作台<span style="color:var(--accent)">.</span></h1></div><div class="camera-picker"><button class="camera-button" id="camera-button" aria-expanded="false"><svg><use href="#i-camera"/></svg><strong id="device-name">GR III</strong><span class="version" id="device-version">2.10</span><svg class="chevron" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg></button><div class="camera-menu" id="camera-menu" hidden><button data-model="gr3">GR III <span>官方 2.10</span></button><button data-model="gr3x">GR IIIx <span>官方 1.60</span></button><p>其他固件版本暂不支持</p></div></div></div>
+<div class="workspace-tabs"><button class="active" data-view="films">胶卷配置</button><button data-view="tools">影像工具</button><span class="autosave"><i class="dot"></i>自动保存</span></div>
+<section class="studio-grid" id="films-view"><div class="visual-column"><div class="preview-head"><span class="section-label">影像预览</span><div class="preview-options" aria-label="预览模式"><button data-preview="original">原图</button><button class="active" data-preview="film">胶卷</button></div></div><div class="preview-frame" id="preview-frame"><img src="/gr3/film-street-source.png" alt="身穿黄色外套的行人在街头，红色与灰蓝色建筑构成影像预览"><i class="preview-cross"></i><div class="photo-caption"><strong id="photo-look">PORTRA 400</strong><span>COLOR NEGATIVE FILM</span></div><span class="frame-count mono">001 / 036</span></div><div class="image-index mono"><span>EVERYDAY STORIES, IN COLOR.</span><span class="sample-note">效果示意</span></div>
+<section class="look-library" id="look-library"><div class="library-heading"><h2>精选胶卷<span class="library-count">/ 08</span></h2><label class="search-button"><svg><use href="#i-search"/></svg><input class="search-box" type="search" id="film-search" placeholder="搜索胶卷" aria-label="搜索胶卷"></label></div><nav class="filters" aria-label="胶卷分类"><button class="active" data-category="all">全部</button><button data-category="color">彩色负片</button><button data-category="cinema">电影卷</button><button data-category="bw">黑白</button></nav><div class="film-grid" id="film-grid"></div><p class="no-results" id="no-results" hidden>没有找到这款胶卷。</p></section></div>
+<aside class="inspector"><div class="inspector-head"><span>LOOK DETAILS</span><button type="button" id="look-reset" aria-label="重置当前胶卷参数">↺</button></div><div class="look-intro"><p class="look-type" id="look-type">KODAK / COLOR NEGATIVE</p><h2 class="look-title" id="look-title">Portra 400</h2><p class="look-note" id="look-note">温暖肤色，柔和日光。</p><div class="tags" id="look-tags"><span class="tag">人像</span><span class="tag">日常</span><span class="tag">暖调</span></div><button class="add-film selected" id="add-film"><svg><use href="#i-check"/></svg>已在方案中</button></div>
+<section class="control-section"><h3>质感调整</h3><div class="control-label"><span>颗粒</span><span id="grain-value">关闭</span></div><div class="segmented" id="grain-control" aria-label="颗粒强度"><button class="active" data-grain="0">关闭</button><button data-grain="1">弱</button><button data-grain="2">中</button><button data-grain="3">强</button></div><div class="toggle-row" style="margin-top:14px"><span>光晕</span><button class="toggle" id="halo-toggle" aria-label="光晕" aria-pressed="false"></button></div></section>
+<section class="control-section"><h3>照片标记</h3><div class="toggle-row"><span>胶卷名称</span><button class="toggle" id="film-name-toggle" aria-label="胶卷名称水印" aria-pressed="false"></button></div><div class="toggle-row"><span>日期水印</span><button class="toggle" id="date-toggle" aria-label="日期水印" aria-pressed="false"></button></div></section>
+<div id="visual-stock-controls"></div><section class="selected-section"><div class="selected-heading"><h3>我的方案</h3><span><b id="selected-count" style="font-weight:500">05</b> / 10</span></div><div class="selected-films" id="selected-films"></div></section><div class="inspector-footer"><svg><use href="#i-shield"/></svg>生成与下载前自动校验</div></aside></section>
+<section class="tool-panel" id="tools-view" hidden><h2>少一点操作，多一点可能。</h2><div data-live-tools></div></section>
+<div class="actionbar"><div class="action-summary"><div class="selected-mini" id="selected-mini"></div><strong id="summary-count">读取胶卷…</strong><span class="divider"></span><span class="ready-label" id="visual-source-state">正在核对来源</span></div><button class="primary" id="generate-button" disabled>生成固件 <span class="arrow">↗</span></button></div><footer class="app-footer"><span>M10V — COLOR, MADE YOURS.</span><span id="visual-action-status" role="status" aria-live="polite"></span></footer></main></div>
+<div id="legacy-workbench" hidden><span id="studio-model-status">GR III / IIIx</span>  <section class="hero"><div class="hero-inner">
     <p class="kicker">GR III / GR IIIx</p><h1>固件工作台</h1>
     <p>仅支持内置基线：GR III 2.10 / GR IIIx 1.60。官方固件上传已关闭。</p>
 
@@ -21,11 +34,11 @@
   <p class="scene-caption"><span>示意图片</span></p>
   <main class="studio">
     <aside class="steps" aria-label="工作台导航">
-      <p class="section-kicker">工作流程</p>
-      <button class="step active" data-step="source"><b>01</b><span>导入固件<small>官方文件 · 身份核验</small></span></button>
-      <button class="step" data-step="features"><b>02</b><span>胶卷与功能<small>胶卷 · 扩展功能</small></span></button>
-      <button class="step" data-step="build"><b>03</b><span>保存固件<small>确认配置 · 下载固件</small></span></button>
-      <div class="steps-foot"><strong>你的影像方案</strong><p>随时切换区域，右侧方案清单持续显示当前状态。</p></div>
+      <p class="section-kicker">YOUR WORKSPACE</p>
+      <button class="step active" data-step="source"><b>01</b><span>确认相机<small>机型 · 官方基线</small></span></button>
+      <button class="step" data-step="features"><b>02</b><span>胶卷配置<small>胶卷 · 影像工具</small></span></button>
+      <button class="step" data-step="build"><b>03</b><span>生成固件<small>核对 · 生成与下载</small></span></button>
+      <div class="steps-foot"><strong>M10V COLOR STUDIO</strong><p>MADE FOR YOUR GR.</p></div>
     </aside>
     <div class="stage">
       <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
@@ -39,8 +52,8 @@
         <div class="stage-actions"><a class="quiet-link" href="/">← 返回机型入口</a><button class="primary" id="camera-next">打开影像方案 <span>→</span></button></div>
       </section>
       <section class="page" data-page="features" hidden>
-        <div class="page-head"><p>设置</p><h2>胶卷与功能</h2><span>选择胶卷，按需开启扩展功能。</span></div>
-        <div class="settings-tabs" role="tablist" aria-label="胶卷与功能"><button id="tab-library" role="tab" aria-selected="true" aria-controls="native-editor">胶卷设置</button><button id="tab-imaging" role="tab" aria-selected="false" aria-controls="imaging-settings">影像方案</button></div>
+        <div class="page-head"><p>设置</p><h2>胶卷工作台<span class="paper-title-dot">.</span></h2><span>选择胶卷，留下你的色彩。</span></div>
+        <div class="settings-tabs" role="tablist" aria-label="胶卷与功能"><button id="tab-library" role="tab" aria-selected="true" aria-controls="native-editor">胶卷配置</button><button id="tab-imaging" role="tab" aria-selected="false" aria-controls="imaging-settings">影像工具</button></div>
         <div class="toolbar"><span id="selection-count">已选择 0 项功能</span><span class="draft-indicator" id="draft-indicator" role="status">自动保存到本机</span><div><button class="outline" id="undo-edit" disabled>撤销</button><button class="outline" id="redo-edit" disabled>重做</button></div></div>
         <div id="imaging-settings" role="tabpanel" aria-labelledby="tab-imaging" hidden>
         <div class="panel-heading"><h3>扩展功能</h3><a href="/guide/#features">功能说明 ↗</a><button class="outline" type="button" data-close-imaging>返回胶卷</button></div><div id="feature-list" class="feature-list"></div>
@@ -49,7 +62,7 @@
         <div class="stage-actions"><button class="outline" data-back="source">返回导入固件</button><button class="primary" id="features-next" disabled>继续保存固件 <span>→</span></button></div>
       </section>
       <section class="page" data-page="source">
-        <div class="page-head"><p>固件来源</p><h2>选择内置基线</h2><span>仅支持内置基线：GR III 2.10 / GR IIIx 1.60。安装官方 30 周年纪念固件（GR III 2.20 / GR IIIx 1.70）的机身不能使用当前 M10V 刷机；不提供适配、降级或自定义 BIN 上传。</span></div>
+        <div class="page-head"><p>固件来源</p><h2>选择内置基线</h2><span>普通工作台使用 GR III 2.10 / GR IIIx 1.60。官方 2.20 / 1.70 请先<a href="/gr3/downgrade.html">二阶降级 ↗</a>。</span></div>
         <div class="source-options">
         <div id="dropzone" hidden></div>
         <input type="file" id="firmware-file" accept=".bin,application/octet-stream" hidden disabled>
@@ -91,7 +104,7 @@
     </div>
     <aside class="plan-rail" aria-label="当前方案清单"><p class="section-kicker">方案摘要</p><h2>当前方案</h2><div id="plan-ledger" class="plan-ledger"></div><button type="button" class="primary rail-action" id="open-build-desk">继续保存固件 ↗</button><p class="rail-note">生成的固件仍需对应机型实机验证。</p></aside>
   </main>
-  <dialog id="recipe-dialog" class="recipe-dialog"><form method="dialog" id="recipe-form">
+</div>  <dialog id="recipe-dialog" class="recipe-dialog"><form method="dialog" id="recipe-form">
     <div class="dialog-head"><p>影像档位</p><button class="dialog-close" value="cancel" aria-label="关闭">×</button><h2>编辑机内影像档位</h2><span id="dialog-slot-label"></span></div>
     <div class="dialog-body">
       <p class="field-title">选择配方来源</p>
@@ -110,18 +123,20 @@
     <div class="dialog-actions"><button class="outline" value="cancel">取消</button><button class="primary" id="apply-recipe" value="apply">应用到此位置</button></div>
   </form></dialog>
   <dialog id="firmware-disclaimer" class="firmware-disclaimer" aria-labelledby="disclaimer-title" aria-describedby="disclaimer-summary">
-    <p class="disclaimer-kicker">保存前，请了解风险</p>
-    <h2 id="disclaimer-title">刷入修改固件可能导致变砖。</h2>
-    <p id="disclaimer-summary">这是非官方修改固件。刷入后可能出现无法启动、功能异常、数据丢失或设备损坏，可能需要维修，且无法保证恢复。</p>
-    <p>官网仅提供已知稳定基线 GR III 2.10 / GR IIIx 1.60。安装官方 30 周年纪念固件（2.20 / 1.70）的机身不能使用当前 M10V 刷机，不提供适配或降级。生成成功不能保证每台相机、每种组合都安全。</p>
+    <p class="disclaimer-kicker">ONE LAST CHECK</p>
+    <h2 id="disclaimer-title">确认你的相机。</h2>
+    <p id="disclaimer-summary">请核对机身实际型号、版本与固件来源。操作步骤和免责声明见使用说明。</p>
+    <p>普通工作台使用 GR III 2.10 / GR IIIx 1.60。官方 2.20 / 1.70 请先<a href="/gr3/downgrade.html">二阶降级</a>。</p>
     <label class="install-field" for="install-camera-model">我在机身上确认的型号<select id="install-camera-model"><option value="">请选择机身型号</option><option value="gr3">GR III</option><option value="gr3x">GR IIIx</option></select></label>
-    <label class="install-field" for="install-camera-version">我在「固件信息/选项」看到的版本<select id="install-camera-version"><option value="">请选择实际版本</option><option value="2.10">2.10</option><option value="1.60">1.60</option><option value="2.20">2.20（30 周年纪念固件，不支持）</option><option value="1.70">1.70（30 周年纪念固件，不支持）</option><option value="other">其他 / 无法确认</option></select></label>
+    <label class="install-field" for="install-camera-version">我在「固件信息/选项」看到的版本<select id="install-camera-version"><option value="">请选择实际版本</option><option value="2.10">2.10</option><option value="1.60">1.60</option><option value="2.20">2.20（请先二阶降级）</option><option value="1.70">1.70（请先二阶降级）</option><option value="other">其他 / 无法确认</option></select></label>
     <p id="install-camera-status" role="status" aria-live="polite"></p>
+    <label class="install-field" for="install-camera-origin">当前机身固件来源<select id="install-camera-origin"><option value="">请选择来源</option><option value="official">理光官方固件</option><option value="m10v-verified">此前已实测通过的 M10V 固件</option><option value="third-party">其他作者制作的固件（停止生成）</option><option value="unknown">无法确认（停止生成）</option></select></label>
+    <label class="install-field" id="install-camera-sha-field" for="install-camera-sha" hidden>此前实测 M10V 包的 SHA-256 记录<input id="install-camera-sha" type="text" inputmode="text" maxlength="64" autocomplete="off" spellcheck="false" placeholder="从此前保存的校验记录复制完整摘要"></label>
+    <p>生成后会再次完整重建校验，下载前浏览器还会核对文件摘要；校验失败即停止下载。填写的机身信息不会替代真实设备检查。</p>
     <ol><li>先备份照片、机内设置和官方原包。用相机格式化一张可靠的空 SD 卡；不要格式化唯一的照片或设置副本。</li><li>使用充满电的 DB-110，或理光指定的 K-AC166J 电源适配器。更新期间不要开关机、拔电池、拔卡或打开卡盖。</li><li>GR III 使用 <code>fwdc239b.bin</code>，GR IIIx 使用 <code>fwdc243b.bin</code>。将对应 BIN 放在卡根目录；不要混放其他机型的更新包，不要把胶卷资源包当固件。</li><li>相机关机、插卡并关好卡盖。按住 MENU 开机，核对更新界面后选择 Execute / 执行。等待屏幕明确显示 Update completed / 更新完成，再关机取卡。</li><li>重启后检查版本、拍摄与回放，备份本次配置和校验记录。删除卡上的更新 BIN，再按说明复制配套胶卷资源，保留已有机内设置文件。</li></ol>
     <p>如更新被拒绝，请停止，不要改名、改版本号或反复强刷。如已黑屏、镜头不回收，且 MENU / 回放均无法启动，请保留原包与故障信息并联系维修；不能保证通过 SD 卡恢复。</p>
     <p><a href="/guide/#safe-install" target="_blank" rel="noopener">查看完整刷入指引与理光官方步骤 ↗</a></p>
     <div class="disclaimer-target" id="disclaimer-target"></div>
     <div class="disclaimer-actions"><button type="button" class="outline" id="disclaimer-cancel" autofocus>返回检查</button><button type="button" class="primary" id="disclaimer-confirm" disabled>确认匹配，继续保存</button></div>
   </dialog>
-</body>
-</html>
+<dialog id="visual-progress" aria-labelledby="visual-progress-title"><button class="dialog-close" id="visual-progress-close" aria-label="关闭生成结果">×</button><p class="dialog-kicker">A LITTLE PATIENCE</p><h2 id="visual-progress-title">正在准备你的色彩。</h2><div id="visual-build-host"></div></dialog><div class="toast" id="toast" role="status" aria-live="polite"></div></body></html>

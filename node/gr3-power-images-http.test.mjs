@@ -12,7 +12,7 @@ import {unwrapFirmwareDownload} from '../web/gr3/firmware-download.mjs';
 test('HTTP power preview, stale-plan rejection and native unified export read back both images',async()=>{
  const dir=await mkdtemp(path.join(os.tmpdir(),'m10v-power-')),server=createServer(new Store(dir));await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;
  try{
-  const status=await(await fetch(base+'/api/status')).json(),post=async(url,body,token=true)=>unwrapFirmwareDownload(await fetch(base+url,{method:'POST',headers:{'Content-Type':'application/json',...(url.endsWith('/build')?{Accept:'multipart/form-data'}:{}),...(token?{'X-M10V-Token':status.session_token}:{})},body:JSON.stringify(body)}));
+  const status=await(await fetch(base+'/api/status')).json(),post=async(url,body,token=true)=>unwrapFirmwareDownload(await fetch(base+url,{method:'POST',headers:{'Content-Type':'application/json',...(url.endsWith('/build')?{Accept:'multipart/form-data','X-M10V-Camera':Buffer.from(JSON.stringify({model:'gr3',version:'2.10',origin:'official'})).toString('base64')}:{}),...(token?{'X-M10V-Token':status.session_token}:{})},body:JSON.stringify(body)}));
   const source=await readFile(new URL('../bin/fwdc239b-gr3-official.bin',import.meta.url)),original=decodeFrameMap(source).decoded,jpeg_base64=original.subarray(59298689,59298689+112509).toString('base64');
   const power_images={startup:{jpeg_base64},shutdown:{jpeg_base64}};
   assert.equal((await post('/api/gr3/power-images/preview',power_images,false)).status,403);

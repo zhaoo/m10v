@@ -7,7 +7,7 @@ export const RELEASE_BASELINES=Object.freeze({
 export const firmwareReleasePolicy=Object.freeze({
  uploads_allowed:false,locked_models:['gr4','gr2'],baselines:{gr3:'2.10',gr3x:'1.60'},
  blocked_firmware:{gr3:['2.20'],gr3x:['1.70']},
- message:'GR IV / GR II 固件导出已暂停；GR III / IIIx 仅支持内置基线 2.10 / 1.60，官方固件上传已关闭。安装官方 30 周年纪念固件（GR III 2.20 / GR IIIx 1.70）的机身不能使用当前 M10V 刷机；不提供适配或降级，禁止改版本号或自定义上传绕过。',
+ message:'GR IV / GR II 固件导出已暂停；普通工作台仅支持内置 GR III 2.10 / GR IIIx 1.60。官方 2.20 / 1.70 请先使用「更多 → 二阶降级」回到对应官方基线，再生成 M10V 固件。普通入口不接受自定义 BIN 或修改版本号绕过。',
 });
 export function releaseRequestLocked(url){
  if(/^\/api\/gr[24](?:\/|$)/.test(url))return true;

@@ -1,4 +1,7 @@
+import {mountVisualStudio} from './visual-studio.mjs';
 import {unwrapFirmwareDownload} from './firmware-download.mjs';
+import {readFirmwareSafety,verifyFirmwareBlob} from './firmware-verification.mjs';
+import {runFirmwareJob} from './firmware-job-client.mjs';
 import {checkCameraForInstall} from './firmware-install-guide.mjs';
 import {mountCinematicStudio} from './cinematic-studio.mjs';
 import {mountBuildCompletion} from './full-library.mjs';
@@ -17,10 +20,12 @@ import {normalizeWorkbenchDraft,preserveLegacyDraft,extensionFeatures,updateWork
 import {modelCapabilities} from './model-capabilities.mjs';
 const gr4Workbench=location.pathname.startsWith('/gr4');
 const nativeApi=gr4Workbench?'/api/gr4/native-library':'/api/gr3/native-library';
-let chosenModel=gr4Workbench?'gr4':location.pathname.startsWith('/gr3x')?'gr3x':'gr3';
+const declaredPageModel=new URLSearchParams(location.hash.slice(1)).get('model');
+let chosenModel=gr4Workbench?'gr4':location.pathname.startsWith('/gr3x')?'gr3x':declaredPageModel==='gr3x'?'gr3x':'gr3';
 let modelLabel=chosenModel==='gr4'?'GR IV':chosenModel==='gr3x'?'GR IIIx':'GR III';
 let nativeEditor;
 let cinematicEditor;
+let visualStudio;
 let completion;
 let powerImages;
 let powerTransitioning=false;
@@ -98,6 +103,13 @@ function restoreHistory(direction){
   invalidate(false);renderFeatures();
 }
 function notice(message, error = false) {
+  if(typeof visualStudio!=='undefined'&&visualStudio&&message&&error)visualStudio.toast(message);
+  else if(message&&error&&document.body?.classList?.contains?.('visual-v5')){
+    const status=document.getElementById('visual-action-status'),toast=document.getElementById('toast'),source=document.getElementById('visual-source-state');
+    if(status)status.textContent=message;if(toast){toast.textContent=message;toast.classList?.add?.('show');}if(source)source.textContent='载入失败 · 请刷新重试';
+    const generate=document.getElementById('generate-button');if(generate)generate.disabled=true;
+  }
+
   $('notice').textContent = message;
   $('notice').classList.toggle('error', error);
   $('notice').hidden = !message;
@@ -110,7 +122,9 @@ async function api(path, options = {}) {
     if(match){path=nativeApi+'/'+(match[3]||'backup');options={...options,body:JSON.stringify({...JSON.parse(options.body||'{}'),project_id:match[1]})};}
   }
   const response = await fetch(path, { ...options,
-    headers: { 'X-M10V-Token': state.token, ...(/\/(native-library|edit)\/build$/.test(path)&&!gr4Workbench?{Accept:'multipart/form-data'}:{}), ...(options.headers || {}) } });
+    headers: { 'X-M10V-Token': state.token,
+      ...(!gr4Workbench&&/\/(build|backup|jobs)$/.test(path)?{'X-M10V-Camera':btoa(JSON.stringify(readCameraDeclaration()))}:{}),
+      ...(/\/(native-library|edit)\/build$/.test(path)&&!gr4Workbench?{Accept:'multipart/form-data'}:{}), ...(options.headers || {}) } });
   if (!response.ok) {
     let message = `请求失败（HTTP ${response.status}）`;
     try { message = (await response.json()).error || message; } catch {
@@ -188,20 +202,17 @@ async function showStep(step) {
   renderLedger();
   notice('');
   const heading=document.querySelector(`.page[data-page="${step}"] h2`);
-  focusWorkbenchHeading(heading);
+  if(typeof visualStudio==='undefined'||!visualStudio)focusWorkbenchHeading(heading);
 }
 function versionUnlockSnapshot(){
- if(chosenModel!=='gr3x')return normalizeVersionUnlock({enabled:false},chosenModel);
- const enabled=state.profile==='native'&&$('version-unlock').checked;
- const option=$('version-known').checked?{enabled,dsp:$('version-dsp').value,cpu:$('version-cpu').value}:{enabled,mode:'dsp-package-only'};
- return normalizeVersionUnlock(option,chosenModel);
+ return normalizeVersionUnlock({enabled:false},chosenModel);
 }
 function renderVersionUnlock(){
 
 
 
 
- const supported=state.profile==='native'&&chosenModel==='gr3x',toggle=$('version-unlock'),known=$('version-known');
+ const supported=false,toggle=$('version-unlock'),known=$('version-known');
  $('version-unlock-option').hidden=!supported;if(!supported){toggle.checked=false;known.checked=false;}
  toggle.disabled=saving||Boolean(activeBuildController)||!supported;$('version-unlock-fields').hidden=!toggle.checked;
  known.disabled=saving||Boolean(activeBuildController)||!supported||!toggle.checked;
@@ -211,6 +222,7 @@ function renderVersionUnlock(){
  $('version-error').textContent=error;return !error;
 }
 function renderLedger() {
+  (typeof visualStudio==='undefined'?null:visualStudio)?.refresh();
   powerImages?.setEnabled(state.features.has('powerImages'));
   powerImages?.setModel();
   const ledger = $('plan-ledger');
@@ -589,14 +601,18 @@ async function importSource(file,local=false) {
     showStep('features');showSettingsTab(state.profile==='native'?'library':'imaging');notice(report.proof?.identity===false?'固件结构核验通过，继续设置方案。':'官方固件核验通过，继续设置方案。');
   } catch (error) { notice(error.message, true); }
 }
-async function download(response, filename) {
-  const url = URL.createObjectURL(await response.blob());
+async function download(response, filename, verification, isCurrent=()=>true) {
+  if(!verification)throw Error('缺少下载安全校验记录，已停止下载。');
+  const blob=await response.blob();await verifyFirmwareBlob(blob,verification);
+  if(!isCurrent())throw Error('方案已变化或下载已取消，请重新保存。');
+  const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a'); anchor.href = url; anchor.download = filename; anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 async function prepare() {
   if (!state.projectId) return;
   let request;try{validateZoomControls($('studio-zoom-controls'));validateZoomControls($('native-editor'));if(state.profile==='native'){if(state.nativeConfig.zoom?.write&&!state.features.has('film'))throw Error('写入裁切焦距需要启用胶卷库');const configuration=prepareZoomConfigurationForBuild(state.nativeConfig,chosenModel);if(configuration.zoom.write){state.nativeConfig=configuration;nativeEditor?.setConfiguration(configuration);}}request=state.profile==='native'?{configuration:structuredClone(state.nativeConfig),film_library:state.features.has('film'),hdf_enabled:state.features.has('digitalHdf'),halation_enabled:state.features.has('halation'),border_enabled:state.features.has('border'),...(chosenModel!=='gr4'?{pure_isp_effects:state.features.has('ispEffects')}:{}),ab_enabled:state.features.has('abCompare'),extensions:nativeExtensions(),debug_mode:debugEnabled(),version_unlock:versionUnlockSnapshot(),...(chosenModel!=='gr4'?{power_images:selectedPowerImages()}:{})}:{selection:selection()};}catch(e){$('preflight-result').textContent=e.message;return;}
+  if(request.version_unlock?.enabled){state.preparation=null;state.preparationRequest=null;$('preflight-result').textContent='网页已禁止版本适配，请保持官方基线版本。';return;}
   activeBuildController?.abort();const controller=new AbortController();activeBuildController=controller;
   const revision=state.revision;state.preparation=null;renderLedger();
   $('prepare-build').disabled = true;
@@ -619,36 +635,44 @@ async function prepare() {
     $('preflight-result').textContent = error.name==='AbortError'?'已取消预检。':error.message;
   } finally { if(activeBuildController===controller){activeBuildController=null;renderLedger();} }
 }
-async function build() {
+async function build(camera=readCameraDeclaration()) {
   if (!state.preparation || !state.preparationRequest || !(riskAcceptedRevision===state.revision)) return;
+  const cameraCheck=checkCameraForInstall(state.source,camera,{requireProvenance:true});if(!cameraCheck.ready)throw Error(cameraCheck.message);
   activeBuildController?.abort();const controller=new AbortController();activeBuildController=controller;
   const revision=state.revision;
-  const exported={model:chosenModel,catalog:structuredClone(state.nativeCatalog),filmLibrary:state.profile==='native'&&state.features.has('film'),request:structuredClone(state.preparationRequest)};
+  const exported={model:chosenModel,sourceSha256:state.source.sha256,configurationSha256:state.preparation.configuration_sha256,catalog:structuredClone(state.nativeCatalog),filmLibrary:state.profile==='native'&&state.features.has('film'),request:structuredClone(state.preparationRequest)};
   $('build-firmware').disabled = true;
   $('cancel-build').hidden=false;
   renderLedger();
   $('build-result').className = 'build-result';
-  $('build-result').textContent = '正在构建、重编码并独立回读，约需半分钟…';
+  $('build-result').textContent = '正在提交安全构建任务…';
   try {
-    const response = await api(`/api/projects/${state.projectId}/${state.profile==='native'?'native-library':'edit'}/build`, {
+    const request={...state.preparationRequest,camera,accepted_configuration_sha256:state.preparation.configuration_sha256};
+    const response = state.profile==='native'&&!gr4Workbench?await runFirmwareJob(api,state.projectId,request,{
+      signal:controller.signal,onProgress:job=>{
+        if(revision!==state.revision||activeBuildController!==controller)return;
+        $('build-result').textContent=job.state==='queued'?`正在排队，当前位置 ${job.position}。可取消，不影响其他用户。`:
+          job.phase==='verifying'?'首次生成完成，正在从源码完整重建并逐字节校验…':job.state==='ready'?'服务端严格校验通过，正在接收并校验下载文件…':'正在生成、重编码并独立回读固件…';
+      }}):await api(`/api/projects/${state.projectId}/${state.profile==='native'?'native-library':'edit'}/build`, {
       method: 'POST', signal:controller.signal, body: JSON.stringify({ ...state.preparationRequest,
-        accepted_configuration_sha256: state.preparation.configuration_sha256 }),
+        camera,accepted_configuration_sha256: state.preparation.configuration_sha256 }),
       headers: { 'Content-Type': 'application/json' },
     });
     if(revision!==state.revision||activeBuildController!==controller){notice('构建期间方案已变化，已放弃旧方案下载。请重新预检。',true);return;}
     let completedReceipt=null;
-    if(state.profile==='native'){
-      const encoded=response.headers.get('X-M10V-Native-Receipt');if(!encoded)throw Error('缺少构建校验记录');
+    {
+      const encoded=response.headers.get(state.profile==='native'?'X-M10V-Native-Receipt':'X-M10V-Build-Receipt');if(!encoded)throw Error('缺少构建校验记录');
       const receipt=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))));
       completedReceipt=receipt;
-      assertVersionUnlockReceipt(receipt.version_unlock,exported.request.version_unlock,exported.model);
+      if(state.profile==='native')assertVersionUnlockReceipt(receipt.version_unlock,exported.request.version_unlock,exported.model);
     }
     const filename=state.preparation.filename||(chosenModel==='gr4'?'fwdc248b.bin':chosenModel==='gr3x'?'fwdc243b.bin':'fwdc239b.bin');
     const firmwareBlob=await response.blob();
+    const verification={audit:readFirmwareSafety(response),sourceSha256:exported.sourceSha256,configurationSha256:exported.configurationSha256,model:exported.model,filename,receipt:completedReceipt};
     if(revision!==state.revision||activeBuildController!==controller){notice('方案已变化，已放弃旧方案下载，请重新保存。',true);return;}
-    await download(new Response(firmwareBlob),filename);
-    completion?.show({firmwareBlob,filename,model:exported.model,catalog:exported.catalog,filmLibrary:exported.filmLibrary,record:{receipt:completedReceipt,configuration:exported.request}});
-    $('build-result').textContent = '固件已生成并下载；服务端独立回读通过。'+(state.preparation.build_source?`输出基线：${state.preparation.build_source.model} · ${state.preparation.build_source.public_version}。`:'')+(state.preparation.debug_mode?'调试已开启：SD 卡根目录保存 M10VMN0/1.BIN、M10VCP0/1.BIN；复现后请复制日志。':'')+(state.source?.build_source?.update_compatibility?`本包更新版本 ${state.source.build_source.update_compatibility.package_version}。`:'')+'相机接受与成像仍需真机验证。'+(state.preparation.reset_required?'配方默认值需在对应影像控制详细设置内重置参数后生效。':'');
+    await download(new Response(firmwareBlob),filename,verification,()=>revision===state.revision&&activeBuildController===controller&&!controller.signal.aborted);
+    completion?.show({firmwareBlob,filename,verification,model:exported.model,catalog:exported.catalog,filmLibrary:exported.filmLibrary,record:{receipt:completedReceipt,safety:verification.audit,configuration:exported.request}});
+    $('build-result').textContent = '固件已下载：服务端完整重建逐字节一致，浏览器 SHA-256 核验通过。'+(state.preparation.build_source?`输出基线：${state.preparation.build_source.model} · ${state.preparation.build_source.public_version}。`:'')+'这些是文件检查，相机接受、启动与成像仍需真机验证。';
   } catch (error) {
     if(revision!==state.revision||activeBuildController!==controller)return;
     $('build-result').className = 'build-result error';
@@ -658,7 +682,8 @@ async function build() {
 function showSettingsTab(tab){
  cinematicEditor?.close();
  enterNativeSelection();
- settingsTab=tab;renderFeatures();const head=document.querySelector('.page[data-page="features"] .page-head');head.querySelector('h2').textContent=tab==='imaging'?'影像方案':'胶卷设置';head.querySelector('span').textContent=tab==='imaging'?'扩展功能默认关闭，按需开启。':'选择胶卷并调整参数。';const library=tab==='library';$('imaging-settings').hidden=library;$('native-editor').hidden=!library;
+ settingsTab=tab;renderFeatures();const head=document.querySelector('.page[data-page="features"] .page-head');head.querySelector('h2').textContent=tab==='imaging'?'影像工具':'胶卷工作台';head.querySelector('span').textContent=tab==='imaging'?'扩展功能默认关闭，按需开启。':'选择胶卷并调整参数。';const library=tab==='library';$('imaging-settings').hidden=library;$('native-editor').hidden=!library;
+ (typeof visualStudio==='undefined'?null:visualStudio)?.showView(tab);
  for(const name of ['imaging','library']){const b=$('tab-'+name);b.setAttribute('aria-selected',String(name===tab));b.tabIndex=name===tab?0:-1;}
 }
 $('tab-imaging').onclick=()=>showSettingsTab('imaging');$('tab-library').onclick=()=>showSettingsTab('library');
@@ -739,26 +764,34 @@ let firmwareDownloadAction='build';
 const firmwareSaveGate=createFirmwareSaveGate({
  dialog:$('firmware-disclaimer'),trigger:$('build-firmware'),cancel:$('disclaimer-cancel'),confirm:$('disclaimer-confirm'),
  canSave:()=>installConfirmation().ready,
- onOpen:()=>{for(const id of ['install-camera-model','install-camera-version'])$(id).value='';installConfirmation();},
+ onOpen:()=>{for(const id of ['install-camera-model','install-camera-version','install-camera-origin','install-camera-sha'])$(id).value='';$('install-camera-sha-field').hidden=true;installConfirmation();},
  readSnapshot:()=>({revision:state.revision,project:state.projectId,action:firmwareDownloadAction}),
  save:async accepted=>{
   if(saving||accepted.revision!==state.revision||accepted.project!==state.projectId)return;
-  saving=true;renderLedger();
+  saving=true;(typeof visualStudio==='undefined'?null:visualStudio)?.startBuild();renderLedger();
   try{
+   if(gr4Workbench){notice('GR IV 固件导出已暂停。',true);return;}
+   const camera=readCameraDeclaration();
    if(accepted.action==='backup'){
-    await download(await api(`/api/projects/${accepted.project}/backup`,{method:'POST',body:''}),gr4Workbench?'fwdc248b-original.bin':'m10v-gr3-official-backup.zip');
+    const response=await api(`/api/projects/${accepted.project}/backup`,{method:'POST',body:'',headers:{'X-M10V-Camera':btoa(JSON.stringify(camera))}});
+    const verification={audit:readFirmwareSafety(response),artifactKind:'official_backup',sourceSha256:state.source.sha256,configurationSha256:state.source.sha256,model:camera.model,filename:'m10v-gr3-backup.zip'};
+    await download(response,verification.filename,verification,()=>accepted.revision===state.revision&&accepted.project===state.projectId);
     notice('官方固件备份已下载；备份不代表可以降级或修复变砖。');return;
    }
-   const preparedRevision=await prepare();if(state.preparation&&preparedRevision===state.revision&&accepted.project===state.projectId){riskAcceptedRevision=preparedRevision;await build();}
+   const preparedRevision=await prepare();if(state.preparation&&preparedRevision===state.revision&&accepted.project===state.projectId){riskAcceptedRevision=preparedRevision;await build(camera);}
   }catch(error){notice(error.message,true);}
-  finally{riskAcceptedRevision=-1;saving=false;renderLedger();}
+  finally{riskAcceptedRevision=-1;saving=false;(typeof visualStudio==='undefined'?null:visualStudio)?.endBuild();renderLedger();}
  }
 });
+function readCameraDeclaration(){
+ return {model:$('install-camera-model').value,version:$('install-camera-version').value,origin:$('install-camera-origin').value,
+  installedSha256:($('install-camera-sha').value||'').trim().toLowerCase()};
+}
 function installConfirmation(){
- const result=checkCameraForInstall(state.source,{model:$('install-camera-model').value,version:$('install-camera-version').value});
+ const result=checkCameraForInstall(state.source,readCameraDeclaration(),{requireProvenance:true});
  $('install-camera-status').textContent=result.message;return result;
 }
-for(const id of ['install-camera-model','install-camera-version'])$(id).addEventListener('change',()=>{installConfirmation();firmwareSaveGate.refresh();});
+for(const id of ['install-camera-model','install-camera-version','install-camera-origin','install-camera-sha'])$(id).addEventListener(id==='install-camera-sha'?'input':'change',()=>{$('install-camera-sha-field').hidden=$('install-camera-origin').value!=='m10v-verified';installConfirmation();firmwareSaveGate.refresh();});
 function requestFirmwareDownload(action,trigger){
  firmwareDownloadAction=action;
  $('disclaimer-confirm').textContent=action==='backup'?'确认匹配，下载备份':'确认匹配，继续保存';
@@ -766,7 +799,8 @@ function requestFirmwareDownload(action,trigger){
  firmwareSaveGate.open(trigger);
 }
 $('build-firmware').addEventListener('click',()=>requestFirmwareDownload('build',$('build-firmware')));
-$('cancel-build').addEventListener('click',()=>{activeBuildController?.abort();$('build-result').textContent='已取消构建，后台处理与临时文件会随请求清理。';});
+$('cancel-build').addEventListener('click',()=>{activeBuildController?.abort();$('build-result').textContent='已请求取消当前任务；后台清理完成后会开始下一位的构建。';});
+window.addEventListener('pagehide',()=>activeBuildController?.abort());
 try {
   const [status, film, community, nativeCatalog, nativeMarkup] = await Promise.all([
     fetch('/api/status').then((r) => r.json()),
@@ -779,15 +813,16 @@ try {
   state.nativeCatalog=nativeCatalog.films;
   $('native-editor').innerHTML=gr4Workbench?nativeMarkup.replaceAll('GR III STREET · 2.10','GR IV · 1.11').replaceAll('/gr3/sd-library.html','/gr4/sd-library.html').replaceAll('fwdc239b.bin','fwdc248b.bin'):nativeMarkup;
   cinematicEditor=mountCinematicStudio($('native-editor'),{showImaging:()=>showSettingsTab('imaging'),addFilm:id=>nativeEditor.toggleFilm(id)});
-  nativeEditor=mountNativeLibrary($('native-editor'),{model:chosenModel,onInspect:(film,selected)=>cinematicEditor?.inspect(film,selected),showZoom:false,defaultZoomWrite:false,loadSaved:false,onEditStart:()=>editHistory.begin(),onEditCommit:()=>{editHistory.commit();updateHistoryButtons();},onChange:(configuration,meta={})=>{state.nativeConfig=configuration;if(!restoringHistory){state.profile='native';if(!meta.globalHdf&&!meta.globalZoom)state.features.add('film');if(configuration.hdf)state.features.add('digitalHdf');if(configuration.stamp||configuration.filmNameStamp)state.features.add('timestamp');if(meta.filmSelection)state.unresolvedSlots=[];if(meta.filmSlot!==undefined)state.unresolvedSlots=state.unresolvedSlots.filter(v=>v.slot!==meta.filmSlot);invalidate();}else invalidate(false);nativeEditor?.setUnresolved(state.unresolvedSlots);if(settingsTab==='imaging'){const focused=document.activeElement?.dataset?.sharedSlot;renderFeatures();if(focused!==undefined)document.querySelector(`[data-shared-slot="${focused}"]`)?.focus({preventScroll:true});}renderBuildSummary();}});
+  nativeEditor=mountNativeLibrary($('native-editor'),{model:chosenModel,onInspect:(film,selected)=>cinematicEditor?.inspect(film,selected,nativeEditor?.getConfiguration()?.slots.find(slot=>slot.film===film?.id)),showZoom:false,defaultZoomWrite:false,loadSaved:false,onEditStart:()=>editHistory.begin(),onEditCommit:()=>{editHistory.commit();updateHistoryButtons();},onChange:(configuration,meta={})=>{state.nativeConfig=configuration;if(!restoringHistory){state.profile='native';if(!meta.globalHdf&&!meta.globalZoom)state.features.add('film');if(configuration.hdf)state.features.add('digitalHdf');if(configuration.stamp||configuration.filmNameStamp)state.features.add('timestamp');if(meta.filmSelection)state.unresolvedSlots=[];if(meta.filmSlot!==undefined)state.unresolvedSlots=state.unresolvedSlots.filter(v=>v.slot!==meta.filmSlot);invalidate();}else invalidate(false);nativeEditor?.setUnresolved(state.unresolvedSlots);if(settingsTab==='imaging'){const focused=document.activeElement?.dataset?.sharedSlot;renderFeatures();if(focused!==undefined)document.querySelector(`[data-shared-slot="${focused}"]`)?.focus({preventScroll:true});}renderBuildSummary();}});
   state.nativeConfig=nativeEditor.getConfiguration();
   if(state.nativeConfig.stamp||state.nativeConfig.filmNameStamp)state.features.add('timestamp');
   if(state.nativeConfig.hdf)state.features.add('digitalHdf');
   state.films = film.looks; state.community = community;
   restoreDraft();showSettingsTab('library');
   renderFeatures();
+  if(typeof mountVisualStudio==='function'&&document.body?.classList?.contains?.('visual-v5'))visualStudio=mountVisualStudio({state,editor:nativeEditor,getModel:()=>chosenModel,importModel:async model=>{$('local-source-model').value=model;await importSource(null,true);},generate:()=>requestFirmwareDownload('build',$('generate-button')),showSettings:showSettingsTab,refreshFeatures:renderFeatures,isBusy:()=>saving||Boolean(activeBuildController)});
   if (!state.runtime&&state.profile==='custom') notice('构建组件尚未就绪，固件导出会被阻止。', true);
-} catch (error) { notice(`工作区载入失败：${error.message}`, true); }
+} catch (error) { notice(`工作区载入失败：${error.message}。请刷新后重试。`, true); }
 
 completion=mountBuildCompletion($('build-completion'),{api});
 $('debug-mode').addEventListener('change',()=>{debugMode=$('debug-mode').checked;invalidate(false);});

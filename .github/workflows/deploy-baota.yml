@@ -26,7 +26,7 @@ jobs:
         run: node scripts/check_changelog.mjs
       - name: Verify deployment controls
         run: |
-          node --test node/github-webhook.test.mjs node/server-deployment.test.mjs node/changelog.test.mjs node/firmware-release-policy.test.mjs
+          node --test node/github-webhook.test.mjs node/server-deployment.test.mjs node/changelog.test.mjs node/firmware-release-policy.test.mjs node/anniversary-downgrade-jobs.test.mjs node/downgrade-ui.test.mjs node/navigation.test.mjs
           python3 -m unittest tests.test_baota_publish tests.test_ssh_deploy tests.test_gr4_codec_memory vendor.gr4.tests.test_codec
       - name: Deploy verified Git bundle over restricted SSH
         env:
