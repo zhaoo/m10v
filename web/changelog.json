@@ -2,6 +2,21 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.04.2",
+      "date": "2026-11-04",
+      "title": "新增 GRemote 连接与无线装卷",
+      "changes": [
+        "GR III 2.10 影像工具新增「GRemote 连接」，默认关闭；开启后下载匹配的固件、SD 服务、胶卷库与独立配对文件。",
+        "GRemote 可读取十个胶卷槽位、装卷，并调整固件已启用的扩展设置；保留能力检查、写入回执和机身读回核对。",
+        "连接选项提供独立的「保留机内设置」，默认开启，保留有效存档中的胶卷和参数；关闭后应用网页选卷。",
+        "保留 GR III 2.10 / GR IIIx 1.60 精确来源与版本限制。IIIx 暂不支持 GRemote，连接开关置灰，普通生成行为保持不变。"
+      ],
+      "notice": "GR III 街拍版 2.10 的 RC2 经用户确认通过。IIIx 联动未适配；其他机型、固件和故障恢复不在本次验收范围。服务与配对须使用同一下载包，不自动刷机或开启 SD 脚本。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.04.1",
       "date": "2026-11-04",
       "title": "增加 GRemote 官网入口",
@@ -10,9 +25,9 @@
         "GRemote 官网同步上线新版 App 功能介绍、Android 1.2.0 下载与 M10V 入口。"
       ],
       "notice": "本次仅更新网站导流菜单与发布记录，不修改固件、胶卷配置或生成逻辑；新的 GRemote 固件连接开关仍在独立候选验证中。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "9ee1e389afa0ad1fbcdacedcb0a0961ea9e485d8",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/41675317518"
     },
     {
       "version": "2026.11.03.4",
