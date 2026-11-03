@@ -18,7 +18,11 @@ export function renderNavigation(pathname = '/') {
   const codes={gr3:'III',gr4:'IV',gr2:'II'};
   const modelLink=item=>`<a class="model-choice${item.active?' current':''}" href="${item.href}"><span class="model-choice-icon" aria-hidden="true">${codes[item.id]}<i></i></span><span class="model-choice-copy"><b>${item.label}</b><small>${descriptions[item.id]}</small></span><span class="model-choice-state">${item.active?'<span class="model-check" aria-hidden="true">✓</span>':item.id==='gr3'?'<span aria-hidden="true">↗</span>':'<small class="model-progress">进行中</small>'}</span></a>`;
   const workbench={href:current?.href||'/gr3/',label:'工作台',active:models.some(item=>item.active)};
-  return `<nav class="site-navigation" aria-label="主导航"><div class="navigation-primary">${link(workbench)}${link(items.find(item=>item.id==='sd'))}</div><details class="navigation-more"><summary aria-label="更多" title="更多"><span aria-hidden="true">•••</span><span class="navigation-more-label">更多</span></summary><div class="navigation-more-options">${items.slice(4).map(link).join('')}<a class="navigation-github" href="https://github.com/zhaoo/m10v" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目，新窗口打开">GitHub ↗</a><details class="model-menu"><summary aria-label="切换机型"><span class="model-summary-label">${current?.label||'选择机型'}</span><span class="model-chevron" aria-hidden="true"></span></summary><div class="model-menu-options"><div class="model-menu-heading"><span>相机工作台</span><span>RICOH GR</span></div>${models.map(modelLink).join('')}</div></details></div></details></nav>`;
+  return `<nav class="site-navigation" aria-label="主导航"><div class="navigation-primary">${link(workbench)}${link(items.find(item=>item.id==='sd'))}</div><details class="navigation-more"><summary aria-label="更多" title="更多"><span aria-hidden="true">•••</span><span class="navigation-more-label">更多</span></summary><div class="navigation-more-options">${items.slice(4).map(link).join('')}${gremoteLink}<a class="navigation-github" href="https://github.com/zhaoo/m10v" target="_blank" rel="noopener noreferrer" aria-label="GitHub 项目，新窗口打开">GitHub ↗</a><details class="model-menu"><summary aria-label="切换机型"><span class="model-summary-label">${current?.label||'选择机型'}</span><span class="model-chevron" aria-hidden="true"></span></summary><div class="model-menu-options"><div class="model-menu-heading"><span>相机工作台</span><span>RICOH GR</span></div>${models.map(modelLink).join('')}</div></details></div></details></nav>`;
+}
+const gremoteLink='<a href="https://gremote.izhaoo.com" target="_blank" rel="noopener noreferrer" aria-label="GRemote 网站，新窗口打开">GRemote ↗</a>';
+export function mountGRemoteLink(menu){
+ if(!menu.querySelector('a[href="https://gremote.izhaoo.com"]'))menu.insertAdjacentHTML('beforeend',gremoteLink);
 }
 export function mountNavigation() {
   if(document.body.classList.contains('visual-v5')){mountVisualNavigation();return;}
@@ -99,6 +103,7 @@ if (typeof document !== 'undefined') mountNavigation();
 function mountVisualNavigation(){
  const toggle=document.getElementById('compact-toggle'),menu=document.getElementById('compact-menu');
  if(!toggle||!menu)return;
+ mountGRemoteLink(menu);
  const close=()=>{menu.hidden=true;toggle.setAttribute('aria-expanded','false');};
  toggle.onclick=()=>{const open=menu.hidden;menu.hidden=!open;toggle.setAttribute('aria-expanded',String(open));};
  document.addEventListener('click',event=>{if(!event.target.closest('.nav-more'))close();});
