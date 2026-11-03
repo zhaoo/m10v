@@ -1,4 +1,5 @@
 import {sendFirmwareDownload} from './firmware-download.mjs';
+import {requireGRemotePackageDownload} from './gr3-gremote-package.mjs';
 import {createFirmwareBuildQueue} from './firmware-build-queue.mjs';
 import {checkWebBuild,verifyWebBackup,requireWebDownload} from './firmware-web-safety.mjs';
 import {prepareCheckedNative,readCheckedProject} from './firmware-checked-build.mjs';
@@ -139,6 +140,12 @@ export function createServer(store = new Store(path.join(root, 'data')),
       return sendFirmwareDownload(request,response,candidate,filename);
     };
     const sendJobResult=result=>{
+      if(result.audit?.schema==='m10v-gremote-delivery-safety/v1'){
+        const audit=requireGRemotePackageDownload(result.candidate,result.audit);
+        if(audit.filename!==result.filename)throw Error('GRemote 连接包文件名与校验记录不同。');
+        for(const [name,value] of Object.entries(result.headers||{}))response.setHeader(name,value);
+        return sendFirmwareDownload(request,response,result.candidate,result.filename);
+      }
       if(result.audit?.schema==='m10v-anniversary-downgrade-safety/v1'){
         const audit=requireAnniversaryDownload(result.candidate,result.audit);
         if(audit.filename!==result.filename)throw Error('降级套件文件名与校验记录不同。');

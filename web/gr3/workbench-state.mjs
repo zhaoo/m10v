@@ -1,20 +1,23 @@
 import {defaultConfiguration,normalizeConfiguration,migrateSimulationSelection,normalizeRawNr,migrateRetiredFilms} from './native-library-state.mjs';
 import {modelCapabilities} from './model-capabilities.mjs';
-export const extensionFeatures=['halation','digitalHdf','border','ispEffects','timestamp','aspect','level','negativeGrain','rawNr','abCompare','powerImages'];
+export const extensionFeatures=['halation','digitalHdf','border','ispEffects','timestamp','aspect','level','negativeGrain','rawNr','abCompare','powerImages','gremote'];
 export function updateWorkbenchFeature(selected,id,enabled,model='gr3'){
  const next=new Set(selected);
+ if(enabled&&id==='gremote'&&(!modelCapabilities(model).gremote||!next.has('film')))throw Error('GRemote 连接需要 GR III 2.10 胶卷库');
  if(enabled&&id==='ispEffects'){
   if(!modelCapabilities(model).ispEffects||!next.has('film'))throw Error('胶片效果菜单需要 GR III / IIIx 胶卷库');
   next.add('digitalHdf');next.add('border');
  }
  enabled?next.add(id):next.delete(id);
  if(!enabled&&['film','digitalHdf','border'].includes(id))next.delete('ispEffects');
+ if(!enabled&&id==='film')next.delete('gremote');
  return next;
 }
 // Old custom selections remain recoverable in a separate local-storage backup.
 export function normalizeWorkbenchDraft(draft={},catalog=[],current=defaultConfiguration(),model=draft.model||'gr3') {
  const hdfOnly=draft.profile==='native'&&draft.features?.includes('digitalHdf')&&!draft.features.includes('film');
  const selected=new Set(draft.features||[]);
+ if(!selected.has('film')||!modelCapabilities(model).gremote)selected.delete('gremote');
  // Restore FN capability once; preserve subsequent explicit opt-outs.
  if(draft.halationMenuSchema!==1&&!hdfOnly&&model!=='gr4')selected.add('halation');
  if(!selected.has('film')||!selected.has('digitalHdf')||!selected.has('border')||!modelCapabilities(model).ispEffects)selected.delete('ispEffects');

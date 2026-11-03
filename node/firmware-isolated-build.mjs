@@ -1,6 +1,7 @@
 import {Worker} from 'node:worker_threads';
 import {readCheckedProject} from './firmware-checked-build.mjs';
 import {checkWebBuild,acceptVerifiedWorkerResult} from './firmware-web-safety.mjs';
+import {createGRemotePackage} from './gr3-gremote-package.mjs';
 
 export function isolatedFirmwareJob(store,id,input,kind='native'){
  const request=structuredClone(input);
@@ -24,7 +25,13 @@ export function isolatedFirmwareJob(store,id,input,kind='native'){
    });
    signal.throwIfAborted();
    const candidate=Buffer.from(value.candidate.buffer,value.candidate.byteOffset,value.candidate.byteLength);
-   return acceptVerifiedWorkerResult(source,request.camera,{...value,candidate},request.accepted_configuration_sha256);
+   const verified=acceptVerifiedWorkerResult(source,request.camera,{...value,candidate},request.accepted_configuration_sha256);
+   if(kind==='native'&&request.gremote_enabled===true){
+    setPhase('verifying');
+    const packaged=await createGRemotePackage({...verified,receipt:{...value.receipt,safety:verified.audit}},{signal});
+    return {...packaged,headers:{...verified.headers,...packaged.headers}};
+   }
+   return verified;
   }finally{signal.removeEventListener('abort',cancel);await worker.terminate();}
  };
 }

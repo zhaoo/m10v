@@ -86,6 +86,71 @@ def _stack_audit(elf,path,linker,frames):
  if maximum>4096 or staging+4096>65536:raise ValueError(f'ARM scratch memory budget exceeded: stack={maximum}, static={staging}, allowance=4096, limit=65536')
  return maximum,staging
 
+def _embedded_owner_identity(rom,manifest):
+ """Read identities by source-pinned ELF constant symbols, never byte search.
+
+ The owner descriptor itself is created in camera RAM. Its initializer's three
+ named .rodata constants are located using the exact compiled object's section
+ layout. Matching the complete relocated object binds those locations and all
+ initializer references to the actual BIN, including the reported UI symbols.
+ """
+ if str(ROOT) not in os.sys.path:os.sys.path.insert(0,str(ROOT))
+ from scripts.build_gr3_m10v_library import FLAGS,link_object
+ from scripts.build_gr3_companion_owner import identity_flags
+ component=manifest['companion'];identity=component['identity']
+ flags=identity_flags(identity)
+ features=component.get('extensions',{}).get('features',{})
+ if set(features)!={'ab','hdf','border','isp','zoom','aspect'} or any(type(v)is not bool for v in features.values()):raise ValueError('runtime owner extension layout differs')
+ flags+=[f'-DM10V_COMPANION_EXT_{name.upper()}={int(features[name])}' for name in ['ab','hdf','border','isp','zoom','aspect']]
+ flags+=['-DM10V_COMPANION_RTOS_ONLY=1','-DM10V_LIVE_COLOR=1','-DM10V_APPENDED_SLOTS=1']
+ for name,digest in component.get('sources',{}).items():
+  if name.startswith('/') or '..' in Path(name).parts or _hash((ROOT/name).read_bytes())!=digest:raise ValueError('runtime owner source differs: '+name)
+ compiler=os.environ.get('M10V_LLVM_CLANG') or shutil.which('clang')
+ if not compiler:raise RuntimeError('Clang is required for embedded owner identity audit')
+ with tempfile.TemporaryDirectory(prefix='m10v-owner-identity-') as private:
+  private=Path(private);os.chmod(private,0o700);obj=private/'owner.o'
+  result=subprocess.run([compiler,*FLAGS,*flags,'-c',str(ROOT/'native/gr3/m10v_companion_owner.c'),'-o',str(obj)],capture_output=True)
+  if result.returncode:raise ValueError('runtime owner identity audit compilation failed')
+  elf=obj.read_bytes()
+ shoff=struct.unpack_from('<I',elf,32)[0];entsize,count=struct.unpack_from('<HH',elf,46)
+ if elf[:7]!=b'\x7fELF\x01\x01\x01' or entsize!=40 or shoff+entsize*count>len(elf):raise ValueError('invalid owner identity audit ELF')
+ sections=[struct.unpack_from('<10I',elf,shoff+i*entsize) for i in range(count)]
+ symbols={}
+ for row in sections:
+  if row[1]!=2:continue
+  strings_row=sections[row[6]];strings=elf[strings_row[4]:strings_row[4]+strings_row[5]]
+  for offset in range(row[4],row[4]+row[5],16):
+   name,value,size,info,other,section=struct.unpack_from('<IIIBBH',elf,offset)
+   label=strings[name:].split(b'\0',1)[0].decode('ascii');symbols[label]=(value,size,section,info&15)
+ first=symbols.get('m10v_companion_ui_storage_enter')
+ object_base=component.get('symbols',{}).get('m10v_companion_ui_storage_enter')
+ if not first or first[0]!=0 or first[3]!=2 or type(object_base)is not int:raise ValueError('runtime owner identity symbol layout differs')
+ linked,exports=link_object(elf,object_base,manifest.get('symbols',{}),prefix='m10v_companion_ui_')
+ base,length=component.get('base'),component.get('bytes')
+ if type(base)is not int or type(length)is not int or not 0<length<65536 or base%128 or object_base<base or object_base+len(linked)>base+length or base<manifest['base'] or base+length>manifest['base']+manifest['code_bytes']:raise ValueError('runtime owner identity bounds differ')
+ if any(component['symbols'].get(name)!=address or manifest.get('symbols',{}).get(name)!=address for name,address in exports.items()):raise ValueError('runtime owner identity symbol addresses differ')
+ # Mirror link_object's allocated section order/alignment; link_object has
+ # already rejected unsupported sections and relocation kinds.
+ names_row=sections[struct.unpack_from('<H',elf,50)[0]];names=elf[names_row[4]:names_row[4]+names_row[5]]
+ starts={};cursor=object_base
+ for index,row in enumerate(sections):
+  section_name=names[row[0]:].split(b'\0',1)[0].decode('ascii')
+  if row[2]&2 and row[5] and not section_name.startswith('.ARM.exidx'):
+   cursor=(cursor+row[8]-1)&~(row[8]-1);starts[index]=cursor;cursor+=row[5]
+ readback={}
+ for key,label in [('buildId','build'),('catalogHash','catalog'),('rendererHash','renderer')]:
+  symbol=symbols.get('.L__const.m10v_companion_ui_init.'+label)
+  if not symbol or symbol[1]!=32 or symbol[3]!=1 or symbol[2] not in starts:raise ValueError('runtime embedded identity constant is missing')
+  value,size,section,_=symbol;address=starts[section]+value
+  if value+size>sections[section][5] or address<object_base or address+32>object_base+len(linked):raise ValueError('runtime embedded identity constant bounds differ')
+  data=rom[address-0x53000000:address-0x53000000+32]
+  if len(data)!=32:raise ValueError('runtime embedded identity constant is truncated')
+  readback[key]=data.hex()
+ if readback!=identity:raise ValueError('runtime embedded companion identity differs from metadata')
+ actual=rom[object_base-0x53000000:object_base-0x53000000+len(linked)]
+ if actual!=linked:raise ValueError('runtime owner identity initializer differs from source and symbols')
+ return readback
+
 def _target_metadata(folder,catalog_hash,renderer_hash):
  folder=Path(folder);receipt=json.loads((folder/'M10V-build-receipt.json').read_text())
  name=receipt.get('filename')
@@ -103,6 +168,9 @@ def _target_metadata(folder,catalog_hash,renderer_hash):
  rom=subprocess.check_output(['node','--input-type=module','-e',command,str(binary)],cwd=ROOT)
  offset=manifest['base']-0x53000000
  if offset<0 or _hash(rom[offset:offset+manifest['code_bytes']])!=manifest['code_sha256']:raise ValueError('candidate runtime hash differs')
+ embedded=_embedded_owner_identity(rom,manifest)
+ if receipt.get('companion_identity')!=embedded:raise ValueError('runtime embedded identity differs from receipt')
+ identity=embedded
  anchors=[]
  for address in [0x5316fcf8,0x5319667c,0x5383c834,0x5383c870]:
   window=rom[address-0x53000000:address-0x53000000+16]

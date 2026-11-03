@@ -1,6 +1,7 @@
 import {mountVisualStudio} from './visual-studio.mjs';
 import {unwrapFirmwareDownload} from './firmware-download.mjs';
 import {readFirmwareSafety,verifyFirmwareBlob} from './firmware-verification.mjs';
+import {readGRemotePackageSafety,verifyGRemotePackageBlob} from './gremote-verification.mjs';
 import {runFirmwareJob} from './firmware-job-client.mjs';
 import {checkCameraForInstall} from './firmware-install-guide.mjs';
 import {mountCinematicStudio} from './cinematic-studio.mjs';
@@ -35,6 +36,7 @@ const nativeExtensions=()=>({aspect:state.features.has('aspect'),level:state.fea
 const debugEnabled=()=>debugMode&&state.profile==='native';
 const selectedPowerImages=()=>state.features.has('powerImages')&&chosenModel!=='gr4'?(powerImages?.getConfiguration()||{}):{};
 const ispEffectsAvailable=()=>modelCapabilities(chosenModel).ispEffects&&state.source?.proof?.identity!==false;
+const gremoteAvailable=()=>modelCapabilities(chosenModel).gremote&&state.source?.sha256==='d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4';
 
 const $ = (id) => document.getElementById(id);
 const powerImagesRoot=$('power-images');
@@ -65,6 +67,7 @@ const definitions = [
   ['level', '滑轨水平仪', '用横竖滑轨辅助调平。开启后在取景中显示水平仪，让底部与右侧圆点进入中央绿环即可。', '实时取景辅助'],
   ['abCompare', 'A/B 快切', '在两种影像风格间快速切换。开启后，在机内 MENU 或 ADJ 的影像控制中按 DISP，依次选 A、B；取景时短按 DISP 切换。', 'GR III / IIIx · 原厂风格与胶卷'],
   ['powerImages', '开关机画面', '替换相机开机或关机图片。开启后在下方上传图片、调整裁切并应用；未上传的画面保留原厂图片。', 'GR III / IIIx · 自定义图片'],
+  ['gremote', 'GRemote 连接', '通过 GRemote 读取、装入胶卷和调整已启用的扩展设置。下载后需安装包内匹配的 SD 服务，并导入个人配对文件。', 'GR III 2.10 · 默认关闭'],
 ];
 const initial = { features: new Set(), recipes: new Map(), projectId: '', source: null,
   token: '', preparation: null, activeStep: 'source', filmMode: 'ektar100', films: [],
@@ -274,7 +277,7 @@ function renderFeatures() {
   if(!modelCapabilities(chosenModel).ispEffects)target.querySelector('[data-feature="ispEffects"]')?.remove();
   for (const [index, [id, name, description, tag]] of definitions.filter(([id])=>id!=='ispEffects'||modelCapabilities(chosenModel).ispEffects).entries()) {
     const active = state.features.has(id);
-    const signature=JSON.stringify([chosenModel,active,state.features.has('film'),id==='ispEffects'?ispEffectsAvailable():null,id==='film'?[state.nativeConfig,state.nativeCatalog.length,state.unresolvedSlots]:id==='recipes'?[...state.recipes]:id==='presets'?[state.stockPresets,state.stockCapabilities.length]:id==='rawNr'?state.rawNr:id==='digitalHdf'?state.nativeConfig.hdf:id==='timestamp'?[state.nativeConfig.stamp,state.nativeConfig.format,state.nativeConfig.corner,state.nativeConfig.color,state.nativeConfig.filmNameStamp]:null]);
+    const signature=JSON.stringify([chosenModel,active,state.features.has('film'),id==='ispEffects'?ispEffectsAvailable():id==='gremote'?gremoteAvailable():null,id==='film'?[state.nativeConfig,state.nativeCatalog.length,state.unresolvedSlots]:id==='recipes'?[...state.recipes]:id==='presets'?[state.stockPresets,state.stockCapabilities.length]:id==='rawNr'?state.rawNr:id==='digitalHdf'?state.nativeConfig.hdf:id==='timestamp'?[state.nativeConfig.stamp,state.nativeConfig.format,state.nativeConfig.corner,state.nativeConfig.color,state.nativeConfig.filmNameStamp]:null]);
     const existing=target.querySelector(`[data-feature="${id}"]`);
     if(existing?.dataset.signature===signature)continue;
     const row = document.createElement('article');row.dataset.feature=id;row.dataset.signature=signature;
@@ -288,8 +291,9 @@ function renderFeatures() {
     button.type = 'button';
     button.setAttribute('aria-pressed',String(active));
     if(gr4Workbench&&id==='timestamp'&&state.profile!=='native'&&!active){button.disabled=true;button.textContent='在胶卷库设置';}
-    if(['timestamp','halation','border','abCompare','ispEffects'].includes(id)&&!state.features.has('film')&&!active){button.disabled=true;button.textContent='需启用胶卷库';}
+    if(['timestamp','halation','border','abCompare','ispEffects','gremote'].includes(id)&&!state.features.has('film')&&!active){button.disabled=true;button.textContent='需启用胶卷库';}
     if(id==='ispEffects'&&!ispEffectsAvailable()){button.disabled=true;button.textContent='需 GR III 2.10 / IIIx 1.60';}
+    if(id==='gremote'&&!gremoteAvailable()){button.disabled=true;button.textContent='仅支持 GR III 2.10';}
     if(['digitalHdf','halation','border','abCompare','powerImages'].includes(id)&&chosenModel==='gr4'){button.disabled=true;button.textContent='仅支持 GR III / IIIx';}
     button.setAttribute('aria-label',`${active?'关闭':'开启'}${name}`);
     button.dataset.imagingField='toggle-'+id;
@@ -311,7 +315,7 @@ function renderFeatures() {
       } else if (id === 'digitalHdf') {
         const levels=document.createElement('div');levels.className='hdf-levels';levels.setAttribute('role','group');levels.setAttribute('aria-label','HDF 模拟默认档位');
         ['关闭','弱','中','强'].forEach((label,value)=>{const b=textNode('button',label);b.type='button';b.dataset.imagingField='hdf-level-'+value;b.setAttribute('aria-pressed',String(state.nativeConfig.hdf===value));b.onclick=()=>nativeEditor.setHdf(value);levels.append(b);});
-        const filmToggle=textNode('button',state.features.has('film')?'关闭胶卷库，仅使用 HDF':'同时启用胶卷库','outline');filmToggle.type='button';filmToggle.onclick=()=>{if(state.features.has('film')){for(const id of ['film','halation','border','timestamp','abCompare','ispEffects'])state.features.delete(id);nativeEditor.setConfiguration({...state.nativeConfig,stamp:0,filmNameStamp:false,zoom:{...state.nativeConfig.zoom,write:false}},{globalHdf:true});}else{state.features.add('film');invalidate();}renderFeatures();};
+        const filmToggle=textNode('button',state.features.has('film')?'关闭胶卷库，仅使用 HDF':'同时启用胶卷库','outline');filmToggle.type='button';filmToggle.onclick=()=>{if(state.features.has('film')){for(const id of ['film','halation','border','timestamp','abCompare','ispEffects','gremote'])state.features.delete(id);nativeEditor.setConfiguration({...state.nativeConfig,stamp:0,filmNameStamp:false,zoom:{...state.nativeConfig.zoom,write:false}},{globalHdf:true});}else{state.features.add('film');invalidate();}renderFeatures();};
         detail.append(levels,filmToggle,textNode('p','这是固件初始档位。机内 HDF 菜单独立保存设置，换卷与重置胶卷不会改变它。'));
       } else if (id === 'ispEffects') detail.append(textNode('p','MENU → 设置 → 效果：漏光、颗粒和模糊分别设有开关与强度；同时保留 HDF 模拟和边框菜单及其已保存设置。关闭此项后，HDF 和边框功能仍按各自开关保留。'));
       else if (id === 'border') detail.append(textNode('p','机内效果菜单中选择关闭、拍立得或 135 胶卷边框。该开关只决定是否加入功能，安装后按需选择样式。'));
@@ -583,7 +587,7 @@ async function importSource(file,local=false) {
     $('build-model').textContent=`${report.model} · 输出基线 ${report.build_source?.public_version||report.public_version}`;
     document.title=`m10v · GR固件工作台 · ${report.model}`;
     document.querySelector('.hero .kicker').textContent=`${report.model} · ${report.public_version}`;
-    state.projectId = report.sha256; state.source = report;if(chosenModel==='gr4'||report.proof?.identity===false)state.features.delete('ispEffects');invalidate();
+    state.projectId = report.sha256; state.source = report;if(chosenModel==='gr4'||report.proof?.identity===false)state.features.delete('ispEffects');if(chosenModel!=='gr3')state.features.delete('gremote');invalidate();
     // Legacy recipe resources are not needed by the film-library workbench.
     renderFeatures();
 
@@ -603,7 +607,9 @@ async function importSource(file,local=false) {
 }
 async function download(response, filename, verification, isCurrent=()=>true) {
   if(!verification)throw Error('缺少下载安全校验记录，已停止下载。');
-  const blob=await response.blob();await verifyFirmwareBlob(blob,verification);
+  const blob=await response.blob();
+  if(verification.artifactKind==='gremote_connection_package')await verifyGRemotePackageBlob(blob,verification);
+  else await verifyFirmwareBlob(blob,verification);
   if(!isCurrent())throw Error('方案已变化或下载已取消，请重新保存。');
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a'); anchor.href = url; anchor.download = filename; anchor.click();
@@ -611,7 +617,7 @@ async function download(response, filename, verification, isCurrent=()=>true) {
 }
 async function prepare() {
   if (!state.projectId) return;
-  let request;try{validateZoomControls($('studio-zoom-controls'));validateZoomControls($('native-editor'));if(state.profile==='native'){if(state.nativeConfig.zoom?.write&&!state.features.has('film'))throw Error('写入裁切焦距需要启用胶卷库');const configuration=prepareZoomConfigurationForBuild(state.nativeConfig,chosenModel);if(configuration.zoom.write){state.nativeConfig=configuration;nativeEditor?.setConfiguration(configuration);}}request=state.profile==='native'?{configuration:structuredClone(state.nativeConfig),film_library:state.features.has('film'),hdf_enabled:state.features.has('digitalHdf'),halation_enabled:state.features.has('halation'),border_enabled:state.features.has('border'),...(chosenModel!=='gr4'?{pure_isp_effects:state.features.has('ispEffects')}:{}),ab_enabled:state.features.has('abCompare'),extensions:nativeExtensions(),debug_mode:debugEnabled(),version_unlock:versionUnlockSnapshot(),...(chosenModel!=='gr4'?{power_images:selectedPowerImages()}:{})}:{selection:selection()};}catch(e){$('preflight-result').textContent=e.message;return;}
+  let request;try{validateZoomControls($('studio-zoom-controls'));validateZoomControls($('native-editor'));if(state.profile==='native'){if(state.nativeConfig.zoom?.write&&!state.features.has('film'))throw Error('写入裁切焦距需要启用胶卷库');const configuration=prepareZoomConfigurationForBuild(state.nativeConfig,chosenModel);if(configuration.zoom.write){state.nativeConfig=configuration;nativeEditor?.setConfiguration(configuration);}}request=state.profile==='native'?{configuration:structuredClone(state.nativeConfig),film_library:state.features.has('film'),hdf_enabled:state.features.has('digitalHdf'),halation_enabled:state.features.has('halation'),border_enabled:state.features.has('border'),...(chosenModel!=='gr4'?{pure_isp_effects:state.features.has('ispEffects'),gremote_enabled:state.features.has('gremote')}:{}),ab_enabled:state.features.has('abCompare'),extensions:nativeExtensions(),debug_mode:debugEnabled(),version_unlock:versionUnlockSnapshot(),...(chosenModel!=='gr4'?{power_images:selectedPowerImages()}:{})}:{selection:selection()};}catch(e){$('preflight-result').textContent=e.message;return;}
   if(request.version_unlock?.enabled){state.preparation=null;state.preparationRequest=null;$('preflight-result').textContent='网页已禁止版本适配，请保持官方基线版本。';return;}
   activeBuildController?.abort();const controller=new AbortController();activeBuildController=controller;
   const revision=state.revision;state.preparation=null;renderLedger();
@@ -666,13 +672,18 @@ async function build(camera=readCameraDeclaration()) {
       completedReceipt=receipt;
       if(state.profile==='native')assertVersionUnlockReceipt(receipt.version_unlock,exported.request.version_unlock,exported.model);
     }
-    const filename=state.preparation.filename||(chosenModel==='gr4'?'fwdc248b.bin':chosenModel==='gr3x'?'fwdc243b.bin':'fwdc239b.bin');
+    const connectionPackage=exported.request.gremote_enabled===true;
+    const filename=connectionPackage?'m10v-gr3-gremote.zip':state.preparation.filename||(chosenModel==='gr4'?'fwdc248b.bin':chosenModel==='gr3x'?'fwdc243b.bin':'fwdc239b.bin');
     const firmwareBlob=await response.blob();
-    const verification={audit:readFirmwareSafety(response),sourceSha256:exported.sourceSha256,configurationSha256:exported.configurationSha256,model:exported.model,filename,receipt:completedReceipt};
+    const verification={audit:connectionPackage?readGRemotePackageSafety(response):readFirmwareSafety(response),sourceSha256:exported.sourceSha256,configurationSha256:exported.configurationSha256,model:exported.model,filename,receipt:completedReceipt,...(connectionPackage?{artifactKind:'gremote_connection_package'}:{})};
     if(revision!==state.revision||activeBuildController!==controller){notice('方案已变化，已放弃旧方案下载，请重新保存。',true);return;}
     await download(new Response(firmwareBlob),filename,verification,()=>revision===state.revision&&activeBuildController===controller&&!controller.signal.aborted);
-    completion?.show({firmwareBlob,filename,verification,model:exported.model,catalog:exported.catalog,filmLibrary:exported.filmLibrary,record:{receipt:completedReceipt,safety:verification.audit,configuration:exported.request}});
-    $('build-result').textContent = '固件已下载：服务端完整重建逐字节一致，浏览器 SHA-256 核验通过。'+(state.preparation.build_source?`输出基线：${state.preparation.build_source.model} · ${state.preparation.build_source.public_version}。`:'')+'这些是文件检查，相机接受、启动与成像仍需真机验证。';
+    if(connectionPackage){
+      $('build-result').textContent='GRemote 连接包已下载，包含固件、匹配的 SD 服务与私有配对文件。请先备份并阅读包内安装说明，不要公开分享；本包仍需真机验证。';
+    }else{
+      completion?.show({firmwareBlob,filename,verification,model:exported.model,catalog:exported.catalog,filmLibrary:exported.filmLibrary,record:{receipt:completedReceipt,safety:verification.audit,configuration:exported.request}});
+      $('build-result').textContent = '固件已下载：服务端完整重建逐字节一致，浏览器 SHA-256 核验通过。'+(state.preparation.build_source?`输出基线：${state.preparation.build_source.model} · ${state.preparation.build_source.public_version}。`:'')+'这些是文件检查，相机接受、启动与成像仍需真机验证。';
+    }
   } catch (error) {
     if(revision!==state.revision||activeBuildController!==controller)return;
     $('build-result').className = 'build-result error';

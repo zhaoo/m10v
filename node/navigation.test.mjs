@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {navigationItems,renderNavigation} from '../web/shared/navigation.js';
+import {navigationItems,renderNavigation,mountGRemoteLink} from '../web/shared/navigation.js';
 import {gr4WorkbenchHtml} from './gr4-native-routes.mjs';
 import {renderChangelog} from './changelog.mjs';
 test('all public locations use one ordered navigation and at most one current page',()=>{
@@ -54,4 +54,20 @@ test('only workbench and film library are primary; utilities and downgrade are c
  assert.doesNotMatch(html,/<details class="navigation-more" open/);
  for(const href of ['/gr3/downgrade.html','/guide/','/skills/','/changelog/','/support/','https://github.com/zhaoo/m10v'])assert.ok(html.slice(html.indexOf('<details class="navigation-more">')).includes(`href="${href}"`));
  assert.equal((html.match(/aria-current="page"/g)||[]).length,1);
+});
+
+test('public navigation links to GRemote exactly once with a safe external target',()=>{
+ for(const path of ['/','/gr3/','/gr4/','/guide/']){
+  const html=renderNavigation(path);
+  assert.equal((html.match(/href="https:\/\/gremote\.izhaoo\.com"/g)||[]).length,1);
+  assert.match(html,/<a[^>]*href="https:\/\/gremote\.izhaoo\.com"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>GRemote/);
+ }
+});
+
+test('visual compact menu mounts one GRemote link across repeated navigation initialization',()=>{
+ let html='';
+ const menu={querySelector:()=>html.includes('https://gremote.izhaoo.com')?{}:null,insertAdjacentHTML:(where,value)=>{assert.equal(where,'beforeend');html+=value;}};
+ mountGRemoteLink(menu);mountGRemoteLink(menu);
+ assert.equal((html.match(/href="https:\/\/gremote\.izhaoo\.com"/g)||[]).length,1);
+ assert.match(html,/target="_blank" rel="noopener noreferrer"/);
 });

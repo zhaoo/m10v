@@ -32,11 +32,12 @@ export function checkedFirmwareJob(store,id,input,kind='native'){
   signal.throwIfAborted();
   const {source,report}=await readCheckedProject(store,id);
   checkWebBuild(source,request.camera,request);
-  let once,plan,header;
+  let once,plan,header,runtimeManifest;
   if(kind==='native'){
    const checked=prepareCheckedNative(source,request);plan=checked.plan;header='X-M10V-Native-Receipt';
    once=async()=>{
     const native=await generateNative(source,request.configuration,checked.base.configuration_sha256,{...checked.options,signal});
+    if(checked.options.companion_identity)runtimeManifest=native.manifest;
     signal.throwIfAborted();
     const power=applyPowerImages(source,native.candidate,request.power_images),candidate=power.candidate;
     const receipt={...native.receipt,build_source:report.build_source,
@@ -66,6 +67,7 @@ export function checkedFirmwareJob(store,id,input,kind='native'){
    rebuild:async()=>(await once()).candidate,signal});
   const completeReceipt={...receipt,safety:audit};
   return {candidate:result.candidate,filename:plan.filename,audit,
+   ...(runtimeManifest?{runtimeManifest,receipt:completeReceipt}:{}),
    headers:{[header]:encoded(completeReceipt),'X-M10V-Build-Source':encoded(report.build_source)}};
  };
 }
