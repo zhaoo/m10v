@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.04.4",
+      "date": "2026-11-04",
+      "title": "修复 GRemote 开关置灰",
+      "changes": [
+        "GR III 可在官方固件来源核验完成前开启 GRemote 草稿配置；生成时继续核对精确官方 2.10 基线。",
+        "胶卷库关闭或机型不支持时，在开关旁说明原因。"
+      ],
+      "notice": "仅修正网页配置入口。使用上一版已真机验收的 GR III 2.10 固件及 SD 服务。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.04.3",
       "date": "2026-11-04",
       "title": "GRemote 热点自动连接",
@@ -11,9 +24,9 @@
         "支持装卷和调整已启用的扩展设置，保留回读核对。GR IIIx 1.60 继续支持普通固件生成。"
       ],
       "notice": "用户已确认 GR III 街拍版 2.10 候选实测通过。请同时更新匹配的固件和 SD 服务，使用 GRemote Android 1.2.1 或更新版本。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "5ddcfbb79240776eecf9097999e117da2b98262a",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/5ddcfbb79240776eecf9097999e117da2b98262a"
     },
     {
       "version": "2026.11.04.2",

@@ -139,6 +139,16 @@ test('studio saves preservation choice in drafts and restores it through undo',(
  context.restoreHistory('undo');assert.equal(state.gremotePreserveSettings,false);
 });
 
+test('GR III can configure GRemote before source import without enabling other firmware',()=>{
+ const studio=readFileSync(new URL('../web/gr3/studio.js',import.meta.url),'utf8');
+ const availability=studio.slice(studio.indexOf('const gremoteAvailable='),studio.indexOf('\n',studio.indexOf('const gremoteAvailable=')));
+ const check=vm.runInNewContext('(chosenModel,state)=>{'+availability+'return gremoteAvailable();}',{modelCapabilities});
+ assert.equal(check('gr3',{source:null}),true);
+ assert.equal(check('gr3',{source:{sha256:'d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4'}}),true);
+ assert.equal(check('gr3',{source:{sha256:'0'.repeat(64)}}),false);
+ for(const model of ['gr3x','gr4','gr2'])assert.equal(check(model,{source:null}),false);
+});
+
 test('active GRemote card exposes preservation checked by default and applies an explicit checkbox choice',()=>{
  const app=readFileSync(new URL('../web/gr3/studio.js',import.meta.url),'utf8'),elements=[];
  const node=tag=>{const value={tag,dataset:{},children:[],listeners:{},append(...children){this.children.push(...children);},setAttribute(){},addEventListener(name,fn){this.listeners[name]=fn;},querySelector:()=>null};elements.push(value);return value;};

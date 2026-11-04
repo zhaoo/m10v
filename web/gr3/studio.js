@@ -36,7 +36,7 @@ const nativeExtensions=()=>({aspect:state.features.has('aspect'),level:state.fea
 const debugEnabled=()=>debugMode&&state.profile==='native';
 const selectedPowerImages=()=>state.features.has('powerImages')&&chosenModel!=='gr4'?(powerImages?.getConfiguration()||{}):{};
 const ispEffectsAvailable=()=>modelCapabilities(chosenModel).ispEffects&&state.source?.proof?.identity!==false;
-const gremoteAvailable=()=>modelCapabilities(chosenModel).gremote&&state.source?.sha256==='d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4';
+const gremoteAvailable=()=>modelCapabilities(chosenModel).gremote&&(!state.source||state.source.sha256==='d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4');
 
 const $ = (id) => document.getElementById(id);
 const powerImagesRoot=$('power-images');
@@ -294,7 +294,12 @@ function renderFeatures() {
     if(gr4Workbench&&id==='timestamp'&&state.profile!=='native'&&!active){button.disabled=true;button.textContent='在胶卷库设置';}
     if(['timestamp','halation','border','abCompare','ispEffects','gremote'].includes(id)&&!state.features.has('film')&&!active){button.disabled=true;button.textContent='需启用胶卷库';}
     if(id==='ispEffects'&&!ispEffectsAvailable()){button.disabled=true;button.textContent='需 GR III 2.10 / IIIx 1.60';}
-    if(id==='gremote'&&!gremoteAvailable()){button.disabled=true;button.textContent='仅支持 GR III 2.10';}
+    if(id==='gremote'&&(!gremoteAvailable()||!state.features.has('film'))){
+      const reason=gremoteAvailable()?'先启用胶卷库，再开启 GRemote 连接。':'GRemote 连接仅支持 GR III 2.10。';
+      button.disabled=true;button.textContent=reason;
+      const hint=textNode('p',reason,'feature-note');hint.id='gremote-unavailable';
+      copy.append(hint);button.setAttribute('aria-describedby',hint.id);
+    }
     if(['digitalHdf','halation','border','abCompare','powerImages'].includes(id)&&chosenModel==='gr4'){button.disabled=true;button.textContent='仅支持 GR III / IIIx';}
     button.setAttribute('aria-label',`${active?'关闭':'开启'}${name}`);
     button.dataset.imagingField='toggle-'+id;
