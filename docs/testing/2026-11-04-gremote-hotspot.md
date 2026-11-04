@@ -12,3 +12,10 @@ Device acceptance
 An outstanding explicitly configured focal seed is still applied by the camera's native path. Automatic read-only initialization does not apply that seed. Until it is applied, the app may omit focal values while continuing to show other settings. The preserving upgrade candidate has no seed.
 
 Automatic access is scoped to the camera AP. Connected clients receive a boot-local HMAC credential. The phone recognizes the network-bound Ricoh HTTP API without a pre-enrolled camera certificate. Existing signed mutations and readback remain in use.
+
+The user reported that the paired candidate passed device testing. This acceptance
+covers the GR III Street Edition 2.10 candidate, ZIP SHA-256
+`c8eb6041f4d2d71f30f4a6d614c8f2064ff9688bc64f454b667d2b3f208dd825`,
+and Android APK SHA-256
+`8a8fc1f7614c271e6d172461f7d5fb5fda16738ad97ee10b0f10d4f206f07c46`.
+The feedback was qualitative. It does not establish iOS or GR IIIx device validation.

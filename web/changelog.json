@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.04.3",
+      "date": "2026-11-04",
+      "title": "GRemote 热点自动连接",
+      "changes": [
+        "GR III 2.10 开启「GRemote 连接」后，Android 版 GRemote 连上相机 Wi-Fi 即可自动建立会话，无需导入配对文件。",
+        "冷启动后自动准备焦距缓存。焦距暂未就绪时，其他机内设置仍可读取。",
+        "支持装卷和调整已启用的扩展设置，保留回读核对。GR IIIx 1.60 继续支持普通固件生成。"
+      ],
+      "notice": "用户已确认 GR III 街拍版 2.10 候选实测通过。请同时更新匹配的固件和 SD 服务，使用 GRemote Android 1.2.1 或更新版本。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.04.2",
       "date": "2026-11-04",
       "title": "新增 GRemote 连接与无线装卷",
@@ -12,9 +26,9 @@
         "保留 GR III 2.10 / GR IIIx 1.60 精确来源与版本限制。IIIx 暂不支持 GRemote，连接开关置灰，普通生成行为保持不变。"
       ],
       "notice": "GR III 街拍版 2.10 的 RC2 经用户确认通过。IIIx 联动未适配；其他机型、固件和故障恢复不在本次验收范围。服务与配对须使用同一下载包，不自动刷机或开启 SD 脚本。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "c324c9d7cec789bd95f69a9d77c2065326505445",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/c324c9d7cec789bd95f69a9d77c2065326505445"
     },
     {
       "version": "2026.11.04.1",
