@@ -49,7 +49,7 @@ export async function auditFlashInputs({source,candidate,receipt,expectedSha256,
    film_library:receipt.film_library_enabled!==false,hdf_enabled:!!receipt.digital_hdf,
    live_color:receipt.live_color,appended_slots:!!receipt.appended_slots,
    halation_enabled:receipt.halation_enabled,border_enabled:receipt.border_enabled,
-   ab_enabled:receipt.ab_enabled,debug_mode:receipt.debug_mode,pure_isp_effects:receipt.pure_isp_effects===true};
+   ab_enabled:receipt.ab_enabled,debug_mode:receipt.debug_mode,adj_exit_trace:receipt.debug_log?.adj_exit_trace??false,pure_isp_effects:receipt.pure_isp_effects===true};
   const plan=prepareNative(source,receipt.configuration,options);
   need(plan.configuration_sha256===receipt.configuration_sha256&&
    plan.runtime_source_sha256===receipt.runtime_source_sha256&&

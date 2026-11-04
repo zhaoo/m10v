@@ -355,6 +355,7 @@ u32 m10v_aspect_live_icon(u32 owner,u32 ratio) {
     case 0: return 257;
     case 3: return 256;
     case 1: return 339;
+    case 2: return 337;
     case 4: return m10v_aspect_icon_record[1];
     case 5: return m10v_aspect_icon_record[2];
 #if M10V_HALF_FRAME
@@ -362,4 +363,15 @@ u32 m10v_aspect_live_icon(u32 owner,u32 ratio) {
 #endif
     default: return 0;
     }
+}
+
+/* ADJ has its own native list and immediate property setter. Use the MENU
+ * order, and keep the two stock rows when private artwork is unavailable. */
+u32 m10v_aspect_adj_count(u32 owner) {
+    if(!owner || BYTE(owner,0x270)) return 2;
+    if(!m10v_aspect_icon_record[1] || !m10v_aspect_icon_record[2]) return 2;
+#if M10V_HALF_FRAME
+    if(!m10v_aspect_half_record[2]) return m10v_aspect_count()-1;
+#endif
+    return m10v_aspect_count();
 }

@@ -13,4 +13,4 @@ const cameraCatalog={schemaVersion:1,rendererHash:sdFilmRecord(33).subarray(8448
  approximation:f.approximation??false,
 }))};
 const gremoteCameraMetadata=Object.freeze({catalogHash:sha256(cameraCatalog),rendererHash:cameraCatalog.rendererHash});
-process.stdout.write(JSON.stringify(gremoteCameraMetadata));
+process.stdout.write(JSON.stringify(process.argv.includes('--catalog')?{...cameraCatalog,hash:gremoteCameraMetadata.catalogHash}:gremoteCameraMetadata));

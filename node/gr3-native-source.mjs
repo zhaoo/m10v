@@ -22,6 +22,7 @@ function dependencies(source,report){
 }
 export function inspectNativeSource(source){
   const report=inspectFirmwareImport(source),model=report.model==='GR IIIx'?'gr3x':'gr3';
+  if(model==='gr3'&&report.public_version==='2.20')throw Error('GR III 2.20 的 M10V 固件构建已永久停用。');
   if(!references.has(model)){
     const file=model==='gr3x'?'fwdc243b-gr3x-official.bin':'fwdc239b-gr3-official.bin';
     const bytes=readFileSync(new URL('../bin/'+file,import.meta.url));

@@ -22,7 +22,9 @@ test('pure ISP opt-in preserves default plan and defaults, binds distinct finger
  const previewOff=prepareNative(source,configuration,{...options,pure_isp_effects:true,live_color:false});
  assert.notEqual(pure.configuration_sha256,previewOff.configuration_sha256);
  assert.equal(pure.configuration.hdf,0);assert.deepEqual(pure.configuration,normal.configuration);
- assert.deepEqual(pure.stock_detail,normal.stock_detail);
+ assert.equal(pure.stock_detail.effect_scope,'per-film');
+ assert.equal(normal.stock_detail.effect_scope,null);
+ assert.deepEqual(pure.stock_detail.ids.filter(id=>!normal.stock_detail.ids.includes(id)),[23,24,25,26]);
  for(const feature of ['ispLightLeak','ispGrain','ispBlur'])assert.ok(pure.features.includes(feature));
  assert.equal(pure.camera_tested,false);
  const x=await readNativeOfficial('gr3x');assert.equal(prepareNative(x,configuration,{...options,pure_isp_effects:true}).camera_model,'gr3x');
@@ -60,7 +62,7 @@ test('trusted runtime modulation bytes and closed patch inventory survive readba
   const base=0x543ff000,runtime=Buffer.concat([Buffer.alloc(4096),raw]);
   const branch=(at,link)=>((link?0xeb000000:0xea000000)|(((base-at-8)>>2)&0xffffff))>>>0;
   const patches=[[0x53771620,0xe51b12d4,false],[0x5367adac,0xe50be650,false],[0x5367ae14,0xeb003ec4,true],[0x5367b404,0xeb03c641,true],[0x5367b410,0xeb003c3e,true],[0x5367b41c,0xeb03c308,true],[0x535033e8,0xeb05f673,true]].map(([address,expected,link])=>({address,expected,replacement:branch(address,link)}));
-  const manifest={base,camera_model:'gr3',film_library_enabled:true,hdf_enabled:true,border:{enabled:true},capture_lifecycle:{snapshot:{live_color:true},native_grain:{query_entry:base}},flags:['-DM10V_PURE_ISP_EFFECTS=1','-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778'],pure_isp_effects:{enabled:true,recipe_bytes:0x57d8,menu_resource_ids:Array.from({length:23},(_,i)=>1163+i),runtime_assets:{base:0x54400000,bytes:raw.length,sha256:assets.blob_sha256,manifest:assets},patches}};
+  const manifest={base,camera_model:'gr3',film_library_enabled:true,hdf_enabled:true,border:{enabled:true},capture_lifecycle:{snapshot:{live_color:true},native_grain:{query_entry:base}},flags:['-DM10V_PURE_ISP_EFFECTS=1','-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778'],pure_isp_effects:{enabled:true,scope:'per-film',recipe_bytes:0x57d8,menu_resource_ids:Array.from({length:23},(_,i)=>1163+i),runtime_assets:{base:0x54400000,bytes:raw.length,sha256:assets.blob_sha256,manifest:assets},patches}};
   assert.equal(pureIspEffectPatches(runtime,manifest).length,7);
   const original=patches[0].replacement;patches[0].replacement=branch(patches[0].address,true);
   assert.throws(()=>pureIspEffectPatches(runtime,manifest),/branch kind/);patches[0].replacement=original;
@@ -104,7 +106,7 @@ from scripts.build_gr3_isp_recipe_color import build
 from scripts.build_gr3_native_grain_hooks import build as build_grain
 import sys,json
 p=Path(sys.argv[1]);r=Path('builds/gr3-pure-isp-feasibility-20261031/gr3-official-rtos.bin').read_bytes()
-names=('m10v_library_valid','m10v_library_tables','m10v_camera_library_preview','m10v_camera_library_custom_profile','m10v_camera_library_mutation_busy','m10v_hdf_reserve','m10v_hdf_task_snapshot','m10v_hdf_settings','m10v_hdf_done','m10v_isp_effects_shot_freeze','m10v_isp_effects_shot_reserve','m10v_isp_effects_shot_read','m10v_isp_effects_pipeline_settings','m10v_isp_effects_pipeline_workspace','m10v_isp_effects_pipeline_execute')
+names=('m10v_library_valid','m10v_library_tables','m10v_camera_library_preview','m10v_camera_library_custom_profile','m10v_camera_library_mutation_busy','m10v_c41_native_data','m10v_hdf_reserve','m10v_hdf_task_snapshot','m10v_hdf_settings','m10v_hdf_done','m10v_isp_effects_shot_freeze','m10v_isp_effects_shot_reserve','m10v_isp_effects_shot_read','m10v_isp_effects_pipeline_settings','m10v_isp_effects_pipeline_workspace','m10v_isp_effects_pipeline_execute')
 exports={name:0x54110000+i*4 for i,name in enumerate(names)}
 owner={'storage':{'color_offset':0x4a08,'color_bytes':1796,'extended_recipe_bytes':0x57d8,'stamp_offset':0x5140,'stamp_bytes':16},'patches':[{'address':0x53523e0c}]}
 code,manifest=build(p,r,exports,owner,base=0x54180000,observer=False,producer_snapshot=True,native_color=True,native_grain=True,shared_hdf=True,pure_isp_effects=True)

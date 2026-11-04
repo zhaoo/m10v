@@ -38,6 +38,7 @@ _Static_assert(sizeof(m10v_settings_controller)<=M10V_SETTINGS_CONTROLLER_BYTES,
 #define M10V_SETTINGS_NAME_ROUTE 0x0200f103u
 #define M10V_SETTINGS_AB_ROUTE 0x0200f104u
 #define M10V_SETTINGS_ZOOM_ROUTE 0x0200f105u
+#define M10V_SETTINGS_ADJ_ROUTE 0x0200f107u
 _Static_assert(sizeof(m10v_zoom_menu)<=sizeof(m10v_settings),"zoom state capacity");
 uint32_t m10v_settings_controller_owner_size(void);
 uint32_t m10v_settings_controller_top_ctor(uint32_t owner);

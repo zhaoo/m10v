@@ -9,11 +9,19 @@
 #include "m10v_tone.h"
 #include <stddef.h>
 #include "m10v_custom_isp.h"
+#if M10V_PURE_ISP_EFFECTS
+#include "m10v_isp_effects_camera.h"
+#endif
 
 typedef uint32_t (*manager_fn)(void);
 typedef int (*read_fn)(uint32_t, const char *, uint32_t, void *);
 typedef int (*write_fn)(uint32_t, const char *, uint32_t, const void *);
+#if M10V_PURE_ISP_EFFECTS
+static const char state_names[2][12] = {"M10V7A.bin", "M10V7B.bin"};
+static const char pre_effects_names[2][12] = {"M10V6A.bin", "M10V6B.bin"};
+#else
 static const char state_names[2][12] = {"M10V6A.bin", "M10V6B.bin"};
+#endif
 
 static int ram(const void *ptr, uint32_t size) {
     uintptr_t p = (uintptr_t)ptr;
@@ -334,12 +342,20 @@ static int load_legacy_library(legacy_state *state) {
     }
     return M10V_LIBRARY_OK;
 }
+static int read_library_pair(uint32_t fs,const char names[2][12],m10v_library_state *state){
+ m10v_library_state candidates[2];int good[2]={0,0};
+ for(uint32_t k=0;k<2;k++){for(uint32_t i=0;i<sizeof(*state);i++)((uint8_t *)&candidates[k])[i]=0;good[k]=((read_fn)0x53825648u)(fs,names[k],sizeof(*state),&candidates[k])&&m10v_library_valid(&candidates[k]);}
+ if(!good[0]&&!good[1])return 0;
+ uint32_t selected=!good[0]||(good[1]&&candidates[1].sequence>candidates[0].sequence);
+ copy(state,&candidates[selected]);return 1;
+}
 static int load_library(m10v_library_state *state){
  if(!ram(state,sizeof(*state)))return M10V_LIBRARY_INVALID;
  uint32_t fs=filesystem();if(!fs)return M10V_LIBRARY_INVALID;
- m10v_library_state candidates[2];int good[2]={0,0};
- for(uint32_t k=0;k<2;k++){for(uint32_t i=0;i<sizeof(*state);i++)((uint8_t *)&candidates[k])[i]=0;good[k]=((read_fn)0x53825648u)(fs,state_names[k],sizeof(*state),&candidates[k])&&m10v_library_valid(&candidates[k]);}
- if(good[0]||good[1]){uint32_t selected=!good[0]||(good[1]&&candidates[1].sequence>candidates[0].sequence);copy(state,&candidates[selected]);return 0;}
+ if(read_library_pair(fs,state_names,state))return 0;
+#if M10V_PURE_ISP_EFFECTS
+ if(read_library_pair(fs,pre_effects_names,state))return 0;
+#endif
  legacy_state old;int result=load_legacy_library(&old);if(result<0)return result;expand_legacy(state,&old);return result==0?4:result;
 }
 int m10v_camera_library_load(m10v_library_state *state){
@@ -468,6 +484,29 @@ int m10v_camera_library_reconcile_legacy_selection(uint32_t model){
   state.reserved&=1u;state.sequence++;state.crc=state_crc(&state,offsetof(m10v_library_state,crc));
   if(store((void *)(uintptr_t)fs,&state))return M10V_LIBRARY_STORE_FAILED;
  }
+#if M10V_PURE_ISP_EFFECTS
+ uint32_t pending=0;
+ for(uint32_t i=0;i<m10v_library_count(&state);i++)pending|=!m10v_film_fx_tagged(&state.effects[i]);
+ if(pending){
+  m10v_isp_effects_settings legacy;
+  for(uint32_t i=0;i<sizeof(legacy);i++)((volatile uint8_t *)&legacy)[i]=0;
+  if(provenance!=1&&m10v_isp_effects_camera_read_legacy(fs,&legacy)<0)return M10V_LIBRARY_STORE_FAILED;
+  for(uint32_t i=0;i<m10v_library_count(&state);i++){
+   m10v_film_effects *e=&state.effects[i];
+   if(m10v_film_fx_tagged(e))continue;
+   uint32_t grain=state.slots[i].grain,size=grain?grain-1u:0u;
+   if(!grain&&legacy.grain_mode>=M10V_ISP_GRAIN_WEAK){
+    state.slots[i].grain=(uint8_t)(legacy.grain_mode-1u);size=legacy.grain_size;
+   }
+   static const uint8_t position[]={0,2,4};
+   m10v_film_fx_set(e,size,legacy.leak_gain,position[legacy.leak_position],legacy.leak_spread,legacy.blur_gain);
+   e->leak_variation|=(uint8_t)(legacy.blur_range<<2);
+  }
+  if(state.sequence==0xffffffffu)return M10V_LIBRARY_INVALID;
+  state.sequence++;state.crc=state_crc(&state,offsetof(m10v_library_state,crc));
+  if(store((void *)(uintptr_t)fs,&state))return M10V_LIBRARY_STORE_FAILED;
+ }
+#endif
 #if M10V_PRESERVE_EXISTING
  /* Upgrade-only opt-in: a valid existing current journal owns the user's
   * selection even if an old compiled-seed receipt is absent or unreadable.
@@ -490,6 +529,25 @@ int m10v_camera_library_reconcile_legacy_selection(uint32_t model){
   if(selected<M10V_SLOT_COUNT&&state.slots[selected].film!=defaults.slots[selected].film){
    ((set_tone_fn)0x532c26c0u)(model,11u);
    if(((get_tone_fn)0x532bd6b4u)(model)!=11u)return M10V_LIBRARY_STORE_FAILED;
+  }
+  for(uint32_t i=0;i<M10V_SLOT_COUNT;i++){
+#if M10V_PURE_ISP_EFFECTS
+   uint32_t film=defaults.slots[i].film;
+   m10v_film_effects *e=&defaults.effects[i];
+   if(film&&!m10v_film_fx_tagged(e)){
+    uint32_t grain=defaults.slots[i].grain;
+    m10v_film_fx_set(e,grain?grain-1u:0,0,0,0,0);
+    for(uint32_t j=0;j<m10v_library_count(&state);j++){
+     if(state.slots[j].film!=film)continue;
+     const m10v_film_effects *prior=&state.effects[j];
+     if(!grain)defaults.slots[i].grain=state.slots[j].grain;
+     m10v_film_fx_set(e,grain?grain-1u:prior->grain_size,prior->leak_gain,
+         prior->leak_position,prior->leak_spread,prior->leak_variation&3u);
+     e->leak_variation=prior->leak_variation;
+     break;
+    }
+   }
+#endif
   }
   for(uint32_t i=0;i<M10V_SLOT_COUNT;i++){state.slots[i]=defaults.slots[i];state.effects[i]=defaults.effects[i];}
   state.reserved&=1u;state.sequence++;state.crc=state_crc(&state,offsetof(m10v_library_state,crc));

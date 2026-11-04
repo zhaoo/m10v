@@ -34,6 +34,26 @@ EVENTS.update(dict(enumerate([
     'live.pair.before','live.pair.after'],230)))
 EVENTS.update({270:'ab.entry.blocked-closing',271:'ab.a1.native-pass',
                272:'ab.close.pending',273:'ab.close.live-entered'})
+EVENTS.update({274:'guides.apply.before',275:'guides.apply.after',
+               276:'guides.restore.before',277:'guides.restore.after',
+               278:'guides.update.before',279:'guides.update.after',
+               280:'adj.route.before',281:'adj.route.after',282:'adj.enter.before',
+               283:'adj.enter.native.after',284:'adj.enter.extension.after',285:'adj.enter.stock-render.after',
+               286:'adj.enter.keys.before',287:'adj.enter.keys.after',
+               288:'adj.enter.aux-key.before',289:'adj.enter.aux-key.after',
+               290:'adj.enter.touch.before',291:'adj.enter.touch.after',
+               292:'adj.enter.canvas.before',293:'adj.enter.canvas.after',
+               294:'adj.enter.timer.before',295:'adj.enter.timer.after',
+               296:'border.save.before',297:'border.save.after',
+               298:'adj.canvas.area.before',299:'adj.canvas.rect.before',
+               300:'adj.canvas.layout.before',301:'adj.canvas.children.before',
+               302:'adj.canvas.invalidate.before',303:'adj.canvas.cleanup.before',
+               304:'adj.canvas.primary.before',305:'adj.canvas.fallback.before',
+               306:'adj.refresh.list.before',307:'adj.refresh.frame.before',
+               308:'adj.refresh.selection.before',309:'adj.refresh.title.before',
+               310:'adj.refresh.detail.before',311:'adj.refresh.footer.before',
+               312:'fn.leak-position.save.before',313:'fn.leak-position.save.after',
+               314:'fn.grain.save.before',315:'fn.grain.save.after'})
 EVENTS.update({102:'capture.rejected',121:'capture.image',125:'capture.request.identity',126:'capture.raw.lifetime',122:'capture.cpu-samples.before',
                123:'capture.cpu-samples.after',124:'capture.layout'})
 PROFILE_STAGES={1:'adapter.enter',2:'settings.before',3:'settings.after',4:'allocation.after',

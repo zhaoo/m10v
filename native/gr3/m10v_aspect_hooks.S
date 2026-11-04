@@ -481,3 +481,22 @@ m10v_aspect_wide_caption:
     .byte 5,1,0,0
     .word m10v_aspect_wide_caption+8
     .hword 49,54,58,57,0
+
+.text
+.p2align 2
+/* Preserve native ADJ preview and selection semantics, including the property
+ * update and return value. Reject a stale/out-of-range list index first. */
+.macro adj_ratio_row name, continuation
+entry \name
+    push {r0-r3,ip,lr}
+    bl m10v_aspect_adj_count
+    ldr r1,[sp,#4]
+    cmp r1,r0
+    pop {r0-r3,ip,lr}
+    movhs r0,#0
+    bxhs lr
+    mov ip,sp
+    jump \continuation
+.endm
+adj_ratio_row adj_apply, 0x531a0ddc
+adj_ratio_row adj_checked, 0x531a121c

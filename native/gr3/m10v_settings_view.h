@@ -22,6 +22,9 @@ enum {
 int m10v_settings_view_create(m10v_settings_view *);
 void m10v_settings_view_draw(m10v_settings_view *, const m10v_settings *, const m10v_settings_ops *);
 void m10v_settings_view_zoom(m10v_settings_view *,const m10v_zoom_menu *);
+#if M10V_ADJ_EXTRA_CAMERA
+void m10v_settings_view_adj(m10v_settings_view *,const m10v_settings *);
+#endif
 /* Caller must unregister the shown root before destruction. */
 void m10v_settings_view_destroy(m10v_settings_view *);
 #endif

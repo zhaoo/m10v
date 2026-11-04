@@ -79,7 +79,11 @@ static void ab_host_attach(m10v_settings_controller *p,uint32_t c){
  uint32_t list=ab_host_word(c,0x1f0);
  h->controller=c;h->rebuilding=1;
  ((fn3)0x533947f0u)(list,(uint32_t)(uintptr_t)&h->position,(uint32_t)(uintptr_t)&h->offset);
- h->mode=2;p->pending_source=0;ab_host_render(p);
+ h->mode=2;p->pending_source=0;
+#if M10V_ADJ_EXTRA_CAMERA
+ m10v_adj_extra_camera_suspend(c,1);
+#endif
+ ab_host_render(p);
 }
 static void ab_host_restore(m10v_settings_controller *p,uint32_t c){
  m10v_native_ab_host *h=ab_host(p);if(!ab_host_owned(h,c))return;
@@ -91,7 +95,11 @@ static void ab_host_restore(m10v_settings_controller *p,uint32_t c){
  M10V_EXIT_LOG(235,c,h->position,h->offset,ab_host_word(c,0x1f0));
  ((fn3)0x53395224u)(ab_host_word(c,0x1f0),h->position,h->offset);
  M10V_EXIT_LOG(236,c,0,0,0);
- h->controller=0;h->rebuilding=0;M10V_LOG(97,21,c,h->origin,0);
+ h->controller=0;h->rebuilding=0;
+#if M10V_ADJ_EXTRA_CAMERA
+ m10v_adj_extra_camera_suspend(c,0);
+#endif
+ M10V_LOG(97,21,c,h->origin,0);
 }
 #if M10V_AB_NATIVE_HOST
 static uint32_t ab_host_wrap(uint32_t value,uint32_t count){while(value>=count)value-=count;return value;}
@@ -182,7 +190,11 @@ uint32_t m10v_settings_controller_ab_adj_refresh(uint32_t c){
  if(render){
   if(ab_host_valid(c)){if(h->mode==1)ab_host_attach(p,c);else ab_host_render(p);}
   else ab_host_cancel(p,c);
- }M10V_EXIT_LOG(261,c,r,render,0);return r;
+ }
+#if M10V_ADJ_EXTRA_CAMERA
+ if(!render)m10v_adj_extra_camera_refresh(c);
+#endif
+ M10V_EXIT_LOG(261,c,r,render,0);return r;
 }
 uint32_t m10v_settings_controller_ab_adj_changed(uint32_t c){
  m10v_native_ab_host *h=ab_host(ab_owner());
@@ -200,6 +212,9 @@ uint32_t m10v_settings_controller_ab_adj_exit(uint32_t c){
  m10v_settings_controller *p=ab_owner();ab_host_restore(p,c);
  M10V_EXIT_LOG(264,c,0,0,0);
  uint32_t r=m10v_ab_adj_exit_original(c);
+#if M10V_ADJ_EXTRA_CAMERA
+ m10v_adj_extra_camera_retire(c,M10V_ADJ_RETIRE_DEFER);
+#endif
  M10V_EXIT_LOG(238,c,r,0,0);return r;
 }
 uint32_t m10v_settings_controller_ab_adj_destroy(uint32_t c){
@@ -207,6 +222,9 @@ uint32_t m10v_settings_controller_ab_adj_destroy(uint32_t c){
  m10v_settings_controller *p=ab_owner();m10v_native_ab_host *h=ab_host(p);
  if(p&&p->ab_exit_source==c)p->ab_exit_source=0;
  if(h&&h->controller==c){h->controller=0;h->mode=0;h->rebuilding=0;p->pending_source=0;}
+ #if M10V_ADJ_EXTRA_CAMERA
+ m10v_adj_extra_camera_retire(c,M10V_ADJ_RETIRE_DESTROY);
+ #endif
  uint32_t r=m10v_ab_adj_destroy_original(c);
  M10V_EXIT_LOG(266,c,r,0,0);return r;
 }

@@ -6,6 +6,8 @@ import {spawnSync} from 'node:child_process';
 import {decodeFrameMap,sum32} from './gr3-frames.mjs';
 import {inspectFirmwareImport} from './firmware.mjs';
 import {auditFlashInputs} from './gr3-flash-safety.mjs';
+import {prepareNative} from './gr3-native-library.mjs';
+import {defaultConfiguration} from '../web/gr3/native-library-state.mjs';
 
 const official=new URL('../bin/fwdc239b-gr3-official.bin',import.meta.url);
 const available=existsSync(official);
@@ -21,6 +23,15 @@ test('CLI reports absent input and invalid options as structured rejections',()=
   assert.equal(result.status,1);const report=JSON.parse(result.stdout);
   assert.equal(report.installation_allowed,false);assert.equal(report.status,'rejected');
  }
+});
+test('ADJ trace requires debug mode and has its own build identity',{skip:!available},()=>{
+ const source=readFileSync(official),config=defaultConfiguration('gr3');
+ assert.throws(()=>prepareNative(source,config,{adj_exit_trace:true}),/ADJ/);
+ const regular=prepareNative(source,config,{debug_mode:true,adj_exit_trace:false});
+ const trace=prepareNative(source,config,{debug_mode:true,adj_exit_trace:true});
+ assert.equal(trace.debug_log.adj_exit_trace,true);
+ assert.notEqual(trace.configuration_sha256,regular.configuration_sha256);
+ assert.notEqual(trace.debug_log.build_id,regular.debug_log.build_id);
 });
 test('a matching public version cannot authorize unknown or third party camera firmware',{skip:!available},async()=>{
  for(const origin of ['unknown','third-party',undefined]){

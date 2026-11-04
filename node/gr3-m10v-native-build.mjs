@@ -1,4 +1,4 @@
-import {companionOwnerBytes,companionNativeSources} from './gr3-companion-owner.mjs';
+import {companionNativeSources} from './gr3-companion-owner.mjs';
 import {FILM_DIRECTORY} from './gr3-film-directory.mjs';
 import {MAX_NATIVE_RTOS_GROWTH} from './gr3-native-budget.mjs';
 // M10V's original runtime is injected into the exact official GR III source.
@@ -7,7 +7,11 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { inspectNativeSource as inspectOfficial } from './gr3-native-source.mjs';
 import { decodeFrameMap, sum32 } from './gr3-frames.mjs';
-import {settingsSources,settingsPatches,checkSettings,abPatches} from './gr3-settings-menu.mjs';
+import {settingsSources,settingsPatches,checkSettings,abPatches,settingsOwnerBytes,adjExtraPatches} from './gr3-settings-menu.mjs';
+import {guidesPatches} from './gr3-guides.mjs';
+const rawDevelopmentSources=['scripts/build_gr3_raw_ingress.py','native/gr3/m10v_raw_ingress.c',
+ 'scripts/build_gr3_raw_menu.py','native/gr3/m10v_raw_menu.c'];
+const cameraExtensionSources=[...['m10v_guides.c','m10v_guides.h','m10v_guides_camera.c','m10v_guides_camera.h','m10v_guides_hooks.S','m10v_adj_extra.c','m10v_adj_extra.h','m10v_adj_extra_camera.c','m10v_adj_extra_camera.h'].map(n=>'native/gr3/'+n),'scripts/build_gr3_guides_hooks.py','node/gr3-guides.mjs'];
 import {zoomPatches} from './gr3-zoom.mjs';
 import {hdfSources,hdfPatches,hdfMenuPatches} from './gr3-digital-hdf.mjs';
 import {hdfAdjPatches} from './gr3-hdf-adj.mjs';
@@ -47,7 +51,7 @@ const ispHooks = [
  [0x536dd3e0,0xe5d7177c,1,0xe51401e0,'curve'],
  [0x535131c0,0xe5d1377c,3,0xe1a0000e,'local_process'],
 ];
-const sources = ['native/gr3/four-looks-reference.json','native/gr3/m10v_four_looks_native_profiles.h','native/gr3/m10v_four_looks.rgba','web/gr3/four-looks-luts.json','scripts/build_gr3_four_looks_reference.py','scripts/fit_gr3_four_looks_native.py','scripts/verify_gr3_four_looks_reference.py','node/gr3-sd-pre-four-looks-contract.json','native/gr3/m10v_aspect_config.h','native/gr3/m10v_half_frame_icon.rgba','native/gr3/half-frame-icon.json','scripts/generate_gr3_half_frame_icon.py','native/gr3/extra-films-reference.json','native/gr3/m10v_extra_films_native_profiles.h','native/gr3/m10v_extra_films.rgba','web/gr3/extra-films-luts.json','scripts/build_gr3_extra_films_reference.py','scripts/fit_gr3_extra_films_native.py','scripts/verify_gr3_extra_films_reference.py','native/gr3/m10v_c41_native_data.c','scripts/fit_gr3_c41_solver.py','node/gr3-sd-pre-five-c41-contract.json','native/gr3/c41-reference.json','native/gr3/m10v_c41_native_profiles.h','native/gr3/m10v_c41.rgba','web/gr3/c41-luts.json','scripts/build_gr3_c41_reference.py','scripts/fit_gr3_c41_native.py','scripts/verify_gr3_c41_reference.py','node/gr3-sd-pre-instax-contract.json','node/gr3-sd-pre-retired-anime-contract.json','node/gr3-sd-pre-c41-contract.json','native/gr3/m10v_anime.h','native/gr3/anime-e6-reference.json','native/gr3/m10v_anime_e6_native_profiles.h','native/gr3/m10v_anime_e6.rgba','native/gr3/m10v_anime_ui.rgba','native/gr3/anime-ui.json','native/gr3/anime-ui-raster.json','third_party/anime-ui-font/OFL.txt','web/gr3/anime-e6-luts.json','scripts/build_gr3_anime_e6_reference.py','scripts/fit_gr3_anime_e6_native.py','scripts/verify_gr3_anime_e6_reference.py','scripts/generate_m10v_anime_ui.py','node/gr3-sd-pre-anime-e6-contract.json','node/gr3-sd-pre-d76-mono-contract.json','native/gr3/m10v_aspect_icons.rgba','native/gr3/aspect-icons.json','scripts/generate_gr3_aspect_icons.py','native/gr3/film_d76_0.c','native/gr3/film_d76_1.c','native/gr3/film_d76_0_data.h','native/gr3/film_d76_1_data.h','native/gr3/m10v_d76.rgba','native/gr3/d76-reference.json','web/gr3/d76-luts.json','scripts/build_gr3_d76_reference.py','scripts/fit_gr3_d76_native.py','scripts/verify_gr3_d76_reference.py','native/gr3/m10v_d76_native_profiles.h','node/gr3-sd-pre-universal-halation-contract.json','node/gr3-sd-pre-d76-contract.json','native/gr3/m10v_spectral_native_profiles.h','native/gr3/m10v_film_directory.h','web/gr3/film-directory.json','node/gr3-film-directory.mjs','scripts/generate_m10v_directory.py','native/gr3/film_spectral_data.h','native/gr3/spectral-reference.json','web/gr3/spectral-luts.json','scripts/build_gr3_spectral_reference.py','scripts/fit_gr3_spectral_native.py','scripts/verify_gr3_spectral_reference.py','native/gr3/m10v_5213.rgba','docs/research/aerocolor-2460/official-medium-curves.json','node/gr3-sd-pre-aerocolor-contract.json','node/gr3-sd-pre-directory-contract.json','native/gr3/m10v_tone.h','native/gr3/m10v_pixel_world.h','native/gr3/m10v_pixel_world.rgba','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/m10v_charmera_ui.rgba','scripts/generate_m10v_charmera_ui.py','native/gr3/film_style_filters_0.c','native/gr3/film_style_filters_1.c','native/gr3/film_style_filters_0_data.h','native/gr3/film_style_filters_1_data.h','native/gr3/m10v_style_filters.rgba','native/gr3/style-filters-reference.json','web/gr3/style-filters-luts.json','scripts/build_gr3_style_filters_reference.py','scripts/fit_gr3_style_filters_native.py','scripts/verify_gr3_style_filters_reference.py','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/m10v_universal_halation.h','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
+const sources = ['native/gr3/four-looks-reference.json','native/gr3/m10v_four_looks_native_profiles.h','native/gr3/m10v_four_looks.rgba','web/gr3/four-looks-luts.json','scripts/build_gr3_four_looks_reference.py','scripts/fit_gr3_four_looks_native.py','scripts/verify_gr3_four_looks_reference.py','node/gr3-sd-pre-four-looks-contract.json','native/gr3/m10v_aspect_config.h','native/gr3/m10v_half_frame_icon.rgba','native/gr3/half-frame-icon.json','scripts/generate_gr3_half_frame_icon.py','native/gr3/extra-films-reference.json','native/gr3/m10v_extra_films_native_profiles.h','native/gr3/m10v_extra_films.rgba','web/gr3/extra-films-luts.json','scripts/build_gr3_extra_films_reference.py','scripts/fit_gr3_extra_films_native.py','scripts/verify_gr3_extra_films_reference.py','native/gr3/m10v_c41_native_data.c','scripts/fit_gr3_c41_solver.py','node/gr3-sd-pre-five-c41-contract.json','node/gr3-sd-pre-per-film-effects-contract.json','node/gr3-sd-per-film-rc1-contract.json','node/gr3-sd-pre-adj-defaults-contract.json','native/gr3/c41-reference.json','native/gr3/m10v_c41_native_profiles.h','native/gr3/m10v_c41.rgba','web/gr3/c41-luts.json','scripts/build_gr3_c41_reference.py','scripts/fit_gr3_c41_native.py','scripts/verify_gr3_c41_reference.py','node/gr3-sd-pre-instax-contract.json','node/gr3-sd-pre-retired-anime-contract.json','node/gr3-sd-pre-c41-contract.json','native/gr3/m10v_anime.h','native/gr3/anime-e6-reference.json','native/gr3/m10v_anime_e6_native_profiles.h','native/gr3/m10v_anime_e6.rgba','native/gr3/m10v_anime_ui.rgba','native/gr3/anime-ui.json','native/gr3/anime-ui-raster.json','third_party/anime-ui-font/OFL.txt','web/gr3/anime-e6-luts.json','scripts/build_gr3_anime_e6_reference.py','scripts/fit_gr3_anime_e6_native.py','scripts/verify_gr3_anime_e6_reference.py','scripts/generate_m10v_anime_ui.py','node/gr3-sd-pre-anime-e6-contract.json','node/gr3-sd-pre-d76-mono-contract.json','native/gr3/m10v_aspect_icons.rgba','native/gr3/aspect-icons.json','scripts/generate_gr3_aspect_icons.py','native/gr3/film_d76_0.c','native/gr3/film_d76_1.c','native/gr3/film_d76_0_data.h','native/gr3/film_d76_1_data.h','native/gr3/m10v_d76.rgba','native/gr3/d76-reference.json','web/gr3/d76-luts.json','scripts/build_gr3_d76_reference.py','scripts/fit_gr3_d76_native.py','scripts/verify_gr3_d76_reference.py','native/gr3/m10v_d76_native_profiles.h','node/gr3-sd-pre-universal-halation-contract.json','node/gr3-sd-pre-d76-contract.json','native/gr3/m10v_spectral_native_profiles.h','native/gr3/m10v_film_directory.h','web/gr3/film-directory.json','node/gr3-film-directory.mjs','scripts/generate_m10v_directory.py','native/gr3/film_spectral_data.h','native/gr3/spectral-reference.json','web/gr3/spectral-luts.json','scripts/build_gr3_spectral_reference.py','scripts/fit_gr3_spectral_native.py','scripts/verify_gr3_spectral_reference.py','native/gr3/m10v_5213.rgba','docs/research/aerocolor-2460/official-medium-curves.json','node/gr3-sd-pre-aerocolor-contract.json','node/gr3-sd-pre-directory-contract.json','native/gr3/m10v_tone.h','native/gr3/m10v_pixel_world.h','native/gr3/m10v_pixel_world.rgba','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/m10v_charmera_ui.rgba','scripts/generate_m10v_charmera_ui.py','native/gr3/film_style_filters_0.c','native/gr3/film_style_filters_1.c','native/gr3/film_style_filters_0_data.h','native/gr3/film_style_filters_1_data.h','native/gr3/m10v_style_filters.rgba','native/gr3/style-filters-reference.json','web/gr3/style-filters-luts.json','scripts/build_gr3_style_filters_reference.py','scripts/fit_gr3_style_filters_native.py','scripts/verify_gr3_style_filters_reference.py','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/m10v_universal_halation.h','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
   'native/gr3/m10v_library_camera.c','native/gr3/m10v_library_menu.c',
   'native/gr3/m10v_library_capture.c','native/gr3/m10v_debug.c','native/gr3/m10v_debug.h','native/gr3/m10v_capture_profile.h','scripts/build_gr3_m10v_library.py'];
 sources.push('native/gr3/m10v_film_color_candidates.h','native/gr3/isp-film-targets.json','scripts/build_gr3_isp_film_targets.py','native/gr3/m10v_spatial_accel.c','native/gr3/m10v_spatial_accel.h');
@@ -56,7 +60,7 @@ sources.push('native/gr3/m10v_file_trace.c','scripts/build_gr3_file_trace.py');
 const halfPairSources=[...halfPairIipSources,'native/gr3/m10v_half_pair.c','native/gr3/m10v_half_pair.h','native/gr3/m10v_half_pair_camera.c','native/gr3/m10v_half_pair_camera.h'];
 sources.push(...hdfSources);
 sources.push('node/gr3-sd-pre-oriented-stamp-contract.json');
-sources.push('native/gr3/m10v_film_identity.h','native/gr3/m10v_unknown_film.rgba','node/gr3-sd-pre-square-art-contract.json');
+sources.push('native/gr3/m10v_film_identity.h','native/gr3/m10v_recorded_film.h','native/gr3/m10v_unknown_film.rgba','node/gr3-sd-pre-square-art-contract.json');
 sources.push('native/gr3/m10v_custom_isp.h','native/gr3/m10v_isp_frame_color.c','native/gr3/m10v_isp_frame_color.h','native/gr3/m10v_isp_recipe_color.c','native/gr3/m10v_isp_recipe_color.h','scripts/build_gr3_isp_recipe_color.py','scripts/build_gr3_isp_color_hook.py');
 const textureSources=['native/gr3/m10v_texture_accel.c','native/gr3/m10v_texture_accel.h','scripts/build_gr3_texture_accel.py'];
 const nativeGrainSources=['scripts/build_gr3_native_grain_hooks.py'];
@@ -79,14 +83,14 @@ export const pureIspEffectSources=[
  'scripts/build_gr3_isp_effect_blur.py','scripts/build_gr3_isp_effect_granulation.py',
  'scripts/build_gr3_isp_effect_render.py','scripts/build_gr3_isp_effect_resize_status.py',
  'scripts/build_gr3_isp_effect_textures.py'];
-export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/gr3_target_relocations.py','node/gr3-native-target.mjs','node/gr3-220-native-target.json','node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
+export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/gr3_target_relocations.py','node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources,...cameraExtensionSources,...rawDevelopmentSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
 export function pureIspEffectPatches(runtime,m){
  const p=m.pure_isp_effects;
  need(m.flags?.includes('-DM10V_PURE_ISP_EFFECTS=1')===!!p?.enabled,'pure ISP compile flag differs');
  if(!p||p.enabled===false){need(!p?.patches?.length,'pure ISP disabled patches present');return [];}
  const fail=(v,s)=>need(v,'pure ISP: '+s);
  fail(p.enabled===true&&['gr3','gr3x'].includes(m.camera_model)&&m.film_library_enabled!==false&&m.hdf_enabled===true&&m.border?.enabled===true&&typeof m.capture_lifecycle?.snapshot?.live_color==='boolean','native dependencies differ');
- fail(p.recipe_bytes===0x57d8&&JSON.stringify(p.menu_resource_ids)===JSON.stringify(Array.from({length:23},(_,i)=>1163+i)),'recipe/menu identity differs');
+ fail(p.scope==='per-film'&&p.recipe_bytes===0x57d8&&JSON.stringify(p.menu_resource_ids)===JSON.stringify(Array.from({length:23},(_,i)=>1163+i)),'recipe/FN identity differs');
  fail(m.flags?.includes('-DM10V_PURE_ISP_EFFECTS=1')&&m.flags?.includes('-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778'),'compile ownership differs');
  const b=p.runtime_assets,a=b?.manifest;
  fail(Buffer.isBuffer(runtime)&&Number.isInteger(m.base)&&b?.base===0x54400000&&b.bytes===11206656&&b.sha256==='23dfbbfdd72c4a64cf2bc2556b2528df3be49c4c5dcbd501da4b1818093b1f5a','asset identity differs');
@@ -191,7 +195,7 @@ function checkRuntime(runtime, manifest) {
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');
   need(manifest.film_count === 107 && manifest.slots === 10 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
-  const expectedSources=[...new Set([...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[]),...(manifest.border?.enabled?borderSources:[]),...(manifest.half_pair?.enabled?halfPairSources:[]),...(manifest.pure_isp_effects?.enabled?pureIspEffectSources:[]),...(manifest.companion?companionNativeSources:[])])];
+  const expectedSources=[...new Set([...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.raw_development?rawDevelopmentSources:[]),...(manifest.adj_extra?cameraExtensionSources:[]),...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[]),...(manifest.border?.enabled?borderSources:[]),...(manifest.half_pair?.enabled?halfPairSources:[]),...(manifest.pure_isp_effects?.enabled?pureIspEffectSources:[]),...(manifest.companion?companionNativeSources:[])])];
   borderPatches(runtime,manifest);
   halfPairIipPatches(runtime,manifest);
   pureIspEffectPatches(runtime,manifest);
@@ -411,11 +415,18 @@ function checkRuntime(runtime, manifest) {
       need(runtime.readUInt32LE(icons.table-BASE+(878+i)*4)===d&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&pixel>=BASE&&pixel+6400<=BASE+runtime.length&&runtime.subarray(pixel-BASE,pixel-BASE+6400).equals(art.subarray(i*6400,(i+1)*6400)),'four ISP looks artwork differs');
     }
   }
-  const resourceCount=405; // Existing identities reserved; new C41 names 1186..1190.
+  const guideLabels=['黄金分割','黄金螺旋（左上）','黄金螺旋（右上）','黄金螺旋（左下）','黄金螺旋（右下）'];
+  const adjLabels=['ADJ','设置 6','设置 7','设置 8','设置 9','构图线','胶卷库','逐卷效果','画幅','HDF 模拟','左右调整 OK 保存'];
+  const resourceCount=405+(manifest.adj_extra?adjLabels.length:0);
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
-  if(manifest.pure_isp_effects?.enabled)need(JSON.stringify(manifest.resources.texts.slice(377,400))===JSON.stringify(JSON.parse(readFileSync(new URL('../native/gr3/m10v_isp_effects_resources.json',import.meta.url),'utf8'))),'pure ISP resource identity differs');
-  need(JSON.stringify(manifest.resources.texts.slice(400))===JSON.stringify(['Harman Phoenix 200','Kodak ColorPlus 200','Fujifilm Natura 1600','Lomo Redscale XR','Agfa Vista 200']),'five C41 resource identity differs');
+  if(manifest.pure_isp_effects?.enabled){
+   const captions=JSON.parse(readFileSync(new URL('../native/gr3/m10v_isp_effects_resources.json',import.meta.url),'utf8'));
+   if(manifest.camera_guides)captions.splice(18,5,...guideLabels);
+   need(JSON.stringify(manifest.resources.texts.slice(377,400))===JSON.stringify(captions),'pure ISP resource identity differs');
+  }
+  need(JSON.stringify(manifest.resources.texts.slice(400,405))===JSON.stringify(['Harman Phoenix 200','Kodak ColorPlus 200','Fujifilm Natura 1600','Lomo Redscale XR','Agfa Vista 200']),'five C41 resource identity differs');
+  if(manifest.adj_extra)need(JSON.stringify(manifest.resources.texts.slice(405))===JSON.stringify(adjLabels),'ADJ settings captions differ');
   for (let i=0;i<resourceCount;i++) {
     const at = manifest.resources.descriptors[i] - BASE, text = manifest.resources.texts[i];
     need(Number.isInteger(at) && at >= 0 && at + 8 < runtime.length && typeof text === 'string', 'native text pointer invalid');
@@ -440,17 +451,21 @@ function checkDetail(runtime,manifest,raw) {
  const d=manifest.detail,base=manifest.base;
  const grain=manifest.experimental_capture?.native_grain===true;
  const halo=manifest.universal_halation;
- const ids=[18,19,20,...(grain?[21]:[]),...(halo?[22]:[]),28,29];
- const fields=['Halation Gain','Halation Spread','Highlight Gate',...(grain?['Film Grain']:[]),...(halo?['Halation Mode']:[]),'RED Exposure','Charmera Color'];
+ const perFilm=manifest.pure_isp_effects?.enabled===true;
+ const ids=[18,19,20,...(grain?[21]:[]),...(halo?[22]:[]),...(perFilm?[23,24,25,26]:[]),28,29];
+ const fields=['Halation Gain','Halation Spread','Highlight Gate',...(grain?['Film Grain']:[]),...(halo?['Halation Mode']:[]),...(perFilm?['Light Leak','Light Leak Position','Light Leak Spread','Blur']:[]),'RED Exposure','Charmera Color'];
  need(d?.schema==='m10v-gr3-native-detail/v2'&&d.backend==='m10v_camera_library_detail'&&d.native_grain===grain&&
   JSON.stringify(d.ids)===JSON.stringify(ids)&&JSON.stringify(d.fields)===JSON.stringify(fields),'native detail contract differs');
  const read=(a,n)=>{need(Number.isInteger(a)&&a%4===0&&a>=base&&a+n<=base+runtime.length,'native detail address outside module');return runtime.subarray(a-base,a-base+n);};
  const captions=read(d.captions,120);
  const variants={halo:[18,19,20,...(grain?[21]:[])],common:grain?[21]:[],red:[...(grain?[21]:[]),28],charmera:[29],phoenix:[18,19,20,...(grain?[21]:[]),28],pixel:[]};
- if(halo)for(const name of Object.keys(variants))variants[name]=[22,18,19,20,...variants[name].filter(id=>![18,19,20].includes(id))];
+ if(halo)for(const name of ['common','red','charmera','pixel'])variants[name]=[22,18,19,20,...variants[name]];
+ if(perFilm)for(const [name,rows] of Object.entries(variants))
+  variants[name]=[...rows.filter(id=>id<21||id===22),21,23,24,25,26,...rows.filter(id=>id>=28)];
  need(d.universal_halation===halo,'native detail capability differs');
  need(d.tables===d.variant_tables?.halo&&JSON.stringify(d.variant_ids)===JSON.stringify(variants),"native detail variants differ");
  const expectedIds=[862,863,864,827,halo?1137:828,913,913,913,913,913,933,manifest.sd_library?1013:948];
+ if(perFilm){expectedIds[3]=1164;expectedIds.splice(5,4,1163,1167,1168,1165);}
  for(let i=0;i<expectedIds.length;i++)need(captions.readUInt16LE(72+i*4)===expectedIds[i]&&captions.readUInt16LE(74+i*4)===expectedIds[i],'native detail caption differs');
  for(const name of ['m10v_detail_table','m10v_detail_control','m10v_camera_library_detail'])read(manifest.symbols[name],4);
  for(const [name,template] of Object.entries(detailInstructions)){
@@ -477,7 +492,7 @@ function checkDetail(runtime,manifest,raw) {
     need(list.subarray(0,n*2).equals(raw.subarray(p-LOAD,p-LOAD+n*2))&&list.subarray(n*2).equals(suffix),'native detail list differs');
    }
   }
-  const maxima=[8,8,8,3,halo?2:3,2,8,5,8,1,2,3,3],dispatch=read(d.slider_dispatch,(ids.length*2+1)*4);
+  const maxima=[8,8,8,3,2,3,4,2,3,1,2,3,3],dispatch=read(d.slider_dispatch,(ids.length*2+1)*4);
   for(let i=0;i<ids.length;i++){
    const id=ids[i];
    need(dispatch.readUInt32LE(i*8)===(0xe35c0000|id)>>>0,'native detail slider selector differs');
@@ -485,7 +500,7 @@ function checkDetail(runtime,manifest,raw) {
   }
   need(dispatch.readUInt32LE(ids.length*8)===branch(d.slider_dispatch+ids.length*8,d.sliders[8]),'native detail slider fallback differs');
   need(JSON.stringify(d.charmera_colors?.names)==='["RED","YELLOW","BLUE","GRAY"]'&&JSON.stringify(d.charmera_colors.value_icons)===JSON.stringify([0,1,2,3].map(i=>(manifest.sd_library?756:750)+i))&&d.charmera_colors.scale_icon===(manifest.sd_library?760:754),'native Charmera enum differs');
-  for(const [maximum,target,color,anime] of [...[8,3,2,1].map(n=>[n,d.sliders[n],false]),[3,d.charmera_colors.slider,true,false]]){
+  for(const [maximum,target,color,anime] of [...[8,3,2,1,...(perFilm?[4]:[])].map(n=>[n,d.sliders[n],false]),[3,d.charmera_colors.slider,true,false]]){
    const start=0x531acfec,stop=0x531ad12c,code=read(target,stop-start+8),mapped=a=>target+a-start+(a>=0x531ad0b4?8:0);
    for(let a=start;a<stop;a+=4){
     const at=mapped(a);let word=raw.readUInt32LE(a-LOAD);
@@ -593,7 +608,7 @@ function lifecyclePatches(manifest,runtime){
   }
  }
  if(m.snapshot?.live_color){
-  need(manifest.sd_library&&manifest.settings_menu?.owner_bytes===companionOwnerBytes(manifest,0x613c),'preview requires owned parameter cache');
+  need(manifest.sd_library&&manifest.settings_menu?.owner_bytes===settingsOwnerBytes(manifest,0x613c),'preview requires owned parameter cache');
   const row=m.snapshot.patches.at(-1);need(row.address===0x53dbd954&&inRuntime(row.entry),'invalid Live Make entry');
   expected.push({address:0x53dbd954,expected:0x536ddecc,replacement:row.entry,name:'native Live Make color'});
   const at=row.entry,ex=m.snapshot.exports;
@@ -678,8 +693,139 @@ function appendedSlotPatches(runtime,manifest,raw) {
   const extra=[{address:0x53523984,expected:0xe3043270,replacement:movw(3,0x4280)},...[['pool_init',0x535239e4,branch(0x535239e4,0x5355e87c,true)],['checkout',0x53523e00,0xe5c12024],['return',0x53523a68,0xe5c32024]].map(([name,address,expected])=>({address,expected,replacement:branch(address,h[name])})),{address:0x53510830,expected:branch(0x53510830,0x5313fd80,true),replacement:branch(0x53510830,h.copy,true)},...[0x53608080,0x5361c0cc].map(address=>({address,expected:branch(address,0x535c780c,true),replacement:branch(address,h.writer,true)}))];
   patches.splice(patches.length-3,0,...extra);
  }
+ const label=playback.name;
+ need(label?.owner_offset===0x31c&&label.owner_bytes===0x320&&
+  JSON.stringify(label.rect)==='[240,280,460,20]','playback name layout differs');
+ for(const [action,stock,first] of [['create',0x5316cd28,true],['destroy',0x53177724,false],['refresh',0x53179ba0,true]]){
+  const entry=label[action],helper=manifest.symbols['m10v_menu_playback_name_'+action];
+  read(helper,4);
+  const body=read(entry,24);
+  const words=[0xe92d4010,0xe1a04000,branch(entry+8,first?stock:helper,true),
+   0xe1a00004,0xe8bd4010,branch(entry+20,first?helper:stock)];
+  need(words.every((word,i)=>body.readUInt32LE(i*4)===word),'playback name '+action+' instructions differ');
+ }
+ patches.push({address:0x53170884,expected:0xe3a00fc7,replacement:movw(0,0x320),name:'playback name owner'});
+ for(const [address,expected,action] of [[0x53178390,0xebffd264,'create'],[0x53177a8c,0xebffff24,'destroy'],[0x5317cb94,0xebfff401,'refresh']]){
+  patches.push({address,expected,replacement:branch(address,label[action],true),name:'playback name '+action});
+ }
  need(m.patches.length===patches.length&&patches.every((p,i)=>p.address===m.patches[i].address&&p.expected===m.patches[i].expected&&p.replacement===m.patches[i].replacement),'appended patch inventory differs');
  return patches;
+}
+function rawIngressPatches(runtime,manifest) {
+ const report=manifest.raw_development?.ingress;
+ if(!report)return [];
+ const playback=manifest.appended_slots?.playback;
+ const copy=playback?.identity_hooks?.copy;
+ const snapshot=manifest.symbols.m10v_isp_frame_raw_snapshot;
+ const official={
+  gr3:'8a4eafcad2716e0b21e9909264e1242e534f0e39e05cba82a53546ceb4070b67',
+  gr3x:'0f11b0d28bc67932d044c5d01bc0314844a756057c89984278c73a23449a24c6'
+ };
+ need(report.schema==='m10v-gr3-raw-ingress/v1'&&manifest.sd_library&&manifest.pure_isp_effects?.enabled&&
+  playback?.identity_enabled&&report.camera_model===manifest.camera_model&&
+  report.required_rtos_sha256===official[report.camera_model]&&report.source_bytes===0x74280&&
+  report.copy_site===0x53510830&&report.chained_identity_copy===copy&&
+  manifest.capture_lifecycle?.snapshot?.exports?.m10v_isp_frame_raw_snapshot===snapshot,
+  'RAW ingress ownership differs');
+ const runtimeWord=at=>{need(Number.isInteger(at)&&!(at&3)&&at>=manifest.base&&
+  at+4<=manifest.base+runtime.length,'RAW ingress outside native runtime');return runtime.readUInt32LE(at-manifest.base);};
+ const inModule=at=>at>=report.base&&at+4<=report.base+report.bytes;
+ runtimeWord(report.base);runtimeWord(report.base+report.bytes-4);runtimeWord(snapshot);
+ const check=(at,words)=>{
+  need(inModule(at)&&inModule(at+(words.length-1)*4),'RAW ingress wrapper outside module');
+  words.forEach((word,i)=>need(runtimeWord(at+i*4)===(word>>>0),'RAW ingress wrapper differs at '+(at+i*4).toString(16)));
+ };
+ const save=[0xe92d5fff,0xe10fc000,0xeef1ea10,0xe92d5000,0xed2d0b20,0xed6d0b20];
+ const restore=[0xecfd0b20,0xecbd0b20,0xe8bd5000,0xeee1ea10,0xe128f00c,0xe8bd5fff];
+ const names=['stage','unstage','after_copy'];
+ const [stage,unstage,consumer]=names.map(name=>report.exports['m10v_raw_ingress_'+name]);
+ for(const at of [stage,unstage,consumer])need(inModule(at)&&Number.isInteger(at)&&!(at&3),'RAW ingress export outside module');
+ const rows=[
+  [0x534bf1d4,0xe3040270,'raw_source_extent',null],
+  [0x534bf1e4,branch(0x534bf1e4,0x5355e87c,true),'raw_source_init',true],
+  [0x534a47ac,0xe2870c07,'raw_preview_clone',false],
+  [0x534c1128,branch(0x534c1128,0x534bffe4,true),'raw_preview_stage',true],
+  [0x534c112c,0xe1a08000,'raw_preview_unstage',false],
+  [0x534a5530,0xe5c43828,'raw_save_clone',false],
+  [0x534c17fc,branch(0x534c17fc,0x534d6ab8,true),'raw_save_stage',true],
+  [0x534c1800,0xe16f6f10,'raw_save_unstage',false],
+  [0x53510830,branch(0x53510830,0x5313fd80,true),'raw_recipe_copy',true],
+  [0x5351081c,0x0a000004,'raw_recipe_no_source',0]
+ ];
+ need(report.patches?.length===rows.length,'RAW ingress patch inventory differs');
+ const entries=rows.map(([address,expected,name,link],i)=>{
+  const row=report.patches[i];need(row.address===address&&row.expected===expected&&row.name===name,
+   'RAW ingress stock hook differs');
+  if(link===null){need(row.replacement===movw(0,0x4280),'RAW source allocation differs');return 0;}
+  const entry=address+8+((row.replacement<<8)>>6);
+  const instruction=branch(address,entry,!!link);
+  need(inModule(entry)&&row.replacement===(link===0?(instruction&0x0fffffff):instruction),'RAW ingress branch differs');
+  return entry;
+ });
+ const init=entries[1];
+ check(init,[0xe92d4010,branch(init+4,0x5355e87c,true),0xe92d500f,0xe304c270,0xe340c007,
+  0xe085c00c,0xe3a03000,0xe58c3000,0xe58c3004,0xe58c3008,0xe58c300c,0xe8bd500f,0xe8bd8010]);
+ for(const [i,offset,frame,operation,original] of [[2,0x83c,0x8c0,1,0x534bffe4],[5,0x82c,0x868,2,0x534d6ab8]]){
+  const [clone,emit,finish]=entries.slice(i,i+3);
+  check(clone,[0xe52dc004,0xe597c000|offset,0xe584c000|offset,0xe49dc004,rows[i][1],branch(clone+20,rows[i][0]+4)]);
+  check(emit,[...save,0xe1a00007,0xe51b1000|frame,0xe3a03000|operation,branch(emit+36,stage,true),
+   ...restore,branch(emit+64,original)]);
+  check(finish,[...save,0xe1a00007,branch(finish+28,unstage,true),...restore,rows[i+2][1],branch(finish+60,rows[i+2][0]+4)]);
+ }
+ const transfer=entries[8];
+ check(transfer,[0xe92d4002,branch(transfer+4,copy,true),...save,0xe1a00004,0xe1a01005,0xe59d2140,
+  branch(transfer+44,consumer,true),...restore,0xe28dd004,0xe49de004,0xe12fff1e]);
+ const noSource=entries[9];
+ check(noSource,[...save,0xe1a00004,0xe1a01005,0xe3a02000,branch(noSource+36,consumer,true),
+  ...restore,branch(noSource+64,0x53510834)]);
+ return report.patches;
+}
+function rawMenuPatches(runtime,manifest) {
+ const report=manifest.raw_development?.menu;
+ if(!report)return [];
+ need(report.schema==='m10v-gr3-raw-menu/v1'&&report.owner_bytes===0x3cc&&report.stock_owner_bytes===0x3c4&&
+  report.native_styles===12&&report.native_custom_sets===2&&report.camera_tested===false&&
+  JSON.stringify(report.request)===JSON.stringify({preview_offset:0x83c,save_offset:0x82c,tag:0x4d520000,as_shot:0,stock:0xffff}),
+  'RAW chooser ABI differs');
+ const inRuntime=at=>Number.isInteger(at)&&!(at&3)&&at>=manifest.base&&at+4<=manifest.base+runtime.length;
+ const helper=name=>{
+  const key='m10v_raw_menu_'+name,at=report.helpers[key];
+  need(inRuntime(at)&&at===manifest.symbols[key],'RAW chooser export differs: '+name);
+  return at;
+ };
+ const thunk=(name,words)=>{
+  const at=report.shims[name],end=at+(words.length-1)*4;
+  need(inRuntime(at)&&inRuntime(end)&&at>=report.base&&end+4<=report.base+report.bytes,'RAW chooser shim outside module');
+  words.forEach((word,i)=>need(runtime.readUInt32LE(at-manifest.base+i*4)===(word>>>0),'RAW chooser shim differs: '+name));
+  return at;
+ };
+ const rows=[
+  [0x5320b3c0,0x5327b940,'init',true],[0x5327ee7c,0x5327ed08,'clear',true],
+  [0x5318a720,0x53289304,'choose',false],[0x531860a4,0x532846c4,'remember',true],
+  [0x5318add4,0x53289314,'restore',true],[0x5318aaa8,0x53283860,'current',true],
+  [0x53186768,0x53283860,'current',true],[0x531869b4,0x53283860,'current',true],
+  [0x531869c8,0x532891a8,'icon',true],[0x5318a10c,0x532891a8,'icon',true],
+  [0x53186778,0x532891f4,'name',true],[0x5318b460,0x532891f4,'name',true]
+ ].map(([address,original,name,link])=>({address,expected:branch(address,original,link),replacement:branch(address,helper(name),link),name:'RAW chooser '+name}));
+ const add=(address,expected,entry,name,link=false)=>rows.push({address,expected,replacement:branch(address,entry,link),name:'RAW chooser '+name});
+ for(const [address,expected,name] of [[0x5320ac20,0xe30606e0,'destroy'],[0x53283358,0xe5d03005,'count'],[0x532833bc,0xe3a0000f,'capacity']])
+  add(address,expected,helper(name),name);
+ let at=report.shims.model;
+ add(0x5320b39c,0xe30606e0,thunk('model',[branch(at,helper('model'),true),branch(at+4,0x5320b3a4)]),'model');
+ for(const [name,address,expected,category] of [['category',0x532834d0,0xe5d03005,true],['value',0x532834f0,0xe1a0c00d,false]]){
+  at=report.shims[name];
+  add(address,expected,thunk(name,[0xe92d4007,branch(at+4,helper('row'),true),0xe3500000,
+   category?0x0a000002:0x0a000001,...(category?[0xe3a00000]:[]),0xe28dd00c,0xe49df004,
+   0xe8bd4007,expected,branch(at+(category?36:32),address+4)]),name);
+ }
+ for(const [name,address,save] of [['preview',0x53281978,0],['save',0x532831e8,1]]){
+  at=report.shims[name];
+  add(address,branch(address,0x5322b6e4,true),thunk(name,[0xe92d401f,0xe1a00002,0xe3a01000|save,
+   branch(at+12,helper('request'),true),0xe8bd401f,branch(at+20,0x5322b6e4)]),name,true);
+ }
+ need(report.patches?.length===rows.length&&rows.every((row,i)=>['address','expected','replacement'].every(k=>row[k]===report.patches[i][k])),
+  'RAW chooser patch inventory differs');
+ return rows;
 }
 function patchList(manifest,runtime) {
   const purePatches=pureIspEffectPatches(runtime,manifest);
@@ -698,12 +844,16 @@ function patchList(manifest,runtime) {
   detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});
   if(manifest.film_library_enabled===false){
     need(manifest.sd_library&&manifest.hdf_menu,'independent HDF menu required');
-    return [...purePatches,...appendedSlotPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfMenuPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...(manifest.hdf_adj?iconPatches:[]),
+    return [...purePatches,...guidesPatches(runtime,manifest),...adjExtraPatches(runtime,manifest),...appendedSlotPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfMenuPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...(manifest.hdf_adj?iconPatches:[]),
       ...hooks.filter(row=>row[2].startsWith('m10v_resource_')||(manifest.hdf_adj&&row[2]==='m10v_icon_pixels')).map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.symbols[name],link),name})),
       {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound primary'},
       {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource bound secondary'}];
   }
-  return [...purePatches,...(manifest.half_pair?.enabled?[{address:0x531b6be4,expected:0xea026e6e,replacement:branch(0x531b6be4,manifest.symbols.m10v_half_pair_select),name:'Half pair explicit menu cancellation'}]:[]),...borderPatches(runtime,manifest),...halfPairIipPatches(runtime,manifest),...zoomPatches(runtime,manifest),...appendedSlotPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
+  const rawEnabled=!!(manifest.sd_library&&manifest.appended_slots&&manifest.pure_isp_effects?.enabled);
+  need(rawEnabled===!!manifest.raw_development?.ingress&&rawEnabled===!!manifest.raw_development?.menu,'RAW development partial build');
+  const ingress=rawIngressPatches(runtime,manifest);
+  const appended=appendedSlotPatches(runtime,manifest).filter(p=>!ingress.some(raw=>p.address===raw.address));
+  return [...purePatches,...guidesPatches(runtime,manifest),...adjExtraPatches(runtime,manifest),...(manifest.half_pair?.enabled?[{address:0x531b6be4,expected:0xea026e6e,replacement:branch(0x531b6be4,manifest.symbols.m10v_half_pair_select),name:'Half pair explicit menu cancellation'}]:[]),...borderPatches(runtime,manifest),...halfPairIipPatches(runtime,manifest),...zoomPatches(runtime,manifest),...appended,...ingress,...rawMenuPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
     replacement:branch(address,manifest.symbols[name],link),name})),
     {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum primary'},
     {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum secondary'},

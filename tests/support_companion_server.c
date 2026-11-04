@@ -54,5 +54,6 @@ int main(void){
  if(getenv("M10V_TEST_HOTSPOT")){cfg.wifi_verified=1;cfg.hotspot_pairing=1;}
  if(getenv("M10V_TEST_UPLOAD")){cfg.upload_film=1;memcpy(cfg.renderer_hash,m10v_sd_renderer_hash,32);}
  m10v_library_init(&current);if(getenv("M10V_TEST_FULL_TEN")){for(unsigned i=0;i<10;i++){current.slots[i].film=(uint16_t)(34+i);current.slots[i].grain=3;current.slots[i].halo_profile=6;current.slots[i].halo_spread=3;current.slots[i].halo_threshold=5;}m10v_companion_state_seal(&current,7);}
+ if(getenv("M10V_TEST_PER_FILM")){m10v_film_fx_set(&current.effects[0],1,2,3,2,3);m10v_companion_state_seal(&current,7);}
  m10v_companion_owner_init(&owner);io.owner=&owner;io.is_current=is_current;io.enter=enter;io.leave=leave;io.is_busy=busy;io.snapshot=snapshot;io.persist_once=persist;io.set_tone=tone;io.commit_settled=settled;io.resolve_custom=resolve;memcpy(io.metadata.build_id,cfg.build_id,32);memcpy(io.metadata.catalog_hash,cfg.catalog_hash,32);memcpy(io.metadata.renderer_hash,cfg.renderer_hash,32);m10v_companion_backend backend={0,exchange};int code=m10v_companion_serve(&cfg,&backend);fprintf(stderr,"Host fixture service exited: code=%d errno=%d\n",code,errno);return code;
 }

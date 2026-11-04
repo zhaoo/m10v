@@ -15,7 +15,7 @@ import { createFilmPreview } from './preview-controller.mjs';
 import { previewFilmPixels } from './film-preview.mjs';
 import {enhanceFilmSelect} from './film-picker.mjs';
 import {mountNativeLibrary} from './native-library.js';
-import {defaultConfiguration,prepareZoomConfigurationForBuild,zoomSummary} from './native-library-state.mjs';
+import {configurationForEffects,defaultConfiguration,prepareZoomConfigurationForBuild,zoomSummary} from './native-library-state.mjs';
 import {renderZoomControls,validateZoomControls} from './zoom-controls.mjs';
 import {normalizeWorkbenchDraft,preserveLegacyDraft,extensionFeatures,updateWorkbenchFeature} from './workbench-state.mjs';
 import {modelCapabilities} from './model-capabilities.mjs';
@@ -59,7 +59,7 @@ const definitions = [
   ['halation', '光晕', '让亮部产生溢出或横向拉丝。开启后，在机内图像控制中选胶卷，按 FN 调整模式和强度；不显示在取景中，可能增加保存等待。', 'GR III / IIIx · 静态 JPEG'],
   ['digitalHdf', 'HDF 模拟', '为照片增加数字柔焦。开启后在下方选初始档位，机内 MENU → 设置 → HDF 模拟也可调整；可单独使用。', 'GR III / IIIx · 静态 JPEG'],
   ['border', '边框', '为照片添加拍立得或 135 胶卷边框。开启后到机内 MENU → 设置 → 效果 → 边框选择样式；向外扩展画布，保留完整构图。', 'GR III / IIIx · 静态 JPEG'],
-  ['ispEffects', '胶片效果菜单', '加入漏光、颗粒和模糊的机内菜单，同时启用 HDF 模拟和边框功能；已有机内 HDF、边框设置会继续生效。关闭 HDF 或边框功能会一并关闭此项。', 'GR III 2.10 / IIIx 1.60 · 静态 JPEG'],
+  ['ispEffects', '逐卷胶片效果', '在胶卷 FN 页面独立调整颗粒、漏光和模糊。构建时包含 HDF 模拟和边框组件，两者在 MENU 内独立设置。', 'GR III 2.10 / IIIx 1.60 · 静态 JPEG'],
   ['timestamp', '时间与胶卷名称水印', '将拍摄日期、时间或胶卷名称印在 JPEG 上。开启后在下方选样式，也可到机内 MENU → 设置 → 时间水印调整。', '相机时钟 · 四角位置'],
   ['aspect', '画幅比例', '增加 4:3、16:9、6x7、XPan 画幅及取景蒙版。开启后在机内拍摄菜单的裁切设置中选择比例。', '4:3 / 16:9 / 6x7 / XPan'],
   ['negativeGrain', '原厂负片颗粒', '为原厂负片风格开放颗粒调节。开启后选负片风格，进入图像控制详细设置调整颗粒档位。', '原厂负片 · 机内调整'],
@@ -323,7 +323,7 @@ function renderFeatures() {
         ['关闭','弱','中','强'].forEach((label,value)=>{const b=textNode('button',label);b.type='button';b.dataset.imagingField='hdf-level-'+value;b.setAttribute('aria-pressed',String(state.nativeConfig.hdf===value));b.onclick=()=>nativeEditor.setHdf(value);levels.append(b);});
         const filmToggle=textNode('button',state.features.has('film')?'关闭胶卷库，仅使用 HDF':'同时启用胶卷库','outline');filmToggle.type='button';filmToggle.onclick=()=>{if(state.features.has('film')){for(const id of ['film','halation','border','timestamp','abCompare','ispEffects','gremote'])state.features.delete(id);nativeEditor.setConfiguration({...state.nativeConfig,stamp:0,filmNameStamp:false,zoom:{...state.nativeConfig.zoom,write:false}},{globalHdf:true});}else{state.features.add('film');invalidate();}renderFeatures();};
         detail.append(levels,filmToggle,textNode('p','这是固件初始档位。机内 HDF 菜单独立保存设置，换卷与重置胶卷不会改变它。'));
-      } else if (id === 'ispEffects') detail.append(textNode('p','MENU → 设置 → 效果：漏光、颗粒和模糊分别设有开关与强度；同时保留 HDF 模拟和边框菜单及其已保存设置。关闭此项后，HDF 和边框功能仍按各自开关保留。'));
+      } else if (id === 'ispEffects') detail.append(textNode('p','ADJ → 滤镜 → FN：按卷保存颗粒、漏光和模糊。工作台可为已选胶卷设置初始值。'));
       else if (id === 'gremote') {
         const label=document.createElement('label'),preserve=document.createElement('input');
         preserve.type='checkbox';preserve.checked=state.gremotePreserveSettings!==false;preserve.disabled=!gremoteAvailable();preserve.dataset.imagingField='gremote-preserve-settings';
@@ -568,7 +568,7 @@ function renderBuildSummary() {
     if(chosenModel==='gr3x'&&$('version-unlock').checked)enabled.push('单包版本适配');
     $('build-feature-count').textContent=enabled.length?enabled.join(' / '):'扩展功能全部关闭';
     $('runtime-state').textContent='胶卷库 · 全部内置';
-    $('build-details').replaceChildren(...state.nativeConfig.slots.map((v,i)=>textNode('p',`槽位 ${i+1} · ${state.nativeCatalog.find(f=>f.id===v.film)?.name||v.film} · 颗粒 ${['关','弱','中','强'][v.grain]}`)),textNode('p',state.features.has('halation')?'光晕：已写入；机内默认关闭，按胶卷选择高光溢出或横向拉丝。':`专属光晕 · ${state.nativeConfig.slots.filter(v=>[33,67].includes(v.film)).map(v=>`${v.film===67?'Harman Phoenix II':'800T'} 强度${v.halo.gain}/8 · 范围${v.halo.spread}/8 · 阈值${v.halo.threshold}/8 · 档位${['关','弱','自然','强'][v.halo.profile]}`).join(' / ')||'未装入'}`),textNode('p',`Harman Red · ${state.nativeConfig.slots.filter(v=>v.film===68).map(v=>`模拟曝光EI ${[125,64,250][v.effects.filmExposure]}`).join(' / ')||'未装入'}`),...(chosenModel!=='gr4'?[textNode('p',zoomSummary(state.nativeConfig))]:[]),textNode('p',`HDF 模拟（全局） · ${['关闭','弱','中','强'][state.nativeConfig.hdf||0]}`),textNode('p',`时间戳 · ${['关闭','日期','日期 + 时间'][state.nativeConfig.stamp]}`),textNode('p',`同一固件包含：${[...state.features].map(id=>id==='film'?'胶卷库':featureName[id]).join('、')}。机内入口：菜单 → 设置 → 胶卷库；快捷菜单保留原厂列表。`));
+    $('build-details').replaceChildren(...state.nativeConfig.slots.map((v,i)=>textNode('p',`槽位 ${i+1} · ${state.nativeCatalog.find(f=>f.id===v.film)?.name||v.film} · 颗粒 ${(state.features.has('ispEffects')?['关','细','中','粗']:['关','弱','中','强'])[v.grain]}`)),textNode('p',state.features.has('halation')?'光晕已写入。可在 ADJ → 滤镜 → FN 调整，800T 和蓝凤凰使用专属光晕。':`专属光晕 · ${state.nativeConfig.slots.filter(v=>[33,67].includes(v.film)).map(v=>`${v.film===67?'Harman Phoenix II':'800T'} 强度${v.halo.gain}/8 · 范围${v.halo.spread}/8 · 阈值${v.halo.threshold}/8 · 档位${['关','弱','自然','强'][v.halo.profile]}`).join(' / ')||'未装入'}`),textNode('p',`Harman Red · ${state.nativeConfig.slots.filter(v=>v.film===68).map(v=>`模拟曝光EI ${[125,64,250][v.effects.filmExposure]}`).join(' / ')||'未装入'}`),...(chosenModel!=='gr4'?[textNode('p',zoomSummary(state.nativeConfig))]:[]),textNode('p',`HDF 模拟（全局） · ${['关闭','弱','中','强'][state.nativeConfig.hdf||0]}`),textNode('p',`时间戳 · ${['关闭','日期','日期 + 时间'][state.nativeConfig.stamp]}`),textNode('p',`同一固件包含：${[...state.features].map(id=>id==='film'?'胶卷库':featureName[id]).join('、')}。机内入口：菜单 → 设置 → 胶卷库；快捷菜单保留原厂列表。`));
     return;
   }
   $('build-feature-count').textContent = `${state.features.size} 项 / ${state.recipes.size} 个配方位置`;
@@ -630,7 +630,7 @@ async function download(response, filename, verification, isCurrent=()=>true) {
 }
 async function prepare() {
   if (!state.projectId) return;
-  let request;try{validateZoomControls($('studio-zoom-controls'));validateZoomControls($('native-editor'));if(state.profile==='native'){if(state.nativeConfig.zoom?.write&&!state.features.has('film'))throw Error('写入裁切焦距需要启用胶卷库');const configuration=prepareZoomConfigurationForBuild(state.nativeConfig,chosenModel);if(configuration.zoom.write){state.nativeConfig=configuration;nativeEditor?.setConfiguration(configuration);}}request=state.profile==='native'?{configuration:structuredClone(state.nativeConfig),film_library:state.features.has('film'),hdf_enabled:state.features.has('digitalHdf'),halation_enabled:state.features.has('halation'),border_enabled:state.features.has('border'),...(chosenModel!=='gr4'?{pure_isp_effects:state.features.has('ispEffects'),gremote_enabled:state.features.has('gremote'),...(state.features.has('gremote')?{gremote_preserve_settings:state.gremotePreserveSettings!==false}:{})}:{}),ab_enabled:state.features.has('abCompare'),extensions:nativeExtensions(),debug_mode:debugEnabled(),version_unlock:versionUnlockSnapshot(),...(chosenModel!=='gr4'?{power_images:selectedPowerImages()}:{})}:{selection:selection()};}catch(e){$('preflight-result').textContent=e.message;return;}
+  let request;try{validateZoomControls($('studio-zoom-controls'));validateZoomControls($('native-editor'));if(state.profile==='native'){if(state.nativeConfig.zoom?.write&&!state.features.has('film'))throw Error('写入裁切焦距需要启用胶卷库');const configuration=prepareZoomConfigurationForBuild(state.nativeConfig,chosenModel);if(configuration.zoom.write){state.nativeConfig=configuration;nativeEditor?.setConfiguration(configuration);}}request=state.profile==='native'?{configuration:configurationForEffects(state.nativeConfig,{halation:state.features.has('halation'),perFilmEffects:state.features.has('ispEffects')}),film_library:state.features.has('film'),hdf_enabled:state.features.has('digitalHdf'),halation_enabled:state.features.has('halation'),border_enabled:state.features.has('border'),...(chosenModel!=='gr4'?{pure_isp_effects:state.features.has('ispEffects'),gremote_enabled:state.features.has('gremote'),...(state.features.has('gremote')?{gremote_preserve_settings:state.gremotePreserveSettings!==false}:{})}:{}),ab_enabled:state.features.has('abCompare'),extensions:nativeExtensions(),debug_mode:debugEnabled(),version_unlock:versionUnlockSnapshot(),...(chosenModel!=='gr4'?{power_images:selectedPowerImages()}:{})}:{selection:selection()};}catch(e){$('preflight-result').textContent=e.message;return;}
   if(request.version_unlock?.enabled){state.preparation=null;state.preparationRequest=null;$('preflight-result').textContent='网页已禁止版本适配，请保持官方基线版本。';return;}
   activeBuildController?.abort();const controller=new AbortController();activeBuildController=controller;
   const revision=state.revision;state.preparation=null;renderLedger();

@@ -8,6 +8,7 @@
 #include "m10v_tone.h"
 #include "m10v_library.h"
 #include "m10v_debug.h"
+#include "m10v_recorded_film.h"
 #ifndef M10V_ISP_NATIVE_GRAIN_MODE
 #define M10V_ISP_NATIVE_GRAIN_MODE 0
 #endif
@@ -140,6 +141,9 @@ static uint32_t film_resource(uint32_t film) {
     if (film >= 34 && film <= 65) return 879 + film - 34;
     return 0;
 }
+#if M10V_RAW_DEVELOPMENT
+uint32_t m10v_menu_film_resource(uint32_t film) { return film_resource(film); }
+#endif
 uint32_t m10v_menu_name(uint32_t translator, uint32_t tone) {
     if(M10V_APPENDED_SLOTS&&(tone==23||tone==24))return ((call2_fn)(M10V_NATIVE_BASE+0x20u))(translator,tone);
     for (uint32_t i = 0; i < M10V_SLOT_COUNT; ++i) {
@@ -204,8 +208,10 @@ uint32_t m10v_menu_value_icon(uint32_t translator, uint32_t value) {
 uint32_t m10v_menu_recorded_icon(uint32_t tag){
  if((tag&0xffff0000u)!=0x20000u)return tag>=0x1000cu&&tag<=0x10015u?876:0;
  uint32_t code=(tag&65535u)+0x100u;
- if(code>=0x2000u&&code<=0xe0c5u)return 754;
- uint32_t film=code-0x1000u;if(!M10V_BUILTIN(film))return 0;
+ m10v_recorded_film recorded;
+ if(!m10v_recorded_film_read(code,&recorded))return 0;
+ if(recorded.bank)return 754;
+ uint32_t film=recorded.id;
  if(M10V_FOUR_LOOKS(film))return M10V_FOUR_LOOKS_ICON(film);
  if(M10V_EXTRA_FILM(film))return M10V_EXTRA_FILM_ICON(film);
  if(M10V_C41(film))return M10V_C41_ICON(film);
@@ -215,6 +221,61 @@ uint32_t m10v_menu_recorded_icon(uint32_t tag){
  if(M10V_STYLE(film))return 762+film-M10V_STYLE_FIRST;
  return film==M10V_PIXEL_ID?(M10V_SD_LIBRARY?761:755):film==M10V_CHAR_ID?(M10V_SD_LIBRARY?755:749):670+film;
 }
+#if M10V_APPENDED_SLOTS
+/* PlaybackSingleController owns the label at the first appended word. The
+ * stock root owns its child list, and the controller destroys the label after
+ * the stock root and widgets. The caption is visible only in DISP detail. */
+#define PLAYBACK_NAME_OFFSET 0x31cu
+static uint32_t *playback_name_widget(uint32_t controller) {
+    return (uint32_t *)(uintptr_t)(controller + PLAYBACK_NAME_OFFSET);
+}
+void m10v_menu_playback_name_create(uint32_t controller) {
+    uint32_t *label = playback_name_widget(controller);
+    *label = 0;
+    uint32_t root = *(const uint32_t *)(uintptr_t)(controller + 0x15cu);
+    if (!root) return;
+    uint32_t widget = ((get_fn)0x536af2a8u)(0x110);
+    if (!widget) return;
+    typedef uint32_t (*label_ctor)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+    ((label_ctor)0x53390ca0u)(widget, 240, 280, 460, 20);
+    ((call2_fn)0x533ad3c0u)(widget, 0);
+    ((call2_fn)0x53390d94u)(widget, 1);
+    ((call3_fn)0x53390db0u)(widget, 20, 20);
+    ((call2_fn)0x533aba64u)(root, widget);
+    ((get_fn)0x533ab5d8u)(widget);
+    *label = widget;
+}
+void m10v_menu_playback_name_destroy(uint32_t controller) {
+    uint32_t *label = playback_name_widget(controller);
+    uint32_t widget = *label;
+    *label = 0;
+    if (widget) ((get_fn)0x53390c7cu)(widget);
+}
+void m10v_menu_playback_name_refresh(uint32_t controller) {
+    uint32_t widget = *playback_name_widget(controller);
+    if (!widget) return;
+    const char *name = 0;
+    if (*(const uint32_t *)(uintptr_t)(controller + 0x124u) == 0x04000001u &&
+        *(const uint16_t *)(uintptr_t)(controller + 0x306u) == 2) {
+        uint32_t metadata = ((get_fn)0x5320b97cu)(((root_fn)0x5320ad88u)());
+        uint32_t tag = metadata ? *(const uint32_t *)(uintptr_t)(metadata + 0x220u) : 0;
+        if (tag >= 0x1000cu && tag <= 0x10015u) {
+            name = "Unknown film";
+        } else if ((tag >> 16) == 2) {
+            m10v_recorded_film film;
+            if (m10v_recorded_film_read((tag & 0xffffu) + 0x100u, &film)) {
+                /* The immutable generation in a SHORT belongs to the
+                 * writing camera. It cannot authenticate another camera's
+                 * local record with the same ID and generation. */
+                if (!film.bank) name = m10v_library_name(film.id);
+                if (!name) name = "Unknown film";
+            }
+        }
+    }
+    if (name) ((call2_fn)0x53390ef8u)(widget, (uint32_t)(uintptr_t)name);
+    ((call2_fn)0x533ad3c0u)(widget, name != 0);
+}
+#endif
 uint32_t m10v_menu_focus(uint32_t controller, uint32_t index) {
     uint8_t *m = model();
     M10V_LOG(30,controller,index,m[0],(uint32_t)m[0x1d]|((uint32_t)m[0x1e]<<8));

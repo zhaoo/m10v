@@ -9,6 +9,9 @@
 #include "m10v_ab.h"
 #include "m10v_sd_library.h"
 #include "m10v_film_directory.h"
+#if M10V_ADJ_EXTRA_CAMERA
+#include "m10v_adj_extra_camera.h"
+#endif
 #ifndef M10V_NATIVE_BASE
 #define M10V_NATIVE_BASE 0x540b6000u
 #endif
@@ -229,3 +232,39 @@ void m10v_settings_view_zoom(m10v_settings_view *v,const m10v_zoom_menu *s){
   }
  }
 }
+
+#if M10V_ADJ_EXTRA_CAMERA
+static uint32_t adj_value_resource(uint32_t id){
+ if(id&&id<=M10V_ADJ_EXTRA_STOCK_MAX){
+  uint32_t root=((uint32_t (*)(void))0x5320ad88u)();
+  uint32_t translator=((fn1)0x5320b67cu)(root);
+  return ((fn2)0x53292810u)(translator,id);
+ }
+ if(id==20)return 1200;
+#if M10V_BORDER_ENABLED
+ if(id==M10V_ADJ_EXTRA_BORDER)return 1155;
+#endif
+ return id>=24&&id<=27 ? 1196+id-24 : M10V_VIEW_OFF;
+}
+void m10v_settings_view_adj(m10v_settings_view *v,const m10v_settings *s){
+ if(!v||!s||v->count!=COUNT)return;
+ caption(v->widgets[TITLE],1191);
+ caption(v->widgets[FOOTER],1201);
+ visible(v->widgets[NAME],0);visible(v->widgets[PAGE],0);
+ visible(v->widgets[ERROR_TEXT],s->error!=0);
+ if(s->error)caption(v->widgets[ERROR_TEXT],M10V_VIEW_FAILED);
+ for(uint32_t i=0;i<10;i++){
+  visible(v->widgets[FRAME+i],0);visible(v->widgets[INNER+i],0);visible(v->widgets[ICON+i],0);
+ }
+ for(uint32_t i=0;i<4;i++){
+  uint32_t selected=i==s->focus;
+  visible(v->widgets[ROW_FRAME+i],selected);visible(v->widgets[ROW_INNER+i],1);
+  color(v->widgets[ROW_FRAME+i],6);color(v->widgets[ROW_INNER+i],2);
+  visible(v->widgets[ROW+i],1);visible(v->widgets[VALUE+i],1);
+  caption(v->widgets[ROW+i],1192+i);
+  caption(v->widgets[VALUE+i],adj_value_resource(selected?s->value:(s->expected>>(8*i))&255u));
+  ((fn2)0x5339658cu)(v->widgets[ROW+i],selected?28:31);
+  ((fn2)0x5339658cu)(v->widgets[VALUE+i],selected?28:31);
+ }
+}
+#endif

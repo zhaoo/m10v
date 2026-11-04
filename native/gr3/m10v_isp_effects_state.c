@@ -42,7 +42,7 @@ void m10v_isp_effects_defaults(m10v_isp_effects_settings *out)
 
 int m10v_isp_effects_validate(const m10v_isp_effects_settings *s)
 {
-    return s && s->leak_gain <= 3 && s->leak_position <= 2 &&
+    return s && s->leak_gain <= 3 && s->leak_position <= (M10V_PURE_ISP_EFFECTS?4u:2u) &&
         s->leak_spread <= 2 && s->grain_mode <= M10V_ISP_GRAIN_STRONG &&
         s->grain_size <= 2 && s->blur_gain <= 3 && s->blur_range <= 2 &&
         (s->reserved == 0 || ((s->reserved & ~127u) == M10V_ISP_EFFECT_PREF_TAG &&
@@ -96,7 +96,7 @@ int m10v_isp_effects_encode(const m10v_isp_effects_settings *s,
     uint32_t sequence, void *record, size_t record_size)
 {
     if (!record || record_size != M10V_ISP_EFFECTS_RECORD_SIZE ||
-        !m10v_isp_effects_validate(s)) return 0;
+        !m10v_isp_effects_validate(s)||s->leak_position>2u) return 0;
     const uint32_t words[] = {
         M10V_ISP_EFFECTS_RECORD_MAGIC, s->reserved?M10V_ISP_EFFECTS_RECORD_VERSION:1u,
         sequence, s->leak_gain, s->leak_position, s->leak_spread,
@@ -123,7 +123,7 @@ int m10v_isp_effects_decode(const void *record, size_t record_size,
         read_le32(bytes + 24), read_le32(bytes + 28), read_le32(bytes + 32),
         read_le32(bytes + 36), read_le32(bytes + 40)
     };
-    if (!m10v_isp_effects_validate(&decoded)||
+    if (!m10v_isp_effects_validate(&decoded)||decoded.leak_position>2u||
         (version==1u?decoded.reserved!=0:decoded.reserved==0)) return 0;
     const uint32_t decoded_sequence = read_le32(bytes + 8);
     copy_metadata(settings,&decoded,sizeof(decoded));

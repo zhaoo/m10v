@@ -109,11 +109,28 @@ def build_appended_slots(base, native_base, stock, symbols):
         'done:;add sp,sp,#8;pop {r4,pc}',detail))
     patch(0x53179b7c,0xeb04f4da,branch(0x53179b7c,icon,True))
     patch(0x532b7cfc,0xebfff1ee,branch(0x532b7cfc,detail,True))
+    # PlaybackSingleController's 106 stock widgets are unchanged. Add an
+    # owned label beside the original Image Control parameters, with the same
+    # layout and mode gates on the two officially supported models.
+    name = dict(owner_offset=0x31c, owner_bytes=0x320, rect=[240, 280, 460, 20])
+    patch(0x53170884, 0xe3a00fc7, movw(0, name['owner_bytes']))
+    for key, site, stock_fn, helper_first in (
+        ('create', 0x53178390, 0x5316cd28, False),
+        ('destroy', 0x53177a8c, 0x53177724, True),
+        ('refresh', 0x5317cb94, 0x53179ba0, False),
+    ):
+        entry = base + len(image)
+        helper = symbols['m10v_menu_playback_name_' + key]
+        first, second = (helper, stock_fn) if helper_first else (stock_fn, helper)
+        image.extend(assembly(
+            f'push {{r4,lr}};mov r4,r0;bl {first:#x};mov r0,r4;pop {{r4,lr}};b {second:#x}', entry))
+        patch(site, branch(site, stock_fn, True), branch(site, entry, True))
+        name[key] = entry
     return bytes(image),dict(schema='m10v-gr3-appended-slots/v2',base=base,bytes=len(image),
         tones=list(range(25,35)),stock_choices=12,shooting_choices='12+enabled_films',shooting_choices_max=22,
         library_index='14+enabled_films',movie_choices=10,raw_development_choices=12,
         entries=dict(count=count,index=index,position=position,maximum=maximum,display=display),
         exif_table=table,exif_bytes=88,patches=patches,
-        playback=dict(icon=icon,detail=detail,metadata_decode=metadata_decode,icon_id=876,metadata_key=0x25,recorded_codes=[0x10c,0x115],identity="recorded-film-short-v1",identity_hooks=identity_hooks,identity_enabled=identity_enabled,
+        playback=dict(icon=icon,detail=detail,name=name,metadata_decode=metadata_decode,icon_id=876,metadata_key=0x25,recorded_codes=[0x10c,0x115],identity="recorded-film-short-v1",identity_hooks=identity_hooks,identity_enabled=identity_enabled,
             recording=dict(builtin='0x1000+film_id',custom='0x2000+(film_id-79)*235+bank-21',custom_banks=[21,255],custom_codes=[0x2000,0xe0c5],si_tail_offset=0x74270,si_tail_bytes=16,pool_count=100,extra_pool_bytes=1600,source='immutable recipe snapshot; leased ShootingInfo only',filesystem_calls=0,legacy='unknown film icon; never current slot',mutable_legacy_custom='slot-only fallback')),
         stock_parameter_proxy=False,state_version=5,camera_tested=False)

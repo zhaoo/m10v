@@ -5,20 +5,23 @@ No old standalone state/allocator hooks are included.
 import struct
 from scripts.build_gr3_menu_patches import assembly, branch, movw
 BASE=0x53000000
-FIELDS=['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Halation Mode','','','','','','RED Exposure','Charmera Color']
+FIELDS=['Halation Gain','Halation Spread','Highlight Gate','Film Grain','Halation Mode','Light Leak','Light Leak Position','Light Leak Spread','Blur','','RED Exposure','Charmera Color']
 DETAIL_IDS={'halo':[18,19,20,21],'common':[21],'red':[21,28],'charmera':[29],'phoenix':[18,19,20,21,28],'pixel':[]}
 STOCK_TABLE=bytes.fromhex('2c4cb35309000000f04ab35309000000144ab3530a000000104fb353090000008c4ab353090000005050b3530a0000000c50b35309000000ac4ab35309000000ec4fb3530a000000584eb3530a000000d049b35304000000b849b3530a000000f449b3530a000000644cb3530a000000784eb3530b000000104bb3530a000000544fb3530a000000304fb3530b000000944fb3530a0000001c4eb3530a000000ec4eb3530b000000844cb3530b000000444ab35305000000b44eb3530b000000f449b3530a000000644cb3530a000000784eb3530b000000104bb3530a000000544fb3530a000000304fb3530b000000944fb3530a0000001c4eb3530a000000ec4eb3530b000000844cb3530b000000444ab35305000000b44eb3530b000000')
 STOCK_CAPTIONS=bytes.fromhex('e3011901e1011b01e2011d01da011f01db012101dc012301e5012501e9012f01e9012f0167012f01e9012f01e9013f01dd012701e4013701d9013101de013301e0013501f8000000')
 STOCK_SLIDER=bytes.fromhex('0dc0a0e1f0d82de97c5705e3055445e304b04ce268d04de2003095e50060a0e10040a0e320300be55b7701eb9f7a01eb9811d6e5305904eb0afdffeb04408de50f30a0e300308de51420a0e30c208de5233ea0e310308de54020a0e314208de5c730a0e318308de50070a0e108408de50410a0e10820a0e32d30a0e354004be248c807eb093da0e30420a0e100308de50710a0e11e30a0e354004be258c807eb54004be20410a0e15dc807eb647196e554104be20700a0e19fc807eb5c400be50c00a0e37c0814eb0030a0e1d02f00e31b2345e30700a0e1002083e5042a0ce3044083e51a2345e3086083e564104be264300be55c390ce358200be51a3345e35c300be56efb07eb5c301be5040053e10300000a64004be20320a0e30010a0e133ff2fe120201be5003095e5030052e10100001a1cd04be2f0a89de8d1cb19eb')
 STOCK_LISTS={1404259372: '0200020102020203020402050206020d000e', 1404259056: '0200020102020203020402050206020d000e', 1404258836: '020202030204020502060207020c020d000e000f', 1404260112: '020202030204020502060207020c020d000f', 1404258956: '020202030204020502060207020d000e000f', 1404260432: '020202030204020502060207020c020d000e000f', 1404260364: '0200020102020203020402050206020d000e', 1404258988: '0200020102020203020402050206020d000e', 1404260332: '02000201020202030204020502060208020d000e', 1404259928: '02000201020202030204020502060209020d000e', 1404258768: '02000201020a0010', 1404258744: '0200020102020203020402050206020b020d000e', 1404258804: '02110200020102020203020402050206020d000e', 1404259428: '02110200020102020203020402050206020d000e', 1404259960: '0211020202030204020502060207020c020d000e000f', 1404259088: '0211020202030204020502060207020c020d000f', 1404260180: '0211020202030204020502060207020d000e000f', 1404260144: '0211020202030204020502060207020c020d000e000f', 1404260244: '02110200020102020203020402050206020d000e', 1404259868: '02110200020102020203020402050206020d000e', 1404260076: '021102000201020202030204020502060208020d000e', 1404259460: '021102000201020202030204020502060209020d000e', 1404258884: '021102000201020a0010', 1404260020: '02110200020102020203020402050206020b020d000e'}
 
-def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=False,universal_halation=False):
+def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=False,universal_halation=False,per_film_effects=False):
  if type(native_grain)is not bool:raise ValueError("native grain capability must be boolean")
  detail_ids={variant:[id for id in ids if id!=21 or native_grain] for variant,ids in DETAIL_IDS.items()}
  if universal_halation:
-  for variant in detail_ids:
+  for variant in ('common','red','charmera','pixel'):
    detail_ids[variant]=[22,18,19,20]+[i for i in detail_ids[variant] if i not in (18,19,20)]
- active_ids=[18,19,20]+([21] if native_grain else [])+([22] if universal_halation else [])+[28,29]
+ if per_film_effects:
+  for variant, ids in detail_ids.items():
+   detail_ids[variant]=[i for i in ids if i<21 or i==22]+[21,23,24,25,26]+[i for i in ids if i>=28]
+ active_ids=[18,19,20]+([21] if native_grain else [])+([22] if universal_halation else [])+([23,24,25,26] if per_film_effects else [])+[28,29]
  image=bytearray();entries={};blocks=[]
  def data(raw,label):
   image.extend(bytes(-len(image)&3));a=base+len(image);image.extend(raw);blocks.append([a,a+len(raw),label]);return a
@@ -46,6 +49,9 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=
  # Existing resource extension occupies IDs786..910. Reuse its text descriptors
  # for three captions, Grain and Soft Diffusion, avoiding another global hook.
  caption_ids=[862,863,864,827,1137 if universal_halation else 828,913,913,913,913,913,933,1013 if sd_library else 948]
+ if per_film_effects:
+  caption_ids[3]=1164
+  caption_ids[5:9]=[1163,1167,1168,1165]
  captions=data(STOCK_CAPTIONS+b''.join(struct.pack('<HH',i,i) for i in caption_ids),'detail caption pairs')
  # Each call site has already saved LR in the genuine stock prologue.
  for name,reg,ui in [('table_ip','ip','r0'),('table_r3','r3','r0'),('table_selected','r3','r4')]:
@@ -98,7 +104,7 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=
   from scripts.gr3_target_relocations import relocations
   relocations.code(destination,output)
   return data(output,'stock slider clone '+str(maximum))
- sliders={n:clone(n) for n in (8,3,2,1)}
+ sliders={n:clone(n) for n in (8,3,2,1)+((4,) if per_film_effects else ())}
  color_slider=clone(3,color=True)
  # Private IDs keep stable meanings across the three visible lists.
  # Restore the original setup frame before dispatch; retain the selected ID
@@ -107,11 +113,11 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=
  entries['exposure_dispatch']=exposure_dispatch
  dispatch=''
  for id in active_ids:
-  maximum=[8,8,8,3,2 if universal_halation else 3,2,8,5,8,1,2,3,3][id-18]
+  maximum=[8,8,8,3,2,3,4,2,3,1,2,3,3][id-18]
   destination=color_slider if id==29 else exposure_dispatch if id==28 else sliders[maximum]
   dispatch+=f'cmp ip,#{id};beq {hex(destination)};'
  dispatch_stub=stub(dispatch+f'b {hex(sliders[8])}','slider dispatch')
  entries['setup']=stub(gate('r0','r4',0x531b075c)+f'mov ip,r0;mov r0,r4;sub sp,fp,#0x10;ldm sp,{{r4,fp,sp,lr}};b {hex(dispatch_stub)}','setup dispatch')
  entries['callback']=stub(gate('r5','r4',0x531b0e48)+f'sub r2,r5,#18;lsl r2,r2,#8;orr r2,r2,r6;mov r1,r4;mov r0,#2;bl {hex(control)};cmp r0,#0;bne 0x531b0c6c;sub sp,fp,#0x1c;ldm sp,{{r4,r5,r6,r7,fp,sp,pc}}','immediate callback')
  entries['reset']=stub('push {r4,lr};bl 0x532c282c;mov r1,r5;mov r0,#7;mov r2,#0;'+f'bl {hex(control)};pop {{r4,pc}}','preserve stock reset')
- return bytes(image),{'schema':'m10v-gr3-native-detail/v2','tables':table_address,'captions':captions,'entries':entries,'fields':[FIELDS[id-18] for id in active_ids],'ids':active_ids,'native_grain':native_grain,'universal_halation':universal_halation,'halation_modes':['off','spill','streak'] if universal_halation else None,'mode_caption':1137 if universal_halation else None,'appended_slots':appended_slots,'variant_rows':46 if appended_slots else 36,'variant_ids':detail_ids,'variant_tables':tables,'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':sliders[8],'slider3':sliders[3],'sliders':sliders,'slider_dispatch':dispatch_stub,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','row_icons':[484,473,398,478,0,0,0,0,0,0,648,648],'row_values':'numeric stock slider index; RED EI125/64/250','row_value_rect':[50,10,40,40],'red_value_rect':[50,10,60,40],'charmera_colors':{'names':['RED','YELLOW','BLUE','GRAY'],'value_icons':list(range(756 if sd_library else 750,760 if sd_library else 754)),'scale_icon':760 if sd_library else 754,'slider':color_slider},'camera_tested':False}
+ return bytes(image),{'schema':'m10v-gr3-native-detail/v2','tables':table_address,'captions':captions,'entries':entries,'fields':[FIELDS[id-18] for id in active_ids],'ids':active_ids,'native_grain':native_grain,'universal_halation':universal_halation,'halation_modes':['off','spill','streak'] if universal_halation else None,'mode_caption':1137 if universal_halation else None,'appended_slots':appended_slots,'variant_rows':46 if appended_slots else 36,'variant_ids':detail_ids,'variant_tables':tables,'backend':'m10v_camera_library_detail','blocks':blocks,'slider8':sliders[8],'slider3':sliders[3],'sliders':sliders,'slider_dispatch':dispatch_stub,'table_symbol':'m10v_detail_tables','lifecycle':'stock immediate callback; cancel exits without rollback','row_icons':[484,473,398,478,0,0,0,0,0,0,648,648],'row_values':'numeric stock slider index; leak position L/U/R/D/Rnd; RED EI125/64/250','row_value_rect':[50,10,40,40],'red_value_rect':[50,10,60,40],'charmera_colors':{'names':['RED','YELLOW','BLUE','GRAY'],'value_icons':list(range(756 if sd_library else 750,760 if sd_library else 754)),'scale_icon':760 if sd_library else 754,'slider':color_slider},'camera_tested':False}

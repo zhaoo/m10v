@@ -51,6 +51,7 @@ class DeliveredPureIspTests(unittest.TestCase):
             raise AssertionError('decoded final runtime no longer matches manifest')
         if cls.manifest['pure_isp_effects'].get('enabled') is not True:
             raise AssertionError('final artifact is not a pure ISP candidate')
+        cls.per_film = cls.manifest['pure_isp_effects'].get('scope') == 'per-film'
         cls.symbols = cls.manifest['symbols']
 
     def call(self, e, name, *args):
@@ -64,7 +65,7 @@ class DeliveredPureIspTests(unittest.TestCase):
     def fixture(self, settings=(0, 0, 0, 1, 0, 0, 0, 0), width=640, height=480, cold=False, film=66):
         e = StockISP(self.image)
         e.events, e.files, e.writes, e.filesystem_online = [], {}, [], True
-        e.hold_expected, e.held, e.forbid_files = False, False, False
+        e.hold_expected, e.held, e.forbid_files, e.reject_write = False, False, False, False
         e.width, e.height = width, height
         assets = self.manifest['pure_isp_effects']['runtime_assets']
         def pixel_access(u, access, address, size, value, data):
@@ -102,10 +103,12 @@ class DeliveredPureIspTests(unittest.TestCase):
                     result = int(data is not None and len(data) == r[2])
                     if result:
                         u.mem_write(r[3], data)
-                else:
+                elif not e.reject_write:
                     e.files[name] = bytes(u.mem_read(r[3], r[2]))
                     e.writes.append(name)
                     result = 1
+                else:
+                    result = 0
             else:
                 return
             u.reg_write(A.UC_ARM_REG_R0, result)
@@ -119,8 +122,9 @@ class DeliveredPureIspTests(unittest.TestCase):
         self.assertEqual(self.call(e, 'm10v_border_camera_refresh', owner), 0)
         setting_pointer = e.alloc(32)
         e.u.mem_write(setting_pointer, struct.pack('<8I', *settings))
-        self.assertEqual(self.call(e, 'm10v_isp_effects_camera_save', owner, setting_pointer), 0)
-        self.assertTrue(any(name.startswith('ISPFX') for name in e.writes))
+        if not self.per_film:
+            self.assertEqual(self.call(e, 'm10v_isp_effects_camera_save', owner, setting_pointer), 0)
+            self.assertTrue(any(name.startswith('ISPFX') for name in e.writes))
         if cold:
             # UI lifecycle refresh cannot reach storage: its exact API keeps
             # this cache cold. Do not inject a shot or completion marker.
@@ -130,11 +134,14 @@ class DeliveredPureIspTests(unittest.TestCase):
         state = bytearray(184)
         struct.pack_into('<IHHI', state, 0, 0x5630314D, 5, 184, 7)
         struct.pack_into('<H6B', state, 12, film, 0, 0, 0, 3, 5, 2)
+        if self.per_film:
+            leak, position, spread, grain, size, blur, _, _ = settings
+            state[14] = max(0, grain-1)
+            state[96:101] = bytes((size, leak, (0,2,4,1,3)[position], spread, 0x80|blur))
         struct.pack_into('<I', state, 180, zlib.crc32(state[:180]))
         state_pointer = e.alloc(184)
-        e.u.mem_write(state_pointer, bytes(state))
-        self.assertEqual(self.call(e, 'm10v_camera_library_mutation_begin'), 1)
-        self.call(e, 'm10v_camera_library_mutation_end', state_pointer)
+        e.files['M10V7B.bin' if self.per_film else 'M10V6B.bin']=bytes(state)
+        self.assertEqual(self.call(e, 'm10v_camera_library_load', state_pointer), 0)
         recipe = e.alloc(0x57D8)
         e.w32(recipe, 0x53D0FC90)
         e.w32(recipe + 0x4778, 0x31545653)
@@ -539,10 +546,14 @@ class DeliveredPureIspTests(unittest.TestCase):
                 self.jpeg(e, recipe, si, request)
 
     def test_queued_ui_update_cannot_retarget_combined_effects_or48mb_query(self):
-        settings = (2, 1, 2, 3, 1, 2, 1, 0)
+        settings = (2, 1, 2, 3, 1, 2, 0 if self.per_film else 1, 0)
         e, recipe, obj, frame, si, request, owner, setting, digital, native, state = self.fixture(settings, 6000, 4000)
-        e.u.mem_write(setting, struct.pack('<8I', *([0] * 8)))
-        self.assertEqual(self.call(e, 'm10v_isp_effects_camera_save', owner, setting), 0)
+        if self.per_film:
+            for field in (8,11,12):
+                self.assertEqual(self.call(e,'m10v_camera_library_effects',state,0,field,0),0)
+        else:
+            e.u.mem_write(setting, struct.pack('<8I', *([0] * 8)))
+            self.assertEqual(self.call(e, 'm10v_isp_effects_camera_save', owner, setting), 0)
         self.enqueue(e, recipe, 0)
         output = e.alloc(96)
         self.assertEqual(self.call(e, 'm10v_isp_effects_shot_read', recipe, output), 1)
@@ -555,9 +566,60 @@ class DeliveredPureIspTests(unittest.TestCase):
         self.assertGreaterEqual(int.from_bytes(e.u.mem_read(queried, 4), 'little'), 48000000)
         self.assertEqual(int.from_bytes(e.u.mem_read(recipe + 0x5778 + 68, 4), 'little'), 0)
 
+    def test_existing_global_effects_migrate_once_without_touching_old_journal(self):
+        if not self.per_film:
+            self.skipTest('requires per-film candidate')
+        e, _, _, _, _, _, _, settings, _, _, state = self.fixture()
+        old = bytearray(e.files.pop('M10V7B.bin'))
+        struct.pack_into('<H6B', old, 12, 66, 3, 0, 0, 3, 5, 2)
+        struct.pack_into('<H6B', old, 20, 67, 0, 0, 0, 3, 5, 2)
+        old[96:104] = bytes(8)
+        struct.pack_into('<I', old, 180, zlib.crc32(old[:180]))
+        e.files['M10V6B.bin'] = bytes(old)
+        e.u.mem_write(settings, struct.pack('<8I', 2, 2, 1, 3, 1, 2, 2, 0))
+        record = e.alloc(48)
+        self.assertEqual(self.call(e,'m10v_isp_effects_encode',settings,1,record,48),1)
+        e.files['ISPFXB.BIN'] = bytes(e.u.mem_read(record,48))
+        def stock_selection(u, address, size, data):
+            if address in (0x532BD6D4,0x532BD6B4):
+                u.reg_write(A.UC_ARM_REG_R0,0 if address==0x532BD6D4 else 11)
+                u.reg_write(A.UC_ARM_REG_PC,u.reg_read(A.UC_ARM_REG_LR))
+        e.u.hook_add(UC_HOOK_CODE,stock_selection)
+        model = e.alloc(0x100)
+        e.reject_write = True
+        self.assertNotEqual(self.call(e,'m10v_camera_library_reconcile_legacy_selection',model),0)
+        self.assertNotIn('M10V7A.bin',e.files)
+        self.assertEqual(e.files['M10V6B.bin'],old)
+        e.reject_write = False
+        self.assertEqual(self.call(e,'m10v_camera_library_reconcile_legacy_selection',model),0)
+        self.assertEqual(e.files['M10V6B.bin'],old)
+        self.assertEqual(e.writes.count('M10V7A.bin'),1)
+        self.assertEqual(self.call(e,'m10v_camera_library_load',state),0)
+        migrated = bytes(e.u.mem_read(state,184))
+        self.assertEqual((migrated[14],migrated[22]),(3,2))
+        self.assertEqual(migrated[96:101],bytes((2,2,4,1,0x8a)))
+        self.assertEqual(migrated[104:109],bytes((1,2,4,1,0x8a)))
+        self.assertEqual(self.call(e,'m10v_camera_library_effects',state,1,8,0),0)
+        self.assertEqual(self.call(e,'m10v_camera_library_reconcile_legacy_selection',model),0)
+        self.assertEqual(self.call(e,'m10v_camera_library_load',state),0)
+        self.assertEqual(bytes(e.u.mem_read(state+96,13))[1::8],bytes((2,0)))
+
+    def test_top_and_bottom_settings_are_frozen_as_distinct_saved_edges(self):
+        if not self.per_film:
+            self.skipTest('requires per-film candidate')
+        for position in (3,4):
+            with self.subTest(position=position):
+                e, recipe, _, _, si, _, _, _, digital, native, _ = self.fixture((2,position,1,1,0,0,0,0))
+                shot=e.alloc(96)
+                self.assertEqual(self.call(e,'m10v_isp_effects_shot_read',recipe,shot),1)
+                self.assertEqual(int.from_bytes(e.u.mem_read(shot+20,4),'little'),position)
+                planning,_=e.params()
+                self.at(e,0x535033D8,digital,planning,si,1)
+                self.assertEqual(self.at(e,0x535033E8,digital,native,planning,e.alloc(4)),1)
+
     def test_untouched_cold_stock_first_shot_passes_gate_into_original_jpeg_route(self):
         e, recipe, obj, frame, si, request, owner, setting, digital, native, state = self.fixture(cold=True)
-        self.assertEqual(int.from_bytes(e.u.mem_read(recipe + 0x5778 + 8, 4), 'little'), 2)
+        self.assertEqual(int.from_bytes(e.u.mem_read(recipe + 0x5778 + 8, 4), 'little'), 1 if self.per_film else 2)
         self.assertEqual(self.call(e, 'm10v_isp_effects_pipeline_encoder_admit', recipe, si), 1)
         # -4 is the existing stock-tone bypass, chained by the original JPEG
         # hook. It must return, rather than holding an untouched cold frame.

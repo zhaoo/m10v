@@ -56,6 +56,9 @@ static uint32_t custom_record(const uint8_t *p,uint32_t id){
  if(!m10v_custom_isp_valid(p))return 0;
  if(!renderer_matches(p+8448,m10v_sd_renderer_hash)&&
     !renderer_matches(p+8448,m10v_sd_pre_five_c41_renderer)&&
+    !renderer_matches(p+8448,m10v_sd_pre_adj_defaults_renderer)&&
+    !renderer_matches(p+8448,m10v_sd_per_film_rc1_renderer)&&
+    !renderer_matches(p+8448,m10v_sd_pre_per_film_renderer)&&
     !renderer_matches(p+8448,m10v_sd_pre_c41_renderer)&&
     !renderer_matches(p+8448,m10v_sd_pre_d76_renderer)&&
     !renderer_matches(p+8448,m10v_sd_pre_anime_e6_renderer)&&
@@ -92,9 +95,12 @@ uint32_t m10v_sd_record(const uint8_t *p,uint32_t n,uint32_t id){
  for(uint32_t i=0;i<n;i+=64)block(h,p+i);
  uint8_t tail[64];for(uint32_t i=0;i<64;++i)tail[i]=0;tail[0]=128;
  uint32_t bits=n*8;for(uint32_t i=0;i<4;++i)tail[63-i]=(uint8_t)(bits>>(8*i));block(h,tail);
- uint32_t current=1,legacy=1,prior=1,previous=1,recent=1,pre_styles=1,texture_prior=1,pre_multiselect=1,pre_directory=1,pre_aerocolor=1,pre_d76=1,pre_isp=1,pre_halo=1,pre_anime_e6=1,pre_mono=1,pre_c41=1,pre_instax=1,pre_orientation=1,pre_retired_anime=1,pre_square_art=1,pre_four_looks=1,pre_five_c41=1;
+ uint32_t current=1,legacy=1,prior=1,previous=1,recent=1,pre_styles=1,texture_prior=1,pre_multiselect=1,pre_directory=1,pre_aerocolor=1,pre_d76=1,pre_isp=1,pre_halo=1,pre_anime_e6=1,pre_mono=1,pre_c41=1,pre_instax=1,pre_orientation=1,pre_retired_anime=1,pre_square_art=1,pre_four_looks=1,pre_five_c41=1,pre_per_film=1,per_film_rc1=1,pre_adj_defaults=1;
  for(uint32_t i=0;i<32;++i){uint8_t v=(uint8_t)(h[i>>2]>>(24-8*(i&3)));
   if(id>321||v!=m10v_sd_pre_five_c41_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])pre_five_c41=0;
+  if(v!=m10v_sd_pre_per_film_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])pre_per_film=0;
+  if(v!=m10v_sd_pre_adj_defaults_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])pre_adj_defaults=0;
+  if(v!=m10v_sd_per_film_rc1_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])per_film_rc1=0;
   if(id>317||v!=m10v_sd_pre_square_art_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])pre_square_art=0;
   if(id>317||v!=m10v_sd_pre_four_looks_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])pre_four_looks=0;
   if(id>297||v!=m10v_sd_pre_multiselect_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])pre_multiselect=0;
@@ -116,6 +122,6 @@ uint32_t m10v_sd_record(const uint8_t *p,uint32_t n,uint32_t id){
   if(id>290||v!=m10v_sd_pre_styles_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])pre_styles=0;
   if(id>72||v!=m10v_sd_legacy_hashes[id-33][i])legacy=0;
   if(id>78||v!=m10v_sd_prior_hashes[id-33][i])prior=0;}
- if(!current&&!legacy&&!prior&&!previous&&!recent&&!pre_styles&&!texture_prior&&!pre_multiselect&&!pre_directory&&!pre_aerocolor&&!pre_d76&&!pre_halo&&!pre_isp&&!pre_anime_e6&&!pre_mono&&!pre_c41&&!pre_retired_anime&&!pre_orientation&&!pre_instax&&!pre_square_art&&!pre_four_looks&&!pre_five_c41)return 0;
+ if(!current&&!legacy&&!prior&&!previous&&!recent&&!pre_styles&&!texture_prior&&!pre_multiselect&&!pre_directory&&!pre_aerocolor&&!pre_d76&&!pre_halo&&!pre_isp&&!pre_anime_e6&&!pre_mono&&!pre_c41&&!pre_retired_anime&&!pre_orientation&&!pre_instax&&!pre_square_art&&!pre_four_looks&&!pre_five_c41&&!pre_per_film&&!per_film_rc1&&!pre_adj_defaults)return 0;
  return id;
 }

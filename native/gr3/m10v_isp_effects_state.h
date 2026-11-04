@@ -3,6 +3,9 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#ifndef M10V_PURE_ISP_EFFECTS
+#define M10V_PURE_ISP_EFFECTS 0
+#endif
 
 /* Independent metadata journal; never reuse legacy film-state padding.
  * Wire format is 12 little-endian uint32 words, with IEEE CRC32 over the
@@ -25,7 +28,7 @@ enum {
 
 typedef struct {
     uint32_t leak_gain;       /* 0 off, 1 weak, 2 medium, 3 strong */
-    uint32_t leak_position;   /* 0 left, 1 right, 2 both */
+    uint32_t leak_position;   /* 0 left, 1 right, 2 legacy both; shot-only 3 top, 4 bottom */
     uint32_t leak_spread;     /* 0 narrow, 1 medium, 2 wide */
     uint32_t grain_mode;      /* M10V_ISP_GRAIN_* */
     uint32_t grain_size;      /* 0 fine, 1 standard, 2 coarse */

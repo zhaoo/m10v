@@ -4,6 +4,9 @@
 #if M10V_BORDER_ENABLED
 #include "m10v_border_camera.h"
 #endif
+#if M10V_ADJ_EXTRA_CAMERA
+#include "m10v_adj_extra_camera.h"
+#endif
 extern uint32_t m10v_ab_adj_event_original(uint32_t,uint32_t);
 extern uint32_t m10v_ab_mapper_original(uint32_t,uint32_t);
 extern uint32_t m10v_ab_selector_original(uint32_t,uint32_t);
@@ -184,6 +187,9 @@ uint32_t m10v_settings_controller_ab_adj_event(uint32_t controller,uint32_t even
   * Discard only our ownership; native exit/destroy owns the actual widgets.
   * No refresh, navigation, setter, storage or diagnostic IO on this path. */
  if(key==1||key==0x35){
+#if M10V_ADJ_EXTRA_CAMERA
+  (void)m10v_adj_extra_camera_event(controller,event);
+#endif
   m10v_settings_controller *p=ab_owner();m10v_native_ab_host *h=ab_host(p);
   if(ab_host_owned(h,controller)||(h&&h->mode==1&&h->source==controller)){
    h->mode=0;h->controller=0;h->source=0;h->rebuilding=0;h->back_pending=0;
@@ -196,6 +202,9 @@ uint32_t m10v_settings_controller_ab_adj_event(uint32_t controller,uint32_t even
 #if M10V_AB_NATIVE_HOST
  if(ab_host_followup(ab_owner(),controller,key,0x02000000u))return 1;
  if(ab_host_event(ab_owner(),controller,event))return 1;
+#endif
+#if M10V_ADJ_EXTRA_CAMERA
+ if(m10v_adj_extra_camera_event(controller,event))return 1;
 #endif
  /* A normal ImageControl confirmation is an explicit exit from A/B, even
   * when the same look is confirmed. Do this before native OK queues 0x86;
@@ -220,9 +229,11 @@ uint32_t m10v_settings_controller_ab_adj_event(uint32_t controller,uint32_t even
 uint32_t m10v_settings_controller_ab_adj_event(uint32_t controller,uint32_t event){
  uint32_t raw=*(const uint16_t *)(uintptr_t)event;
  uint32_t context=ab_ram(controller,0x280)?*(const uint8_t *)(uintptr_t)(controller+0x270)|((uint32_t)*(const uint8_t *)(uintptr_t)(controller+0x1f4)<<8)|((uint32_t)*(const uint8_t *)(uintptr_t)(controller+0x279)<<16):0xffffffffu;
- M10V_EXIT_LOG(230,controller,raw,context,*(const volatile uint32_t *)0x55063988u);
+ int trace=raw==1||raw==8||raw==0x1e||raw==0x35||raw==0x86||raw==0x88||
+     raw==0x89||raw==0xaa||raw==0xd8;
+ if(trace)M10V_EXIT_LOG(230,controller,raw,context,*(const volatile uint32_t *)0x55063988u);
  uint32_t r=ab_trace_event_impl(controller,event);
- M10V_EXIT_LOG(231,controller,raw,r,0);return r;
+ if(trace)M10V_EXIT_LOG(231,controller,raw,r,0);return r;
 }
 #endif
 
@@ -249,9 +260,9 @@ uint32_t m10v_settings_controller_ab_selector(uint32_t mapper,uint32_t key){
 #if M10V_DEBUG_MODE && M10V_ADJ_EXIT_TRACE
 uint32_t m10v_settings_controller_ab_selector(uint32_t mapper,uint32_t key){
 
- if(key==1||(key>=0x35&&key<=0x38))M10V_EXIT_LOG(253,mapper,key,0,0);
+ if(key==1||key==0x35)M10V_EXIT_LOG(253,mapper,key,0,0);
  uint32_t r=ab_trace_selector_impl(mapper,key);
- if(key==1||(key>=0x35&&key<=0x38))M10V_EXIT_LOG(254,mapper,key,r,0);return r;
+ if(key==1||key==0x35)M10V_EXIT_LOG(254,mapper,key,r,0);return r;
 }
 #endif
 
@@ -344,6 +355,9 @@ uint32_t m10v_settings_controller_ab_live_enter(uint32_t live,uint32_t route,uin
   if(p->ab.enabled&&(ab_current()!=p->ab.selected||!ab_live_films_match(&p->ab)))ab_stop(&p->ab);
   M10V_EXIT_LOG(269,live,p->ab.enabled,0,0);
  }M10V_EXIT_LOG(247,live,r,0,route);
+#if M10V_GUIDES_CAMERA
+ if(route==0x08000000u)m10v_guides_camera_restore(live);
+#endif
 #if M10V_COMPANION_ENABLED
  p=ab_owner();
  if(route==0x08000000u&&p&&p->library_initialized&&!p->power_off_pending)
@@ -353,12 +367,18 @@ uint32_t m10v_settings_controller_ab_live_enter(uint32_t live,uint32_t route,uin
 }
 uint32_t m10v_settings_controller_ab_live_leave(uint32_t live){
  M10V_EXIT_LOG(255,live,0,0,0);
+#if M10V_GUIDES_CAMERA
+ m10v_guides_camera_leave(live);
+#endif
  m10v_settings_controller *p=ab_owner();if(p)ab_clear(&p->ab);
  /* No A/B widgets or synchronous SD diagnostics on native transitions. */
  uint32_t r=m10v_ab_live_leave_original(live);M10V_EXIT_LOG(256,live,r,0,0);return r;
 }
 uint32_t m10v_settings_controller_ab_live_destroy(uint32_t live){
  M10V_EXIT_LOG(257,live,0,0,0);
+#if M10V_GUIDES_CAMERA
+ m10v_guides_camera_leave(live);
+#endif
  m10v_settings_controller *p=ab_owner();if(p)ab_clear(&p->ab);
  uint32_t r=m10v_ab_live_destroy_original(live);M10V_EXIT_LOG(258,live,r,0,0);return r;
 }
@@ -391,6 +411,13 @@ uint32_t m10v_settings_controller_ab_dispatch(uint32_t c,uint32_t event){
   * Preserve original service updates, then recover only a filtered first
   * press. Reacquire ownership after native dispatch; it can destroy the page. */
  uint32_t raw=*(const uint16_t *)(uintptr_t)event;
+#if M10V_ADJ_EXTRA_CAMERA
+ if(raw==0x193&&ab_ram(c,0x128)&&ab_host_word(c,0x124)==0x02000000u){
+  uint32_t result=m10v_ab_dispatch_original(c,event);
+  m10v_adj_extra_camera_after_route_leave(c);
+  return result;
+ }
+#endif
  if(raw==1){
   uint32_t packet=*(const uint32_t *)(uintptr_t)(event+4);
   if(ab_ram(packet,8)&&*(const uint8_t *)(uintptr_t)packet==2&&ab_host_word(packet,4)==0)ab_main_off();
@@ -444,11 +471,29 @@ uint32_t m10v_settings_controller_ab_dispatch(uint32_t c,uint32_t event){
  return handled?1:r;
 }
 #if M10V_DEBUG_MODE && M10V_ADJ_EXIT_TRACE
+static int trace_adj_route(uint32_t route){
+ return route==0x02000000u||route==0x02000012u||route==0x02000073u||
+        route==0x020000a0u||route==M10V_SETTINGS_FILMS_ROUTE||route==0x0200f108u||
+        route==0x02000107u||route==0x0200010au||route==0x0200010du||route==0x02000112u;
+}
 uint32_t m10v_settings_controller_ab_dispatch(uint32_t c,uint32_t event){
- uint32_t raw=*(const uint16_t *)(uintptr_t)event,phase=0xffffffffu,value=0xffffffffu;uint32_t packet=*(const uint32_t *)(uintptr_t)(event+4);if(ab_ram(packet,8)){phase=*(const uint8_t *)(uintptr_t)packet;value=ab_host_word(packet,4);}
- if(raw==1||raw==4||raw==5||raw==8)M10V_EXIT_LOG(251,c,raw,phase,value);
+ uint32_t raw=*(const uint16_t *)(uintptr_t)event;
+ uint32_t packet=*(const uint32_t *)(uintptr_t)(event+4);
+ uint32_t route=ab_ram(c,0x128)?ab_host_word(c,0x124):0;
+ uint32_t destination=raw==0x193&&ab_ram(packet,8)?ab_host_word(packet,0):0;
+ int transition=(trace_adj_route(route)||trace_adj_route(destination))&&
+     (raw==0x193||raw==0x1e||raw==0xd8||raw==0x86||raw==0x88||raw==0xda);
+ int physical=raw==1||raw==8||(raw==0x1e&&route==0x08000000u);
+ if(transition)M10V_EXIT_LOG(280,c,raw,route,destination);
+ if(physical){
+  uint32_t phase=ab_ram(packet,8)?*(const uint8_t *)(uintptr_t)packet:0xffffffffu;
+  uint32_t value=ab_ram(packet,8)?ab_host_word(packet,4):0xffffffffu;
+  M10V_EXIT_LOG(251,c,raw,phase,value);
+ }
  uint32_t r=ab_trace_dispatch_impl(c,event);
- if(raw==1||raw==4||raw==5||raw==8)M10V_EXIT_LOG(252,c,raw,r,0);return r;
+ if(transition)M10V_EXIT_LOG(281,c,raw,route,r);
+ if(physical)M10V_EXIT_LOG(252,c,raw,r,0);
+ return r;
 }
 #endif
 #if M10V_COMPANION_ENABLED

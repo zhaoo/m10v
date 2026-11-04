@@ -20,7 +20,8 @@ static unsigned field(const m10v_library_state*state,unsigned slot,unsigned key)
  const m10v_slot*v=&state->slots[slot];const m10v_film_effects*e=&state->effects[slot];switch(key){
  case M10V_FIELD_FILMID:return v->film;case M10V_FIELD_GRAIN:return v->grain;case M10V_FIELD_GRAINSIZE:return e->grain_size;
  case M10V_FIELD_HALOGAIN:return v->halo_gain;case M10V_FIELD_HALOSPREAD:return v->halo_spread;case M10V_FIELD_HALOTHRESHOLD:return v->halo_threshold;case M10V_FIELD_HALOPROFILE:return v->halo_profile;
- case M10V_FIELD_LEAKGAIN:return e->leak_gain;case M10V_FIELD_LEAKPOSITION:return e->leak_position;case M10V_FIELD_LEAKSPREAD:return e->leak_spread;case M10V_FIELD_LEAKVARIATION:return e->leak_variation;case M10V_FIELD_FILMEXPOSURE:return e->film_exposure;case M10V_FIELD_CHARMERACOLOR:return e->reserved[1];default:return 0;}
+ case M10V_FIELD_LEAKGAIN:return e->leak_gain;case M10V_FIELD_LEAKPOSITION:return e->leak_position;case M10V_FIELD_LEAKSPREAD:return e->leak_spread;/* The v1 wire field is legacy variation. Tagged bytes store on-camera blur. */
+ case M10V_FIELD_LEAKVARIATION:return m10v_film_fx_tagged(e)?0:e->leak_variation;case M10V_FIELD_FILMEXPOSURE:return e->film_exposure;case M10V_FIELD_CHARMERACOLOR:return e->reserved[1];default:return 0;}
 }
 static void snapshot_json(m10v_companion_server*s,writer*w,const m10v_companion_snapshot*snap){
  text(w,"{\"protocol\":1,\"schemaVersion\":2,\"bootId\":");hex(w,s->auth.boot,16);text(w,",\"instanceId\":");hex(w,s->config->instance_id,16);

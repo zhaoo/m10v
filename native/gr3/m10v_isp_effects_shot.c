@@ -2,6 +2,11 @@
 #include "m10v_isp_effects_shot.h"
 #include "m10v_isp_effects_camera.h"
 #include "m10v_save_trace.h"
+#if M10V_PURE_ISP_EFFECTS
+#include "m10v_tone.h"
+#include "m10v_isp_recipe_color.h"
+#include "m10v_film_identity.h"
+#endif
 #ifndef M10V_ISP_EFFECTS_SHOT_OFFSET
 #error "Builder must allocate the ISP effects shot tail and define its offset"
 #endif
@@ -89,9 +94,42 @@ int m10v_isp_effects_shot_freeze(uint32_t recipe){
     uint32_t expected=0;
     if(!__atomic_compare_exchange_n(&s->ready,&expected,3,0,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE))
         return expected==1&&shot_valid(recipe,s);
-    m10v_isp_effects_settings frozen;uint32_t sequence;
-    int valid=m10v_isp_effects_camera_snapshot(&frozen,&sequence)&&m10v_isp_effects_validate(&frozen);
     uint32_t si=*(const volatile uint32_t*)(uintptr_t)(recipe+0x44c8u);
+    m10v_isp_effects_settings frozen;uint32_t sequence=0;
+#if M10V_PURE_ISP_EFFECTS
+    m10v_isp_effects_defaults(&frozen);
+    const m10v_isp_recipe_color *color=(const void*)(uintptr_t)(recipe+M10V_SAVE_COLOR_OFFSET);
+    int valid=shot_ram(si,0x94c);
+    if(valid){
+        uint32_t tone=*(const volatile uint8_t*)(uintptr_t)(si+0x77cu);
+        uint32_t slot=m10v_tone_slot(tone);
+        if(slot<M10V_SLOT_COUNT)frozen.grain_mode=M10V_ISP_GRAIN_OFF;
+        if(color->magic==M10V_ISP_RECIPE_COLOR_MAGIC&&color->version==1&&
+           color->bytes==sizeof(*color)&&!color->busy&&color->selected_tone==tone&&
+           color->sequence==color->state.sequence&&m10v_library_valid(&color->state)&&
+           slot<M10V_SLOT_COUNT&&color->state.slots[slot].film){
+            const m10v_film_effects *e=&color->state.effects[slot];
+            uint32_t grain=color->state.slots[slot].grain;
+            sequence=color->sequence;frozen.grain_mode=grain+1u;
+            frozen.grain_size=grain?grain-1u:0u;
+            if(m10v_film_fx_tagged(e)){
+                static const uint8_t position[]={0,3,1,4};
+                uint32_t edge=e->leak_position;
+                if(edge==4u){
+                    const m10v_film_identity *identity=m10v_film_identity_owned(si);
+                    uint32_t seed=(identity?identity->generation:0u)^(si>>4)^(recipe>>6);
+                    edge=(seed*0x9e3779b9u)>>30;
+                }
+                frozen.grain_size=e->grain_size;frozen.leak_position=position[edge];
+                frozen.leak_gain=e->leak_gain;frozen.leak_spread=e->leak_spread;
+                frozen.blur_gain=e->leak_variation&3u;
+                frozen.blur_range=(e->leak_variation>>2)&3u;
+            }
+        }
+    }
+#else
+    int valid=m10v_isp_effects_camera_snapshot(&frozen,&sequence)&&m10v_isp_effects_validate(&frozen);
+#endif
     uint32_t orientation=valid?shot_orientation(recipe,si):0;
     valid=valid&&orientation;
     if(valid){frozen.reserved=0;shot_copy(&s->settings,&frozen,sizeof(frozen));s->sequence=sequence;s->source_si=si;s->saved_orientation=orientation;}

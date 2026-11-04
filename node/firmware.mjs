@@ -95,10 +95,15 @@ function decode(payload, decodedSize = DECODED_SIZE) {
 }
 
 export function inspectOfficial(data) {
+  return inspectKnownOfficial(data);
+}
+
+function inspectKnownOfficial(data, allowRetired = false) {
   requireValue(Buffer.isBuffer(data), 'input: firmware must be bytes');
   const identity = hash(data);
   const isX = identity === '708e79f3b7b96a7e1581b4acf4c412233050a1832718ef7f06c8397db1b431c7';
   const is220 = identity === GR3_220_SHA256;
+  requireValue(!is220 || allowRetired, 'GR III 2.20 的 M10V 固件构建已永久停用。');
   const decodedBytes = is220 ? 59798532 : DECODED_SIZE;
   const sectionRules = rules.map(([name, size, flags, count]) => [name, is220 && name === 'RTOS' ? 17520384 : is220 && name === 'RES' ? 6675096 : size, flags, is220 && name === 'RES' ? 37 : count]);
   requireValue([FILE_SIZE, 30391788, 30472516].includes(data.length), 'size: unsupported firmware length');
@@ -158,7 +163,7 @@ export function inspectOfficial(data) {
 
 export function readOfficialSection(data, name) {
   // Revalidate the entire exact baseline before exposing a read-only payload.
-  const report = inspectOfficial(data);
+  const report = inspectKnownOfficial(data, true);
   if (!rules.some((rule) => rule[0] === name)) throw new Error('unknown official section');
   const end = 128 + data.readUInt32LE(data.length - 12);
   const { output } = decode(data.subarray(128, end), data.readUInt32LE(data.length - 8));
@@ -179,7 +184,7 @@ export function inspectFirmwareImport(data) {
     'container: invalid firmware size');
   const identity = hash(data);
   if ([SHA256, GR3_220_SHA256, '708e79f3b7b96a7e1581b4acf4c412233050a1832718ef7f06c8397db1b431c7'].includes(identity))
-    return inspectOfficial(data);
+    return inspectKnownOfficial(data, true);
   const project = data.readUInt32LE(48), isX = project === 609;
   requireValue(project === 588 || isX, 'container: unsupported camera model');
   const magic = isX ? 0x02610261 : 0x024c024c, footer = data.length - 24;

@@ -4,7 +4,7 @@ import {existsSync,readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {resolveIspEffectOptions} from './gr3-isp-effect-options.mjs';
 import {readNativeOfficial,prepareNative} from './gr3-native-library.mjs';
-import {defaultConfiguration} from '../web/gr3/native-library-state.mjs';
+import {configurationForEffects,defaultConfiguration} from '../web/gr3/native-library-state.mjs';
 import {normalizeWorkbenchDraft,updateWorkbenchFeature} from '../web/gr3/workbench-state.mjs';
 import {modelCapabilities} from '../web/gr3/model-capabilities.mjs';
 
@@ -22,8 +22,8 @@ test('GRemote opt-in binds current App metadata and deterministic source/configu
  const source=await readNativeOfficial(),input={gremote_enabled:true,configuration:defaultConfiguration()},before=structuredClone(input);
  const options=resolveIspEffectOptions(source,input,'GR III'),identity=options.companion_identity;
  assert.ok(identity,'GRemote opt-in must include the resident owner');
- assert.equal(identity.catalogHash,'5d3ec9b649a410b0ec988d09d7107872ce8fa67520a9502fc6ef840318d8f9fb');
- assert.equal(identity.rendererHash,'7595208a0cf061d661fd90ab0b8233fd0cf5d5090a2209dff38c9c47a7f21995');
+ assert.equal(identity.catalogHash,'cf7032d8db4c13c266229084f323e231bfea0fc50e3ad1e9966f25d2f4ddfb99');
+ assert.equal(identity.rendererHash,'8860d923d8a0bb65ac9530c52d89d140a5345505230c165e0c0c78f9f1972fba');
  assert.match(identity.buildId,/^[a-f0-9]{64}$/);
  assert.deepEqual(resolveIspEffectOptions(source,structuredClone(input),'GR III'),options);
  assert.deepEqual(input,before);
@@ -111,7 +111,7 @@ test('studio preflight sends the explicit GRemote choice and never sends private
   const state={projectId:'a'.repeat(64),profile:'native',features:new Set(['film',...(enabled?['gremote']:[])]),gremotePreserveSettings:preserve,nativeConfig:defaultConfiguration(),revision:1};
   let sent;
   const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,{});return nodes.get(id);};
-  const context=vm.createContext({state,$:node,structuredClone,AbortController,validateZoomControls(){},prepareZoomConfigurationForBuild:c=>c,
+  const context=vm.createContext({state,$:node,configurationForEffects,structuredClone,AbortController,validateZoomControls(){},prepareZoomConfigurationForBuild:c=>c,
    nativeExtensions:()=>({}),debugEnabled:()=>false,versionUnlockSnapshot:()=>({enabled:false}),selectedPowerImages:()=>({}),renderLedger(){},
    api:async(path,options)=>{sent=JSON.parse(options.body);return {json:async()=>({ready:true})};}});
   vm.runInContext("let chosenModel='gr3',activeBuildController=null,riskAcceptedRevision=-1;"+method,context);

@@ -2,6 +2,9 @@
 #define M10V_LIBRARY_H
 #include <stdint.h>
 
+#ifndef M10V_PURE_ISP_EFFECTS
+#define M10V_PURE_ISP_EFFECTS 0
+#endif
 #ifndef M10V_UNIVERSAL_HALATION
 #define M10V_UNIVERSAL_HALATION 0
 #endif
@@ -10,14 +13,16 @@
 #define M10V_HALO_SPILL 4u
 #define M10V_HALO_STREAK 5u
 static inline uint32_t m10v_halo_enabled(uint32_t film,uint32_t gain,uint32_t profile){
+    if(film==33||film==67)return gain && profile!=M10V_HALO_OFF;
 #if M10V_UNIVERSAL_HALATION
-    (void)film;return gain && (profile==M10V_HALO_SPILL||profile==M10V_HALO_STREAK);
+    return gain && (profile==M10V_HALO_SPILL||profile==M10V_HALO_STREAK);
 #else
-    return gain && profile<=3 && (film==33||film==67);
+    return 0;
 #endif
 }
 static inline uint32_t m10v_halo_workspace_planes(uint32_t film,uint32_t profile){
 #if M10V_UNIVERSAL_HALATION
+    if(film==33||film==67)return 6;
     if(profile==M10V_HALO_STREAK || (profile==M10V_HALO_SPILL&&film!=33&&film!=67))return 4;
 #else
     (void)film;(void)profile;
@@ -72,8 +77,26 @@ static inline uint32_t m10v_halo_workspace_planes(uint32_t film,uint32_t profile
 #define M10V_LIBRARY_STORE_FAILED -2
 
 typedef struct { uint16_t film; uint8_t grain, soft, halo_gain, halo_spread, halo_threshold, halo_profile; } m10v_slot;
-/* Retired grain_size/leak_* bytes retain their per-film layout. */
+static inline void m10v_slot_default_halation(m10v_slot *slot) {
+    slot->halo_gain=slot->film==33?7:0;
+    slot->halo_spread=slot->film==33?7:3;
+    slot->halo_threshold=5;
+    slot->halo_profile=slot->film==33&&M10V_UNIVERSAL_HALATION?M10V_HALO_SPILL:slot->film==66?1:2;
+}
+
+/* The high bit in the legacy variation byte marks per-film ISP settings.
+ * The low nibble stores blur strength and migrated range. */
+#define M10V_FILM_FX_TAG 0x80u
 typedef struct { uint8_t grain_size, leak_gain, leak_position, leak_spread, leak_variation, film_exposure, reserved[2]; } m10v_film_effects;
+static inline uint32_t m10v_film_fx_tagged(const m10v_film_effects *e){
+    return (e->leak_variation & 0xf0u)==M10V_FILM_FX_TAG&&(e->leak_variation & 12u)!=12u;
+}
+static inline void m10v_film_fx_set(m10v_film_effects *e,uint32_t size,uint32_t gain,
+        uint32_t position,uint32_t spread,uint32_t blur){
+    e->grain_size=(uint8_t)size;e->leak_gain=(uint8_t)gain;
+    e->leak_position=(uint8_t)position;e->leak_spread=(uint8_t)spread;
+    e->leak_variation=(uint8_t)(M10V_FILM_FX_TAG|blur);
+}
 typedef struct {
     uint32_t magic;
     uint16_t version, size;

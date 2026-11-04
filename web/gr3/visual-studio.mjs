@@ -1,6 +1,7 @@
 import {createFilmPreview} from './preview-controller.mjs';
 import {paperPreviewLook} from './paper-preview.mjs';
 import {supportsNativeFilm} from './model-capabilities.mjs';
+import {defaultFilmEffects,resetNativeTexture} from './native-library-state.mjs';
 const FEATURED=[37,35,56,66,299,34,33,67];
 const details={
  37:{brand:'KODAK',category:'color',meta:'C41 · ISO 400',note:'温暖肤色，柔和日光。',tags:['人像','日常','暖调']},
@@ -32,6 +33,61 @@ export function mountVisualStudio({state,editor,getModel,importModel,generate,sh
  const undo=$('undo-edit'),redo=$('redo-edit');undo.className='visual-history';redo.className='visual-history';
  document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='z'&&!/^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName)){event.preventDefault();(event.shiftKey?redo:undo).click();refresh();}});
  function activeSlot(){return config().slots.find(slot=>slot.film===active);}
+ const effectLevels=['关','轻','中','强'];
+ const haloToggle=$('halo-toggle');
+ const effectControls=node('div',undefined,'film-effect-controls');
+ const haloControls=node('div',undefined,'film-effect-controls');
+ haloToggle.closest('.toggle-row').before(effectControls);
+ haloToggle.closest('.toggle-row').after(haloControls);
+ function updateSlot(update){
+  const next=config(),index=next.slots.findIndex(slot=>slot.film===active);
+  if(index<0||isBusy())return;
+  update(next.slots[index]);
+  editor.setConfiguration(next,{filmSlot:index});
+  refresh();
+ }
+ function control(parent,label,choices,change){
+  const row=node('label',undefined,'control-label'),input=node('select');
+  input.setAttribute('aria-label',label);
+  row.append(node('span',label),input);
+  input.append(...choices.map(([value,name])=>{const option=node('option',name);option.value=value;return option;}));
+  input.onchange=()=>updateSlot(slot=>change(slot,Number(input.value)));
+  parent.append(row);
+  return {row,input};
+ }
+ const filmEffects=[
+  ['leakGain','漏光',effectLevels],['leakPosition','漏光位置',['左','上','右','下','随机']],
+  ['leakSpread','漏光范围',['低','中','高']],['blur','模糊',effectLevels],
+ ].map(([key,label,labels])=>[key,control(effectControls,label,labels.map((label,value)=>[value,label]),
+  (slot,value)=>{slot.filmEffects={...defaultFilmEffects(),...slot.filmEffects,[key]:value};})]);
+ const haloMode=control(haloControls,'光晕模式',[[4,'高光溢出'],[5,'横向拉丝']],(slot,value)=>{slot.halo.profile=value;});
+ const haloParameters=[['gain','光晕强度'],['spread','光晕范围'],['threshold','光晕阈值']].map(([key,label])=>[key,
+  control(haloControls,label,Array.from({length:9},(_,i)=>[i,String(i)]),(slot,value)=>{slot.halo[key]=value;})]);
+ function renderEffects(slot){
+  const perFilm=state.features.has('ispEffects');
+  const special=[33,67].includes(active),halo=slot?.halo;
+  const haloOn=!!halo?.gain&&(special||halo.profile===4||halo.profile===5);
+  const canEdit=!!slot&&!isBusy(),haloAvailable=getModel()!=='gr4'&&state.features.has('halation');
+  const grainLevels=perFilm?['关','细','中','粗']:['关闭','弱','中','强'];
+  for(const button of document.querySelectorAll('[data-grain]')){
+   const value=Number(button.dataset.grain);
+   button.textContent=grainLevels[value];
+   button.classList.toggle('active',value===(slot?.grain||0));
+   button.disabled=!canEdit||(!perFilm&&[289,290].includes(active)&&value!==0);
+  }
+  $('grain-value').textContent=grainLevels[slot?.grain||0];
+  effectControls.hidden=!perFilm;
+  for(const [key,{row,input}] of filmEffects){
+   row.hidden=(key==='leakPosition'||key==='leakSpread')&&!slot?.filmEffects?.leakGain;
+   input.disabled=!canEdit;input.value=slot?.filmEffects?.[key]??0;
+  }
+  haloToggle.disabled=!canEdit||!haloAvailable;
+  haloToggle.setAttribute('aria-pressed',String(haloOn));
+  haloControls.hidden=!haloAvailable||!haloOn;
+  haloMode.row.hidden=special;haloMode.input.value=halo?.profile===5?5:4;
+  haloMode.input.disabled=!canEdit;
+  for(const [key,{input}] of haloParameters){input.value=halo?.[key]??0;input.disabled=!canEdit;}
+ }
  function select(id){
   active=id;const index=config().slots.findIndex(slot=>slot.film===id);
   if(index>=0)engine.querySelectorAll('#slots .slot')[index]?.click();
@@ -55,9 +111,8 @@ export function mountVisualStudio({state,editor,getModel,importModel,generate,sh
   const film=byId(active)||catalog()[0];if(!film)return;active=film.id;const d=metadata(film),slot=activeSlot(),included=!!slot,c=config();
   $('look-title').textContent=film.name;$('photo-look').textContent=film.name.toUpperCase();$('look-type').textContent=d.brand+' / '+(d.category==='bw'?'BLACK & WHITE':d.category==='cinema'?'MOTION PICTURE':'COLOR NEGATIVE');$('look-note').textContent=d.note;$('look-tags').replaceChildren(...d.tags.map(tag=>node('span',tag,'tag')));
   const add=$('add-film');add.classList.toggle('selected',included);add.replaceChildren();if(included){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'),use=document.createElementNS('http://www.w3.org/2000/svg','use');use.setAttribute('href','#i-check');svg.append(use);add.append(svg,document.createTextNode('已在方案中'));}else add.textContent='+ 加入方案';
-  for(const button of document.querySelectorAll('[data-grain]')){const value=Number(button.dataset.grain);button.classList.toggle('active',value===(slot?.grain||0));button.disabled=!included||([289,290].includes(active)&&value!==0)||isBusy();}
-  $('grain-value').textContent=['关闭','弱','中','强'][slot?.grain||0];$('look-reset').disabled=!included||isBusy();
-  $('halo-toggle').setAttribute('aria-pressed',String(state.features.has('halation')));$('film-name-toggle').setAttribute('aria-pressed',String(c.filmNameStamp));$('date-toggle').setAttribute('aria-pressed',String(c.stamp>0));
+  renderEffects(slot);$('look-reset').disabled=!included||isBusy();
+  $('film-name-toggle').setAttribute('aria-pressed',String(c.filmNameStamp));$('date-toggle').setAttribute('aria-pressed',String(c.stamp>0));
   for(const link of document.querySelectorAll('a[href^="/gr3/sd-library.html"]'))link.href='/gr3/sd-library.html#model='+getModel();
   for(const link of document.querySelectorAll('header .wordmark,.primary-nav>a:first-child'))link.href='/gr3/#model='+getModel();
   $('device-name').textContent=getModel()==='gr3x'?'GR IIIx':getModel()==='gr4'?'GR IV':'GR III';$('device-version').textContent=getModel()==='gr3x'?'1.60':getModel()==='gr4'?'1.11':'2.10';
@@ -91,9 +146,22 @@ export function mountVisualStudio({state,editor,getModel,importModel,generate,sh
  for(const button of document.querySelectorAll('[data-preview]'))button.onclick=()=>{previewMode=button.dataset.preview;void renderPreview();};
  $('film-search').oninput=event=>{query=event.target.value.toLowerCase().trim();renderFilms();};
  $('add-film').onclick=()=>{if(activeSlot()){toast('这款胶卷已在方案中');return;}editor.toggleFilm(active);refresh();};
- for(const button of document.querySelectorAll('[data-grain]'))button.onclick=()=>{if(!activeSlot())return;const index=config().slots.findIndex(slot=>slot.film===active);engine.querySelectorAll('#slots .slot')[index]?.click();engine.querySelectorAll('#grain button')[Number(button.dataset.grain)]?.click();refresh();};
- $('look-reset').onclick=()=>{engine.querySelector('#reset-texture').click();refresh();};
- $('halo-toggle').onclick=()=>{document.querySelector('#feature-list [data-feature="halation"]>.feature-toggle')?.click();refresh();};
+ for(const button of document.querySelectorAll('[data-grain]'))button.onclick=()=>updateSlot(slot=>{
+  slot.grain=Number(button.dataset.grain);
+  if(state.features.has('ispEffects'))slot.filmEffects??=defaultFilmEffects();
+ });
+ $('look-reset').onclick=()=>{
+  const next=config(),index=next.slots.findIndex(slot=>slot.film===active);
+  if(index<0||isBusy())return;
+  const reset=resetNativeTexture(next,index);
+  if(state.features.has('ispEffects'))reset.slots[index].filmEffects=defaultFilmEffects();
+  if(state.features.has('halation'))reset.slots[index].halo.profile=6;
+  editor.setConfiguration(reset,{filmSlot:index});refresh();
+ };
+ haloToggle.onclick=()=>updateSlot(slot=>{
+  const special=[33,67].includes(slot.film),enabled=haloToggle.getAttribute('aria-pressed')==='true';
+  slot.halo.gain=enabled?0:3;slot.halo.profile=enabled?6:special?2:4;
+ });
  const setMark=(key,value)=>{const next={...config(),[key]:value};if(next.stamp||next.filmNameStamp)state.features.add('timestamp');else state.features.delete('timestamp');editor.setConfiguration(next);refreshFeatures();refresh();};
  $('film-name-toggle').onclick=()=>setMark('filmNameStamp',!config().filmNameStamp);$('date-toggle').onclick=()=>setMark('stamp',config().stamp?0:1);
  $('generate-button').onclick=()=>void requestGenerate();

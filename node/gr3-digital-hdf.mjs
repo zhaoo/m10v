@@ -1,4 +1,4 @@
-import {companionOwnerBytes} from './gr3-companion-owner.mjs';
+import {settingsOwnerBytes} from './gr3-settings-menu.mjs';
 // Independent ARM byte/readback contract. Never trust the builder patch list.
 import {borderPatches} from './gr3-border.mjs';
 export const hdfSources=['native/gr3/m10v_digital_hdf.c','scripts/build_gr3_digital_hdf.py','native/gr3/m10v_hdf_menu.c','scripts/build_gr3_hdf_menu.py','native/gr3/m10v_hdf_state.h','native/gr3/m10v_hdf_adj.c','native/gr3/m10v_hdf_adj.rgba','scripts/build_gr3_hdf_adj.py'];
@@ -59,8 +59,10 @@ export function hdfMenuPatches(runtime,m){
  const d=m.hdf_menu;if(!d)return [];
  const pure=m.pure_isp_effects?.enabled===true;
  const full=m.film_library_enabled!==false,offset=full?(m.capture_lifecycle?.snapshot?.snapshot_ingress_installed?0x613c:0x213c):0x13bc;
- need(d.schema==='m10v-gr3-hdf-menu/v1'&&d.film_library===full&&d.owner_offset===offset&&d.owner_bytes===companionOwnerBytes(m,offset+(pure?0x22c:0x1c0))&&d.controller_bytes===(pure?0x200:0x1c0)&&d.route===0x0200f102&&typeof m.zoom?.enabled==='boolean'&&d.rows.length===(full?3:1),'independent menu ownership differs');
- if(pure)need(JSON.stringify(d.effects_children)==='["HDF","Border","Light leak","Grain","Blur"]','pure ISP effects menu inventory differs');
+ const captions=full?[937,938,1140]:[970],routes=full?[0x0200f100,0x0200f101,0x0200f102]:[0x0200f102];
+ if(m.adj_extra){captions.push(1191);routes.push(0x0200f107);}
+ need(d.schema==='m10v-gr3-hdf-menu/v1'&&d.film_library===full&&d.owner_offset===offset&&d.owner_bytes===settingsOwnerBytes(m,offset+(pure?0x22c:0x1c0))&&d.controller_bytes===(pure?0x200:0x1c0)&&d.route===0x0200f102&&typeof m.zoom?.enabled==='boolean'&&d.rows.length===captions.length,'independent menu ownership differs');
+ if(pure)need(JSON.stringify(d.effects_children)==='["HDF","Border"]','effects menu must keep only HDF and border');
  if(pure)need(full&&d.effects_cache_owner_offset===offset+0x200&&d.effects_cache_bytes===44,'effects cache ownership differs');
  const s=m.symbols,base=m.base;
  const words=(at,list)=>{need(Number.isInteger(at)&&at%4===0&&at>=base&&at+list.length*4<=base+runtime.length,'menu code bounds');list.forEach((v,i)=>need(runtime.readUInt32LE(at-base+i*4)===(v>>>0),'menu instruction differs'));};
@@ -71,7 +73,7 @@ export function hdfMenuPatches(runtime,m){
  const out=[];
  for(const [a,e,n,l] of [[0x5316f3b8,0xe300313b,'factory',false],[0x5319667c,0xe1a0c00d,'top_dtor',false],[0x5316fcf8,0xeb00ab5a,'top_ctor',true],[0x53221a4c,0xeb001c7e,'key_route',true]])out.push({address:a,expected:e,replacement:branch(a,s['m10v_hdf_menu_'+n],l),name:'HDF independent menu '+n});
  out.push({address:0x5316fcec,expected:0xe30103bc,replacement:mov(0,d.owner_bytes),name:'HDF menu owner'},{address:0x53b36adc,expected:0x1e1d1b19,replacement:((30+d.rows.length)<<24)|0x1d1b19,name:'HDF menu row count'});
- d.rows.forEach((at,i)=>{const caption=i===d.rows.length-1?(full?1140:970):[937,938,990,1024][i];words(at,[0xe92d4010,0xe1a04001,0xe1a00004,0xe3a01000,branch(at+16,0x5339de20,true),0xe1a00004,mov(1,caption),0xe1a02001,0xe8bd4010,branch(at+36,0x5339dc70)]);out.push({address:0x53b36bd0+i*8,expected:0,replacement:at,name:'HDF menu row'},{address:0x53b36c88+i*4,expected:0x10000000,replacement:full?[0x0200f100,0x0200f101,0x0200f102][i]:0x0200f102,name:'HDF menu route'});});
+ d.rows.forEach((at,i)=>{words(at,[0xe92d4010,0xe1a04001,0xe1a00004,0xe3a01000,branch(at+16,0x5339de20,true),0xe1a00004,mov(1,captions[i]),0xe1a02001,0xe8bd4010,branch(at+36,0x5339dc70)]);out.push({address:0x53b36bd0+i*8,expected:0,replacement:at,name:'HDF menu row'},{address:0x53b36c88+i*4,expected:0x10000000,replacement:routes[i],name:'HDF menu route'});});
  if(full&&m.zoom.enabled)out.push({address:0x53b37018,expected:0x02000074,replacement:0x0200f105,name:'Crop selection and focal editor entry'});
  need(m.resources.texts[184]==='HDF 模拟'&&m.resources.texts[191]==='','independent menu captions differ');
  out.forEach((p,i)=>need(d.patches[i]?.address===p.address&&d.patches[i]?.expected===p.expected&&d.patches[i]?.replacement===p.replacement,'independent menu patch list differs'));

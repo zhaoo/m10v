@@ -2,6 +2,9 @@
  * Only a pending UI value changes while browsing; OK commits the same HDF
  * journal as MENU. Capture consumes its published cache, never this cursor. */
 #include "m10v_hdf_state.h"
+#if M10V_ADJ_EXTRA_CAMERA
+#include "m10v_adj_extra_camera.h"
+#endif
 extern int m10v_hdf_load(uint32_t *);
 extern int m10v_hdf_save(uint32_t);
 extern uint32_t m10v_hdf_adj_parent_event(uint32_t,uint32_t);
@@ -37,6 +40,12 @@ uint32_t m10v_hdf_adj_event(uint32_t c,uint32_t event){
  /* These keys enter native capture/power/return services. Relinquish only
   * our cursor; never storage, widget rebuild or navigation on this path. */
  if(key==1||key==0x35||key==0x89||key==0xaa){if(p)p->controller=0;return m10v_hdf_adj_parent_event(c,event);}
+#if M10V_ADJ_EXTRA_CAMERA
+ if(key==0xd8&&m10v_adj_extra_camera_lever_pending(c)){
+  if(p&&p->controller==c)p->controller=0;
+  return m10v_hdf_adj_parent_event(c,event);
+ }
+#endif
  if(key==0xd8&&p&&p->controller==c&&selected(c)==20){
   uint32_t value=((fn1)0x53394820u)(word(c,0x1f0));
   if(value>3||m10v_hdf_save(value)){

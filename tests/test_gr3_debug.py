@@ -268,6 +268,64 @@ class ExitOnlyLogArmTests(unittest.TestCase):
         self.assertEqual(sum(c[0]=='close' for c in self.calls),self.successful_opens)
         self.assertEqual(self.decoded()['rejected_pages'],0)
 
+    def test_guide_stages_share_the_exit_history(self):
+        self.assertEqual(self.log(273), 1)
+        for event in range(274, 280):
+            self.assertEqual(self.log(event, 1, 2, 3, 4), 1)
+        self.assertEqual(self.log(316), 0)
+        records = self.decoded()['records']
+        self.assertEqual([record['stage'] for record in records], [
+            'ab.close.live-entered', 'guides.apply.before', 'guides.apply.after',
+            'guides.restore.before', 'guides.restore.after',
+            'guides.update.before', 'guides.update.after',
+        ])
+        self.assertTrue(all(record['channel'] == 'ab' for record in records))
+
+    def test_menu_return_trace_records_route_and_dispatch_result(self):
+        self.assertEqual(self.log(296, 0x55050000, 2, 1, 100), 1)
+        self.assertEqual(self.log(297, 0x55050000, 2, 0, 101), 1)
+        self.assertEqual(self.log(280, 0x55050000, 0x193, 0x0200f108, 0x08000000), 1)
+        self.assertEqual(self.log(282, 0x55051000, 0x10000000, 1, 0x55051000), 1)
+        for event in range(286, 296):
+            self.assertEqual(self.log(event, 0x55051000, 0, 0, 0), 1)
+        for event in range(298, 306):
+            self.assertEqual(self.log(event, 0x55051000, 0x55060000, 0, 0), 1)
+        self.assertEqual(self.log(283, 0x55051000, 0, 0x55060000, 0x55060000), 1)
+        self.assertEqual(self.log(284, 0x55051000, 0, 0, 0), 1)
+        self.assertEqual(self.log(281, 0x55050000, 0x193, 0x0200f108, 1), 1)
+        records = self.decoded()['records']
+        self.assertEqual([row['stage'] for row in records], [
+            'border.save.before', 'border.save.after', 'adj.route.before', 'adj.enter.before',
+            'adj.enter.keys.before', 'adj.enter.keys.after',
+            'adj.enter.aux-key.before', 'adj.enter.aux-key.after',
+            'adj.enter.touch.before', 'adj.enter.touch.after',
+            'adj.enter.canvas.before', 'adj.enter.canvas.after',
+            'adj.enter.timer.before', 'adj.enter.timer.after',
+            'adj.canvas.area.before', 'adj.canvas.rect.before', 'adj.canvas.layout.before',
+            'adj.canvas.children.before', 'adj.canvas.invalidate.before',
+            'adj.canvas.cleanup.before', 'adj.canvas.primary.before', 'adj.canvas.fallback.before', 'adj.enter.native.after',
+            'adj.enter.extension.after', 'adj.route.after',
+        ])
+        self.assertEqual(records[1]['arguments'], [0x55050000, 2, 0, 101])
+        self.assertEqual(records[2]['arguments'], [0x55050000, 0x193, 0x0200f108, 0x08000000])
+        self.assertTrue(all(row['channel'] == 'ab' for row in records))
+
+    def test_fn_journal_and_isp_worker_use_separate_retention(self):
+        for event in (306, 307, 308, 309, 310, 311, 312, 313, 198):
+            self.assertEqual(self.log(event, 1, 2, 3, 4), 1)
+        rows = self.decoded()['records']
+        self.assertEqual({r['channel'] for r in rows if r['event'] != 198}, {'ab'})
+        self.assertEqual(len({r['channel'] for r in rows}), 2)
+        self.assertEqual([r['stage'] for r in rows if r['event'] in (312, 313)],
+                         ['fn.leak-position.save.before', 'fn.leak-position.save.after'])
+
+    def test_grain_save_and_native_assertion_survive_exit_trace_filter(self):
+        for event in (314, 315, 212):
+            self.assertEqual(self.log(event, 1, 2, 3, 4), 1)
+        stages = {row['stage']: row['channel'] for row in self.decoded()['records']}
+        self.assertEqual(stages, {'fn.grain.save.before': 'ab',
+                                  'fn.grain.save.after': 'ab', 'firmware.assert': 'capture'})
+
     def test_partial_checkpoint_write_retains_previous_valid_page(self):
         self.assertEqual(self.log(230),1)
         self.fail_write=True;self.assertEqual(self.log(233),0)

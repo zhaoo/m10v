@@ -59,12 +59,24 @@ static uint32_t energy_pixel(const m10v_library_image *im,uint32_t x,uint32_t ro
     uint32_t excess=light>gate?light-gate:0;return excess*excess*8;
 }
 static void energy_line(const m10v_library_image *im,uint16_t *line,uint32_t row,uint32_t gate,int distance) {
+    uint32_t width=im->width,step=(uint32_t)distance;
+#if M10V_SPATIAL_NEON
+    uint32_t at=row*im->stride;
+    uint32_t end=m10v_spatial_halo_line(im->y+at,im->chroma+at,line,width,gate,step);
+    if(end){
+        for(uint32_t x=0;x<width;++x){
+            if(x==8)x=end;
+            line[x]=(uint16_t)((energy_pixel(im,energy_edge(x,width,-distance),row,gate,1)+
+                2u*energy_pixel(im,x,row,gate,1)+energy_pixel(im,energy_edge(x,width,distance),row,gate,1))>>2);
+        }
+        return;
+    }
+#endif
     /* Traverse each distance lane with a rolling three-tap window. The
      * previous right sample becomes the next center, so original red energy
      * is evaluated once per pixel instead of three times. Replicated borders
      * and the final integer rounding remain exactly the same. No extra plane
      * or mutable state is needed; rows still come from the original image. */
-    uint32_t width=im->width,step=(uint32_t)distance;
     for(uint32_t lane=0;lane<step && lane<width;++lane) {
         uint32_t left=energy_pixel(im,0,row,gate,1);
         uint32_t center=energy_pixel(im,lane,row,gate,1);
@@ -76,23 +88,41 @@ static void energy_line(const m10v_library_image *im,uint16_t *line,uint32_t row
         }
     }
 }
+static inline __attribute__((always_inline)) uint32_t energy_cell(const m10v_library_image *im,uint32_t x0,uint32_t y0,
+    uint32_t step,uint32_t gate,int red_sensitive,uint32_t *peak){
+#if M10V_SPATIAL_NEON
+    if((step==8||step==16)&&x0+step<=im->width){
+        uint32_t rows=im->height-y0;
+        uint32_t at=y0*im->stride+x0;
+        return m10v_spatial_halo_cell(im->y+at,red_sensitive?im->chroma+at:0,
+            im->stride,step,rows<step?rows:step,gate,peak);
+    }
+#endif
+    uint32_t sum=0,max_energy=0;
+    for(uint32_t row=y0;row<y0+step&&row<im->height;++row){
+        for(uint32_t x=x0;x<x0+step&&x<im->width;++x){
+            uint32_t energy=energy_pixel(im,x,row,gate,red_sensitive);
+            sum+=energy;
+            if(energy>max_energy)max_energy=energy;
+        }
+    }
+    if(peak)*peak=max_energy;
+    return sum;
+}
 static uint32_t energy_source(const m10v_library_image *im,uint16_t *a,uint32_t gw,uint32_t gh,uint32_t shift,uint32_t gate,int red_sensitive) {
     uint32_t step=1u<<shift,active=0;
     for(uint32_t gy=0;gy<gh;++gy)for(uint32_t gx=0;gx<gw;++gx) {
-        uint32_t sum=0;
         /* Integrate actual covered pixel energy; missing edge pixels are zero.
          * Maximum 16*16*49928 < 2^24; average stays <=49928. */
-        for(uint32_t dy=0;dy<step;++dy) {
-            uint32_t row=(gy<<shift)+dy;if(row>=im->height)break;
-            for(uint32_t dx=0;dx<step;++dx) {
-                uint32_t x=(gx<<shift)+dx;if(x>=im->width)break;
-                sum+=energy_pixel(im,x,row,gate,red_sensitive);
-            }
-        }
+        uint32_t sum=energy_cell(im,gx<<shift,gy<<shift,step,gate,red_sensitive,0);
         a[gy*gw+gx]=(uint16_t)(sum>>(2*shift));
         active|=sum;
     }
     return active;
+}
+static uint32_t energy_project(const uint16_t *top,const uint16_t *bottom,
+    uint32_t x,uint32_t step,uint32_t fy){
+    return top[x]*(step-fy)+bottom[x]*fy;
 }
 static void m10v_800t_effects(m10v_library_image *im,const m10v_slot *choice,uint8_t *scratch,uint32_t gw,uint32_t gh,uint32_t shift) {
     uint32_t cells=gw*gh;
@@ -124,22 +154,39 @@ static void m10v_800t_effects(m10v_library_image *im,const m10v_slot *choice,uin
     int fine=gain && lines*im->width<=cells;uint32_t head=0;
     if(fine)for(uint32_t i=0;i<lines;++i)
         energy_line(im,b+i*im->width,energy_edge(0,im->height,(int)i-(int)distance),176+8u*choice->halo_threshold,(int)distance);
+    uint32_t step=1u<<shift,half=step>>1;
     for(uint32_t row=0;row<im->height;++row) {
-      for(uint32_t x=0;x<im->width;x+=2) {
-
-        uint32_t at=row*im->stride+x,y0=im->y[at],y1=im->y[at+1],peak=y0>y1?y0:y1;
+      uint32_t py=row<half?0:row-half,gy=py>>shift,ny=gy+1<gh?gy+1:gy;
+      uint32_t fy=py&(step-1),at_row=row*im->stride;
+      const uint16_t *near_top=0,*near_mid=0,*near_bot=0;
+      if(fine){
+          uint32_t mid=head+distance,bot=head+2*distance;
+          if(mid>=lines)mid-=lines;
+          if(bot>=lines)bot-=lines;
+          near_top=b+head*im->width;near_mid=b+mid*im->width;near_bot=b+bot*im->width;
+      }
+      for(uint32_t x=0;x<im->width;){
+        uint32_t px=x<half?0:x-half,gx=px>>shift,nx=gx+1<gw?gx+1:gx;
+        uint32_t end=(((gx+1)<<shift)+half+1u)&~1u;
+        if(end>im->width)end=im->width;
+        uint32_t left=gain?energy_project(halo+gy*gw,halo+ny*gw,gx,step,fy):0;
+        uint32_t right=gain?energy_project(halo+gy*gw,halo+ny*gw,nx,step,fy):0;
+        if(!(left|right)&&!fine&&!soft){x=end;continue;}
+        for(;x<end;x+=2){
+        uint32_t near=0;
+        if(fine){
+            near=(near_top[x]+near_top[x+1]+2u*(near_mid[x]+near_mid[x+1])+
+                near_bot[x]+near_bot[x+1])>>3;
+        }
+        if(!(left|right|near)&&!soft)continue;
+        uint32_t at=at_row+x,y0=im->y[at],y1=im->y[at+1],peak=y0>y1?y0:y1;
         uint32_t protect=(255-peak)*4;if(protect>255)protect=255;
         /* Broad halo needs its own exposure gain: cell integration plus repeated
          * normalized blur otherwise rounds real6000px lamp fringes to zero.
          * Keep fine gain unchanged; maximum sum17*49928*8*255 fits uint32. */
         if(!protect&&!soft)continue;
-        uint32_t scatter=gain?16u*energy_sample(halo,gw,gh,x,row,shift):0;
-        if(fine) {
-            uint32_t mid=head+distance,bot=head+2*distance;if(mid>=lines)mid-=lines;if(bot>=lines)bot-=lines;
-            uint32_t near=0;
-            for(uint32_t dx=0;dx<2;++dx)near+=b[head*im->width+x+dx]+2u*b[mid*im->width+x+dx]+b[bot*im->width+x+dx];
-            scatter=(near>>3)+scatter;
-        }
+        uint32_t fx=x<half?0:(x-half)&(step-1);
+        uint32_t scatter=near+16u*((left*(step-fx)+right*fx)>>(2*shift));
         uint32_t r=(scatter*gain*protect)>>16;
         if(r>192)r=192;
         /* An exactly zero contribution leaves all four destination bytes
@@ -155,6 +202,7 @@ static void m10v_800t_effects(m10v_library_image *im,const m10v_slot *choice,uin
         im->y[at]=energy_clamp((int)(y0+lift+((bloom*(255-y0))>>8)));
         im->y[at+1]=energy_clamp((int)(y1+lift+((bloom*(255-y1))>>8)));
         im->chroma[at]=energy_clamp(cb);im->chroma[at+1]=energy_clamp(cr);
+        }
       }
       if(fine && row+1<im->height) {
           energy_line(im,b+head*im->width,energy_edge(row,im->height,(int)distance+1),176+8u*choice->halo_threshold,(int)distance);

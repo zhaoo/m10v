@@ -16,6 +16,7 @@ class Server(unittest.TestCase):
   if self._testMethodName=='test_full_ten_slot_snapshot_and_receipt_fit_response_budget':env['M10V_TEST_FULL_TEN']='1'
   if self._testMethodName=='test_async_read_busy_and_submit_waits_for_read_turn':env['M10V_TEST_ASYNC_READ']='1'
   if self._testMethodName=='test_timeout_keeps_unknown_write_locked_but_reads_remain_available':env['M10V_TEST_STALL']='1'
+  if self._testMethodName=='test_per_film_state_stays_wire_compatible':env['M10V_TEST_PER_FILM']='1'
   if 'mismatch' in self._testMethodName:env['M10V_TEST_MISMATCH']='1'
   if self._testMethodName=='test_extensions_unknown_write_blocks_all_mutations':env['M10V_TEST_EXT_UNKNOWN']='1'
   self.process=subprocess.Popen([str(self.exe)],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);self.addCleanup(self.stop)
@@ -118,6 +119,17 @@ class Server(unittest.TestCase):
   self.assertEqual(value['stateSchema'],2)
   self.assertEqual(value['slotCount'],10)
   self.assertEqual(value['readOnlyParameters'],['grainSize','leakGain','leakPosition','leakSpread','leakVariation'])
+ def test_per_film_state_stays_wire_compatible(self):
+  status,state=self.request('GET','/m10v/v1/state');self.assertEqual(status,200)
+  parameters=state['config']['slots'][0]['parameters']
+  for key,value in {'leakGain':2,'leakPosition':3,'leakSpread':2,'leakVariation':0}.items():
+   self.assertEqual(parameters[key],value)
+  self.assertEqual(self.request('POST','/m10v/v1/operations',self.envelope(state))[0],202)
+  for _ in range(8):
+   _,receipt=self.request('GET','/m10v/v1/operations/'+'a'*32)
+   if receipt['status']=='committed':break
+  self.assertEqual(receipt['status'],'committed')
+  self.assertEqual(receipt['snapshot']['config']['slots'][0]['parameters'],{**parameters,'grain':2})
  def test_duplicate_operation_commits_once_and_returns_verified_snapshot(self):
   status,state=self.request('GET','/m10v/v1/state');self.assertEqual(status,200);operation=self.envelope(state)
   status,queued=self.request('POST','/m10v/v1/operations',operation);self.assertEqual(status,202);self.assertEqual(queued['status'],'queued')

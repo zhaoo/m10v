@@ -240,8 +240,6 @@ int m10v_isp_effects_pipeline_encoder_admit(uint32_t recipe,uint32_t si){
         if(!m10v_tone_valid(selected))pipeline_hold(recipe,21,selected);
         uint32_t slot=m10v_tone_slot(selected);
         if(slot<M10V_SLOT_COUNT&&color->state.slots[slot].film){
-            uint32_t film=color->state.slots[slot].film;
-            if(film==M10V_PIXEL_ID||film==M10V_CHAR_ID)return 1;
             grain=color->state.slots[slot].grain;
         }
     }

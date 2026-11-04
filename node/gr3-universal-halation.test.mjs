@@ -11,7 +11,10 @@ test('universal halation is explicit GR III film capability, bound into plan and
  assert.notEqual(on.configuration_sha256,off.configuration_sha256);
  assert.ok(on.features.includes('halation'));
  const initial=Buffer.from(on.initial_state_hex,'hex');
- for(let i=0;i<10;i++){assert.equal(initial[16+i*8],0);assert.ok(initial[19+i*8]<4);}
+ for(let i=0;i<10;i++){
+  assert.equal(initial[16+i*8],i===4?8:0);
+  assert.equal(initial[19+i*8],i===4?4:i<4?2:0);
+ }
  assert.equal(config.slots[4].halo.gain,8,'input configuration is not mutated');
  assert.deepEqual(on.stock_detail.halation_modes,['off','spill','streak']);
  assert.equal(on.stock_detail.halation_films,'all');

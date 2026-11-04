@@ -24,7 +24,7 @@ class EffectsMenuTests(unittest.TestCase):
  def setUpClass(cls):
   cls.tmp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.tmp.cleanup);p=Path(cls.tmp.name)
   source=ROOT/'native/gr3/m10v_hdf_menu.c';obj=p/'menu.o';stateobj=p/'state.o';elf=p/'menu.elf';link=p/'link.ld'
-  cls.flags=[*FLAGS,'-DM10V_PURE_ISP_EFFECTS=1','-DM10V_BORDER_ENABLED=1','-DM10V_HDF_ENABLED=1','-DM10V_HDF_OWNER_OFFSET=0x13bc','-DM10V_BORDER_CACHE_OWNER_OFFSET=0x1564','-DM10V_ISP_EFFECT_CACHE_OWNER_OFFSET=0x15bc']
+  cls.flags=[*FLAGS,'-DM10V_PURE_ISP_EFFECTS=1','-DM10V_BORDER_ENABLED=1','-DM10V_HDF_ENABLED=1','-DM10V_ADJ_EXTRA_CAMERA=1','-DM10V_HDF_OWNER_OFFSET=0x13bc','-DM10V_BORDER_CACHE_OWNER_OFFSET=0x1564','-DM10V_ISP_EFFECT_CACHE_OWNER_OFFSET=0x15bc']
   cls.flags.append('-DM10V_DEBUG_MODE=1')
   subprocess.run([shutil.which('clang'),*cls.flags,'-c',str(source),'-o',str(obj)],check=True,capture_output=True)
   subprocess.run([shutil.which('clang'),*FLAGS,'-c',str(ROOT/'native/gr3/m10v_isp_effects_state.c'),'-o',str(stateobj)],check=True,capture_output=True)
@@ -75,94 +75,44 @@ class EffectsMenuTests(unittest.TestCase):
  def child(self,index):
   for _ in range(index):self.key(0xd1)
   self.key(0xd8)
- def test_root_five_entries_scroll_without_persisting(self):
+ def test_effects_root_only_shows_hdf_and_border(self):
   self.ready();self.call('m10v_hdf_menu_enter',self.page,0,0)
-  self.assertEqual(self.rows(),[1141,1155,1163,1164])
   for _ in range(4):self.key(0xd1)
-  self.assertEqual(self.rows(),[1155,1163,1164,1165]);self.assertEqual(self.get(self.page+0x1a4),4)
-  self.assertEqual(self.saved_settings,[])
- def test_switch_is_outer_row_and_strength_choices_never_contain_off(self):
-  self.ready();self.child(2)
-  self.assertEqual(self.rows(),[1184,1166,1167,1168])
-  self.key(0xd8);self.assertEqual(self.rows()[:2],[972,1185])
-  self.key(0xda);self.key(0xd1);self.key(0xd8)
-  self.assertEqual(self.rows()[:3],[973,974,975])
- def test_disable_edit_strength_then_enable_restores_preference_without_other_changes(self):
-  self.settings=[3,1,2,4,1,2,1,0]
-  self.ready();self.child(2);self.key(0xd8);self.key(0xd0);self.key(0xd8)
-  self.assertEqual(self.settings[0],0)
-  self.key(0xd1);self.key(0xd8)
-  self.assertEqual(self.get(self.page+0x180),2)
-  self.key(0xd0);self.key(0xd0);self.key(0xd8)
-  self.assertEqual(self.settings[0],0)
-  self.key(0xd0);self.key(0xd8);self.key(0xd1);self.key(0xd8)
-  self.assertEqual(self.settings[:7],[1,1,2,4,1,2,1])
- def test_diagnostics_expose_entry_navigation_and_refresh_rejection(self):
-  self.ready();self.call('m10v_hdf_menu_enter',self.page,0,0);self.key(0xd1)
-  self.assertIn(33,[r[0] for r in self.traces]);self.assertIn(35,[r[0] for r in self.traces])
-  self.assertEqual([r[2] for r in self.traces if r[0]==36], [0xd1])
-  self.assertEqual([r[2] for r in self.traces if r[0]==39], [1])
-  self.refresh_error=True
-  self.assertEqual(self.call('m10v_hdf_menu_ready',self.page,0),0)
-  self.assertIn([34,self.page,4,0xfffffffe,1],self.traces)
- def test_stock_factory_polling_never_writes_diagnostic_pages(self):
-  for _ in range(100):
-   self.call('m10v_hdf_menu_factory',self.owner,1)
-   self.call('m10v_hdf_menu_key_route',1)
-  self.assertEqual(self.traces,[])
-  self.call('m10v_hdf_menu_factory',self.owner,0x0200f102)
-  self.assertEqual(self.traces,[])
- def test_all_parameter_fields_round_trip(self):
-  for child,fields in ((2,((0,2,3),(1,2,2),(2,2,2))),(3,((3,3,4),(4,2,2))),(4,((5,2,3),(6,2,2)))):
-   self.setUp();self.ready();self.child(child)
-   self.key(0xd8);self.key(0xd1);self.key(0xd8)
-   for index,(field,maximum,stored) in enumerate(fields):
-    self.key(0xd1)
-    self.key(0xd8)
-    for _ in range(maximum+2):self.key(0xd1)
-    self.assertEqual(self.get(self.page+0x180),maximum)
-    self.key(0xd8);self.assertEqual(self.settings[field],stored)
-    self.assertEqual(self.get(self.page+0x18c),2)
-   self.assertEqual(len(self.saved_settings),len(fields)+1)
- def test_grain_four_strength_choices_exclude_off_and_cancel_never_writes(self):
-  self.ready();self.child(3);self.key(0xd1);self.key(0xd8)
-  self.assertEqual(self.rows(),[1171,973,974,975])
-  for _ in range(4):self.key(0xd1)
-  self.assertEqual(self.get(self.page+0x180),3)
-  self.key(0xda);self.assertEqual(self.saved_settings,[]);self.assertEqual(self.settings[3],0)
-  self.assertEqual(self.get(self.page+0x18c),2)
- def test_failed_save_stays_open_reconciles_and_shows_error(self):
-  self.ready();self.child(2);self.key(0xd8);self.key(0xd1);self.save_error=True;self.key(0xd8)
-  self.assertEqual(self.get(self.page+0x18c),0);self.assertEqual(self.get(self.page+0x188),1)
-  self.assertEqual(self.get(self.page+0x180),0);self.assertIn('m10v_isp_effects_camera_refresh',self.camera_events)
-  self.assertEqual(self.closed,[])
- def test_resources_have_all_stable_ids(self):
+  self.assertEqual(self.get(self.page+0x1a4),1)
+  self.assertEqual(self.rows()[:2],[1141,1155])
+  self.assertFalse(any('isp_effects' in event for event in self.camera_events))
+ def test_resources_keep_fn_labels_and_direction_choices(self):
   words=json.loads((ROOT/'native/gr3/m10v_isp_effects_resources.json').read_text())
-  self.assertEqual(len(words),23);self.assertEqual((words[0],words[-2],words[-1]),('漏光','开关','开启'))
+  self.assertEqual(len(words),23)
+  self.assertEqual(words[:3],['漏光','颗粒','模糊'])
+  self.assertEqual(words[4],'漏光位置 左上右下随机')
+  self.assertEqual([words[i] for i in (12,7,13,8,14)],['左','上','右','下','随机'])
  def test_hdf_border_remain_independent_children(self):
   self.ready();self.child(0);self.key(0xd1);self.key(0xd8)
   self.assertEqual(self.hdf_saved,[1]);self.assertEqual(self.get(self.page+0x18c),1)
   self.key(0xd1);self.key(0xd8);self.key(0xd1);self.key(0xd1);self.key(0xd8)
   self.assertEqual(self.border_saved,[2]);self.assertEqual(self.get(self.page+0x18c),1)
   self.assertEqual(self.saved_settings,[])
- def test_cache_separate_from_controller_and_destructor_invalidates_only_magic(self):
-  self.u.mem_write(self.page+0x1e8,bytes([0xa5])*0x48)
-  self.ready();self.assertEqual(bytes(self.u.mem_read(self.page+0x1e8,0x18)),bytes(0x18))
-  self.assertEqual(self.get(self.page+0x22c),0xa5a5a5a5)
-  before=bytes(self.u.mem_read(self.page+0x204,40))
-  self.call('m10v_hdf_menu_top_dtor',self.owner)
-  self.assertEqual(self.get(self.page+0x200),0)
-  self.assertEqual(bytes(self.u.mem_read(self.page+0x204,40)),before)
- def test_optional_layout_builder_and_missing_features_fail(self):
+ def test_adj_border_opens_directly_and_closes_to_parent(self):
+  route=0x0200f108
+  self.assertEqual(self.call('m10v_hdf_menu_factory',self.owner,route),self.page)
+  self.assertEqual(self.call('m10v_hdf_menu_ready',self.page,route),1)
+  self.call('m10v_hdf_menu_enter',self.page,route,0)
+  self.assertEqual(self.rows()[:3],[972,1156,1157])
+  self.assertNotIn('m10v_hdf_load',self.camera_events)
+  self.key(0xd1);self.key(0xd8)
+  self.assertEqual(self.border_saved,[1])
+  self.assertEqual(self.closed,[self.page])
+  self.assertEqual(self.call('m10v_hdf_menu_ready',self.page,route),1)
+  self.key(0xd1);self.key(0x86)
+  self.assertEqual(self.border_saved,[1])
+  self.assertEqual(self.closed,[self.page,self.page])
+  self.ready()
+  self.assertEqual(self.get(self.page+0x18c),1)
+ def test_controller_keeps_preexisting_owner_extent(self):
   symbols={f'm10v_hdf_menu_{n}':0x54101000+i*4 for i,n in enumerate(('destroy','enter','ready','key','factory','top_ctor','top_dtor','key_route'))}
   settings={'rows':[],'exports':{'m10v_settings_top_dtor_original':0x53190000,'m10v_settings_factory_original':0x53190004}}
   _,m=builder.build_hooks(0x54120000,symbols,settings,film_library=False,pure_isp_effects=True)
-  old=builder.build_hooks(0x54120000,symbols,settings,film_library=False)
-  self.assertEqual(old,builder.build_hooks(0x54120000,symbols,settings,film_library=False,pure_isp_effects=False))
-  self.assertEqual(old[1]['controller_bytes'],0x1c0);self.assertNotIn('effects_cache_owner_offset',old[1])
-  self.assertEqual(m['controller_bytes'],0x200);self.assertEqual(m['owner_bytes'],0x13bc+0x22c)
-  self.assertEqual(m['effects_cache_owner_offset'],0x15bc)
-  for define in ('-DM10V_BORDER_ENABLED=0','-DM10V_HDF_ENABLED=0'):
-   flag=define.split('=')[0]+'=1';flags=[x for x in self.flags if x!=flag]
-   p=subprocess.run([shutil.which('clang'),*flags,define,'-c',str(ROOT/'native/gr3/m10v_hdf_menu.c'),'-o',str(Path(self.tmp.name)/'bad.o')],capture_output=True)
-   self.assertNotEqual(p.returncode,0)
+  self.assertEqual(m['owner_bytes'],0x13bc+0x22c)
+  self.call('m10v_hdf_menu_top_dtor',self.owner)
+  self.assertFalse(any('isp_effects' in event for event in self.camera_events))

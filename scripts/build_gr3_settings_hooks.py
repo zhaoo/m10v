@@ -9,9 +9,12 @@ BASE_VTABLE=[0x5316c7e0,0x5316c774,0x5316c7bc,0x5316c740,0x5316c748,
  0x5316dfa8,0x5316c74c,0x5316c750,0x5316c754,0x5316c758,
  0x5316c760,0x5316c768,0x5316d0f0,0x5316c76c,0x5316cec8]
 
-def build_settings_hooks(base,symbols,live_color=False,appended_slots=False,custom_zoom=True,companion=False):
+def build_settings_hooks(base,symbols,live_color=False,appended_slots=False,custom_zoom=True,companion=False,extra_owner_bytes=0):
  if type(companion)is not bool or (companion and not live_color):raise ValueError("companion requires live owner cache")
  owner_bytes=0x6440 if companion else 0x613c if live_color else 0x213c
+ if extra_owner_bytes:
+  if extra_owner_bytes!=0x6d00 or not live_color:raise ValueError('extended controls require the shared TopMenu owner')
+  owner_bytes=extra_owner_bytes
  image=bytearray();exports={};patches=[];rows=[]
  def data(raw):
   image.extend(bytes(-len(image)&3));a=base+len(image);image.extend(raw);return a

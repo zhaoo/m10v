@@ -235,6 +235,11 @@ int m10v_capture_library(uint32_t context) {
         *(const uint32_t *)(uintptr_t)request != 0x53d0fe60u) REJECT(-3,5,request,shooting);
     const uint8_t *req = (const uint8_t *)(uintptr_t)request;
     if (req[12] != 1 || req[13] > 1 || ((const uint8_t *)(uintptr_t)jpeg)[16] != 1) REJECT(-4,6,req[12],req[13]);
+#if M10V_RAW_DEVELOPMENT
+    /* Mode 12 owns its completed color and identity in Still Make. The
+     * developed JPEG never uses the live capture journal or residual effects. */
+    if(sequence_mode==12u)return 0;
+#endif
 #if M10V_PURE_ISP_EFFECTS
     /* This bridge's return value is not an encoder abort. The authenticated
      * gate retains an incomplete admitted frame instead of returning and

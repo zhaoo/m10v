@@ -18,7 +18,7 @@ int m10v_isp_effects_render(uint32_t ctx,const uint32_t photo[8],uint32_t work,u
  copy_words((uint32_t*)&frozen,(const uint32_t*)shot,sizeof(frozen)/4u);
  const m10v_isp_effects_settings *s=&frozen.settings;
  if(frozen.magic!=M10V_ISP_EFFECTS_SHOT_MAGIC||!ram(frozen.owner,4)||frozen.ready!=1||frozen.planned!=1||!frozen.source_si||frozen.failed||
-    frozen.effective_grain_strength>3||s->leak_gain>3||s->leak_position>2||s->leak_spread>2||s->grain_mode>4||s->grain_size>2||s->blur_gain>3||s->blur_range>2||s->reserved||frozen.reserved||
+    frozen.effective_grain_strength>3||s->leak_gain>3||s->leak_position>4||s->leak_spread>2||s->grain_mode>4||s->grain_size>2||s->blur_gain>3||s->blur_range>2||s->reserved||frozen.reserved||
     (frozen.saved_orientation!=1&&frozen.saved_orientation!=3&&frozen.saved_orientation!=6&&frozen.saved_orientation!=8)||
     (s->grain_mode&&frozen.effective_grain_strength!=s->grain_mode-1u))return -1;
  if(!s->leak_gain&&!frozen.effective_grain_strength)return 1;
@@ -55,9 +55,13 @@ int m10v_isp_effects_render(uint32_t ctx,const uint32_t photo[8],uint32_t work,u
     overlap(original_y,allocation_y,U(&frozen),sizeof(frozen))||overlap(original_uv,allocation_uv,U(&frozen),sizeof(frozen)))return -1;
  if(s->leak_gain){
   uint32_t position=s->leak_position,orientation=frozen.saved_orientation;
-  if((orientation==3u||orientation==6u)&&position<2u)position^=1u;
+  uint32_t vertical=orientation==6u||orientation==8u;
+  if(position>=3u){
+   position=(position-3u)^(orientation==3u||orientation==8u);
+   vertical=!vertical;
+  }else if((orientation==3u||orientation==6u)&&position<2u)position^=1u;
   uint32_t at=position*3u+s->leak_spread,profile=(s->leak_gain-1u)*3u;
-  const m10v_isp_effect_texture (*fields)[2]=(orientation==6u||orientation==8u)?m10v_render_leaks_vertical:m10v_render_leaks;
+  const m10v_isp_effect_texture (*fields)[2]=vertical?m10v_render_leaks_vertical:m10v_render_leaks;
   const m10v_isp_effect_texture *field=&fields[at][0];
   if(prepare(field,work,capacity,w,h,field->width,field->height,0,format,&plan,frozen.source_si)!=1)return -4;
   copy_words(uvview,p,8);uvview[1]=p[2];uvview[2]=0;uvview[4]=w|(uvh<<16);uvview[5]=stride|(uvh<<16);

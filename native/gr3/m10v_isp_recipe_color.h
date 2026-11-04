@@ -13,6 +13,7 @@ typedef struct {
     uint32_t si,info,tuning,busy;
     union {
       m10v_isp_frame_target target;
+      struct {uint32_t code,mode,generation;} raw;
       struct {uint32_t magic,si,tone,grain,size,planned,armed,noise_ready,done;} native_grain;
     };
     m10v_library_state state;
@@ -21,6 +22,8 @@ typedef struct {
  * Call before queueing the recipe; SD/filesystem services are not called here.
  * This module does NOT claim any approximate target is equivalent to a 3D LUT. */
 int m10v_isp_frame_recipe_snapshot(void *recipe,const m10v_library_state *);
+int m10v_isp_frame_raw_supported(uint32_t film);
+int m10v_isp_frame_raw_snapshot(void *recipe,uint32_t mode,uint32_t code);
 int m10v_isp_frame_recipe_state(void *recipe,m10v_library_state *out);
 int m10v_isp_frame_recipe_producer(void *recipe);
 uint32_t m10v_isp_frame_recipe_direction(void *recipe,uint32_t shooting);

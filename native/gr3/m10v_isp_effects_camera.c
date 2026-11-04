@@ -76,6 +76,11 @@ static int effect_latest(uint32_t fs,m10v_isp_effects_settings *settings,
     if(record)for(uint32_t i=0;i<M10V_ISP_EFFECTS_RECORD_SIZE;i++)record[i]=records[chosen][i];
     return 1;
 }
+int m10v_isp_effects_camera_read_legacy(uint32_t fs,m10v_isp_effects_settings *settings){
+    uint32_t sequence;
+    m10v_isp_effects_defaults(settings);
+    return effect_latest(fs,settings,&sequence,0);
+}
 /* Compare a journal candidate to an authenticated warm cache. Serial ordering
  * has the same less-than-half-range surviving-generation contract as codec. */
 static int effect_not_older(const m10v_isp_effects_settings *candidate,uint32_t seq,

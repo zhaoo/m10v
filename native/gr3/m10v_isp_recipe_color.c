@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include "m10v_custom_isp.h"
 #include "m10v_film_identity.h"
+#include "m10v_recorded_film.h"
 #if M10V_PURE_ISP_EFFECTS
 #include "m10v_isp_effects_pipeline.h"
 #endif
@@ -11,15 +12,16 @@ void m10v_isp_frame_identity_clear(uint32_t si){
  __atomic_store_n(&p->magic,0,__ATOMIC_RELEASE);p->generation++;p->code=0;p->check=0;
 }
 uint32_t m10v_isp_frame_identity_code(uint32_t si){return m10v_film_identity_read(si);}
-static void identity_publish(uint32_t si,const m10v_library_state *state,uint32_t tone){
- m10v_film_identity *p=m10v_film_identity_owned(si);uint32_t slot=m10v_tone_slot(tone);
- if(!p||slot>=M10V_SLOT_COUNT)return;
- uint32_t film=state->slots[slot].film,bank=state->effects[slot].reserved[0],code=0;
- if(M10V_BUILTIN(film))code=0x1000u+film;
- else if(M10V_CUSTOM(film)&&bank>=21&&bank<=255)code=0x2000u+(film-79u)*235u+bank-21u;
- if(!code)return;
+static void identity_publish_code(m10v_film_identity *p,uint32_t code){
+ if(!p||!code)return;
  p->code=code;p->check=~code^p->generation;
  __atomic_store_n(&p->magic,M10V_FILM_IDENTITY_MAGIC,__ATOMIC_RELEASE);
+}
+static void identity_publish(uint32_t si,const m10v_library_state *state,uint32_t tone){
+ uint32_t slot=m10v_tone_slot(tone);
+ if(slot>=M10V_SLOT_COUNT)return;
+ uint32_t code=m10v_recorded_film_code(state->slots[slot].film,state->effects[slot].reserved[0]);
+ identity_publish_code(m10v_film_identity_owned(si),code);
 }
 typedef struct {uint32_t magic;m10v_isp_frame_target target;} custom_isp_snapshot;
 _Static_assert(sizeof(custom_isp_snapshot)==M10V_SAVE_CUSTOM_ISP_BYTES,"custom recipe extent");
@@ -121,6 +123,86 @@ static m10v_isp_recipe_color *from_context(const void *context){
     if(parameters<0x1a8)return 0;
     return owned((void *)(parameters-0x1a8));
 }
+#if M10V_RAW_DEVELOPMENT
+#define M10V_ISP_RECIPE_RAW_MAGIC 0x31574152u
+#define M10V_RAW_CARRIER_TONE 25u
+static int raw_mode(uint32_t mode){return mode-9u<=3u;}
+int m10v_isp_frame_raw_supported(uint32_t film){
+ return film!=M10V_CHAR_ID&&film!=M10V_PIXEL_ID&&supported(film,0);
+}
+int m10v_isp_frame_raw_snapshot(void *recipe,uint32_t mode,uint32_t code){
+ m10v_isp_recipe_color *s=owned(recipe);
+ if(!s||!raw_mode(mode)||s->busy)return 0;
+ s->magic=0;
+ uint32_t si=*(const uint32_t *)((const uint8_t *)recipe+0x44c8u);
+ m10v_film_identity *lease=m10v_film_identity_owned(si);
+ if(!lease)return 0;
+ __atomic_store_n(&lease->magic,0,__ATOMIC_RELEASE);
+ m10v_recorded_film film;
+ if(!m10v_recorded_film_read(code,&film)||film.bank||
+    !m10v_isp_frame_raw_supported(film.id))return 0;
+ s->version=1;s->bytes=sizeof(*s);s->status=M10V_ISP_RECIPE_READY;
+ s->si=si;s->info=0;s->tuning=0;s->tone=0;s->selected_tone=0;
+ s->raw.code=code;s->raw.mode=mode;s->raw.generation=lease->generation;
+ s->magic=M10V_ISP_RECIPE_RAW_MAGIC;
+ return 1;
+}
+static m10v_film_identity *raw_lease(const m10v_isp_recipe_color *s,const void *context){
+ uintptr_t recipe=(uintptr_t)s-M10V_SAVE_COLOR_OFFSET;
+ if((uintptr_t)context!=recipe+0x96cu||
+    *(const uint32_t *)(recipe+0x18u)!=s->raw.mode||
+    *(const uint32_t *)(recipe+0x44c8u)!=s->si||
+    ((const uint32_t *)context)[0x34/4]!=s->si)return 0;
+ m10v_film_identity *lease=m10v_film_identity_owned(s->si);
+ return lease&&lease->generation==s->raw.generation?lease:0;
+}
+static int raw_begin(m10v_isp_recipe_color *s,const void *context,void *tuning,void *info){
+ if(s->version!=1||s->bytes!=sizeof(*s)||s->busy||!tuning||!info||
+    *(const uint32_t *)tuning!=0x53dbd8a0u||
+    ((const uint8_t *)info)[0x82acu]!=0||
+    ((const uint32_t *)info)[0x82d0u/4]!=s->si)return 0;
+ m10v_film_identity *lease=raw_lease(s,context);
+ if(!lease)return 0;
+ /* A repeated Make must earn its own completed identity again. */
+ if(s->raw.mode==12u)__atomic_store_n(&lease->magic,0,__ATOMIC_RELEASE);
+ uint8_t *shot=(void *)(uintptr_t)s->si;
+ s->tone=shot[0x77c];
+ s->info=(uint32_t)(uintptr_t)info;s->tuning=(uint32_t)(uintptr_t)tuning;
+ s->busy=1;
+ /* This synchronous Still Make call owns the recipe's leased SI. Only
+  * its native parameter reads see the neutral carrier. Restore the stock
+  * tone before any subsequent processing or original metadata writer. */
+ shot[0x77c]=M10V_RAW_CARRIER_TONE;
+ return 1;
+}
+static int raw_finish(m10v_isp_recipe_color *s,const void *context){
+ if(!s->busy)return 0;
+ m10v_film_identity *lease=raw_lease(s,context);
+ void *info=(void *)(uintptr_t)s->info;
+ const uint8_t *tuning=(const void *)(uintptr_t)s->tuning;
+ s->busy=0;s->info=0;s->tuning=0;
+ s->status=M10V_ISP_RECIPE_REJECTED;
+ /* Even a rejected context must release the temporary carrier if this
+  * exact SI lease is still valid. Never write to a returned or reused SI. */
+ m10v_film_identity *owner=m10v_film_identity_owned(s->si);
+ if(!owner||owner->generation!=s->raw.generation)return 0;
+ uint8_t *shot=(void *)(uintptr_t)s->si;
+ shot[0x77c]=(uint8_t)s->tone;
+ if(!lease||((const uint8_t *)info)[0x82acu]!=0||
+    ((const uint32_t *)info)[0x82d0u/4]!=s->si)return 0;
+ uint32_t film=s->raw.code-M10V_RECORDED_BUILTIN_BASE;
+ uint32_t generation=s->si^s->raw.generation^s->raw.code;
+ if(!generation)generation=1;
+ m10v_isp_native_look look;
+ const void *gamma=*(const void *const *)(tuning+0x17c);
+ if(!m10v_isp_native_look_prepare(&look,film,0,generation)||
+    !m10v_isp_native_look_apply(&look,gamma,info,shot[0x7be]==1)||
+    !m10v_isp_native_look_matches(&look,film,0,generation))return 0;
+ s->status=M10V_ISP_RECIPE_APPLIED;
+ if(s->raw.mode==12u)identity_publish_code(lease,s->raw.code);
+ return 1;
+}
+#endif
 int m10v_isp_frame_recipe_snapshot(void *recipe,const m10v_library_state *state){
     m10v_isp_recipe_color *s=owned(recipe);
     if(!s||!m10v_library_valid(state))return 0;
@@ -154,13 +236,8 @@ int m10v_isp_frame_recipe_state(void *recipe,m10v_library_state *out){
 static int producer_mutating(m10v_isp_recipe_color *s){
  s->version=1;s->bytes=sizeof(*s);s->status=M10V_ISP_RECIPE_MUTATING;s->busy=0;s->selected_tone=0;s->magic=M10V_ISP_RECIPE_COLOR_MAGIC;return 0;
 }
-int m10v_isp_frame_recipe_producer(void *recipe){
+static int recipe_producer(void *recipe){
 #if M10V_ISP_RECIPE_COLOR_PRODUCER
-#if M10V_PURE_ISP_EFFECTS
-    /* Independent global effects freeze at genuine ingress even when color
-     * is already frozen, the stock tone has no slot, or color UI is cold. */
-    m10v_isp_effects_shot_freeze((uint32_t)(uintptr_t)recipe);
-#endif
 #if M10V_ISP_SHARED_HDF
     m10v_hdf_task_snapshot((uint32_t)(uintptr_t)recipe);
 #endif
@@ -216,8 +293,22 @@ int m10v_isp_frame_recipe_producer(void *recipe){
     (void)recipe;return 0;
 #endif
 }
+int m10v_isp_frame_recipe_producer(void *recipe){
+#if M10V_RAW_DEVELOPMENT
+    m10v_isp_recipe_color *s=owned(recipe);
+    if(s&&raw_mode(*(const uint32_t *)((const uint8_t *)recipe+0x18u)))return 0;
+#endif
+    int result=recipe_producer(recipe);
+#if M10V_PURE_ISP_EFFECTS
+    m10v_isp_effects_shot_freeze((uint32_t)(uintptr_t)recipe);
+#endif
+    return result;
+}
 int m10v_isp_frame_recipe_begin(const void *context,void *tuning,void *info){
     m10v_isp_recipe_color *s=from_context(context);
+#if M10V_RAW_DEVELOPMENT
+    if(s&&s->magic==M10V_ISP_RECIPE_RAW_MAGIC)return raw_begin(s,context,tuning,info);
+#endif
     if(!s||s->magic!=M10V_ISP_RECIPE_COLOR_MAGIC||s->version!=1||s->bytes!=sizeof(*s)||
        (s->status!=M10V_ISP_RECIPE_READY&&s->status!=M10V_ISP_RECIPE_APPLIED&&s->status!=M10V_ISP_RECIPE_OBSERVED)||s->busy||!tuning||!info||
        *(uint32_t *)tuning!=0x53dbd8a0u)return 0;
@@ -262,6 +353,9 @@ int m10v_isp_frame_recipe_begin(const void *context,void *tuning,void *info){
 }
 int m10v_isp_frame_recipe_finish(const void *context){
     m10v_isp_recipe_color *s=from_context(context);
+#if M10V_RAW_DEVELOPMENT
+    if(s&&s->magic==M10V_ISP_RECIPE_RAW_MAGIC)return raw_finish(s,context);
+#endif
     if(!s||s->magic!=M10V_ISP_RECIPE_COLOR_MAGIC||!s->busy)return 0;
     void *info=(void *)(uintptr_t)s->info;
     const uint8_t *tuning=(const uint8_t *)(uintptr_t)s->tuning;
@@ -373,8 +467,6 @@ uint32_t m10v_isp_frame_recipe_grain_settings(const void *context,void *params,u
         uint32_t tone=*(const uint8_t*)(uintptr_t)(si+0x77cu);
         uint32_t slot=m10v_tone_slot(selected_tone(s,tone));
         if(slot<M10V_SLOT_COUNT&&s->state.slots[slot].film){
-            uint32_t film=s->state.slots[slot].film;
-            if(film==M10V_PIXEL_ID||film==M10V_CHAR_ID)return hdf;
             strength=s->state.slots[slot].grain;
         }
     }

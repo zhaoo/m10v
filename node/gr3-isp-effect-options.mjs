@@ -21,7 +21,7 @@ export function resolveIspEffectOptions(source,input={},sourceModel){
  const options={
   debug_mode:input.debug_mode??false,extensions:input.extensions,version_unlock:input.version_unlock,
   film_library,hdf_enabled:input.hdf_enabled,
-  halation_enabled:input.halation_enabled??false,border_enabled:input.border_enabled??false,
+  halation_enabled:input.halation_enabled??(film_library!==false&&input.live_color!==false),border_enabled:input.border_enabled??false,
   ab_enabled:input.ab_enabled??false,appended_slots:input.appended_slots,
   live_color:input.live_color,pure_isp_effects,
  };

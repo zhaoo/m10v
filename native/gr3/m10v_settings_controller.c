@@ -10,6 +10,24 @@
 #include "m10v_film_card.h"
 #include "m10v_film_directory.h"
 #include "m10v_zoom_camera.h"
+#if M10V_ADJ_EXTRA_CAMERA
+#include "m10v_adj_extra_camera.h"
+#define M10V_SETTINGS_ADJ_EXTRA 10u
+static const uint8_t adj_extra_functions[]={
+ M10V_ADJ_EXTRA_GUIDES,M10V_ADJ_EXTRA_FILM,M10V_ADJ_EXTRA_EFFECTS,M10V_ADJ_EXTRA_ASPECT,20,
+#if M10V_BORDER_ENABLED
+ M10V_ADJ_EXTRA_BORDER,
+#endif
+};
+static uint32_t adj_function(uint32_t index){
+ const volatile uint8_t *stock=(const volatile uint8_t *)M10V_ADJ_EXTRA_STOCK_LIST;
+ if(index<M10V_ADJ_EXTRA_STOCK_CHOICES)return stock[index];
+ return adj_extra_functions[index-M10V_ADJ_EXTRA_STOCK_CHOICES];
+}
+#endif
+#if M10V_GUIDES_CAMERA
+#include "m10v_guides_camera.h"
+#endif
 #ifndef M10V_AB_ENABLED
 #define M10V_AB_ENABLED 1
 #endif
@@ -75,7 +93,9 @@ static m10v_settings_controller *page(uint32_t owner,uint32_t i){
 }
 #include "m10v_ab_camera.inc"
 uint32_t m10v_settings_controller_owner_size(void){
-#if M10V_COMPANION_ENABLED
+#if M10V_ADJ_EXTRA_CAMERA || M10V_GUIDES_CAMERA
+ return 0x6d00;
+#elif M10V_COMPANION_ENABLED
  return M10V_COMPANION_DESCRIPTOR_OFFSET+M10V_COMPANION_DESCRIPTOR_BYTES;
 #else
  return M10V_SETTINGS_OWNER_BYTES+2*M10V_SETTINGS_CONTROLLER_BYTES+(M10V_LIVE_COLOR?0x4000u:0u);
@@ -97,6 +117,12 @@ uint32_t m10v_settings_controller_top_ctor(uint32_t owner){
 #if M10V_COMPANION_ENABLED
  m10v_companion_ui_init(owner);
 #endif
+#if M10V_ADJ_EXTRA_CAMERA
+ m10v_adj_extra_camera_init(owner);
+#endif
+#if M10V_GUIDES_CAMERA
+ m10v_guides_camera_init(owner);
+#endif
  #if M10V_HALF_PAIR_ENABLED
  m10v_half_pair_init(owner);
  #endif
@@ -109,6 +135,12 @@ uint32_t m10v_settings_controller_destroy(m10v_settings_controller *p){
  return (uint32_t)(uintptr_t)p;
 }
 uint32_t m10v_settings_controller_top_dtor(uint32_t owner){
+#if M10V_ADJ_EXTRA_CAMERA
+ m10v_adj_extra_camera_dispose(owner);
+#endif
+#if M10V_GUIDES_CAMERA
+ m10v_guides_camera_dispose(owner);
+#endif
 #if M10V_COMPANION_ENABLED
  m10v_companion_ui_stop(owner);
 #endif
@@ -123,6 +155,12 @@ uint32_t m10v_settings_controller_top_dtor(uint32_t owner){
  return m10v_settings_top_dtor_original(owner);
 }
 uint32_t m10v_settings_controller_factory(uint32_t factory,uint32_t route){
+#if M10V_ADJ_EXTRA_CAMERA
+ if(route==M10V_SETTINGS_ADJ_ROUTE){
+  uint32_t owner=m10v_settings_factory_original(factory,0x0200004au);
+  return owner?(uint32_t)(uintptr_t)page(owner,1):0;
+ }
+#endif
  if(route==M10V_SETTINGS_AB_ROUTE&&!m10v_settings_controller_ab_available())return m10v_settings_factory_original(factory,route);
  if(route!=M10V_SETTINGS_FILMS_ROUTE&&route!=M10V_SETTINGS_STAMP_ROUTE&&route!=M10V_SETTINGS_NAME_ROUTE&&route!=M10V_SETTINGS_AB_ROUTE&&route!=M10V_SETTINGS_ZOOM_ROUTE)
   return m10v_settings_factory_original(factory,route);
@@ -142,6 +180,16 @@ uint32_t m10v_settings_controller_ready(m10v_settings_controller *p,uint32_t rou
  p->base[0x12b]=p->page==M10V_SETTINGS_AB?0:2;
  p->base[0x137]=p->page==M10V_SETTINGS_AB?0:2;
  int opened=0;
+#if M10V_ADJ_EXTRA_CAMERA
+ if(route==M10V_SETTINGS_ADJ_ROUTE){
+  m10v_adj_extra_assignments a;
+  m10v_adj_extra_camera_load(&a);
+  p->page=M10V_SETTINGS_ADJ_EXTRA;
+  p->state.focus=0;p->state.error=0;p->state.value=a.function[0];
+  p->state.expected=(uint32_t)a.function[0]|((uint32_t)a.function[1]<<8)|
+      ((uint32_t)a.function[2]<<16)|((uint32_t)a.function[3]<<24);
+ }else
+#endif
  if(p->page==M10V_SETTINGS_ZOOM){m10v_zoom_menu_ops z;zoom_ops(&z);m10v_zoom_menu_open(&p->zoom,&z);}
  else opened=m10v_settings_open(&p->state,&o,p->page);
  if(route==M10V_SETTINGS_AB_ROUTE)M10V_LOG(92,route,(uint32_t)opened,p->state.screen,p->view.count);
@@ -155,6 +203,10 @@ void m10v_settings_controller_enter(m10v_settings_controller *p,uint32_t route,u
  if(route==M10V_SETTINGS_AB_ROUTE)M10V_LOG(94,(uint32_t)(uintptr_t)p,route,p->state.screen,flags);
  (void)route;(void)flags;m10v_settings_ops o;ops(&o);
  M10V_LOG(80,p->page,route,p->state.screen,p->state.focus);
+#if M10V_ADJ_EXTRA_CAMERA
+ if(p->page==M10V_SETTINGS_ADJ_EXTRA)m10v_settings_view_adj(&p->view,&p->state);
+ else
+#endif
  if(p->page==M10V_SETTINGS_ZOOM)m10v_settings_view_zoom(&p->view,&p->zoom);
  else m10v_settings_view_draw(&p->view,&p->state,&o);
  ((fn3)0x5316d354u)((uint32_t)(uintptr_t)p,0,p->view.widgets[0]);
@@ -227,6 +279,34 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
  case 0x86:case 0x89:case 0xda:key=M10V_KEY_BACK;break;
  default:return 0;
  }
+#if M10V_ADJ_EXTRA_CAMERA
+ if(p->page==M10V_SETTINGS_ADJ_EXTRA){
+  m10v_settings *s=&p->state;
+  s->error=0;
+  if(key==M10V_KEY_BACK){
+   ((fn1)0x5316ca28u)((uint32_t)(uintptr_t)p);
+   return 1;
+  }
+  if(key==M10V_KEY_UP||key==M10V_KEY_DOWN){
+   s->focus=(s->focus+(key==M10V_KEY_UP?3u:1u))&3u;
+   s->value=(s->expected>>(8*s->focus))&255u;
+  }else if(key==M10V_KEY_LEFT||key==M10V_KEY_RIGHT){
+   uint32_t index=0,count=M10V_ADJ_EXTRA_STOCK_CHOICES+sizeof(adj_extra_functions);
+   for(uint32_t i=1;i<count;i++)if(adj_function(i)==s->value)index=i;
+   index=key==M10V_KEY_LEFT?(index?index-1:count-1):(index+1==count?0:index+1);
+   s->value=adj_function(index);
+  }else if(key==M10V_KEY_OK){
+   uint32_t shift=8*s->focus,old=(s->expected>>shift)&255u;
+   if(s->value!=old){
+    if(m10v_adj_extra_camera_assign(s->focus+6,s->value))
+     s->expected=(s->expected&~(255u<<shift))|(s->value<<shift);
+    else s->error=M10V_SETTINGS_SAVE_FAILED;
+   }
+  }
+  m10v_settings_view_adj(&p->view,s);
+  return 1;
+ }
+#endif
  if(p->page==M10V_SETTINGS_ZOOM){
   m10v_zoom_menu_ops z;zoom_ops(&z);
   m10v_zoom_menu_key(&p->zoom,&z,key);
@@ -266,6 +346,9 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
 /* Scoped to the original key dispatch call site, never the global route getter. */
 uint32_t m10v_settings_controller_key_route(uint32_t model){
  uint32_t route=((fn1)0x53228c4cu)(model);
+#if M10V_ADJ_EXTRA_CAMERA
+ if(route==M10V_SETTINGS_ADJ_ROUTE)return 0x0200004au;
+#endif
  return route==M10V_SETTINGS_FILMS_ROUTE||route==M10V_SETTINGS_STAMP_ROUTE||route==M10V_SETTINGS_NAME_ROUTE||route==M10V_SETTINGS_AB_ROUTE||route==M10V_SETTINGS_ZOOM_ROUTE?0x0200004au:route;
 }
 

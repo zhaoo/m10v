@@ -139,6 +139,19 @@ def apply_overlay(rtos,half_frame=True):
     for address in [0x531b4e08,0x531b6bd0,0x531b82f8]:
         mov(address,3,table,expected=(0xe30938cc,0xe30a3520))
         mov(address+4,3,table,True,expected=(0xe345340b,0xe34533b5))
+    # Stock ADJ still type 4 has separate count, draw, apply and check
+    # callbacks. Extend those specific consumers without changing the
+    # native ADJ descriptor, option navigation, or shared icon translator.
+    for address,name,preimage in [
+        (0x5319fea0,'adj_count',0xe3a00002),
+        (0x531a0dd8,'adj_apply',0xe1a0c00d),
+        (0x531a1218,'adj_checked',0xe1a0c00d),
+    ]:
+        word(address,branch(address,symbols['m10v_aspect_'+name]),preimage)
+    for address in [0x531a0df0,0x531a1234,0x531a3438]:
+        mov(address,3,table,expected=0xe30a3520)
+        mov(address+4,3,table,True,expected=0xe34533b5)
+    word(0x531a3444,branch(0x531a3444,symbols['m10v_aspect_live_icon'],True),0xeb03c0ed)
     classes=symbols['m10v_aspect_classes']
     word(0x534371d4,0xe3530005 if half_frame else 0xe3530004,(0xe3530002,0xe3530003))
     mov(0x534371dc,2,classes,expected=(0xe30c2dcc,0xe30928d0))

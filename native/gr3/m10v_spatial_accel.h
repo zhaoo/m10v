@@ -13,6 +13,17 @@
 int m10v_spatial_blur_u16(uint16_t *a,uint16_t *b,uint32_t capacity,
     uint32_t width,uint32_t height,uint32_t passes,uint32_t distance);
 
+/* Same synchronous NEON ownership as blur. Cell width is 8 or 16 and
+ * starts on a chroma pair. A null chroma pointer selects luminance only.
+ * A null peak pointer requests only the sum. */
+uint32_t m10v_spatial_halo_cell(const uint8_t *y,const uint8_t *chroma,
+    uint32_t stride,uint32_t width,uint32_t rows,uint32_t gate,uint32_t *peak);
+
+/* Fill only the vectorizable interior of one original image row.
+ * Return the first unwritten index, or 0 when the scalar path is needed. */
+uint32_t m10v_spatial_halo_line(const uint8_t *y,const uint8_t *chroma,
+    uint16_t *line,uint32_t width,uint32_t gate,uint32_t distance);
+
 /* Official Granulation workspace protocol, independently executed against
  * locked GR III 2.10 bytes: align16(width)*height + alignment headroom.
  * Pure query only; never allocates. Address 0 queries an aligned buffer.

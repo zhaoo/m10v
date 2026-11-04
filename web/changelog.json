@@ -2,6 +2,22 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.05.1",
+      "date": "2026-11-05",
+      "title": "扩展 ADJ、RAW 显影与逐卷效果",
+      "changes": [
+        "GR III 2.10 和 GR IIIx 1.60 支持九格 ADJ、扩展画幅、边框快捷入口及黄金构图线。修复退出后重绘引用已释放控件的问题。",
+        "机内 RAW 显影可选卷或使用 As Shot，按每张 DNG 的配方处理，回放详情显示实际胶卷。",
+        "在 FN 内按卷设置颗粒、漏光、模糊和光晕。保留 800T 和蓝凤凰的专属光晕，修正漏光位置标题。",
+        "停止提供 GR III 2.20 的修改固件生成。",
+        "新版 GR III 2.10 无线连接包配套 GRemote Android 1.2.4，旧连接包仍可在新版 App 中使用。"
+      ],
+      "notice": "GR III 2.10 候选已获用户实机验收。GR IIIx 1.60 已通过离线回归。请使用与机型匹配的固件及胶卷资源。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.04.4",
       "date": "2026-11-04",
       "title": "修复 GRemote 开关置灰",
@@ -10,9 +26,9 @@
         "胶卷库关闭或机型不支持时，在开关旁说明原因。"
       ],
       "notice": "仅修正网页配置入口。使用上一版已真机验收的 GR III 2.10 固件及 SD 服务。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "340a4f44344bd9e2b5583162e59a6e6c1ee5566f",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/41764916541"
     },
     {
       "version": "2026.11.04.3",

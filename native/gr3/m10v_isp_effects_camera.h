@@ -2,6 +2,7 @@
 #define M10V_ISP_EFFECTS_CAMERA_H
 #include <stdint.h>
 #include "m10v_isp_effects_state.h"
+int m10v_isp_effects_camera_read_legacy(uint32_t fs,m10v_isp_effects_settings *settings);
 
 /* Builder must reserve this entire independently owned tail before the UI
  * controller constructor, and define M10V_ISP_EFFECT_CACHE_OWNER_OFFSET for
