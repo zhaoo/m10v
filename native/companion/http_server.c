@@ -41,7 +41,11 @@ static int receipt_json(m10v_companion_server*s,const m10v_operation_receipt*r){
  if(r->status==M10V_OPERATION_COMMITTED&&r->has_snapshot){text(&w,",\"snapshot\":");if(r->extension)extension_json(s,&w,&r->extension_snapshot);else snapshot_json(s,&w,&r->snapshot);}text(&w,"}");return finish(s,&w);
 }
 int m10v_companion_server_init(m10v_companion_server*s,const m10v_companion_server_config*cfg,const m10v_companion_backend*backend){
- if(!s||!cfg||!backend||!backend->exchange||!cfg->random||!cfg->now_ms||!cfg->operation_timeout_ms)return 1;for(unsigned i=0;i<sizeof(*s);i++)((uint8_t*)s)[i]=0;s->config=cfg;s->backend=*backend;s->pending_index=-1;uint8_t boot[16];if(!cfg->random(cfg->random_ctx,boot,16))return 1;return m10v_auth_init(&s->auth,cfg->key,cfg->key_id,boot,cfg->random,cfg->random_ctx);
+ if(!s||!cfg||!backend||!backend->exchange||!cfg->random||!cfg->now_ms||!cfg->operation_timeout_ms)return 1;for(unsigned i=0;i<sizeof(*s);i++)((uint8_t*)s)[i]=0;s->config=cfg;s->backend=*backend;s->pending_index=-1;uint8_t boot[16];if(!cfg->random(cfg->random_ctx,boot,16))return 1;if(!cfg->hotspot_pairing)return m10v_auth_init(&s->auth,cfg->key,cfg->key_id,boot,cfg->random,cfg->random_ctx);
+ uint8_t key[32],digest[32];char key_id[33];
+ if(!cfg->wifi_verified||!cfg->random(cfg->random_ctx,key,sizeof(key)))return 1;
+ m10v_sha256(key,sizeof(key),digest);m10v_hex(digest,16,key_id);
+ return m10v_auth_init(&s->auth,key,key_id,boot,cfg->random,cfg->random_ctx);
 }
 void m10v_companion_tick(m10v_companion_server*s){
  if(s->pending_index<0)return;m10v_operation_receipt*r=&s->receipts[s->pending_index];unsigned command=r->status==M10V_OPERATION_QUEUED?M10V_BACKEND_SUBMIT:M10V_BACKEND_POLL;
@@ -164,6 +168,17 @@ static __attribute__((noinline)) int route_authenticated(m10v_companion_server*s
 
 int m10v_companion_process_parsed(m10v_companion_server*s,const uint8_t*body,uint32_t body_bytes){
  s->authenticated=0;s->session[0]=0;s->response_signature[0]=0;
+ if(equal(s->request.path,"/m10v/v1/hotspot")){
+  const m10v_http_request*r=&s->request;
+  if(!s->config->hotspot_pairing||!s->config->wifi_verified||!r->hotspot_host||
+     !r->hotspot_client||r->browser_origin||r->fields||body_bytes||!equal(r->method,"GET"))
+   return error(s,401,M10V_ERROR_UNAUTHORIZED);
+  writer w=begin(s,200);
+  text(&w,"{\"schema\":\"m10v.companion-pairing/v1\",\"protocol\":1,\"model\":\"GR III\",\"instanceId\":");
+  hex(&w,s->config->instance_id,16);text(&w,",\"keyId\":");quoted(&w,s->auth.key_id);
+  text(&w,",\"keyHex\":");hex(&w,s->auth.key,32);text(&w,"}");
+  return finish(s,&w);
+ }
  if(m10v_auth_accept(&s->auth,&s->request,body,body_bytes,s->session))return error(s,401,M10V_ERROR_UNAUTHORIZED);
  s->authenticated=1;m10v_companion_tick(s);
  int result=route_authenticated(s,body,body_bytes);

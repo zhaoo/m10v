@@ -42,7 +42,7 @@ export async function verifyGRemotePackageBlob(blob,{audit,sourceSha256,configur
   &&completeChecks(audit.checks,PACKAGE_CHECKS),'缺少完整的连接包离线验证证据。');
  need(model==='gr3'&&audit.model==='gr3'&&audit.public_version==='2.10','连接包仅支持 GR III 2.10。');
  need(filename==='m10v-gr3-gremote.zip'&&audit.filename===filename,'连接包文件名不匹配。');
- need(audit.pairing_policy==='fresh-per-download'&&audit.apk_included===false&&typeof audit.film_pack_included==='boolean'&&isHash(audit.service_sha256),'独立服务、个人配对或组件回执无效。');
+ need(audit.pairing_policy==='camera-hotspot-per-boot'&&audit.apk_included===false&&typeof audit.film_pack_included==='boolean'&&isHash(audit.service_sha256),'独立服务或热点连接回执无效。');
  verifyFirmwareEvidence(audit.firmware,sourceSha256,configurationSha256);
  need(isRecord(receipt)&&receipt.model==='GR III'&&receipt.camera_model==='gr3'&&receipt.public_version==='2.10'&&receipt.filename==='fwdc239b.bin','原始固件构建回执缺失或机型不匹配。');
  for(const field of ['source_sha256','configuration_sha256','candidate_sha256'])need(sameHash(receipt[field],audit.firmware[field]),`原始固件构建回执摘要不匹配（${field}）。`);

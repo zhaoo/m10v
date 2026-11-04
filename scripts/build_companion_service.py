@@ -178,9 +178,10 @@ def _target_metadata(folder,catalog_hash,renderer_hash):
   anchors.append(window)
  return identity,anchors,receipt['candidate_sha256']
 
-def build_service(output,*,catalog_hash,renderer_hash,key=None,instance_id=None,candidate_dir=None):
+def build_service(output,*,catalog_hash,renderer_hash,key=None,instance_id=None,candidate_dir=None,hotspot_pairing=False):
  catalog_hash=_metadata(catalog_hash);renderer_hash=_metadata(renderer_hash)
  target=_target_metadata(candidate_dir,catalog_hash,renderer_hash) if candidate_dir is not None else None
+ if hotspot_pairing and (target is None or key is not None):raise ValueError("hotspot pairing requires a resident target and a boot-local key")
  key=secrets.token_bytes(32) if key is None else key;instance_id=secrets.token_bytes(16) if instance_id is None else instance_id
  if type(key)is not bytes or len(key)!=32 or type(instance_id)is not bytes or len(instance_id)!=16:raise ValueError('invalid pairing material')
  output=Path(output)
@@ -214,7 +215,7 @@ static m10v_linux_target_config target_config={.build=BUILD,.catalog=CATALOG,.re
 static unsigned boot_used;
 static void stage(const char*p){unsigned n=0;while(p[n])n++;register unsigned r0 __asm__("r0")=1,r1 __asm__("r1")=(unsigned)(uintptr_t)p,r2 __asm__("r2")=n,r7 __asm__("r7")=4;__asm__ volatile("svc 0":"+r"(r0):"r"(r1),"r"(r2),"r"(r7):"memory","cc");}
 static int seeded_random(void*c,uint8_t*out,uint32_t n){(void)c;if(!boot_used){if(n!=16)return 0;for(unsigned i=0;i<16;i++)out[i]=target_config.nonce[i];boot_used=1;return 1;}return m10v_linux_random(0,out,n);}
-static m10v_companion_server_config config={.key=KEY,.instance_id=INSTANCE,.build_id=BUILD,.catalog_hash=CATALOG,.renderer_hash=RENDERER,.key_id="KEYID",.random=seeded_random,.now_ms=m10v_linux_now_ms,.operation_timeout_ms=3000,.read_state=1,.write_state=1};
+static m10v_companion_server_config config={.key=KEY,.instance_id=INSTANCE,.build_id=BUILD,.catalog_hash=CATALOG,.renderer_hash=RENDERER,.key_id="KEYID",.random=seeded_random,.now_ms=m10v_linux_now_ms,.operation_timeout_ms=3000,.read_state=1,.write_state=1,.hotspot_pairing=HOTSPOT};
 static const m10v_companion_backend backend={&target,m10v_linux_target_exchange};
 static int run(void){
  stage("M10V_START\\n");
@@ -225,15 +226,18 @@ static int run(void){
  for(unsigned i=0;i<160;i++){code=m10v_linux_target_hello(&target);if(!code)break;if(code!=M10V_ERROR_BUSY||!m10v_linux_pause_ms(50))goto done;}
  if(code)goto done;
  stage("HELLO_OK\\n");
- for(unsigned i=0;i<600&&!config.wifi_verified;i++){m10v_linux_prepare_wifi(&config);if(!config.wifi_verified&&!m10v_linux_pause_ms(100)){code=1;goto done;}}
- if(!config.wifi_verified){code=1;goto done;}
+ /* The camera can enable Wi-Fi long after startup. Keep the same boot owner
+  * and wait for its AP instead of exiting with the per-boot launch lock held. */
+ while(!m10v_linux_prepare_wifi(&config)){
+  if(!m10v_linux_pause_ms(500)){code=1;goto done;}
+ }
  stage("WIFI_OK\\n");code=m10v_companion_serve(&config,&backend);
  done:m10v_linux_devmem_close(&memory);return code;
 }
 __attribute__((noreturn))void _start(void){int result=run();register unsigned r0 __asm__("r0")=(unsigned)result,r7 __asm__("r7")=1;__asm__ volatile("svc 0"::"r"(r0),"r"(r7):"memory");for(;;){}}
 '''
-  main=main.replace('ANCHORS','{'+','.join(array(x) for x in anchors)+'}')
- for token,value in [('KEYID',key_id),('KEY',array(key)),('INSTANCE',array(instance_id)),('BUILD',array(bytes.fromhex(target[0]['buildId'] if target else source_fingerprint))),('CATALOG',array(bytes.fromhex(catalog_hash))),('RENDERER',array(bytes.fromhex(renderer_hash)))]:main=main.replace(token,value)
+  main=main.replace('ANCHORS','{'+','.join(array(x) for x in anchors)+'}').replace('HOTSPOT',str(int(hotspot_pairing)))
+ for token,value in [('KEYID','' if hotspot_pairing else key_id),('KEY',array(bytes(32) if hotspot_pairing else key)),('INSTANCE',array(instance_id)),('BUILD',array(bytes.fromhex(target[0]['buildId'] if target else source_fingerprint))),('CATALOG',array(bytes.fromhex(catalog_hash))),('RENDERER',array(bytes.fromhex(renderer_hash)))]:main=main.replace(token,value)
  flags=['--target=armv7-none-eabi','-mcpu=cortex-a9','-marm','-mfloat-abi=soft','-Os','-std=c11','-ffreestanding','-fno-builtin','-fno-stack-protector','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-ffunction-sections','-fdata-sections','-fno-vectorize','-fno-slp-vectorize','-Wall','-Wextra','-Werror','-fstack-usage','-I',str(ROOT/'native/companion')]
  stack={}
  with tempfile.TemporaryDirectory(prefix='m10v-companion-build-') as private:
@@ -253,9 +257,11 @@ __attribute__((noreturn))void _start(void){int result=run();register unsigned r0
     if len(cells)>=2:stack[cells[0].rsplit(':',1)[-1]]=max(stack.get(cells[0].rsplit(':',1)[-1],0),int(cells[1]))
  stack_bound,staging_bytes=_stack_audit(elf_path.read_bytes(),elf_path,linker,stack)
  pairing={'schema':'m10v.companion-pairing/v1','protocol':1,'model':'GR III','instanceId':instance_id.hex(),'keyId':key_id,'keyHex':key.hex()}
- pair=output/'pairing.json';pair.write_text(json.dumps(pairing,indent=2)+'\n');os.chmod(pair,0o600)
+ if not hotspot_pairing:
+  pair=output/'pairing.json';pair.write_text(json.dumps(pairing,indent=2)+'\n');os.chmod(pair,0o600)
  receipt={'schema':'m10v-companion-service/v1','buildId':source_fingerprint[:24],'sourceFingerprint':source_fingerprint,'serviceSha256':_hash(elf_path.read_bytes()),'catalogHash':catalog_hash,'rendererHash':renderer_hash,'registrySha256':_hash((ROOT/'contracts/companion-v1.json').read_bytes()),'installable':False,'listenEnabled':False,'cameraPassed':False,'capabilities':{'readState':False,'writeState':False,'uploadFilm':False,'captureEvidence':False},'linuxAbiEvidence':'compile-only','reason':'residentOwnerCacheAndWifiInterfaceUnproven','functionStackBytes':stack,'stackAllowanceBytes':4096,'reachableStackBoundBytes':stack_bound,'stagingStaticBytes':staging_bytes}
  if target:receipt.update({'buildId':target[0]['buildId'],'firmwareSha256':target[2],'installable':True,'reason':'debugCandidateRequiresDeviceValidation','listenPolicy':'residentHelloAndVerifiedWifi','capabilities':{'readState':True,'writeState':True,'uploadFilm':False,'captureEvidence':False}})
+ if hotspot_pairing:receipt['pairingPolicy']='camera-hotspot-per-boot'
  (output/'service-receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
  return receipt
 if __name__=='__main__':

@@ -107,20 +107,40 @@ int m10v_zoom_camera_save(m10v_zoom_state *s,const m10v_zoom_editor *e){
  return applied;
 }
 #if M10V_COMPANION_ENABLED
+static int native_crop_matches(const m10v_zoom_state *durable){
+ uint32_t root=((uint32_t(*)(void))0x53525d5cu)();
+ if(!ram(root,4)||!ram(*(uint32_t*)(uintptr_t)root,4))return 0;
+ uint32_t expected=m10v_zoom_native_back_bits(*(uint32_t*)(uintptr_t)root);
+ if(expected!=0x3f800000u&&expected!=m10v_zoom_bits(durable->mm[0])&&expected!=m10v_zoom_bits(durable->mm[1]))return 0;
+ extern uint32_t m10v_zoom_native_front_bits(uint32_t);
+ root=((uint32_t(*)(void))0x5320ad88u)();
+ uint32_t front=root?((uint32_t(*)(uint32_t))0x5320b31cu)(root):0;
+ if(!ram(front,4)||m10v_zoom_native_front_bits(front)!=expected)return 0;
+ return 1;
+}
+int m10v_zoom_camera_prime(void){
+ m10v_settings_controller *p=cache();
+ if(!p)return -1;
+ if((p->zoom_flags&~7u)==MAGIC)return 0;
+ uint32_t fs=filesystem();if(!fs)return -1;
+ /* An unapplied build seed belongs to the native installation path. */
+ if(M10V_ZOOM_SEED_LO|M10V_ZOOM_SEED_HI){
+  uint32_t marker[4];
+  if(!((int (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,"M10VZW.bin",sizeof(marker),marker))return -1;
+  for(unsigned i=0;i<4;i++)if(marker[i]!=m10v_zoom_seed_parameters[i])return -1;
+ }
+ m10v_zoom_io io={(void*)(uintptr_t)fs,read_page,0};m10v_zoom_state durable;
+ if(m10v_zoom_load(&durable,&io)<0||cache()!=p||!native_crop_matches(&durable))return -1;
+ publish(p,&durable);
+ return 0;
+}
 int m10v_zoom_camera_snapshot(m10v_zoom_state *s){
  uint32_t fs=filesystem();if(!s||!fs)return -1;
  m10v_settings_controller *p=cache();
  if(!p||(p->zoom_flags&~7u)!=MAGIC||(p->zoom_flags&PENDING)||(p->zoom_flags&3u)>2u)return -1;
  m10v_zoom_io io={(void*)(uintptr_t)fs,read_page,write_page};m10v_zoom_state durable;
  if(m10v_zoom_load(&durable,&io)<0||durable.mm[0]!=p->zoom_mm[0]||durable.mm[1]!=p->zoom_mm[1])return -1;
- uint32_t root=((uint32_t(*)(void))0x53525d5cu)();
- if(!ram(root,4)||!ram(*(uint32_t*)(uintptr_t)root,4))return -1;
- uint32_t expected=m10v_zoom_native_back_bits(*(uint32_t*)(uintptr_t)root);
- if(expected!=0x3f800000u&&expected!=m10v_zoom_bits(durable.mm[0])&&expected!=m10v_zoom_bits(durable.mm[1]))return -1;
- extern uint32_t m10v_zoom_native_front_bits(uint32_t);
- root=((uint32_t(*)(void))0x5320ad88u)();
- uint32_t front=root?((uint32_t(*)(uint32_t))0x5320b31cu)(root):0;
- if(!ram(front,4)||m10v_zoom_native_front_bits(front)!=expected)return -1;
+ if(!native_crop_matches(&durable))return -1;
  /* No lazy cache load, seed application, setters or cache publication. */
  *s=durable;return 0;
 }

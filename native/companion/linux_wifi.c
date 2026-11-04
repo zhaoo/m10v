@@ -1,5 +1,5 @@
 #include "linux_wifi.h"
-int m10v_linux_wifi_discover(void*ctx,m10v_wifi_query query,char name[16]){
+int m10v_linux_wifi_discover(void*ctx,m10v_wifi_query query,char name[16],int require_ap){
  uint8_t entries[512],request[32];unsigned found=0;char selected[16];
  if(!query||!name)return 0;
  int bytes=query(ctx,0x8912,entries,sizeof(entries));
@@ -12,6 +12,10 @@ int m10v_linux_wifi_discover(void*ctx,m10v_wifi_query query,char name[16]){
   if(query(ctx,0x8913,request,sizeof(request))||!(request[16]&1)||(request[16]&8))continue;
   for(unsigned i=16;i<32;i++)request[i]=0;
   if(query(ctx,0x8b01,request,sizeof(request))||!request[16])continue;
+  if(require_ap){
+   for(unsigned i=16;i<32;i++)request[i]=0;
+   if(query(ctx,0x8b07,request,sizeof(request))||request[16]!=3||request[17]||request[18]||request[19])continue;
+  }
   if(++found>1)return 0;
   for(unsigned i=0;i<16;i++)selected[i]=(char)p[i];
  }

@@ -17,9 +17,10 @@ class WifiTests(unittest.TestCase):
       return 31 if mode=='truncated' else count*32
      if command==0x8913:p[16]=8 if mode=='loopback' else 0 if mode=='down' else 1;return 0
      if command==0x8b01:p[16]=0 if mode=='ethernet' else ord('I');return -1 if mode=='failed' else 0
+     if command==0x8b07:p[16]=2 if mode=='station' else 3;return -1 if mode=='noMode' else 0
      return -1
-    out=C.create_string_buffer(16);fn=cb(query);lib.m10v_linux_wifi_discover.argtypes=[C.c_void_p,cb,C.c_void_p]
-    return lib.m10v_linux_wifi_discover(None,fn,out),out.value
+    out=C.create_string_buffer(16);fn=cb(query);lib.m10v_linux_wifi_discover.argtypes=[C.c_void_p,cb,C.c_void_p,C.c_int]
+    return lib.m10v_linux_wifi_discover(None,fn,out,1),out.value
    self.assertEqual(case('ok'),(1,b'wlan0'))
-   for mode in ['ambiguous','wrongIP','truncated','loopback','down','ethernet','failed']:
+   for mode in ['ambiguous','wrongIP','truncated','loopback','down','ethernet','failed','station','noMode']:
     with self.subTest(mode=mode):self.assertEqual(case(mode)[0],0)

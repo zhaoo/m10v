@@ -50,9 +50,11 @@ static int extension_read(void*v,m10v_extension_snapshot*out){
  out->available|=((1u<<12)-(1u<<5));
 #endif
 #if M10V_COMPANION_EXT_ZOOM
- m10v_zoom_state zoom;if(m10v_zoom_camera_snapshot(&zoom))return M10V_ERROR_BRIDGE_UNAVAILABLE;
- out->values[17]=zoom.mm[0];out->values[18]=zoom.mm[1];out->values[19]=m10v_zoom_live_slot();generations[4]=zoom.sequence;
- out->available|=7u<<17;
+ m10v_zoom_state zoom;
+ if(!m10v_zoom_camera_snapshot(&zoom)){
+  out->values[17]=zoom.mm[0];out->values[18]=zoom.mm[1];out->values[19]=m10v_zoom_live_slot();generations[4]=zoom.sequence;
+  out->available|=7u<<17;
+ }
 #endif
 #if M10V_COMPANION_EXT_ASPECT
  if(m10v_settings_controller_remote_aspect_read(&out->values[20]))return M10V_ERROR_BRIDGE_UNAVAILABLE;

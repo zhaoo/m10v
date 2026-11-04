@@ -21,7 +21,7 @@ typedef uint32_t (*fn2)(uint32_t,uint32_t);
 typedef uint32_t (*fn3)(uint32_t,uint32_t,uint32_t);
 typedef void (*cache_fn)(void*,uint32_t);
 typedef struct {
- uint32_t vtable,ui_owner,timer_id,session_bound,vtable_words[3],locked,store_depth,store_generation;
+ uint32_t vtable,ui_owner,timer_id,session_bound,vtable_words[3],locked,store_depth,store_generation,zoom_prime_retry,zoom_primed;
  _Alignas(128) m10v_resident_wire wire;
  m10v_resident_consumer consumer;
  m10v_companion_owner transaction;
@@ -178,7 +178,16 @@ void m10v_companion_ui_start(uint32_t owner){
 uint32_t m10v_companion_ui_timer(uint32_t value,uint32_t timer,uint32_t ignored){
  (void)ignored;ui_context*c=(void*)(uintptr_t)value;
  if(!ram(value,sizeof(*c))||(value&127u)||c->timer_id!=timer||!current(c))return 0;
- c->timer_id=0;m10v_resident_ops ops={c,cache_in,cache_out,execute};
+ c->timer_id=0;
+#if M10V_COMPANION_EXT_ZOOM
+ if(c->session_bound&&!c->zoom_primed&&!c->locked&&!c->store_depth&&!c->transaction.pending.present&&!c->extensions.pending.present&&!extension_busy(c)){
+  if(c->zoom_prime_retry)c->zoom_prime_retry--;
+  else if(!m10v_zoom_camera_prime())c->zoom_primed=1;
+  else c->zoom_prime_retry=9;
+  if(!current(c))return 0;
+ }
+#endif
+ m10v_resident_ops ops={c,cache_in,cache_out,execute};
  (void)m10v_resident_consume(&c->wire,&c->consumer,&ops);
  if(current(c))m10v_companion_ui_start(c->ui_owner);return 0;
 }

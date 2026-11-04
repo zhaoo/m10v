@@ -1,20 +1,23 @@
-import {readFileSync} from 'node:fs';
-import {nativeCatalog,prepareNative} from './gr3-native-library.mjs';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+import {prepareNative} from './gr3-native-library.mjs';
 import {companionSourceFingerprint} from './gr3-companion-owner.mjs';
-import {sdFilmRecord} from './gr3-sd-film-pack.mjs';
 import {sha256} from './gr3-fit-binding.mjs';
 
 const officialHash='d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4';
-const contract=JSON.parse(readFileSync(new URL('../contracts/companion-v1.json',import.meta.url)));
-const catalog=await nativeCatalog();
-// Match GRemote's sync_m10v_contract + sync_camera_contract metadata, without
-// importing the phone renderer or any private pairing material.
-const cameraCatalog={schemaVersion:1,rendererHash:sdFilmRecord(33).subarray(8448,8480).toString('hex'),entries:catalog.films.map(f=>({
- id:f.id,name:f.name,group:f.group,icon:`assets/films/camera-icons/${f.id}.png`,
- parameters:Object.fromEntries(Object.entries(contract.parameters).filter(([,p])=>(!p.filmIds||p.filmIds.includes(f.id))&&!p.excludeFilmIds?.includes(f.id)).map(([key,p])=>[key,{min:p.min,max:p.overrides?.[f.id]??p.max,default:p.default,label:p.label}])),
- approximation:f.approximation??false,
-}))};
-export const gremoteCameraMetadata=Object.freeze({catalogHash:sha256(cameraCatalog),rendererHash:cameraCatalog.rendererHash});
+let cameraMetadata;
+function readCameraMetadata(){
+ if(cameraMetadata)return cameraMetadata;
+ // Isolate SD catalog initialization. Ordinary builds never load it and the
+ // long-lived parent only retains the two hashes.
+ const output=execFileSync(process.execPath,[
+  fileURLToPath(new URL('../scripts/read_gr3_gremote_camera_metadata.mjs',import.meta.url)),
+ ],{encoding:'utf8',timeout:30000,maxBuffer:4096});
+ const {catalogHash,rendererHash}=JSON.parse(output);
+ if(![catalogHash,rendererHash].every(value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value)))
+  throw Error('Invalid GRemote camera catalog identity');
+ return cameraMetadata=Object.freeze({catalogHash,rendererHash});
+}
 
 export function resolveGRemoteOptions(source,input={},sourceModel){
  for(const field of ['companion_identity','preserve_existing'])if(Object.hasOwn(input,field))throw Error('公开 GRemote 构建不接受私有身份或升级存档策略。');
@@ -27,6 +30,7 @@ export function resolveGRemoteOptions(source,input={},sourceModel){
  const ordinaryOptions=Object.fromEntries(names.filter(name=>input[name]!==undefined).map(name=>[name,input[name]]));
  const base=prepareNative(source,input.configuration,ordinaryOptions);
  const preserve_existing=input.gremote_preserve_settings??true;
+ const gremoteCameraMetadata=readCameraMetadata();
  const buildId=sha256({schema:'m10v-public-companion-build/v2',configurationSha256:base.configuration_sha256,
   preserveExisting:preserve_existing,companionSourceSha256:companionSourceFingerprint(),...gremoteCameraMetadata,powerImages:input.power_images??{}});
  return {companion_identity:{buildId,...gremoteCameraMetadata},...(preserve_existing?{preserve_existing:true}:{})};

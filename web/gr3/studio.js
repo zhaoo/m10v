@@ -67,7 +67,7 @@ const definitions = [
   ['level', '滑轨水平仪', '用横竖滑轨辅助调平。开启后在取景中显示水平仪，让底部与右侧圆点进入中央绿环即可。', '实时取景辅助'],
   ['abCompare', 'A/B 快切', '在两种影像风格间快速切换。开启后，在机内 MENU 或 ADJ 的影像控制中按 DISP，依次选 A、B；取景时短按 DISP 切换。', 'GR III / IIIx · 原厂风格与胶卷'],
   ['powerImages', '开关机画面', '替换相机开机或关机图片。开启后在下方上传图片、调整裁切并应用；未上传的画面保留原厂图片。', 'GR III / IIIx · 自定义图片'],
-  ['gremote', 'GRemote 连接', '通过 GRemote 读取、装入胶卷和调整已启用的扩展设置。下载后需安装包内匹配的 SD 服务，并导入个人配对文件。', 'GR III 2.10 · 默认关闭'],
+  ['gremote', 'GRemote 连接', '通过 GRemote 读取、装入胶卷和调整已启用的扩展设置。下载后需安装包内匹配的 SD 服务，新版 GRemote 连接相机 Wi-Fi 后自动同步。', 'GR III 2.10 · 默认关闭'],
 ];
 const initial = { features: new Set(), recipes: new Map(), projectId: '', source: null,
   token: '', preparation: null, activeStep: 'source', filmMode: 'ektar100', films: [],
@@ -687,7 +687,7 @@ async function build(camera=readCameraDeclaration()) {
     if(revision!==state.revision||activeBuildController!==controller){notice('方案已变化，已放弃旧方案下载，请重新保存。',true);return;}
     await download(new Response(firmwareBlob),filename,verification,()=>revision===state.revision&&activeBuildController===controller&&!controller.signal.aborted);
     if(connectionPackage){
-      $('build-result').textContent='GRemote 连接包已下载，包含固件、匹配的 SD 服务与私有配对文件。请先备份并阅读包内安装说明，不要公开分享；本包仍需真机验证。';
+      $('build-result').textContent='GRemote 连接包已下载，包含固件、匹配的 SD 服务。请先备份并阅读包内安装说明；本包仍需真机验证。';
     }else{
       completion?.show({firmwareBlob,filename,verification,model:exported.model,catalog:exported.catalog,filmLibrary:exported.filmLibrary,record:{receipt:completedReceipt,safety:verification.audit,configuration:exported.request}});
       $('build-result').textContent = '固件已下载：服务端完整重建逐字节一致，浏览器 SHA-256 核验通过。'+(state.preparation.build_source?`输出基线：${state.preparation.build_source.model} · ${state.preparation.build_source.public_version}。`:'')+'这些是文件检查，相机接受、启动与成像仍需真机验证。';

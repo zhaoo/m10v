@@ -12,7 +12,7 @@ class CameraZoom(unittest.TestCase):
    for name,addr in [('m10v_zoom.c',0x540c0000),('m10v_zoom_camera.c',0x540d0000)]:
     obj=pathlib.Path(tmp)/'a.o';subprocess.run(['clang',*FLAGS,*getattr(cls,'seed_flags',[]),*getattr(cls,'companion_flags',[]),'-c',str(ROOT/'native/gr3'/name),'-o',str(obj)],check=True,capture_output=True)
     exports=['m10v_zoom_'+n for n in (['load','open','adjust','save','replace'] if name=='m10v_zoom.c' else ['camera_load','camera_save','camera_bits','camera_slot','camera_select'])]
-    if name=='m10v_zoom_camera.c' and getattr(cls,'companion_flags',[]):exports+=['m10v_zoom_camera_snapshot']
+    if name=='m10v_zoom_camera.c' and getattr(cls,'companion_flags',[]):exports+=['m10v_zoom_camera_snapshot','m10v_zoom_camera_prime']
     b,s=link_object(obj.read_bytes(),addr,cls.symbols,prefix='m10v_settings_',omitted_exports=('m10v_settings_open','m10v_settings_key'),additional_exports=exports);cls.symbols.update(s);cls.blobs.append((addr,b))
  def setUp(self):
   self.u=Uc(UC_ARCH_ARM,UC_MODE_ARM);u=self.u
@@ -114,6 +114,14 @@ if __name__=='__main__':unittest.main()
 
 class CompanionZoomSnapshot(CameraZoom):
  companion_flags=['-DM10V_COMPANION_ENABLED=1']
+ def test_cold_prime_enables_snapshot_without_persistent_write_or_crop_change(self):
+  out=RAM+0xa00
+  self.assertEqual(self.call('camera_snapshot',out),0xffffffff)
+  self.assertEqual(self.call('camera_prime'),0)
+  self.assertEqual(self.call('camera_snapshot',out),0)
+  self.assertEqual(struct.unpack('<IHH',self.u.mem_read(out,8)),(0,35,50))
+  self.assertEqual(self.writes,0)
+  self.assertEqual(self.apply,[])
  def test_failed_verify_cannot_report_durable_value_as_effective_without_repair(self):
   s=RAM+0x800;e=RAM+0x900;out=RAM+0xa00
   self.call('camera_load',s);self.call('camera_select',0);self.fail_verify_once=True

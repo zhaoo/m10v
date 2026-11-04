@@ -32,15 +32,18 @@ class ActualConnectionPackageTests(unittest.TestCase):
    out=cls.d/f'connection-{index}.zip';meta=cls.module.package_connection(cls.candidate,out);cls.outputs.append((out,meta))
  @classmethod
  def tearDownClass(cls):cls.temp.cleanup()
- def test_unique_fresh_pairing_and_service_are_bound(self):
-  pairs=[]
+ def test_no_static_pairing_and_unique_service_instances(self):
+  services=[]
   for out,meta in self.outputs:
    with zipfile.ZipFile(out) as z:
-    pair=json.loads(z.read('private/pairing.json'));elf=z.read('02_SERVICE/SD_ROOT/SCRIPT/MCW1101/SERVICE.BIN')
-   key=bytes.fromhex(pair['keyHex']);self.assertEqual(hashlib.sha256(key).hexdigest()[:32],pair['keyId'])
-   self.assertIn(key,elf);self.assertIn(bytes.fromhex(pair['instanceId']),elf);pairs.append(pair)
-   self.assertNotIn('keyHex',json.dumps(meta));self.assertNotIn(pair['keyHex'],json.dumps(meta))
-  self.assertNotEqual(pairs[0]['keyHex'],pairs[1]['keyHex']);self.assertNotEqual(pairs[0]['instanceId'],pairs[1]['instanceId'])
+    self.assertNotIn('private/pairing.json',z.namelist())
+    elf=z.read('02_SERVICE/SD_ROOT/SCRIPT/MCW1101/SERVICE.BIN')
+    receipt=json.loads(z.read('evidence/service-receipt.json'))
+   self.assertEqual(receipt['pairingPolicy'],'camera-hotspot-per-boot')
+   self.assertEqual(receipt['serviceSha256'],hashlib.sha256(elf).hexdigest())
+   self.assertEqual(meta['pairing_policy'],'camera-hotspot-per-boot')
+   services.append(elf)
+  self.assertNotEqual(*services)
  def test_archive_paths_hashes_instructions_and_safety(self):
   out,meta=self.outputs[0]
   self.assertEqual(stat.S_IMODE(out.stat().st_mode),0o600)
@@ -54,7 +57,7 @@ class ActualConnectionPackageTests(unittest.TestCase):
     digest,name=line.split('  ',1);self.assertEqual(hashlib.sha256(z.read(name)).hexdigest(),digest)
    for name,item in manifest['files'].items():self.assertEqual(hashlib.sha256(z.read(name)).hexdigest(),item['sha256'])
    text=z.read('开始前必读.txt').decode()
-   for phrase in ['GR III 2.10','IIIx','尚未通过','配对密钥','不要直接覆盖','不要删除整个 SCRIPT','不自动','GRemote','重新导入','备份','回退']:
+   for phrase in ['GR III 2.10','IIIx','尚未通过','自动建立会话','不要直接覆盖','不要删除整个 SCRIPT','不自动','GRemote','无需导入','备份','回退']:
     with self.subTest(phrase=phrase):self.assertIn(phrase,text)
    self.assertNotIn('keyHex',text)
    self.assertIn('/tmp/m10v-companion-1101.lock',z.read('02_SERVICE/SD_ROOT/SCRIPT/MCW1101/SERVICE.SH').decode())

@@ -50,7 +50,7 @@ static int wifi_query(void*ctx,unsigned command,void*out,unsigned bytes){
 int m10v_linux_prepare_wifi(m10v_companion_server_config*cfg){
  if(!cfg)return 0;cfg->wifi_verified=0;
  long socket=syscall6(281,2,1,0,0,0,0);if(socket<0)return 0;unsigned fd=(unsigned)socket;
- int ok=m10v_linux_wifi_discover(&fd,wifi_query,cfg->wifi_interface);close_fd((int)fd);
+ int ok=m10v_linux_wifi_discover(&fd,wifi_query,cfg->wifi_interface,cfg->hotspot_pairing);close_fd((int)fd);
  if(ok){cfg->wifi_address[0]=192;cfg->wifi_address[1]=168;cfg->wifi_address[2]=0;cfg->wifi_address[3]=1;cfg->wifi_verified=1;}return ok;
 }
 int m10v_linux_pause_ms(unsigned ms){
@@ -74,7 +74,7 @@ static int write_all(m10v_companion_server*s,int fd,const uint8_t*bytes,unsigned
 static int append(uint8_t*out,unsigned*used,const char*text){unsigned n=len(text);if(*used+n>=M10V_HTTP_MAX_HEAD)return 0;for(unsigned i=0;i<n;i++)out[(*used)++]=(uint8_t)text[i];return 1;}
 static void decimal(unsigned value,char*out){char reverse[11];unsigned n=0;do{reverse[n++]=(char)('0'+value%10);value/=10;}while(value);unsigned i=0;while(n)out[i++]=reverse[--n];out[i]=0;}
 static void reply(m10v_companion_server*s,int fd){
- unsigned used=0;char value[12],boot[33];uint8_t*out=s->input;decimal(s->status,value);append(out,&used,"HTTP/1.1 ");append(out,&used,value);append(out,&used," Response\r\nConnection: close\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: ");decimal(s->output_bytes,value);append(out,&used,value);append(out,&used,"\r\n");
+ unsigned used=0;char value[12],boot[33];uint8_t*out=s->input;decimal(s->status,value);append(out,&used,"HTTP/1.1 ");append(out,&used,value);append(out,&used," Response\r\nConnection: close\r\nCache-Control: no-store\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: ");decimal(s->output_bytes,value);append(out,&used,value);append(out,&used,"\r\n");
  if(s->authenticated){m10v_hex(s->auth.boot,16,boot);append(out,&used,"X-M10V-Boot: ");append(out,&used,boot);append(out,&used,"\r\nX-M10V-Session: ");append(out,&used,s->session);append(out,&used,"\r\nX-M10V-Response-Signature: ");append(out,&used,s->response_signature);append(out,&used,"\r\n");}
  append(out,&used,"\r\n");if(write_all(s,fd,out,used))write_all(s,fd,s->output.bytes,s->output_bytes);
 }
@@ -93,5 +93,12 @@ int m10v_companion_serve(const m10v_companion_server_config*cfg,const m10v_compa
  if(!cfg||!cfg->wifi_verified)return M10V_ERROR_BRIDGE_UNAVAILABLE;
 #endif
  if(m10v_companion_server_init(&server,cfg,backend))return M10V_ERROR_BRIDGE_UNAVAILABLE;int fd=listener(cfg);if(fd<0)return M10V_ERROR_BRIDGE_UNAVAILABLE;
- while(1){int peer=accept_one(fd);if(peer==-4)continue;if(peer<0){close_fd(fd);return M10V_ERROR_BRIDGE_UNAVAILABLE;}connection(&server,peer);close_fd(peer);}
+ while(1){int peer=accept_one(fd);if(peer==-4)continue;if(peer<0){close_fd(fd);return M10V_ERROR_BRIDGE_UNAVAILABLE;}
+#if !defined(M10V_COMPANION_HOST_TEST)
+ if(cfg->hotspot_pairing){
+  m10v_companion_server_config current=*cfg;
+  if(!m10v_linux_prepare_wifi(&current)||!m10v_constant_equal((const uint8_t*)current.wifi_interface,(const uint8_t*)cfg->wifi_interface,16)){close_fd(peer);continue;}
+ }
+#endif
+ connection(&server,peer);close_fd(peer);}
 }

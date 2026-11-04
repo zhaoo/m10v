@@ -10,7 +10,8 @@ class Server(unittest.TestCase):
   result=subprocess.run(['clang','-std=c11','-Wall','-Wextra','-Werror','-DM10V_COMPANION_HOST_TEST','-I',str(ROOT/'native/companion'),*[str(ROOT/'native/companion'/f) for f in ['auth.c','http_parser.c','json.c','operations.c','http_server.c','linux_io.c','transaction.c','film_upload.c','extensions.c','extensions_json.c']],*[str(ROOT/'native/gr3'/f) for f in ['m10v_library.c','halation_core.c','film_5207.c','film_harman.c','film_curated.c','film_newstocks.c','film_style_filters_0.c','film_style_filters_1.c','film_d76_0.c','film_d76_1.c','m10v_sd_library.c']],str(ROOT/'tests/support_companion_server.c'),'-o',str(cls.exe)],capture_output=True,text=True)
   if result.returncode:raise AssertionError(result.stderr)
  def setUp(self):
-  env=dict(os.environ)
+  env=dict(os.environ);self.key=KEY;self.key_id='fixture-key'
+  if self._testMethodName=='test_hotspot_bootstrap_reads_and_signs_with_boot_key':env['M10V_TEST_HOTSPOT']='1'
   if self._testMethodName=='test_upload_chunks_verified_then_install_is_separate':env['M10V_TEST_UPLOAD']='1'
   if self._testMethodName=='test_full_ten_slot_snapshot_and_receipt_fit_response_budget':env['M10V_TEST_FULL_TEN']='1'
   if self._testMethodName=='test_async_read_busy_and_submit_waits_for_read_turn':env['M10V_TEST_ASYNC_READ']='1'
@@ -22,6 +23,14 @@ class Server(unittest.TestCase):
   if not line:
    diagnostic=self.process.stderr.read();self.fail(f'host service exited before listen: returncode={self.process.wait()} stderr={diagnostic}')
   self.port=int(line);self.boot='';self.session='';self.sequence=0;self.nonce=0
+  if 'M10V_TEST_HOTSPOT' in env:
+   code,pair,headers=self.hotspot({'Host':'192.168.0.1:18743','X-M10V-Hotspot':'1'})
+   self.assertEqual(code,200)
+   self.assertEqual(headers['cache-control'],'no-store')
+   self.assertEqual(pair['schema'],'m10v.companion-pairing/v1')
+   self.key=bytes.fromhex(pair['keyHex']);self.key_id=pair['keyId']
+   self.assertNotEqual(self.key,KEY)
+   self.assertEqual(hashlib.sha256(self.key).hexdigest()[:32],self.key_id)
   response=self.request('GET','/m10v/v1/capabilities');self.assertEqual(response[0],200);self.boot=response[1]['bootId'];self.session=response[1]['sessionId']
  def stop(self):
   self.process.terminate()
@@ -31,15 +40,36 @@ class Server(unittest.TestCase):
  def request(self,method,path,payload=None,*,bad_signature=False):
   body=b'' if payload is None else payload if isinstance(payload,bytes) else json.dumps(payload,separators=(',',':')).encode();self.nonce+=1
   if self.session:self.sequence+=1
-  nonce=f'{self.nonce:032x}';canonical='\n'.join([method,path,self.boot,self.session,str(self.sequence),nonce,hashlib.sha256(body).hexdigest()]);signature=hmac.digest(KEY,canonical.encode(),'sha256').hex()
+  nonce=f'{self.nonce:032x}';canonical='\n'.join([method,path,self.boot,self.session,str(self.sequence),nonce,hashlib.sha256(body).hexdigest()]);signature=hmac.digest(self.key,canonical.encode(),'sha256').hex()
   if bad_signature:signature='0'*64
-  headers={'X-M10V-KeyId':'fixture-key','X-M10V-Boot':self.boot,'X-M10V-Session':self.session,'X-M10V-Seq':str(self.sequence),'X-M10V-Nonce':nonce,'X-M10V-Signature':signature,'Content-Length':str(len(body))}
+  headers={'X-M10V-KeyId':self.key_id,'X-M10V-Boot':self.boot,'X-M10V-Session':self.session,'X-M10V-Seq':str(self.sequence),'X-M10V-Nonce':nonce,'X-M10V-Signature':signature,'Content-Length':str(len(body))}
   if isinstance(payload,bytes):headers['X-M10V-Chunk-Hash']=hashlib.sha256(body).hexdigest()
   self.last_wire=(method,path,body,headers)
   connection=http.client.HTTPConnection('127.0.0.1',self.port,timeout=3);connection.request(method,path,body,headers);response=connection.getresponse();raw=response.read();status=response.status;out_headers={k.lower():v for k,v in response.getheaders()};connection.close()
   if status!=401:
-   signed='\n'.join(['RESPONSE',method,path,out_headers['x-m10v-boot'],out_headers['x-m10v-session'],str(self.sequence),nonce,str(status),hashlib.sha256(raw).hexdigest()]);self.assertEqual(out_headers['x-m10v-response-signature'],hmac.digest(KEY,signed.encode(),'sha256').hex())
+   signed='\n'.join(['RESPONSE',method,path,out_headers['x-m10v-boot'],out_headers['x-m10v-session'],str(self.sequence),nonce,str(status),hashlib.sha256(raw).hexdigest()]);self.assertEqual(out_headers['x-m10v-response-signature'],hmac.digest(self.key,signed.encode(),'sha256').hex())
   return status,json.loads(raw)
+ def hotspot(self,headers,method='GET'):
+  connection=http.client.HTTPConnection('127.0.0.1',self.port,timeout=3)
+  connection.request(method,'/m10v/v1/hotspot',headers=headers)
+  response=connection.getresponse()
+  result=response.status,json.loads(response.read()),dict((k.lower(),v) for k,v in response.getheaders())
+  connection.close()
+  return result
+ def test_hotspot_bootstrap_reads_and_signs_with_boot_key(self):
+  host={'Host':'192.168.0.1:18743'};native={**host,'X-M10V-Hotspot':'1'}
+  for headers in [host,{**native,'Origin':'https://example.com'},{**native,'Host':'example.com'}]:
+   code,value,_=self.hotspot(headers);self.assertEqual(code,401);self.assertNotIn('keyHex',value)
+  self.assertEqual(self.hotspot(native,'POST')[0],401)
+  status,state=self.request('GET','/m10v/v1/state');self.assertEqual(status,200)
+  self.assertEqual(self.request('POST','/m10v/v1/operations',self.envelope(state),bad_signature=True)[0],401)
+  self.assertEqual(self.request('POST','/m10v/v1/operations',self.envelope(state))[0],202)
+  for _ in range(8):
+   _,receipt=self.request('GET','/m10v/v1/operations/'+'a'*32)
+   if receipt['status']=='committed':break
+  self.assertEqual(receipt['status'],'committed')
+ def test_legacy_service_never_releases_its_pairing_key(self):
+  self.assertEqual(self.hotspot({'Host':'192.168.0.1:18743','X-M10V-Hotspot':'1'})[0],401)
  def envelope(self,state,request_id='a'*32):return {'protocol':1,'requestId':request_id,'bootId':self.boot,'baseRevision':state['revision'],'catalogHash':state['catalogHash'],'rendererHash':state['rendererHash'],'patch':[{'slot':0,'grain':2}],'activateSlot':None}
  def test_extensions_independent_discovery_and_verified_commit(self):
   status,caps=self.request('GET','/m10v/v1/extensions/capabilities');self.assertEqual(status,200)

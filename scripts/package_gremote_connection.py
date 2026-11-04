@@ -51,14 +51,14 @@ def _instructions(ident,has_films):
  return ('''M10V × GRemote 连接包（个人下载）
 仅适用于精确官方 GR III 2.10 基线；GR IIIx / GR II / GR IV 等其他机型不支持。
 本候选仅完成离线检查，尚未通过本包真机验收，不代表允许安装。请等待当前候选的明确设备验证安排，不要直接刷机。
-ZIP 含本次下载新生成的个人配对密钥，请勿公开分享。App 请从 GRemote 官方发布页单独获取：https://github.com/zhaoo/gremote/releases/latest 。本包不含 APK。
+首次连接时，相机热点内的 GRemote 会自动建立会话。App 请从 GRemote 官方发布页单独获取：https://github.com/zhaoo/gremote/releases/latest 。本包不含 APK。
 
 准备与人工安装边界
 1. 在获得本候选的明确验证安排后，先关机，备份固件、现有 SCRIPT/STARTUP.TTL、机身设置、M10V/FILMS.M10、自定义 LUT、个人配方与照片。
 2. 固件位于 01_FIRMWARE/SD_ROOT/fwdc239b.bin。仅按已确认的 GR III 2.10 机身流程操作；完成后关机并移走卡根目录的 BIN。本包不自动刷机、不自动写 SD 卡，不添加 ModeSet / DEVELOP.MOD，不写入持久脚本模式开关。
 3. 服务位于 02_SERVICE/SD_ROOT/SCRIPT/MCW1101/SERVICE.BIN 与 SERVICE.SH。只有已确认 SD 脚本启动方式后才人工放置服务。
 4. 本包提供 SCRIPT/STARTUP.TTL 参考启动脚本。不要直接覆盖已有自定义脚本；有其他插件时先合并并保留启动顺序。不要删除整个 SCRIPT，不覆盖机身设置或照片。
-5. 每次下载会生成新配对。将 private/pairing.json 经 GRemote 的配对导入入口重新导入；不要继续使用旧包配对文件。服务和配对必须来自同一个 ZIP，不混用不同下载包。
+5. 使用支持自动连接的 GRemote Android 版本。连上相机自身的 Wi-Fi 后打开 App，无需导入配对文件。
 6. 服务每次开机只启动一次；失败后先关机再开机，不在同一开机周期热重启服务。手机连接相机 Wi-Fi 后先读取状态，再修改单项并等待回执和机身读回。
 7. '''+films+'''
 
@@ -87,20 +87,16 @@ def package_connection(candidate_dir,out,*,include_films=True):
   temp=Path(temp);os.chmod(temp,0o700)
   service=temp/'service'
   # No caller-provided key/instance or retained pairing path is accepted.
-  meta=build_service(service,catalog_hash=ident['catalogHash'],renderer_hash=ident['rendererHash'],candidate_dir=candidate_dir)
+  meta=build_service(service,catalog_hash=ident['catalogHash'],renderer_hash=ident['rendererHash'],candidate_dir=candidate_dir,hotspot_pairing=True)
   elf=(service/'m10v-companion.elf').read_bytes();_audit_elf(elf)
   need(meta.get('installable')is True and meta.get('cameraPassed')is False and meta.get('firmwareSha256')==sha(firmware) and meta.get('serviceSha256')==sha(elf),'service firmware identity differs')
   need(all(meta.get(k)==ident[k] for k in ['buildId','catalogHash','rendererHash']),'service companion identity differs')
-  pair=(service/'pairing.json').read_bytes();pairing=json.loads(pair)
-  need(pairing.get('schema')=='m10v.companion-pairing/v1' and pairing.get('model')=='GR III' and re.fullmatch('[a-f0-9]{64}',pairing.get('keyHex','')) and re.fullmatch('[a-f0-9]{32}',pairing.get('instanceId','')),'invalid generated pairing')
-  key=bytes.fromhex(pairing['keyHex'])
-  need(pairing.get('keyId')==sha(key)[:32] and key in elf and bytes.fromhex(pairing['instanceId']) in elf,'pairing differs from service executable')
+  need(meta.get('pairingPolicy')=='camera-hotspot-per-boot' and not (service/'pairing.json').exists(),'service must use a boot-local hotspot credential')
   files={
    '01_FIRMWARE/SD_ROOT/fwdc239b.bin':firmware,
    '02_SERVICE/SD_ROOT/SCRIPT/MCW1101/SERVICE.BIN':elf,
    '02_SERVICE/SD_ROOT/SCRIPT/MCW1101/SERVICE.SH':SERVICE_SH,
    '02_SERVICE/SD_ROOT/SCRIPT/STARTUP.TTL':STARTUP_TTL,
-   'private/pairing.json':pair,
    'evidence/firmware-receipt.json':(candidate_dir/'M10V-build-receipt.json').read_bytes(),
    'evidence/runtime-manifest.json':(candidate_dir/'M10V-runtime-manifest.json').read_bytes(),
    'evidence/service-receipt.json':(service/'service-receipt.json').read_bytes(),
@@ -111,7 +107,7 @@ def package_connection(candidate_dir,out,*,include_films=True):
    film,film_audit=_film_pack(temp,ident);files['03_FILMS/SD_ROOT/M10V/FILMS.M10']=film
    files['evidence/film-pack-audit.json']=(json.dumps(film_audit,indent=2)+'\n').encode()
   files['开始前必读.txt']=_instructions(ident,include_films)
-  manifest={'schema':'m10v-gremote-connection-package/v1','model':'GR III','public_version':'2.10','status':'offline_verified_camera_unverified','camera_tested':False,'installation_allowed':False,'wireless_ready':False,'companion_identity':ident,'firmware_sha256':sha(firmware),'service_sha256':sha(elf),'pairing_policy':'fresh-per-download','apk_included':False,'files':{name:{'sha256':sha(data),'bytes':len(data)} for name,data in files.items()}}
+  manifest={'schema':'m10v-gremote-connection-package/v1','model':'GR III','public_version':'2.10','status':'offline_verified_camera_unverified','camera_tested':False,'installation_allowed':False,'wireless_ready':False,'companion_identity':ident,'firmware_sha256':sha(firmware),'service_sha256':sha(elf),'pairing_policy':'camera-hotspot-per-boot','apk_included':False,'files':{name:{'sha256':sha(data),'bytes':len(data)} for name,data in files.items()}}
   files['manifest.json']=(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n').encode()
   files['SHA256SUMS']=''.join(sha(data)+'  '+name+'\n' for name,data in sorted(files.items())).encode()
   need(sum(map(len,files.values()))<=MAX_BYTES,'package exceeds 70 MiB unpacked size limit')
@@ -129,7 +125,7 @@ def package_connection(candidate_dir,out,*,include_films=True):
   except BaseException:
    if created:out.unlink(missing_ok=True)
    raise
-  return {'schema':manifest['schema'],'model':'GR III','public_version':'2.10','status':manifest['status'],'camera_tested':False,'installation_allowed':False,'sha256':sha(out.read_bytes()),'bytes':out.stat().st_size,'firmware_sha256':sha(firmware),'service_sha256':sha(elf),'companion_identity':ident,'pairing_policy':'fresh-per-download','apk_included':False,'film_pack_included':include_films,'files':{name:{'sha256':sha(data),'bytes':len(data)} for name,data in files.items()}}
+  return {'schema':manifest['schema'],'model':'GR III','public_version':'2.10','status':manifest['status'],'camera_tested':False,'installation_allowed':False,'sha256':sha(out.read_bytes()),'bytes':out.stat().st_size,'firmware_sha256':sha(firmware),'service_sha256':sha(elf),'companion_identity':ident,'pairing_policy':'camera-hotspot-per-boot','apk_included':False,'film_pack_included':include_films,'files':{name:{'sha256':sha(data),'bytes':len(data)} for name,data in files.items()}}
 
 if __name__=='__main__':
  parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--candidate-dir',required=True);parser.add_argument('--out',required=True);parser.add_argument('--without-films',action='store_true');args=parser.parse_args()

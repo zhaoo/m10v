@@ -19,7 +19,9 @@ int m10v_http_parse_head(const char*p,uint32_t bytes,m10v_http_request*out){
   unsigned start=colon+1,stop=end;while(start<stop&&(p[start]==' '||p[start]=='\t'))start++;while(stop>start&&(p[stop-1]==' '||p[stop-1]=='\t'))stop--;
   for(unsigned i=start;i<stop;i++)if((unsigned char)p[i]<32||(unsigned char)p[i]>126)return 1;
   if(lower_equal(p+at,colon-at,"transfer-encoding")||lower_equal(p+at,colon-at,"expect"))return 1;
-  if(lower_equal(p+at,colon-at,"host")){if(seen_host++||start==stop||stop-start>80)return 1;}
+  if(lower_equal(p+at,colon-at,"host")){if(seen_host++||start==stop||stop-start>80)return 1;out->hotspot_host=equal(p+start,stop-start,"192.168.0.1:18743");}
+  else if(lower_equal(p+at,colon-at,"origin"))out->browser_origin=1;
+  else if(lower_equal(p+at,colon-at,"x-m10v-hotspot")){if(out->hotspot_client||!equal(p+start,stop-start,"1"))return 1;out->hotspot_client=1;}
   else if(lower_equal(p+at,colon-at,"content-length")){if(seen_length++||start==stop||(stop-start>1&&p[start]=='0'))return 1;uint32_t value=0;for(unsigned i=start;i<stop;i++){if(p[i]<'0'||p[i]>'9'||value>1638)return 1;value=value*10+(unsigned)(p[i]-'0');if(value>M10V_HTTP_MAX_BODY)return 1;}out->content_length=value;}
   else if(lower_equal(p+at,colon-at,"x-m10v-chunk-hash")){if(out->chunk_hash[0]||stop-start!=64||!copy(out->chunk_hash,sizeof(out->chunk_hash),p+start,stop-start))return 1;}
   else {

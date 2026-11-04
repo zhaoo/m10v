@@ -551,7 +551,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             from scripts.build_gr3_companion_owner import build_companion_owner
             companion_features={'ab':ab_enabled,'hdf':bool(hdf_enabled),'border':border_enabled,'isp':pure_isp_effects,'zoom':custom_zoom,'aspect':base>=0x540be000}
             remote_names=['m10v_settings_controller_remote_'+n for n in ['busy','ab_read','ab_write','aspect_read','aspect_write']]
-            remote_names+=['m10v_zoom_camera_snapshot','m10v_zoom_camera_save','m10v_zoom_live_slot','m10v_zoom_live_apply'] if custom_zoom else []
+            remote_names+=['m10v_zoom_camera_snapshot','m10v_zoom_camera_prime','m10v_zoom_camera_save','m10v_zoom_live_slot','m10v_zoom_live_apply'] if custom_zoom else []
             companion_imports={**symbols,**dict.fromkeys(remote_names,base)}
             companion_base=(base+len(image)+127)&~127
             companion_code,companion_report=build_companion_owner(companion_base,companion_imports,companion_identity,folder,extensions=companion_features)

@@ -19,7 +19,7 @@ typedef struct {
  m10v_random_bytes random;void *random_ctx;
  uint64_t (*now_ms)(void*);void *clock_ctx;
  uint32_t operation_timeout_ms;
- uint8_t read_state,write_state,upload_film,capture_evidence,wifi_verified;
+ uint8_t read_state,write_state,upload_film,capture_evidence,wifi_verified,hotspot_pairing;
  uint8_t wifi_address[4];char wifi_interface[16];
 } m10v_companion_server_config;
 typedef struct {uint8_t request_id[16],digest[32];union {m10v_companion_snapshot snapshot;m10v_extension_snapshot extension_snapshot;};uint8_t status,error,has_snapshot,occupied,extension;} m10v_operation_receipt;

@@ -212,7 +212,7 @@ def build(base, stock, aspect=False, seed=None, debug_log=None, camera_model='gr
         linked=folder/'zoom.o'
         subprocess.run([lld,'-r',*objects,'-o',str(linked)],check=True,capture_output=True)
         image+=bytes(-len(image)&15)
-        code,symbols=link_object(linked.read_bytes(),base+len(image),bindings,'m10v_zoom_',additional_exports=EXPORTS+(['m10v_zoom_camera_snapshot'] if companion else [])+(['m10v_zoom_assert_trace'] if debug_log is not None else []))
+        code,symbols=link_object(linked.read_bytes(),base+len(image),bindings,'m10v_zoom_',additional_exports=EXPORTS+(['m10v_zoom_camera_snapshot','m10v_zoom_camera_prime'] if companion else [])+(['m10v_zoom_assert_trace'] if debug_log is not None else []))
         image+=code
     from scripts.gr3_target_relocations import relocations
     # The fixed prefix consists only of displaced-instruction trampolines;
