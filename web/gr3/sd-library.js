@@ -1,5 +1,5 @@
 import {customFilmArtwork} from '/gr3/film-artwork.mjs';
-import {supportsNativeFilm} from '/gr3/model-capabilities.mjs';
+import {catalogFilms} from '/gr3/film-catalog-view.mjs';
 const gr4Page=location.pathname.startsWith('/gr4');
 const visualPage=document.body?.classList?.contains('visual-v5')===true;
 const requestedModel=new URLSearchParams(location.hash?.startsWith('#model=')?location.hash.slice(1):location.search).get('model');
@@ -68,7 +68,7 @@ try{
 function applyModel(next){
  model=gr4Page?'gr4':['gr3','gr3x'].includes(next)?next:'';
  $('sd-model').value=model;
- films=model?allFilms.filter(f=>supportsNativeFilm(model,f.id)):[];
+ films=model?catalogFilms(allFilms,model):[];
  selected.clear();$('sd-films').replaceChildren();
  for(const node of document.querySelectorAll('[data-film-count-copy]'))for(const child of node.childNodes)if(child.nodeType===3)child.textContent=child.textContent.replace(/[0-9]+(?=\s*[套款])/g,String(films.length));
  for(const f of films){

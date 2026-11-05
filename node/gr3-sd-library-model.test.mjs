@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
-import {supportsNativeFilm} from '../web/gr3/model-capabilities.mjs';
+import {catalogFilms} from '../web/gr3/film-catalog-view.mjs';
 
 const source=(await readFile(new URL('../web/gr3/sd-library.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
 class Element {
@@ -34,7 +34,7 @@ async function page(search=''){
  };
  await vm.runInNewContext('(async()=>{'+source+'})()',{
   document,location,URLSearchParams,URL:class extends URL{static createObjectURL(){return 'blob:test';}static revokeObjectURL(){}},
-  history:{replaceState(){}},fetch,supportsNativeFilm,customFilmArtwork:()=>'',setTimeout(){},console,
+  history:{replaceState(){}},fetch,catalogFilms,customFilmArtwork:()=>'',setTimeout(){},console,
   FileReader:class {readAsDataURL(file){file.arrayBuffer().then(bytes=>{this.result='data:text/plain;base64,'+Buffer.from(bytes).toString('base64');this.onload();});}},
  });
  return {$,requests,inputs:()=>document.querySelectorAll('#sd-films input')};

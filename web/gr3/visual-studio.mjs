@@ -1,8 +1,7 @@
 import {createFilmPreview} from './preview-controller.mjs';
 import {paperPreviewLook} from './paper-preview.mjs';
-import {supportsNativeFilm} from './model-capabilities.mjs';
+import {catalogFilms,catalogGroups} from './film-catalog-view.mjs';
 import {defaultFilmEffects,resetNativeTexture} from './native-library-state.mjs';
-const FEATURED=[37,35,56,66,299,34,33,67];
 const details={
  37:{brand:'KODAK',category:'color',meta:'C41 · ISO 400',note:'温暖肤色，柔和日光。',tags:['人像','日常','暖调']},
  35:{brand:'KODAK',category:'color',meta:'C41 · ISO 200',note:'像午后阳光一样，明亮温暖。',tags:['街拍','暖黄','复古']},
@@ -17,10 +16,10 @@ const metadata=film=>details[film.id]||{brand:film.name.split(' ')[0].toUpperCas
 const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 export function mountVisualStudio({state,editor,getModel,importModel,generate,showSettings,refreshFeatures,isBusy}){
  const $=id=>document.getElementById(id),engine=$('native-editor');
- let active=37,view='films',category='all',query='',all=false,previewMode='film',renderer=createFilmPreview({width:1536,height:1024}),previewSequence=0;
+ let active=37,view='films',category='',query='',previewMode='film',renderer=createFilmPreview({width:1536,height:1024}),previewSequence=0;
  let renderQueued=false,toastTimer,importing=false,legacyLooks=[];
  const config=()=>editor.getConfiguration();
- const catalog=()=>state.nativeCatalog.filter(f=>supportsNativeFilm(getModel(),f.id));
+ const catalog=()=>catalogFilms(state.nativeCatalog,getModel());
  const byId=id=>catalog().find(f=>f.id===id);
  const canvas=document.createElement('canvas');canvas.width=1536;canvas.height=1024;canvas.setAttribute('aria-label','浏览器胶卷色彩示意');canvas.className='visual-preview-canvas';$('preview-frame').querySelector('img').after(canvas);
  const toast=message=>{$('toast').textContent=message;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),2400);};
@@ -96,18 +95,25 @@ export function mountVisualStudio({state,editor,getModel,importModel,generate,sh
   render();renderPreview();
  }
  function renderFilms(){
-  const films=catalog(),rows=(all||query||category!=='all'?films:FEATURED.map(id=>films.find(f=>f.id===id)).filter(Boolean)).filter(f=>(category==='all'||metadata(f).category===category)&&f.name.toLowerCase().includes(query));
+  const films=catalog(),groups=catalogGroups(films);
+  if(category&&!groups.includes(category))category='';
+  $('film-categories').replaceChildren(...['',...groups].map(group=>{
+   const button=node('button',group||'全部',category===group?'active':'');button.type='button';button.dataset.category=group;
+   button.setAttribute('aria-pressed',String(category===group));
+   button.onclick=()=>{category=group;renderFilms();};return button;
+  }));
+  const rows=catalogFilms(films,getModel(),{group:category,query});
   const grid=$('film-grid');grid.replaceChildren();
   for(const film of rows){const button=node('button',undefined,'film-card'+(active===film.id?' active':''));button.type='button';button.dataset.film=String(film.id);button.setAttribute('aria-label',`预览 ${film.name}`);button.setAttribute('aria-pressed',String(active===film.id));
    const art=node('span',undefined,'film-art'),dot=node('span',active===film.id?'✓':'','select-dot'),icon=document.createElement('img');icon.src=film.icon_url;icon.alt='';icon.width=80;icon.height=80;art.append(dot,icon);
-   button.append(art,node('span',film.name,'film-name'),node('span',metadata(film).meta,'film-meta'));button.onclick=()=>select(film.id);grid.append(button);
+   button.append(art,node('span',film.name,'film-name'),node('span',film.group,'film-meta'));button.onclick=()=>select(film.id);grid.append(button);
   }
   $('no-results').hidden=rows.length>0;document.querySelector('.library-count').textContent='/ '+String(rows.length).padStart(2,'0');
  }
  function renderSelected(){
   const c=config(),host=$('selected-films');host.replaceChildren();
   for(const [index,slot]of c.slots.entries()){const film=byId(slot.film);if(!film)continue;const button=node('button',undefined,'selected-item'+(slot.film===active?' active':''));button.type='button';button.dataset.selected=String(film.id);const icon=document.createElement('img');icon.className='selected-film-icon';icon.src=film.icon_compact_url||film.icon_url;icon.alt='';const remove=node('span','×','remove-film');remove.dataset.remove=String(film.id);remove.setAttribute('aria-label',`移除 ${film.name}`);button.append(node('span',String(index+1).padStart(2,'0'),'index'),icon,node('span',film.name,'selected-name'),remove);button.onclick=event=>{if(event.target.closest('[data-remove]')){editor.toggleFilm(film.id);render();}else select(film.id);};host.append(button);}
-  $('selected-count').textContent=String(c.slots.length).padStart(2,'0');$('summary-count').textContent=c.slots.length+' 款胶卷';$('selected-mini').replaceChildren(...c.slots.slice(0,5).map(slot=>{const img=document.createElement('img'),film=byId(slot.film);img.src=film?.icon_compact_url||film?.icon_url||'';img.alt='';return img;}));
+  $('selected-count').textContent=String(c.slots.length).padStart(2,'0');$('summary-count').textContent=c.slots.length+' 款胶卷';$('selected-mini').replaceChildren(...c.slots.map(slot=>{const img=document.createElement('img'),film=byId(slot.film);img.src=film?.icon_compact_url||film?.icon_url||'';img.alt=film?.name||'';img.title=film?.name||'';return img;}));
  }
  function render(){
   const film=byId(active)||catalog()[0];if(!film)return;active=film.id;const d=metadata(film),slot=activeSlot(),included=!!slot,c=config();
@@ -144,7 +150,6 @@ export function mountVisualStudio({state,editor,getModel,importModel,generate,sh
  }
  async function changeModel(model){if(importing||isBusy())return;const desiredView=view;importing=true;render();try{await importModel(model);setView(desiredView);}catch(error){toast(error.message);}finally{importing=false;if(state.projectId)history.replaceState(null,'','#model='+getModel()+(view==='tools'?'&view=tools':''));render();renderPreview();}}
  for(const button of document.querySelectorAll('[data-view]'))button.onclick=()=>setView(button.dataset.view);
- for(const button of document.querySelectorAll('[data-category]'))button.onclick=()=>{all=button.dataset.category==='all'?!all:true;category=button.dataset.category;document.querySelectorAll('[data-category]').forEach(other=>other.classList.toggle('active',other===button));renderFilms();};
  for(const button of document.querySelectorAll('[data-preview]'))button.onclick=()=>{previewMode=button.dataset.preview;void renderPreview();};
  $('film-search').oninput=event=>{query=event.target.value.toLowerCase().trim();renderFilms();};
  $('add-film').onclick=()=>{if(activeSlot()){toast('这款胶卷已在方案中');return;}editor.toggleFilm(active);refresh();};

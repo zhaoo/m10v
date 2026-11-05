@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.05.4",
+      "date": "2026-11-05",
+      "title": "工作台胶卷与胶卷库同步",
+      "changes": [
+        "GR III / IIIx 网页工作台默认展示对应机型的完整胶卷库，名称、图标、分类与顺序保持一致。",
+        "胶卷分类随共享目录自动更新，新增胶卷同步出现在工作台，支持搜索和按分类选择。",
+        "方案与摘要完整展示最多 10 款已选胶卷，保留选择顺序、逐卷参数和草稿恢复。"
+      ],
+      "notice": "本次仅修改网站配置界面，沿用已有固件、机内菜单与十卷配置协议。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.05.3",
       "date": "2026-11-05",
       "title": "新增 Marlboro 黑白红晕胶卷",
@@ -11,9 +25,9 @@
         "保留已有胶卷编号、十个活动槽位和旧 SD 胶卷资源兼容。"
       ],
       "notice": "本轮 Marlboro 候选已获用户实机验收并授权发布。请使用与机型匹配的固件和胶卷资源。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "35d4235c5805f42405b6aeb0cc45654ba3eefd0f",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/41985729565"
     },
     {
       "version": "2026.11.05.2",
