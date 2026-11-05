@@ -71,10 +71,15 @@ function previewRgbLutPixels(source,lut,table){
   }
   return output;
 }
+let marlboroTablesPromise;
 let animeE6TablesPromise,c41TablesPromise,extraFilmsTablesPromise,fourLooksTablesPromise;
 let harmanTablesPromise,curatedTablesPromise,newstocksTablesPromise,styleFiltersTablesPromise,spectralTablesPromise,d76TablesPromise;
 export async function renderPreviewPixels(source, look, width, height) {
   const film=look.film??look.id;
+  if(film===327){
+    marlboroTablesPromise??=fetch(new URL('./marlboro-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('Film LUT unavailable');return r.json();}).catch(e=>{marlboroTablesPromise=undefined;throw e;});
+    const lut=await marlboroTablesPromise;return previewRgbLutPixels(source,lut,lut.stocks[0].native_values);
+  }
   if(Number.isInteger(film)&&film>=318&&film<=321){
     fourLooksTablesPromise??=fetch(new URL('./four-looks-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('Film LUT unavailable');return r.json();}).catch(e=>{fourLooksTablesPromise=undefined;throw e;});
     const lut=await fourLooksTablesPromise;return previewRgbLutPixels(source,lut,lut.stocks.find(s=>s.id===film)?.native_values);

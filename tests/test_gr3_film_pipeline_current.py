@@ -369,6 +369,42 @@ const v=await exportSdFilms({ids:[],customFilms:[{name:'Warm',filename:'warm.cub
                 self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),0)
                 self.assertEqual(self.capture(e,recipe,si,request),0xfffffffb)
 
+    def test_marlboro_real_producer_freezes_queued_identity_and_zero_pixel_encoder(self):
+        for stage in (0,1):
+            for slot in (0,9):
+                with self.subTest(stage=stage,slot=slot):
+                    e,recipe,obj,frame,si,request,data=self.fixture(327,slot=slot,stage=stage)
+                    e.u.mem_write(recipe+0x4a08,bytes(1796))
+                    owner=self.publish_owner(e,data)
+                    self.enqueue(e,recipe,19)
+                    newer=bytearray(e.u.mem_read(data,184))
+                    struct.pack_into('<I',newer,8,8)
+                    struct.pack_into('<H',newer,12+slot*8,66)
+                    struct.pack_into('<I',newer,180,zlib.crc32(newer[:180]))
+                    e.u.mem_write(owner+0x2144,bytes(newer));e.w32(owner+0x2140,4)
+                    for kind in (0,16,1,8,9,2,4):self.enqueue(e,recipe,kind)
+                    self.make(e,recipe,obj,frame)
+                    tone=25+slot
+                    self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,tone,data),1)
+                    self.assertEqual(self.capture(e,recipe,si,request),0)
+
+    def test_marlboro_missing_native_completion_rejects_before_pixel_work(self):
+        e,recipe,obj,frame,si,request,data=self.fixture(327)
+        e.u.mem_write(recipe+0x4a08,bytes(1796))
+        self.publish_owner(e,data);self.enqueue(e,recipe,19)
+        self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),0)
+        self.assertEqual(self.capture(e,recipe,si,request),0xfffffffb)
+
+    def test_marlboro_actual_arm_profile_matches_quantized_isp_coefficients(self):
+        q=json.loads((ROOT/'native/gr3/marlboro-reference.json').read_text())['native_profiles_full'][0]
+        e,recipe,obj,frame,si,request,data=self.fixture(327)
+        native=e.alloc(1600)
+        self.assertEqual(self.call(e,'m10v_isp_native_look_prepare',native,327,0,42),1)
+        target=bytes(e.u.mem_read(native+28,1572))
+        expected=tuple(v for key in ('matrix_q13','post_q9','curves') for row in q[key] for v in row)
+        self.assertEqual(struct.unpack('<18h768H',target),expected)
+        self.assertEqual(self.call(e,'m10v_isp_native_look_prepare',native,327,1,43),0)
+
     def test_four_looks_actual_arm_preparation_matches_quantized_source_profiles(self):
         reference=json.loads((ROOT/'native/gr3/four-looks-reference.json').read_text())
         targets=[]
@@ -509,7 +545,7 @@ assert.throws(()=>buildNativeLibrary(s,r,m),/snapshot submission wrapper instruc
 import{readNativeOfficial,prepareNative,generateNative}from'./node/gr3-native-library.mjs';
 import{defaultConfiguration}from'./web/gr3/native-library-state.mjs';import{decodeFrameMap}from'./node/gr3-frames.mjs';
 const model=process.argv[2],s=await readNativeOfficial(model),c=defaultConfiguration(model),o={debug_mode:false,live_color:false,hdf_enabled:false};
-c.slots=[318,319,320,321,33].map(film=>({...c.slots[0],film}));
+c.slots=[318,319,320,321,33,327].map(film=>({...c.slots[0],film}));
 const p=prepareNative(s,c,o),r=await generateNative(s,c,p.configuration_sha256,o);
 const b=decodeFrameMap(r.candidate).decoded;
 writeFileSync(process.argv[1]+'/rtos.bin',b.subarray(0x10870,0x10870+b.readUInt32LE(0x1086c)));
@@ -522,6 +558,7 @@ writeFileSync(process.argv[1]+'/manifest.json',JSON.stringify(r.manifest));
             self.assertEqual(self.manifest['settings_menu']['owner_bytes'], 0x613c)
             self.test_durable_ui_load_publishes_owner_used_by_actual_task_submission()
             self.test_four_looks_real_producer_freezes_queued_identity_and_zero_pixel_encoder()
+            self.test_marlboro_real_producer_freezes_queued_identity_and_zero_pixel_encoder()
 
     def test_ordinary_builtin_profiles_complete_under_native_parameter_changes(self):
         for film in (*range(33,79),318,319,320,321):

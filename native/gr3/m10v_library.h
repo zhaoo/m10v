@@ -9,11 +9,18 @@
 #define M10V_UNIVERSAL_HALATION 0
 #endif
 /* Legacy 0..3 never opts an old journal into the new capability. */
+#define M10V_MARLBORO_ID 327u
+#define M10V_MARLBORO_ICON 887u
+#define M10V_MARLBORO_NAME 1202u
+#ifndef M10V_MARLBORO_NATIVE
+#define M10V_MARLBORO_NATIVE 0
+#endif
+static inline uint32_t m10v_800t_halation_film(uint32_t film){return film==33||film==M10V_MARLBORO_ID;}
 #define M10V_HALO_OFF 6u
 #define M10V_HALO_SPILL 4u
 #define M10V_HALO_STREAK 5u
 static inline uint32_t m10v_halo_enabled(uint32_t film,uint32_t gain,uint32_t profile){
-    if(film==33||film==67)return gain && profile!=M10V_HALO_OFF;
+    if(m10v_800t_halation_film(film)||film==67)return gain && profile!=M10V_HALO_OFF;
 #if M10V_UNIVERSAL_HALATION
     return gain && (profile==M10V_HALO_SPILL||profile==M10V_HALO_STREAK);
 #else
@@ -22,8 +29,8 @@ static inline uint32_t m10v_halo_enabled(uint32_t film,uint32_t gain,uint32_t pr
 }
 static inline uint32_t m10v_halo_workspace_planes(uint32_t film,uint32_t profile){
 #if M10V_UNIVERSAL_HALATION
-    if(film==33||film==67)return 6;
-    if(profile==M10V_HALO_STREAK || (profile==M10V_HALO_SPILL&&film!=33&&film!=67))return 4;
+    if(m10v_800t_halation_film(film)||film==67)return 6;
+    if(profile==M10V_HALO_STREAK || (profile==M10V_HALO_SPILL&&!m10v_800t_halation_film(film)&&film!=67))return 4;
 #else
     (void)film;(void)profile;
 #endif
@@ -67,7 +74,7 @@ static inline uint32_t m10v_halo_workspace_planes(uint32_t film,uint32_t profile
 #define M10V_ANIME_VALUE_FIRST 864u
 #define M10V_ANIME_SCALE_ICON 868u
 #define M10V_ANIME_CAPTION 1148u
-#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID || (id)==M10V_5213_ID || M10V_STYLE(id) || M10V_D76(id) || M10V_ANIME_E6(id)||M10V_C41(id)||M10V_EXTRA_FILM(id)||M10V_FOUR_LOOKS(id)))
+#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_MARLBORO_ID || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID || (id)==M10V_5213_ID || M10V_STYLE(id) || M10V_D76(id) || M10V_ANIME_E6(id)||M10V_C41(id)||M10V_EXTRA_FILM(id)||M10V_FOUR_LOOKS(id)))
 #define M10V_CUSTOM(id) ((id)>M10V_FILM_COUNT && (id)<=M10V_CUSTOM_MAX_ID)
 #define M10V_SLOT_COUNT 10u
 #define M10V_CUSTOM_IMMUTABLE_FIRST 21u
@@ -78,10 +85,10 @@ static inline uint32_t m10v_halo_workspace_planes(uint32_t film,uint32_t profile
 
 typedef struct { uint16_t film; uint8_t grain, soft, halo_gain, halo_spread, halo_threshold, halo_profile; } m10v_slot;
 static inline void m10v_slot_default_halation(m10v_slot *slot) {
-    slot->halo_gain=slot->film==33?7:0;
-    slot->halo_spread=slot->film==33?7:3;
+    slot->halo_gain=m10v_800t_halation_film(slot->film)?7:0;
+    slot->halo_spread=m10v_800t_halation_film(slot->film)?7:3;
     slot->halo_threshold=5;
-    slot->halo_profile=slot->film==33&&M10V_UNIVERSAL_HALATION?M10V_HALO_SPILL:slot->film==66?1:2;
+    slot->halo_profile=m10v_800t_halation_film(slot->film)&&M10V_UNIVERSAL_HALATION?M10V_HALO_SPILL:slot->film==66?1:2;
 }
 
 /* The high bit in the legacy variation byte marks per-film ISP settings.

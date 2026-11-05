@@ -229,7 +229,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     half_pair_enabled=bool(camera_model=='gr3' and base>=0x540be000 and film_library and sd_library and recipe_snapshot and lifecycle_trace)
     pair_flags=[f'-DM10V_HALF_PAIR_ENABLED={int(half_pair_enabled)}']
     native_owned=bool(native_color and native_grain and recipe_snapshot and lifecycle_trace)
-    compile_flags += [f'-DM10V_FOUR_LOOKS_NATIVE={int(camera_model=="gr3" and native_owned)}']
+    compile_flags += [f'-DM10V_FOUR_LOOKS_NATIVE={int(camera_model=="gr3" and native_owned)}',f'-DM10V_MARLBORO_NATIVE={int(native_owned)}']
     if type(border_hardware)is not bool or (border_hardware and not(border_enabled and native_owned and save_chain_trace and view_deferred)):
         raise ValueError('border hardware requires explicit opt-in, owned native pipeline, RAW lifetime and view recovery')
     if live_color and (not native_color or not sd_library):raise ValueError('live color requires native color and owned settings')
@@ -274,9 +274,9 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 empty=True
                 if any(initial[12+i*8:20+i*8]) or any(initial[96+i*8:104+i*8]):raise ValueError('disabled film must be empty')
                 continue
-            if empty or film in seen or not (1<=film<=78 or 289<=film<=305 or 309<=film<=326) or grain>3 or soft>3 or gain>8 or spread>8 or threshold>8 or profile>(6 if universal_halation else 3):raise ValueError('invalid enabled film')
+            if empty or film in seen or not (1<=film<=78 or 289<=film<=305 or 309<=film<=327) or grain>3 or soft>3 or gain>8 or spread>8 or threshold>8 or profile>(6 if universal_halation else 3):raise ValueError('invalid enabled film')
             if 318<=film<=321 and camera_model!='gr3':raise ValueError('Four looks require the verified GR III native pipeline')
-            if (film==294 or 309<=film<=326) and not native_owned:raise ValueError('New looks require ISP still ownership')
+            if (film==294 or 309<=film<=327) and not native_owned:raise ValueError('New looks require ISP still ownership')
             seen.add(film)
         if initial[92]>2 or any(v>3 for v in initial[93:96]) or struct.unpack_from('<I',initial,176)[0] not in (0,1) or struct.unpack_from('<I',initial,180)[0]!=zlib.crc32(initial[:180]):raise ValueError('invalid initial settings/checksum')
     if not native_grain and any(initial[14+i*8] for i in range(10)):raise ValueError('Grain requires the GR III native processing pipeline')
@@ -314,6 +314,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     verify_extra_films(ROOT)
     from scripts.verify_gr3_four_looks_reference import verify as verify_four_looks
     verify_four_looks(ROOT)
+    from scripts.build_gr3_marlboro_reference import verify as verify_marlboro
+    verify_marlboro(ROOT)
     if base & 4095: raise ValueError('runtime base must be page aligned')
     configured = os.environ.get('M10V_LLVM_CLANG')
     candidates = [configured] if configured else [
@@ -848,6 +850,9 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if texts[395:400]!=['']*5:raise ValueError('guide captions overlap existing resources')
             texts[395:400]=GUIDES_CAPTIONS
             texts+=ADJ_CAPTIONS
+        if 786+len(texts)<1202:texts+=['']*(1202-786-len(texts))
+        if 786+len(texts)!=1202:raise ValueError('Marlboro resource allocation differs')
+        texts+=['Marlboro']
         last_resource=786+len(texts)-1
         if sd_library:
             from scripts.generate_m10v_card_captions import resource as caption_resource
@@ -999,8 +1004,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         half_frame=bool(camera_model=='gr3' and base>=0x540be000)
         half_pixels=(ROOT/'native/gr3/m10v_half_frame_icon.rgba').read_bytes() if half_frame else b''
         if half_frame and len(half_pixels)!=9600:raise ValueError('half-frame icon extent differs')
-        icon_count = 887
-        descriptor_count=old_descriptor_count+19+int(hdf_adj_report is not None)+int(half_frame)
+        icon_count = 888
+        descriptor_count=old_descriptor_count+20+int(hdf_adj_report is not None)+int(half_frame)
         icon_descriptors = icon_table + icon_count*4
         icon_data = icon_descriptors + descriptor_count*8
         relocations.data(icon_table,stock_directory)
@@ -1020,6 +1025,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         else:image+=bytes(4) # Keep Half resource 877 reserved on every model.
         image+=b''.join(struct.pack('<I',icon_descriptors+(old_descriptor_count+10+int(hdf_adj_report is not None)+int(half_frame)+i)*8) for i in range(4))
         image += b''.join(struct.pack('<I',icon_descriptors+(old_descriptor_count+14+int(hdf_adj_report is not None)+int(half_frame)+i)*8) for i in range(5))
+        image += struct.pack('<I',icon_descriptors+(old_descriptor_count+19+int(hdf_adj_report is not None)+int(half_frame))*8)
         image += b''.join(struct.pack('<HHI',40,40,(icon_data+(len(icon_pixels) if i<retired_icon_count else (i-retired_icon_count)*6400))//4) for i in range(78))
         if sd_library:
             image += bytes(5*8) # Reserved ROM padding; dynamic metadata is in owned RAM.
@@ -1083,6 +1089,9 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         four_data=c41_data+len(c41_pixels)+len(extra_pixels)+len(hdf_adj_pixels)+len(unknown_pixels)+len(half_pixels)
         image+=b''.join(struct.pack('<HHI',40,40,(four_data+i*6400)//4) for i in range(4))
         image+=b''.join(struct.pack('<HHI',40,40,(c41_data+(2+i)*6400)//4) for i in range(5))
+        marlboro_pixels=(ROOT/'native/gr3/m10v_marlboro.rgba').read_bytes()
+        if len(marlboro_pixels)!=6400:raise ValueError('Marlboro artwork extent differs')
+        image += struct.pack('<HHI',40,40,(four_data+len(four_pixels))//4)
         image += icon_pixels
         if sd_library:
             from scripts.generate_m10v_film_cards import custom_icon
@@ -1090,7 +1099,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if custom_pixels!=custom_icon():raise ValueError('custom LUT icon differs from source')
             image += custom_pixels
         image += (ROOT/'native/gr3/m10v_charmera.rgba').read_bytes()
-        image += color_pixels+pixel_pixels+style_pixels+spectral_icon+d76_icon_pixels+aspect_pixels+anime_pixels+c41_pixels+extra_pixels+hdf_adj_pixels+unknown_pixels+half_pixels+four_pixels
+        image += color_pixels+pixel_pixels+style_pixels+spectral_icon+d76_icon_pixels+aspect_pixels+anime_pixels+c41_pixels+extra_pixels+hdf_adj_pixels+unknown_pixels+half_pixels+four_pixels+marlboro_pixels
         icon_asm=folder/'icons.S';icon_obj=folder/'icons.o'
         icon_asm.write_text("""
             .syntax unified
@@ -1322,7 +1331,9 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         'native/gr3/four-looks-reference.json','native/gr3/m10v_four_looks_native_profiles.h',
         'native/gr3/m10v_four_looks.rgba','web/gr3/four-looks-luts.json',
         'scripts/build_gr3_four_looks_reference.py','scripts/fit_gr3_four_looks_native.py',
-        'scripts/verify_gr3_four_looks_reference.py','node/gr3-sd-pre-four-looks-contract.json']})
+        'scripts/verify_gr3_four_looks_reference.py','node/gr3-sd-pre-four-looks-contract.json',
+        'scripts/build_gr3_marlboro_reference.py','scripts/preview_gr3_marlboro.py','native/gr3/marlboro-reference.json',
+        'native/gr3/m10v_marlboro_native_profile.h','native/gr3/m10v_marlboro.rgba','web/gr3/marlboro-luts.json','node/gr3-sd-pre-marlboro-contract.json']})
     if sd_library:
         manifest['custom_isp']={'schema':'m10v-custom-isp/v1','record_offset':6688,'payload_bytes':1572,
             'preview_offset':0x213c,'preview_bytes':0x4000,'storage':'inline TopMenu allocation',

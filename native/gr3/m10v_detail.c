@@ -29,7 +29,7 @@ uint32_t m10v_detail_table(uint32_t ui){
  m10v_library_state s;
  int i=load(ui,&s);if(i<0)return 0x53b3488cu;
  uint32_t film=s.slots[i].film;
- return (uint32_t)(uintptr_t)(film==290?&m10v_detail_pixel_tables:film==M10V_CHAR_ID?&m10v_detail_charmera_tables:film==67?&m10v_detail_phoenix_tables:film==33?&m10v_detail_tables:film==68?&m10v_detail_red_tables:&m10v_detail_common_tables);
+ return (uint32_t)(uintptr_t)(film==290?&m10v_detail_pixel_tables:film==M10V_CHAR_ID?&m10v_detail_charmera_tables:film==67?&m10v_detail_phoenix_tables:m10v_800t_halation_film(film)?&m10v_detail_tables:film==68?&m10v_detail_red_tables:&m10v_detail_common_tables);
 }
 static uint32_t value(const m10v_library_state *s,uint32_t target,uint32_t field){
  const m10v_slot *v=&s->slots[target];
@@ -78,7 +78,7 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
  if(op==4)field=((fn1)0x531b01d0u)(ui)-18;
  uint32_t film=s.slots[target].film;
  if(op==9)return film==67?1:2;
- uint32_t special=film==33||film==67;
+ uint32_t special=m10v_800t_halation_film(film)||film==67;
  if(op!=7&&(field>11||field==9||(field==11&&film!=M10V_CHAR_ID)||
     (field>=5&&field<=8&&!M10V_PURE_ISP_EFFECTS)||
     (field==4&&(!M10V_UNIVERSAL_HALATION||special))||
@@ -114,7 +114,7 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
   else {
    uint32_t gain=old->halo_gain,spread=old->halo_spread,threshold=old->halo_threshold,grain=M10V_ISP_NATIVE_GRAIN_MODE?old->grain:0,soft=old->soft;
    if(field==0)gain=v;else if(field==1)spread=v;else if(field==2)threshold=v;else if(field==3)grain=v;else soft=v;
-   if(film==33&&!M10V_UNIVERSAL_HALATION)result=m10v_camera_library_detail(&s,(uint32_t)target,gain,spread,threshold,grain,soft);
+   if(m10v_800t_halation_film(film)&&!M10V_UNIVERSAL_HALATION)result=m10v_camera_library_detail(&s,(uint32_t)target,gain,spread,threshold,grain,soft);
    else if(field<3)result=m10v_camera_library_halation(&s,(uint32_t)target,gain,spread,threshold,
        M10V_UNIVERSAL_HALATION&&special?M10V_HALO_SPILL:old->halo_profile);
    else result=m10v_camera_library_texture(&s,(uint32_t)target,grain,soft);

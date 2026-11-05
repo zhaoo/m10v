@@ -17,7 +17,10 @@ class Gr4StorageDetailTests(unittest.TestCase):
   def compile_one(name,base,prefix,externals):
    obj=cls.folder/(Path(name).name+'.o')
    subprocess.run([os.environ.get('M10V_LLVM_CLANG','clang'),*FLAGS,'-I',str(ROOT/'native/gr3'),'-c',str(ROOT/'native/gr4'/name),'-o',str(obj)],check=True)
-   raw,symbols=link_object(obj.read_bytes(),base,externals,prefix,omitted_exports=('m10v_camera_library_preview','m10v_camera_library_preview_init','m10v_camera_library_preview_clear','m10v_camera_library_film_name_stamp','m10v_camera_library_select_custom') if prefix=='m10v_camera_library_' else ('m10v_sd_camera_custom_record','m10v_sd_camera_custom_name','m10v_sd_camera_catalog_name') if prefix=='m10v_sd_camera_' else ())
+   # Same explicit unsupported API inventory as the production GR IV builder.
+   camera_omitted=('custom_profile','preview','preview_init','preview_clear','mutation_begin','mutation_end','mutation_busy','remove','shooting_count','menu_index','reconcile_legacy_selection','select_custom','film_name_stamp')
+   sd_omitted=('custom_record','custom_name','catalog_name','directory_item','directory_install','directory_extent')
+   raw,symbols=link_object(obj.read_bytes(),base,externals,prefix,omitted_exports=tuple('m10v_camera_library_'+n for n in camera_omitted) if prefix=='m10v_camera_library_' else tuple('m10v_sd_camera_'+n for n in sd_omitted) if prefix=='m10v_sd_camera_' else ())
    cls.images.append((base,raw));cls.symbols.update(symbols);return symbols
   compile_one('../gr3/m10v_sd_library.c',0x54470000,'m10v_sd_',cls.symbols)
   compile_one('m10v_library_camera.c',0x54480000,'m10v_camera_library_',cls.symbols)
@@ -89,6 +92,18 @@ class Gr4StorageDetailTests(unittest.TestCase):
   for page,row,want in [(0,0,33),(0,3,68),(4,7,57),(5,7,65),(6,0,0),(32,0,0)]:self.assertEqual(self.call('m10v_sd_camera_item',page,row),want)
   self.short=True;self.assertEqual(self.call('m10v_sd_camera_item',0,0),0)
   self.assertEqual((self.opened,self.allocations),(0,0))
+ def test_imported_marlboro_journal_is_compacted_in_memory_without_writing_storage(self):
+  from tests.test_gr3_four_looks_native import state_bytes
+  saved=bytes(state_bytes([34,327,66]))
+  self.files['M10V6A.bin']=saved;self.files['M10V6B.bin']=saved
+  self.assertEqual(self.call('m10v_camera_library_load',0x5500a000),0)
+  actual=bytes(self.u.mem_read(0x5500a000,184))
+  self.assertEqual([struct.unpack_from('<H',actual,12+i*8)[0] for i in range(10)],[34,66]+[0]*8)
+  self.assertEqual(actual[12:20],saved[12:20]);self.assertEqual(actual[20:28],saved[28:36])
+  self.assertEqual(actual[96:104],saved[96:104]);self.assertEqual(actual[104:112],saved[112:120])
+  self.assertEqual(zlib.crc32(actual[:180]),struct.unpack_from('<I',actual,180)[0])
+  self.assertEqual(self.call('m10v_camera_library_select',0x5500a000,0,327),0xffffffff)
+  self.assertFalse(any(c[0]=='save' for c in self.calls));self.assertEqual(self.files['M10V6A.bin'],saved)
  def test_complete_sd_snapshot_before_journal_and_without_card(self):
   self.assertEqual(self.call('m10v_sd_camera_install',0,3,68,2),0)
   self.assertEqual(self.calls[0],('save','M10VS68.bin'))

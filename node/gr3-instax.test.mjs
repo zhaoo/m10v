@@ -9,7 +9,7 @@ import {defaultConfiguration} from '../web/gr3/native-library-state.mjs';
 import {preSquareArtRecord} from './test-support/pre-square-records.mjs';
 test('Instax appends identity 317 under creative and serializes an ISP builtin',()=>{
  const group=FILM_GROUPS.find(g=>g.name==='创意');
- assert.deepEqual(group.films.slice(-3),[{id:316,name:'LomoChrome Turquoise'},{id:317,name:'Instax Color'},{id:321,name:'LomoChrome Purple'}]);
+ assert.deepEqual(group.films.filter(f=>f.id!==327).slice(-3),[{id:316,name:'LomoChrome Turquoise'},{id:317,name:'Instax Color'},{id:321,name:'LomoChrome Purple'}]);
  const stocks=JSON.parse(readFileSync(new URL('../web/gr3/extra-films-luts.json',import.meta.url))).stocks;
  assert.deepEqual(stocks.map(s=>s.id),[314,315,316,317]);
  const f=stocks.at(-1);assert.equal(f.iso,800);assert.equal(f.camera_calibrated,false);

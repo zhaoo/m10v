@@ -179,8 +179,30 @@ static int load_library(m10v_library_state *state){
  if(good[0]||good[1]){uint32_t selected=!good[0]||(good[1]&&candidates[1].sequence>candidates[0].sequence);copy(state,&candidates[selected]);return 0;}
  legacy_state old;int result=load_legacy_library(&old);if(result<0)return result;expand_legacy(state,&old);return result==0?4:result;
 }
-int m10v_camera_library_load(m10v_library_state *state){return load_library(state);}
+int m10v_camera_library_load(m10v_library_state *state){
+ int result=load_library(state);
+ if(result>=0){
+  /* A shared journal can arrive from GR III/IIIx. Keep the user's other
+   * slots in RAM without rewriting a record containing unsupported ISP color. */
+  uint32_t count=0,changed=0;
+  for(uint32_t i=0;i<M10V_SLOT_COUNT;i++){
+   if(state->slots[i].film==M10V_MARLBORO_ID){changed=1;continue;}
+   state->slots[count]=state->slots[i];state->effects[count]=state->effects[i];count++;
+  }
+  if(changed){
+   for(;count<M10V_SLOT_COUNT;count++){
+    for(uint32_t j=0;j<sizeof(m10v_slot);j++)((uint8_t*)&state->slots[count])[j]=0;
+    for(uint32_t j=0;j<sizeof(m10v_film_effects);j++)((uint8_t*)&state->effects[count])[j]=0;
+   }
+   uint32_t crc=0xffffffffu;
+   for(uint32_t i=0;i<sizeof(*state)-4;i++){crc^=((uint8_t*)state)[i];for(uint32_t bit=0;bit<8;bit++)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));}
+   state->crc=~crc;
+  }
+ }
+ return result;
+}
 int m10v_camera_library_select(m10v_library_state *state, uint32_t slot, uint32_t film) {
+    if(film==M10V_MARLBORO_ID)return M10V_LIBRARY_INVALID;
     if (!ram(state, sizeof(*state))) return M10V_LIBRARY_INVALID;
     uint32_t fs = filesystem();
     return fs ? m10v_library_select(state, slot, film, store, (void *)(uintptr_t)fs) : M10V_LIBRARY_STORE_FAILED;

@@ -50,7 +50,7 @@ static uint32_t root_rows(const uint8_t *m,uint32_t index){
     uint32_t rows[5],n=0;
     if(M10V_ISP_NATIVE_GRAIN_MODE&&film!=M10V_CHAR_ID&&film!=M10V_PIXEL_ID)rows[n++]=130;
     rows[n++]=132;
-    if(M10V_UNIVERSAL_HALATION||film==33||film==67)rows[n++]=film==67?339:214;
+    if(M10V_UNIVERSAL_HALATION||m10v_800t_halation_film(film)||film==67)rows[n++]=film==67?339:214;
     if(film==68||film==M10V_CHAR_ID)rows[n++]=film==M10V_CHAR_ID?359:340;
     return index==0xffffffffu?n:index<n?rows[index]:0;
 }
@@ -124,6 +124,7 @@ static uint32_t resource(uint32_t tone) {
     return 0;
 }
 static uint32_t film_resource(uint32_t film) {
+    if(film==M10V_MARLBORO_ID)return M10V_MARLBORO_NAME;
     if(M10V_FOUR_LOOKS(film))return M10V_FOUR_LOOKS_NAME(film);
     if(M10V_EXTRA_FILM(film))return M10V_EXTRA_FILM_NAME(film);
     if(M10V_C41(film))return M10V_C41_NAME(film);
@@ -188,6 +189,7 @@ uint32_t m10v_menu_icon(uint32_t translator, uint32_t tone) {
 #if M10V_SD_LIBRARY
             if(M10V_CUSTOM(state.slots[i].film))return 754;
 #endif
+            if(state.slots[i].film==M10V_MARLBORO_ID)return M10V_MARLBORO_ICON;
             if(M10V_FOUR_LOOKS(state.slots[i].film))return M10V_FOUR_LOOKS_ICON(state.slots[i].film);
             if(M10V_EXTRA_FILM(state.slots[i].film))return M10V_EXTRA_FILM_ICON(state.slots[i].film);
             if(M10V_C41(state.slots[i].film))return M10V_C41_ICON(state.slots[i].film);
@@ -212,6 +214,7 @@ uint32_t m10v_menu_recorded_icon(uint32_t tag){
  if(!m10v_recorded_film_read(code,&recorded))return 0;
  if(recorded.bank)return 754;
  uint32_t film=recorded.id;
+ if(film==M10V_MARLBORO_ID)return M10V_MARLBORO_ICON;
  if(M10V_FOUR_LOOKS(film))return M10V_FOUR_LOOKS_ICON(film);
  if(M10V_EXTRA_FILM(film))return M10V_EXTRA_FILM_ICON(film);
  if(M10V_C41(film))return M10V_C41_ICON(film);

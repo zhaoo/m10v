@@ -29,6 +29,7 @@ def generate():
  specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/anime-e6-luts.json').read_text())['stocks'] if v['id']<309]
  specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/four-looks-luts.json').read_text())['stocks']]
  specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/c41-luts.json').read_text())['stocks'] if v['id']>=322]
+ specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/marlboro-luts.json').read_text())['stocks']]
  rows=['static const struct { uint8_t brand,main,sub,header,color,ink,accent,motif; } box_cards[]={'];palette=[];words=[]
  for i,name,spec in specs:
   brand,title,code,paper,ink,accent,motif=artwork(name,i,spec)

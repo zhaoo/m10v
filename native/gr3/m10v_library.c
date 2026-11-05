@@ -205,7 +205,7 @@ int m10v_library_halation(m10v_library_state *state,uint32_t slot,uint32_t gain,
     return commit(state,&next,store,context);
 }
 int m10v_library_detail(m10v_library_state *state,uint32_t slot,uint32_t gain,uint32_t spread,uint32_t threshold,uint32_t grain,uint32_t soft,m10v_library_store store,void *context) {
-    if(!m10v_library_valid(state)||slot>=M10V_SLOT_COUNT||state->slots[slot].film!=33||gain>8||spread>8||threshold>8||grain>3||soft>3)return M10V_LIBRARY_INVALID;
+    if(!m10v_library_valid(state)||slot>=M10V_SLOT_COUNT||!m10v_800t_halation_film(state->slots[slot].film)||gain>8||spread>8||threshold>8||grain>3||soft>3)return M10V_LIBRARY_INVALID;
     m10v_library_state next;copy_state(&next,state);
     m10v_slot *v=&next.slots[slot];v->halo_gain=(uint8_t)gain;v->halo_spread=(uint8_t)spread;
     v->halo_threshold=(uint8_t)threshold;v->grain=(uint8_t)grain;v->soft=(uint8_t)soft;v->halo_profile=2;
@@ -573,7 +573,7 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     const m10v_slot *choice = &state->slots[slot];
     /* New looks are ISP-only color. Never map these identities to old CPU LUTs. */
     if(M10V_ANIME(choice->film))return M10V_LIBRARY_INVALID;
-    if((M10V_FOUR_LOOKS(choice->film)||M10V_ANIME_E6(choice->film)||M10V_C41(choice->film)||M10V_EXTRA_FILM(choice->film))&&!(completed&M10V_NATIVE_COLOR))return M10V_LIBRARY_INVALID;
+    if((choice->film==M10V_MARLBORO_ID||M10V_FOUR_LOOKS(choice->film)||M10V_ANIME_E6(choice->film)||M10V_C41(choice->film)||M10V_EXTRA_FILM(choice->film))&&!(completed&M10V_NATIVE_COLOR))return M10V_LIBRARY_INVALID;
     if(M10V_CUSTOM(choice->film)&&!custom_lut)return M10V_LIBRARY_INVALID;
     uint32_t shift = 0, gw = image->width, gh = image->height;
     /* Power-of-two sampling must not depend on an ARM division runtime. */
@@ -586,7 +586,7 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     uint32_t use_halo = !(completed&M10V_NATIVE_HALO) && m10v_halo_enabled(choice->film,choice->halo_gain,choice->halo_profile);
     uint32_t special_halo=use_halo;
 #if M10V_UNIVERSAL_HALATION
-    special_halo=use_halo && (choice->film==33||choice->film==67);
+    special_halo=use_halo && (m10v_800t_halation_film(choice->film)||choice->film==67);
 #endif
     /* Legacy per-film soft is retired, including imported SD/journal values.
      * Digital HDF runs upstream in the original native Clarity owner. */
@@ -615,7 +615,7 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
     }
     /* Optional exact color cache follows spatial storage. Missing capacity
      * keeps the previous ABI and renderer. Validate before the first write. */
-    uint32_t spatial=(use_halo && !(choice->film==33&&special_halo))?4*cells:0;
+    uint32_t spatial=(use_halo && !(m10v_800t_halation_film(choice->film)&&special_halo))?4*cells:0;
     void *color_memory=0;
     if(choice->film>33 && scratch && !((uintptr_t)scratch&3) &&
        scratch_bytes>=spatial+M10V_COLOR_CACHE_BYTES &&
@@ -626,7 +626,7 @@ static int render_stages(m10v_library_image *image,const m10v_library_state *sta
        !overlap(scratch,scratch_bytes,image,sizeof(*image)) &&
        !(state->stamp&&overlap(scratch,scratch_bytes,date,sizeof(*date))))
         color_memory=scratch+spatial;
-    if(choice->film==33 && (special_halo || soft)){
+    if(m10v_800t_halation_film(choice->film) && (special_halo || soft)){
         m10v_slot spatial_choice=*choice;
         if(completed&M10V_NATIVE_HALO)spatial_choice.halo_gain=0;
         spatial_choice.soft=(uint8_t)soft;

@@ -62,7 +62,7 @@ class DeliveredPureIspTests(unittest.TestCase):
     make = current.CurrentFilmPipelineTests.make
     capture = current.CurrentFilmPipelineTests.capture
 
-    def fixture(self, settings=(0, 0, 0, 1, 0, 0, 0, 0), width=640, height=480, cold=False, film=66):
+    def fixture(self, settings=(0, 0, 0, 1, 0, 0, 0, 0), width=640, height=480, cold=False, film=66, stage=1):
         e = StockISP(self.image)
         e.events, e.files, e.writes, e.filesystem_online = [], {}, [], True
         e.hold_expected, e.held, e.forbid_files, e.reject_write = False, False, False, False
@@ -146,7 +146,7 @@ class DeliveredPureIspTests(unittest.TestCase):
         e.w32(recipe, 0x53D0FC90)
         e.w32(recipe + 0x4778, 0x31545653)
         obj = e.cursor
-        e.make(25, 1)
+        e.make(25, stage)
         frame = obj + 0x1400
         si = int.from_bytes(e.u.mem_read(frame + 0x82D0, 4), 'little')
         e.u.mem_write(si + 0x77C, b'\x0B' if cold else b'\x19')
@@ -544,6 +544,37 @@ class DeliveredPureIspTests(unittest.TestCase):
                 self.assertEqual(self.at(e, 0x53503AB4, digital, native, execution, 0), 1)
                 self.assertEqual(e.events, [])
                 self.jpeg(e, recipe, si, request)
+
+    def test_marlboro_real_producer_still_spatial_and_jpeg_preserve_queued_film_without_cpu_pixels(self):
+        for stage in (0,1):
+            with self.subTest(stage=stage):
+                e,recipe,obj,frame,si,request,owner,setting,digital,native,state=self.fixture(width=6000,height=4000,film=327,stage=stage)
+                self.assertEqual(self.call(e,'m10v_camera_library_select',state,0,66),0)
+                self.enqueue(e,recipe,0)
+                frozen=e.alloc(184)
+                self.assertEqual(self.call(e,'m10v_isp_frame_recipe_state',recipe,frozen),1)
+                self.assertEqual(struct.unpack('<H',e.u.mem_read(frozen+12,2))[0],327)
+                self.make(e,recipe,obj,frame)
+                self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,frozen),1)
+                planning,_=e.params();self.at(e,0x535033D8,digital,planning,si,1)
+                queried=e.alloc(4)
+                self.assertEqual(self.at(e,0x535033E8,digital,native,planning,queried),1)
+                self.assertEqual(struct.unpack('<I',e.u.mem_read(queried,4))[0],0)
+                execution,_=e.params();self.at(e,0x53503AA0,digital,execution,si,1)
+                self.assertEqual(self.at(e,0x53503AB4,digital,native,execution,0),1)
+                self.assertEqual(e.events,[])
+                self.jpeg(e,recipe,si,request)
+
+    def test_marlboro_missing_color_completion_rejects_before_cpu_pixel_work(self):
+        e,recipe,obj,frame,si,request,owner,setting,digital,native,state=self.fixture(width=6000,height=4000,film=327)
+        planning,_=e.params();self.at(e,0x535033D8,digital,planning,si,1)
+        queried=e.alloc(4);self.assertEqual(self.at(e,0x535033E8,digital,native,planning,queried),1)
+        execution,_=e.params();self.at(e,0x53503AA0,digital,execution,si,1)
+        self.assertEqual(self.at(e,0x53503AB4,digital,native,execution,0),1)
+        # Invalidate only the completion status, retaining the valid frozen
+        # state. This exercises rejection without forcing a storage fallback.
+        e.w32(recipe+0x4a08+12,3)
+        self.assertEqual(self.capture(e,recipe,si,request),0xfffffffb)
 
     def test_queued_ui_update_cannot_retarget_combined_effects_or48mb_query(self):
         settings = (2, 1, 2, 3, 1, 2, 0 if self.per_film else 1, 0)

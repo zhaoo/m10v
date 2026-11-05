@@ -2,7 +2,7 @@ import {isGr3Family,modelCapabilities} from './model-capabilities.mjs';
 // One catalogue and one selected-film contract for simulation and in-camera library.
 export const defaultEffects=()=>({grainSize:0,leakGain:0,leakPosition:0,leakSpread:4,leakVariation:0,filmExposure:0});
 export const defaultFilmEffects=()=>({leakGain:0,leakPosition:0,leakSpread:0,blur:0});
-export const defaultHalo=(film)=>({gain:film===33?7:0,spread:film===33?7:3,threshold:5,profile:film===66?1:2});
+export const defaultHalo=(film)=>({gain:[33,327].includes(film)?7:0,spread:[33,327].includes(film)?7:3,threshold:5,profile:film===66?1:2});
 export const defaultConfiguration=(model='gr3')=>({slots:Array.from({length:5},(_,i)=>{const film=i===4?33:34+i;return {film,grain:0,soft:0,halo:defaultHalo(film),effects:defaultEffects()};}),stamp:0,format:0,corner:0,color:0,filmNameStamp:false,hdf:0,zoom:{write:false,slots:[...(modelCapabilities(model).zoom?.defaults??[35,50])],revision:0}});
 export function normalizeConfiguration(value=defaultConfiguration()){
  const exact=(obj,keys)=>obj&&typeof obj==='object'&&!Array.isArray(obj)&&Object.keys(obj).sort().join('|')===[...keys].sort().join('|');
@@ -15,7 +15,7 @@ export function normalizeConfiguration(value=defaultConfiguration()){
  const hdf=value.hdf===undefined?0:value.hdf;if(!int(hdf,0,3))throw Error('HDF 模拟档位无效');
  const slots=value.slots.map(s=>{
   const {filmEffects,...legacy}=s??{};
-  if(!(exact(legacy,['film','grain','soft','halo'])||exact(legacy,['film','grain','soft'])||exact(legacy,['film','grain','soft','halo','effects']))||!(int(s.film,1,78)||(int(s.film,289,305)||int(s.film,309,326)))||!int(s.grain,0,3)||!int(s.soft,0,3))throw Error('胶卷或质感档位无效');
+  if(!(exact(legacy,['film','grain','soft','halo'])||exact(legacy,['film','grain','soft'])||exact(legacy,['film','grain','soft','halo','effects']))||!(int(s.film,1,78)||(int(s.film,289,305)||int(s.film,309,327)))||!int(s.grain,0,3)||!int(s.soft,0,3))throw Error('胶卷或质感档位无效');
   if(filmEffects!==undefined&&(!exact(filmEffects,Object.keys(defaultFilmEffects()))||!int(filmEffects.leakGain,0,3)||!int(filmEffects.leakPosition,0,4)||!int(filmEffects.leakSpread,0,2)||!int(filmEffects.blur,0,3)))throw Error('胶片效果档位无效');
   const h=s.halo??defaultHalo(s.film);if(!exact(h,['gain','spread','threshold','profile'])||!int(h.gain,0,8)||!int(h.spread,0,8)||!int(h.threshold,0,8)||!int(h.profile,0,6))throw Error('胶卷光晕参数无效');
   const inputEffects=s.effects??defaultEffects(),oldKeys=['grainSize','leakGain','leakPosition','leakSpread','leakVariation'];
@@ -100,7 +100,7 @@ export function configurationForEffects(value,{halation,perFilmEffects}){
  const c=normalizeConfiguration(value);
  for(const s of c.slots){
   if(!perFilmEffects){delete s.filmEffects;if([289,290].includes(s.film))s.grain=0;}
-  if(!halation&&s.halo.profile>3)s.halo=[33,67].includes(s.film)?{...s.halo,profile:2}:defaultHalo();
+  if(!halation&&s.halo.profile>3)s.halo=[33,67,327].includes(s.film)?{...s.halo,profile:2}:defaultHalo();
  }
  return c;
 }

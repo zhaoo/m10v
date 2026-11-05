@@ -103,7 +103,7 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
     # Match the real selected private list row, including each stock prefix.
     kind=uc.mem_read(ui+0x19a,1)[0];setting=uc.mem_read(ui+0x199,1)[0]
     p,n=struct.unpack_from('<II',self.rtos,0xb3488c+(setting*12+kind)*8)
-    ids=self.manifest['detail']['variant_ids']['pixel' if film==290 else 'charmera' if film==289 else 'phoenix' if film==67 else 'halo' if film==33 else 'red' if film==68 else 'common']
+    ids=self.manifest['detail']['variant_ids']['pixel' if film==290 else 'charmera' if film==289 else 'phoenix' if film==67 else 'halo' if film in (33,327) else 'red' if film==68 else 'common']
     result=n+ids.index(18+field) if 18+field in ids else n
    elif real_row and a==0x536af31c:result=0x5500c000
    elif real_row and a==0x533ad3c0:calls.append(('visible',args[0],args[1]))
@@ -221,13 +221,13 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
 
  def test_stock_count_and_selector_resolve_each_carrier_dynamically(self):
   for tone in (12,18,19,20,21):
-   for film in (33,34):
+   for film in (33,327,34):
     u,ui,slider,calls,state=self.machine(tone,film)
     kind=u.mem_read(ui+0x19a,1)[0]
     p,n=struct.unpack_from('<II',self.rtos,0xb3488c+kind*8)
     original=sum(self.rtos[p-0x53000000+i*2]!=1 for i in range(n))
-    self.assertEqual(self.execute(u,0x531afab8,ui,0,kind),original+(4 if film==33 else 1))
-    if film==33:
+    self.assertEqual(self.execute(u,0x531afab8,ui,0,kind),original+(4 if film in (33,327) else 1))
+    if film in (33,327):
      for field in range(4):
       # machine's external widget-index stub supplies last field selection.
       u,ui,slider,calls,state=self.machine(tone,film,field)
@@ -260,6 +260,16 @@ let at=0;while(at<d.length){const name=d.toString('ascii',at,at+8).split(String.
   for field,expected in enumerate((3,4,5,1)):
    u,ui,slider,calls,state=self.machine(field=field);self.execute(u,0x531b03cc,ui)
    self.assertIn(('current',expected),calls)
+ def test_marlboro_uses_the_same_fn_table_current_values_and_ranges_as_800t(self):
+  for field in range(4):
+   outputs=[]
+   for film in (33,327):
+    u,ui,slider,calls,state=self.machine(film=film,field=field)
+    table=self.execute(u,self.manifest['symbols']['m10v_detail_table'],ui)
+    self.execute(u,0x531b03cc,ui)
+    self.execute(u,0x531b05c4,ui)
+    outputs.append((table,[c for c in calls if c[0] in ('current','range','scale','default')]))
+   self.assertEqual(outputs[0],outputs[1])
  def test_real_callback_persists_selected_slot_and_failure_restores_slider(self):
   for tone in (12,18,19,20,21):
    for field in range(4):

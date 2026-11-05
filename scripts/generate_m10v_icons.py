@@ -157,7 +157,8 @@ def artwork(name,i,spec=None):
  323:('KODAK','COLORPLUS','200','#f0c534','#9d2828','#dc5c28',1),
  324:('FUJIFILM','NATURA','1600','#eee8d6','#245f41','#69a46f',8),
  325:('LOMOGRAPHY','REDSCALE','XR 50-200','#bd472b','#f4dcaa','#772a24',6),
- 326:('AGFA','VISTA','200','#c83c4c','#f1e4c8','#507594',5)}
+ 326:('AGFA','VISTA','200','#c83c4c','#f1e4c8','#507594',5),
+ 327:('M10V','MARLBORO','B&W RED','#edece8','#181818','#b51c2b',8)}
  if i in curated:brand,title,code,paper,ink,accent,motif=curated[i]
  return brand,title,code,paper,ink,accent,motif
 
@@ -315,6 +316,12 @@ def generate():
   im.save(out/f"{spec['id']}.png",optimize=True);box_icon(spec['name'],spec['id'],160,spec).save(out/f"{spec['id']}-large.png",optimize=True)
   meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
  (ROOT/'native/gr3/m10v_four_looks.rgba').write_bytes(four_pixels)
+ marlboro_pixels=bytearray()
+ for spec in json.loads((ROOT/'web/gr3/marlboro-luts.json').read_text())['stocks']:
+  im=box_icon(spec['name'],spec['id'],spec=spec);raw=im.tobytes();marlboro_pixels+=raw
+  im.save(out/f"{spec['id']}.png",optimize=True);box_icon(spec['name'],spec['id'],160,spec).save(out/f"{spec['id']}-large.png",optimize=True)
+  meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
+ (ROOT/'native/gr3/m10v_marlboro.rgba').write_bytes(marlboro_pixels)
  for row in meta:
   large=out/f"{row['id']:02d}-large.png"
   revision=hashlib.sha256(large.read_bytes()).hexdigest()[:12]

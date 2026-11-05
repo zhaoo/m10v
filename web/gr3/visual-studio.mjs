@@ -67,7 +67,7 @@ export function mountVisualStudio({state,editor,getModel,importModel,generate,sh
   control(haloControls,label,Array.from({length:9},(_,i)=>[i,String(i)]),(slot,value)=>{slot.halo[key]=value;})]);
  function renderEffects(slot){
   const perFilm=state.features.has('ispEffects');
-  const special=[33,67].includes(active),halo=slot?.halo;
+  const special=[33,67,327].includes(active),halo=slot?.halo;
   const haloOn=!!halo?.gain&&(special||halo.profile===4||halo.profile===5);
   const canEdit=!!slot&&!isBusy(),haloAvailable=getModel()!=='gr4'&&state.features.has('halation');
   const grainLevels=perFilm?['关','细','中','粗']:['关闭','弱','中','强'];
@@ -161,7 +161,7 @@ export function mountVisualStudio({state,editor,getModel,importModel,generate,sh
   editor.setConfiguration(reset,{filmSlot:index});refresh();
  };
  haloToggle.onclick=()=>updateSlot(slot=>{
-  const special=[33,67].includes(slot.film),enabled=haloToggle.getAttribute('aria-pressed')==='true';
+  const special=[33,67,327].includes(slot.film),enabled=haloToggle.getAttribute('aria-pressed')==='true';
   slot.halo.gain=enabled?0:3;slot.halo.profile=enabled?6:special?2:4;
  });
  const setMark=(key,value)=>{const next={...config(),[key]:value};if(next.stamp||next.filmNameStamp)state.features.add('timestamp');else state.features.delete('timestamp');editor.setConfiguration(next);refreshFeatures();refresh();};

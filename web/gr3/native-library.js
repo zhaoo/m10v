@@ -67,7 +67,7 @@ function render(){
  onInspect(films.find(f=>f.id===film),true);
  const label=$('#active-slot-label');if(label)label.textContent=`已选 ${active+1} · ${films.find(f=>f.id===film)?.name||'载入中'}`;
  if($('#charmera-controls')){$('#charmera-controls').hidden=film!==289;$('#effect-charmeraColor').value=String(configuration.slots[active].effects.charmeraColor??0);$('#effect-charmeraColor').disabled=busy;}
- $('#halo-controls').hidden=halationWrite||![33,67].includes(film);
+ $('#halo-controls').hidden=halationWrite||![33,67,327].includes(film);
  $('#red-controls').hidden=![67,68].includes(film);
  $('#red-controls .label').textContent=(film===67?'Harman Phoenix II':'Harman Red')+' · 模拟曝光EI';
  const eiOptions=film===67?[[0,'EI 200 · 标准'],[1,'EI 120 · 增加曝光']]:[[0,'EI 125 · 标准'],[1,'EI 64 · 明亮橙黄'],[2,'EI 250 · 浓郁暗红']];

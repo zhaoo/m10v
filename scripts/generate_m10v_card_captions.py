@@ -11,6 +11,7 @@ OUTPUT=ROOT/'native/gr3/m10v_card_captions.json'
 WIDTH,HEIGHT=120,28
 
 def resource(film):
+ if film==327:return 1202
  if 322<=film<=326:return 1186+film-322
  if 318<=film<=321:return 1159+film-318
  if film==317:return 1158

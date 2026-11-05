@@ -1241,5 +1241,16 @@
     "sha256": "99ab98ac640fdc5833656e5da027234e6721fe1a5befc38932a3c185fc681385",
     "icon_compact_url": "/gr3/film-icons/321.png?v=99ab98ac640f",
     "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 327,
+    "name": "Marlboro",
+    "title": "MARLBORO",
+    "code": "B&W RED",
+    "color": "#b51c2b",
+    "icon_url": "/gr3/film-icons/327-large.png?v=e7d1653c8892",
+    "sha256": "c0bcc3f9bf7860c5bfb72f2c0530071f19f90f694751661d709223275466af41",
+    "icon_compact_url": "/gr3/film-icons/327.png?v=c0bcc3f9bf78",
+    "artwork_revision": "classic-square-v1"
   }
 ]
