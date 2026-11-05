@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.05.2",
+      "date": "2026-11-05",
+      "title": "补充 GRemote 配套 SD 脚本下载说明",
+      "changes": [
+        "GR III 2.10 开启 GRemote 连接后，生成确认框标明下载的是固件与 SD 脚本 ZIP。",
+        "下载完成页展示 STARTUP.TTL、SERVICE.SH、SERVICE.BIN 的位置及 SD 卡目录，提示先备份已有启动脚本。",
+        "修改方案或重新生成时清除上一份下载说明。"
+      ],
+      "notice": "本次更新网页下载说明，固件与服务生成逻辑沿用上一版。手机连接相机 Wi-Fi 后可自动连接 M10V，首次使用仍需确认机身已启用 SD 脚本。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.05.1",
       "date": "2026-11-05",
       "title": "扩展 ADJ、RAW 显影与逐卷效果",
@@ -13,9 +27,9 @@
         "新版 GR III 2.10 无线连接包配套 GRemote Android 1.2.4，旧连接包仍可在新版 App 中使用。"
       ],
       "notice": "GR III 2.10 候选已获用户实机验收。GR IIIx 1.60 已通过离线回归。请使用与机型匹配的固件及胶卷资源。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "a8ff3a9fe7a8b06f23b789b6ba646606d393d85a",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/41877800713"
     },
     {
       "version": "2026.11.04.4",

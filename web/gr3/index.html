@@ -73,7 +73,7 @@
         <div class="stage-actions"><a class="outline" href="/">返回机型选择</a><button class="primary" id="source-next" disabled>继续胶卷与功能 <span>→</span></button></div>
       </section>
       <section class="page" data-page="build" hidden>
-        <div class="page-head"><p>保存</p><h2>保存固件</h2><span>保存前自动核验固件与方案，完成后下载对应机型的 BIN。</span></div>
+        <div class="page-head"><p>保存</p><h2>保存固件</h2><span>保存前自动核验固件与方案。开启 GRemote 连接时，下载包含配套 SD 脚本的 ZIP。</span></div>
         <div class="build-summary"><div><small>机型</small><strong id="build-model">等待导入固件</strong></div><div><small>扩展功能</small><strong id="build-feature-count">—</strong></div><div><small>构建状态</small><strong id="runtime-state">读取中</strong></div></div>
         <div class="review-edit-links" aria-label="返回修改方案"><button type="button" data-back="source">修改固件来源 ↗</button><button type="button" data-back="features">修改胶卷与影像 ↗</button></div><div id="build-details" class="build-details"></div>
         <button class="outline wide" id="prepare-build" hidden>核验方案 →</button>
@@ -86,6 +86,23 @@
         <button class="primary wide" id="build-firmware" disabled>保存固件 →</button>
         <button class="outline wide" id="cancel-build" hidden>取消当前构建</button>
         <div id="build-result" class="build-result" role="status" aria-live="polite"></div>
+        <section id="gremote-build-completion" class="build-completion" hidden aria-labelledby="gremote-completion-title">
+          <p class="completion-kicker">下载完成 <span>GR III · 2.10</span></p>
+          <h3 id="gremote-completion-title">GRemote 连接包</h3>
+          <p>解压 <code>m10v-gr3-gremote.zip</code>，先阅读包内的《开始前必读》。固件在 <code>01_FIRMWARE</code>，启动脚本和匹配的服务在 <code>02_SERVICE</code>。</p>
+          <details class="sd-install-guide" open>
+            <summary>SD 脚本与文件位置</summary>
+            <p>确认机身已启用 SD 脚本后，按包内说明将 <code>02_SERVICE/SD_ROOT</code> 下的文件放到 SD 卡对应位置。已有 <code>STARTUP.TTL</code> 时先备份，保留原有插件的启动流程。</p>
+            <pre>SD 卡根目录
+└─ SCRIPT/
+   ├─ STARTUP.TTL
+   └─ MCW1101/
+      ├─ SERVICE.SH
+      └─ SERVICE.BIN</pre>
+            <p>服务启动后，手机连上相机 Wi-Fi，打开 GRemote 即可自动连接。此下载只通过了文件校验，是否可安装请以包内说明为准。</p>
+            <a href="https://gremote.izhaoo.com/">获取 GRemote ↗</a>
+          </details>
+        </section>
         <section id="build-completion" class="build-completion" hidden aria-labelledby="completion-title">
           <p class="completion-kicker">构建完成 <span data-completed-model></span></p><h3 id="completion-title">固件已生成</h3>
           <button type="button" class="primary" data-firmware-download>再次下载固件 BIN ↓</button>

@@ -29,7 +29,9 @@ export function mountVisualStudio({state,editor,getModel,importModel,generate,sh
  const advanced=document.querySelector('.advanced-options');if(advanced){const section=node('section',undefined,'advanced-options');section.append(node('h3','调试选项'));for(const child of [...advanced.children])if(child.tagName!=='SUMMARY')section.append(child);advanced.replaceWith(section);}
 
  $('visual-stock-controls').append(engine);
- for(const id of ['preflight-result','build-result','cancel-build','build-completion'])$('visual-build-host').append($(id));
+ for(const id of ['preflight-result','build-result','cancel-build','build-completion','gremote-build-completion']){
+  const panel=$(id);if(panel)$('visual-build-host').append(panel);
+ }
  const undo=$('undo-edit'),redo=$('redo-edit');undo.className='visual-history';redo.className='visual-history';
  document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='z'&&!/^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName)){event.preventDefault();(event.shiftKey?redo:undo).click();refresh();}});
  function activeSlot(){return config().slots.find(slot=>slot.film===active);}
