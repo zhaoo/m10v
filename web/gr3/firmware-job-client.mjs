@@ -76,7 +76,9 @@ export async function runFirmwareJob(api, projectId, input, { signal, onProgress
     jobId = job.id;
     for (;;) {
       ensureActive();
-      if (job.state === 'failed') throw new FirmwareJobError('固件构建或离线验证失败，请重新生成。');
+      if (job.state === 'failed') throw new FirmwareJobError(job.error?.code==='M10V_BUILD_TIMEOUT'
+        ? '固件生成或独立校验超时，请稍后重试。'
+        : '固件构建或离线验证失败，请重新生成。');
       if (job.state === 'cancelled') throw abortedError();
       if (job.state === 'expired' || (job.expiresAt != null && (!Number.isFinite(job.expiresAt) || job.expiresAt <= Date.now()))) {
         throw new FirmwareJobError('固件构建任务结果已过期，请重新生成。');

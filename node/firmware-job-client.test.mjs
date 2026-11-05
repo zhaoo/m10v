@@ -81,6 +81,12 @@ test('failed, cancelled, and expired jobs never yield a download', async () => {
   }
 });
 
+test('a server deadline is reported as a timeout without exposing internal error details', async () => {
+  const server = service({snapshots:[{id:jobId,state:'failed',error:{code:'M10V_BUILD_TIMEOUT',message:'https://secret.example/internal'}}]});
+  await assert.rejects(runFirmwareJob(server.api,projectId,{film:'test'},{intervalMs:0}),error=>/超时/.test(error.message)&&!error.message.includes('https:'));
+  assert.equal(server.downloads,0);
+});
+
 test('cancels queued job once and interrupts a long polling wait', async () => {
   const server = service();
   const controller = new AbortController();

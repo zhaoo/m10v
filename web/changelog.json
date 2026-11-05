@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.05.5",
+      "date": "2026-11-05",
+      "title": "修复复杂方案生成超时",
+      "changes": [
+        "GR III / IIIx 官网保存时，首次生成与独立完整重建分别计时，避免扩展功能较多的方案在校验中被提前取消。",
+        "保留完整重建、逐字节比对、机型与来源校验，以及排队和取消功能。",
+        "超过单阶段限时会明确提示超时，便于区分构建失败和等待超时。"
+      ],
+      "notice": "本次仅调整网站任务的时间限制和错误提示，固件内容、配置与机内功能保持不变。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.05.4",
       "date": "2026-11-05",
       "title": "工作台胶卷与胶卷库同步",
@@ -11,9 +25,9 @@
         "方案与摘要完整展示最多 10 款已选胶卷，保留选择顺序、逐卷参数和草稿恢复。"
       ],
       "notice": "本次仅修改网站配置界面，沿用已有固件、机内菜单与十卷配置协议。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "c393b912ea958db55e18cdea858c1b291962209a",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/42019699371"
     },
     {
       "version": "2026.11.05.3",
