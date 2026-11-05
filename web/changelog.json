@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.05.3",
+      "date": "2026-11-05",
+      "title": "新增 Marlboro 黑白红晕胶卷",
+      "changes": [
+        "GR III 2.10 与 GR IIIx 1.60 的胶卷库「创意」分组新增 Marlboro，呈现高反差黑白底色和亮部红色光晕。",
+        "黑白底色由原生 ISP 处理，红晕复用现有 800T 路径；FN 参数、默认值及保存和重置行为与 800T 一致。",
+        "保留已有胶卷编号、十个活动槽位和旧 SD 胶卷资源兼容。"
+      ],
+      "notice": "本轮 Marlboro 候选已获用户实机验收并授权发布。请使用与机型匹配的固件和胶卷资源。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.05.2",
       "date": "2026-11-05",
       "title": "补充 GRemote 配套 SD 脚本下载说明",
@@ -11,9 +25,9 @@
         "修改方案或重新生成时清除上一份下载说明。"
       ],
       "notice": "本次更新网页下载说明，固件与服务生成逻辑沿用上一版。手机连接相机 Wi-Fi 后可自动连接 M10V，首次使用仍需确认机身已启用 SD 脚本。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "8fa5f6ff012e5fcb4e90ede13940d8d42f43b267",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/41973457467"
     },
     {
       "version": "2026.11.05.1",
