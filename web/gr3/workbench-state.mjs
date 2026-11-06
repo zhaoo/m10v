@@ -15,18 +15,20 @@ export function updateWorkbenchFeature(selected,id,enabled,model='gr3'){
 }
 // Old custom selections remain recoverable in a separate local-storage backup.
 export function normalizeWorkbenchDraft(draft={},catalog=[],current=defaultConfiguration(),model=draft.model||'gr3') {
- const hdfOnly=draft.profile==='native'&&draft.features?.includes('digitalHdf')&&!draft.features.includes('film');
  const selected=new Set(draft.features||[]);
  if(!selected.has('film')||!modelCapabilities(model).gremote)selected.delete('gremote');
- // Restore FN capability once; preserve subsequent explicit opt-outs.
- if(draft.halationMenuSchema!==1&&!hdfOnly&&model!=='gr4')selected.add('halation');
- if(!selected.has('film')||!selected.has('digitalHdf')||!selected.has('border')||!modelCapabilities(model).ispEffects)selected.delete('ispEffects');
- if(draft.imagingSchema!==1&&Object.keys(draft.powerImages||{}).length)selected.add('powerImages');
- const features=[...(hdfOnly?[]:['film']),...extensionFeatures.filter(id=>selected.has(id)&&!(hdfOnly&&['halation','border','timestamp','abCompare'].includes(id)))];
  let configuration=migrateRetiredFilms(draft.nativeConfiguration||current);
  let unresolved=Array.isArray(draft.unresolvedSlots)?draft.unresolvedSlots:[];
  const legacy=draft.profile!=='native'&&draft.features?.includes('film');
  if(legacy){const migrated=migrateSimulationSelection(draft.filmIds||[],draft.filmTexture||{},catalog,configuration);configuration=migrated.configuration;unresolved=migrated.unresolved;}
+ if(configuration.slots.some(slot=>slot.film===329||slot.film===330)&&modelCapabilities(model).ispEffects){
+  for(const feature of ['film','digitalHdf','border','ispEffects'])selected.add(feature);
+ }
+ const hdfOnly=draft.profile==='native'&&selected.has('digitalHdf')&&!selected.has('film');
+ if(draft.halationMenuSchema!==1&&!hdfOnly&&model!=='gr4')selected.add('halation');
+ if(!selected.has('film')||!selected.has('digitalHdf')||!selected.has('border')||!modelCapabilities(model).ispEffects)selected.delete('ispEffects');
+ if(draft.imagingSchema!==1&&Object.keys(draft.powerImages||{}).length)selected.add('powerImages');
+ const features=[...(hdfOnly?[]:['film']),...extensionFeatures.filter(id=>selected.has(id)&&!(hdfOnly&&['halation','border','timestamp','abCompare'].includes(id)))];
  configuration.stamp=features.includes('timestamp')?(configuration.stamp||1):0;
  if(!features.includes('timestamp'))configuration.filmNameStamp=false;
  if(!features.includes('digitalHdf'))configuration.hdf=0;

@@ -277,6 +277,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if empty or film in seen or not (1<=film<=78 or 289<=film<=305 or 309<=film<=330) or grain>3 or soft>3 or gain>8 or spread>8 or threshold>8 or profile>(6 if universal_halation else 3):raise ValueError('invalid enabled film')
             if 318<=film<=321 and camera_model!='gr3':raise ValueError('Four looks require the verified GR III native pipeline')
             if (film==294 or 309<=film<=330) and not native_owned:raise ValueError('New looks require ISP still ownership')
+            if film in (329,330) and not pure_isp_effects:raise ValueError('KOLOR/Pegasus require pure ISP rainbow rendering')
             seen.add(film)
         if initial[92]>2 or any(v>3 for v in initial[93:96]) or struct.unpack_from('<I',initial,176)[0] not in (0,1) or struct.unpack_from('<I',initial,180)[0]!=zlib.crc32(initial[:180]):raise ValueError('invalid initial settings/checksum')
     if not native_grain and any(initial[14+i*8] for i in range(10)):raise ValueError('Grain requires the GR III native processing pipeline')

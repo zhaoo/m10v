@@ -128,7 +128,7 @@ static m10v_isp_recipe_color *from_context(const void *context){
 #define M10V_RAW_CARRIER_TONE 25u
 static int raw_mode(uint32_t mode){return mode-9u<=3u;}
 int m10v_isp_frame_raw_supported(uint32_t film){
- return film!=M10V_CHAR_ID&&film!=M10V_PIXEL_ID&&supported(film,0);
+ return !M10V_RAINBOW(film)&&film!=M10V_CHAR_ID&&film!=M10V_PIXEL_ID&&supported(film,0);
 }
 int m10v_isp_frame_raw_snapshot(void *recipe,uint32_t mode,uint32_t code){
  m10v_isp_recipe_color *s=owned(recipe);

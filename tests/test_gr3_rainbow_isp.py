@@ -142,6 +142,14 @@ class RainbowRenderBindingTests(unittest.TestCase):
         self.assertIn('for(uint32_t sign=0;sign<2;sign++)', renderer)
         self.assertNotIn('CPU fallback', renderer)
 
+    def test_all_entrypoints_fail_closed_without_the_rainbow_isp_stage(self):
+        planner = (ROOT / 'node/gr3-native-library.mjs').read_text()
+        self.assertIn('KOLOR / Pegasus 必须启用纯 ISP 彩虹场', planner)
+        builder = (ROOT / 'scripts/build_gr3_m10v_library.py').read_text()
+        self.assertIn('KOLOR/Pegasus require pure ISP rainbow rendering', builder)
+        recipe = (ROOT / 'native/gr3/m10v_isp_recipe_color.c').read_text()
+        self.assertIn('!M10V_RAINBOW(film)', recipe)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -509,13 +509,17 @@ class DeliveredPureIspTests(unittest.TestCase):
         # Inspect actual decoded delivered data, independently of builder's
         # Python curve generator. This proves data binding, not ISP arithmetic.
         at=self.symbols['m10v_render_curves']-BASE
-        tables=struct.unpack('<7680h',self.image[at:at+15360])
+        tables=struct.unpack('<9216h',self.image[at:at+18432])
         for profile in range(9):
             offset=profile*768
             self.assertEqual(tables[offset+256:offset+512],tuple(range(256)))
             self.assertEqual(tables[offset+512:offset+768],tuple(range(256)))
         self.assertEqual(tables[9*768:9*768+256],(0,)*256)
         self.assertEqual(tables[9*768+256:9*768+512],tuple(range(256)))
+        self.assertEqual(tables[10*768:10*768+256],(255,)*256)
+        self.assertEqual(tables[11*768:11*768+256],(0,)*256)
+        for profile in (10,11):
+            self.assertEqual(tables[profile*768+256:profile*768+768],tuple(range(256))*2)
 
     def test_all_off_real_producer_query_execution_and_jpeg_bridge_have_zero_pixel_access(self):
         e, recipe, obj, frame, si, request, owner, setting, digital, native, state = self.fixture()
@@ -544,6 +548,41 @@ class DeliveredPureIspTests(unittest.TestCase):
                 self.assertEqual(self.at(e, 0x53503AB4, digital, native, execution, 0), 1)
                 self.assertEqual(e.events, [])
                 self.jpeg(e, recipe, si, request)
+
+    def test_shd50_keeps_native_color_but_has_no_rainbow_stage(self):
+        e,recipe,obj,frame,si,request,owner,setting,digital,native,state=self.fixture(width=6000,height=4000,film=328)
+        shot=e.alloc(96)
+        self.assertEqual(self.call(e,'m10v_isp_effects_shot_read',recipe,shot),1)
+        self.assertEqual(int.from_bytes(e.u.mem_read(shot+92,4),'little'),0)
+        planning,_=e.params();self.at(e,0x535033D8,digital,planning,si,1)
+        queried=e.alloc(4);self.assertEqual(self.at(e,0x535033E8,digital,native,planning,queried),1)
+        self.assertEqual(int.from_bytes(e.u.mem_read(queried,4),'little'),0)
+        execution,_=e.params();self.at(e,0x53503AA0,digital,execution,si,1)
+        self.assertEqual(self.at(e,0x53503AB4,digital,native,execution,0),1)
+        self.assertEqual(e.events,[])
+        self.jpeg(e,recipe,si,request)
+
+    def test_kolor_and_pegasus_execute_six_sensor_coordinate_native_passes_before_jpeg(self):
+        for film,kind in ((329,1),(330,2)):
+            with self.subTest(film=film):
+                e,recipe,obj,frame,si,request,owner,setting,digital,native,state=self.fixture(width=6000,height=4000,film=film)
+                shot=e.alloc(96)
+                self.assertEqual(self.call(e,'m10v_isp_effects_shot_read',recipe,shot),1)
+                descriptor=int.from_bytes(e.u.mem_read(shot+92,4),'little')
+                self.assertEqual(descriptor&0xffc00000,0x52400000)
+                self.assertEqual(descriptor&3,kind)
+                self.enable_native_driver_fixture(e,native)
+                planning,_=e.params();self.at(e,0x535033D8,digital,planning,si,1)
+                queried=e.alloc(4);self.assertEqual(self.at(e,0x535033E8,digital,native,planning,queried),1)
+                self.assertGreaterEqual(int.from_bytes(e.u.mem_read(queried,4),'little'),48000000)
+                execution,_=e.params();self.at(e,0x53503AA0,digital,execution,si,1)
+                e.w32(execution+0x30,int.from_bytes(e.u.mem_read(queried,4),'little'))
+                self.assertEqual(self.at(e,0x53503AB4,digital,native,execution,0),1)
+                self.assertEqual(int.from_bytes(e.u.mem_read(recipe+0x5778+68,4),'little'),8)
+                self.assertEqual(e.resize_dispatches,6)
+                self.assertEqual(e.events.count(self.symbols['m10v_isp_effect_granulation_owned']),6)
+                self.assertEqual(e.events.count(self.symbols['m10v_isp_effect_granulation_luma']),0)
+                self.jpeg(e,recipe,si,request)
 
     def test_marlboro_real_producer_still_spatial_and_jpeg_preserve_queued_film_without_cpu_pixels(self):
         for stage in (0,1):

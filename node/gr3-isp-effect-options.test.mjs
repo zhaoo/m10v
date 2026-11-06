@@ -99,3 +99,11 @@ test('workbench effects selection visibly includes dependencies and removing eit
  assert.deepEqual(normalizeWorkbenchDraft().features,['film']);
  assert.ok(!normalizeWorkbenchDraft({features:['film','ispEffects','digitalHdf','border']},[],defaultConfiguration(),'gr4').features.includes('ispEffects'));
 });
+
+test('restored KOLOR and Pegasus selections cannot silently drop the required ISP stage',()=>{
+ for(const film of [329,330]){
+  const configuration=defaultConfiguration();configuration.slots[0].film=film;
+  const restored=normalizeWorkbenchDraft({profile:'native',features:['film'],nativeConfiguration:configuration},[],configuration,'gr3');
+  for(const feature of ['film','digitalHdf','border','ispEffects'])assert.ok(restored.features.includes(feature));
+ }
+});
