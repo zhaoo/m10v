@@ -109,6 +109,11 @@ test('HDF entry is independent of film and preserves the simplified workbench',a
  assert.match(html,/>影像工具<\/button>/);
 });
 
+test('imaging tools label the ISP effect card as film imprint',async()=>{
+ const app=await readFile(new URL('../web/gr3/studio.js',import.meta.url),'utf8');
+ assert.match(app,/\['ispEffects', '胶片印花',/);
+});
+
 test('HDF-only feature cannot be removed until film is enabled',async()=>{
  const app=await readFile(new URL('../web/gr3/studio.js',import.meta.url),'utf8');
  const guard=app.slice(app.indexOf("if(id==='digitalHdf'&&active&&!state.features.has('film'))"),app.indexOf("state.features=updateWorkbenchFeature(",app.indexOf("if(id==='digitalHdf'&&active&&!state.features.has('film'))")));

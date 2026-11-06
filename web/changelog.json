@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.07.1",
+      "date": "2026-11-07",
+      "title": "修正胶片印花标题并发布三款胶卷",
+      "changes": [
+        "将 GR III / IIIx 工作台的效果卡片标题由错误的「逐卷胶片效果」修正为「胶片印花」。",
+        "C41 胶卷库新增 SHD50、Revolog KOLOR 与 Pegasus，保存成片继续使用相机原生 ISP 管线，不执行 CPU LUT、CPU 随机纹理或 CPU 整图调色。",
+        "沿用已确认的 R2 固件候选身份；本次文案修正不改变固件、ISP 资源或机内功能。"
+      ],
+      "notice": "本次发布包含已获用户确认的三款胶卷与网页标题修正。请使用与机型匹配的官方 GR III 2.10 / GR IIIx 1.60 来源生成固件。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.06.2",
       "date": "2026-11-06",
       "title": "新增 SHD50、Revolog KOLOR 与 Pegasus",
@@ -11,9 +25,9 @@
         "三款胶卷的保存成片不执行 CPU LUT、CPU 随机纹理或 CPU 整图调色；KOLOR、Pegasus 可与全局胶卷印花在同一曝光中分别完成。"
       ],
       "notice": "合并七款胶卷印花后的 R2 候选已按精确 GR III / GR IIIx 固件身份获得用户确认并授权发布。请使用与机型匹配的官方 2.10 / 1.60 来源生成固件。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "0be04a7c9a5e1600991c4c2170be84fee42f7be5",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/0be04a7c9a5e1600991c4c2170be84fee42f7be5"
     },
     {
       "version": "2026.11.06.1",
