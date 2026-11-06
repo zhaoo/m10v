@@ -44,12 +44,13 @@ static int shot_geometry(uint32_t width,uint32_t height){
 static uint32_t shot_workspace(const m10v_isp_effects_settings *s,
     uint32_t width,uint32_t height,uint32_t grain){
     uint32_t plane=((width+15u)&~15u)*height;
-    return s->leak_gain?plane*2u:grain?plane*3u/2u:0;
+    return s->leak_gain||m10v_isp_effects_imprint(s)?plane*2u:grain?plane*3u/2u:0;
 }
 static uint32_t shot_enabled(const m10v_isp_effects_shot_snapshot *s){
     return (s->effective_grain_strength?M10V_ISP_EFFECTS_NATIVE_GRAIN:0u)|
         (s->settings.leak_gain?M10V_ISP_EFFECTS_NATIVE_LEAK:0u)|
-        (s->settings.blur_gain?M10V_ISP_EFFECTS_NATIVE_BLUR:0u);
+        (s->settings.blur_gain?M10V_ISP_EFFECTS_NATIVE_BLUR:0u)|
+        (m10v_isp_effects_imprint(&s->settings)?M10V_ISP_EFFECTS_NATIVE_IMPRINT:0u);
 }
 static int shot_si(uint32_t recipe,uint32_t si){
     return shot_ram(si,4)&&si==*(const volatile uint32_t*)(uintptr_t)(recipe+0x44c8u);
@@ -98,8 +99,13 @@ int m10v_isp_effects_shot_freeze(uint32_t recipe){
     m10v_isp_effects_settings frozen;uint32_t sequence=0;
 #if M10V_PURE_ISP_EFFECTS
     m10v_isp_effects_defaults(&frozen);
+    /* Global imprint is independent of per-film texture settings. Read the
+     * authenticated owner cache once at the real producer, never at Make. */
+    uint32_t imprint;
+    int global_valid=m10v_isp_effects_camera_imprint_snapshot(&imprint);
+    if(global_valid&&imprint)frozen.reserved=M10V_ISP_EFFECT_PREF_TAG|(imprint<<7);
     const m10v_isp_recipe_color *color=(const void*)(uintptr_t)(recipe+M10V_SAVE_COLOR_OFFSET);
-    int valid=shot_ram(si,0x94c);
+    int valid=global_valid&&shot_ram(si,0x94c);
     if(valid){
         uint32_t tone=*(const volatile uint8_t*)(uintptr_t)(si+0x77cu);
         uint32_t slot=m10v_tone_slot(tone);
@@ -132,7 +138,7 @@ int m10v_isp_effects_shot_freeze(uint32_t recipe){
 #endif
     uint32_t orientation=valid?shot_orientation(recipe,si):0;
     valid=valid&&orientation;
-    if(valid){frozen.reserved=0;shot_copy(&s->settings,&frozen,sizeof(frozen));s->sequence=sequence;s->source_si=si;s->saved_orientation=orientation;}
+    if(valid){frozen.reserved=m10v_isp_effects_imprint_snapshot_word(frozen.reserved);shot_copy(&s->settings,&frozen,sizeof(frozen));s->sequence=sequence;s->source_si=si;s->saved_orientation=orientation;}
     __atomic_store_n(&s->ready,valid?1u:2u,__ATOMIC_RELEASE);
     return valid;
 }

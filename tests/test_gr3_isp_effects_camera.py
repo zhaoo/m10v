@@ -36,7 +36,7 @@ class EffectsCameraTests(unittest.TestCase):
         subprocess.run([shutil.which('clang'), *FLAGS,
             '-DM10V_ISP_EFFECT_CACHE_OWNER_OFFSET=' + hex(OFFSET), '-c', str(src), '-o', str(obj)],
             check=True, capture_output=True)
-        exports = tuple('m10v_isp_effects_camera_' + name for name in ('init', 'refresh', 'save', 'snapshot'))
+        exports = tuple('m10v_isp_effects_camera_' + name for name in ('init', 'refresh', 'save', 'snapshot','imprint_snapshot'))
         cls.code, cls.symbols = link_object(obj.read_bytes(), BASE, prefix='m10v_settings_',
             omitted_exports=('m10v_settings_open', 'm10v_settings_key'), additional_exports=exports)
 
@@ -115,6 +115,22 @@ class EffectsCameraTests(unittest.TestCase):
 
     def cache_bytes(self):
         return bytes(self.u.mem_read(CACHE, 44))
+
+    def test_imprint_snapshot_retains_committed_word_while_full_cache_is_busy(self):
+        self.call('init',OWNER)
+        self.put(INPUT,0,0,0,0,0,0,0,0x46580000|(7<<7))
+        self.assertEqual(self.call('save',OWNER,INPUT),0)
+        self.forbid_services=True
+        self.put(CACHE+4,self.word(CACHE+4)|1)
+        self.put(CACHE+12,0xffffffff)
+        self.assertEqual(self.call('imprint_snapshot',OUT),1)
+        self.assertEqual(self.word(OUT),7)
+        self.put(CACHE+4,0);self.put(OUT,99)
+        self.assertEqual(self.call('imprint_snapshot',OUT),0)
+        self.assertEqual(self.word(OUT),99)
+        self.put(CACHE,0);self.put(OUT,99)
+        self.assertEqual(self.call('imprint_snapshot',OUT),0)
+        self.assertEqual(self.word(OUT),99)
 
     def snapshot(self):
         self.forbid_services = True

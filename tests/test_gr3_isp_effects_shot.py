@@ -103,6 +103,18 @@ class EffectsShotTests(unittest.TestCase):
         self.assertEqual(self.word(OUT + 12), 7)
         self.assertEqual(self.word(OUT + 8), 1)
 
+    def test_imprint_only_snapshot_freezes_and_reserves_real_workspace_before_completion(self):
+        self.settings=(0,0,0,1,0,0,0,0x46580000|(5<<7)|66)
+        self.assertEqual(self.call('freeze',RECIPE),1)
+        self.assertEqual(self.word(SHOT+44),0x46580000|(5<<7))
+        self.settings=(0,)*8
+        self.assertEqual(self.call('freeze',RECIPE),1)
+        self.assertEqual(self.call('plan',RECIPE,SI,6000,4000,0),1)
+        self.assertEqual(self.word(SHOT+56),48000000)
+        self.assertEqual(self.word(SHOT+68),0)
+        self.assertEqual(self.call('complete',RECIPE,SI,8),1)
+        self.assertEqual(self.word(SHOT+68),8)
+
     def test_unavailable_and_invalid_settings_are_frozen_until_explicit_reserve(self):
         for invalid in (False, True):
             self.call('reserve', RECIPE)

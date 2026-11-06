@@ -17,6 +17,14 @@
  * V2 gives the final word a tagged, bounded remembered-strength contract.
  * Per-shot settings clear this UI word before reaching the ISP renderer. */
 #define M10V_ISP_EFFECT_PREF_TAG 0x46580000u
+/* V3 adds a global imprint in bits7..9, without changing any metadata ABI.
+ * 0 off; 1 cats/fish, 2 sakura, 3 rainbow, 4 jellyfish, 5 paws,
+ * 6 goose, 7 Pokemon (Pikachu/Bulbasaur/Charmander/Squirtle). */
+#define M10V_ISP_IMPRINT_MASK 0x380u
+static inline uint32_t m10v_isp_effects_imprint_word(uint32_t word){return (word>>7)&7u;}
+static inline uint32_t m10v_isp_effects_imprint_snapshot_word(uint32_t word){
+    return (word&M10V_ISP_IMPRINT_MASK)?M10V_ISP_EFFECT_PREF_TAG|(word&M10V_ISP_IMPRINT_MASK):0u;
+}
 
 enum {
     M10V_ISP_GRAIN_INHERIT = 0,
@@ -36,6 +44,13 @@ typedef struct {
     uint32_t blur_range;      /* 0 small, 1 medium, 2 large */
     uint32_t reserved;        /* 0 legacy, or tagged V2 UI strength memory */
 } m10v_isp_effects_settings;
+static inline uint32_t m10v_isp_effects_imprint(const m10v_isp_effects_settings *s){
+    return s?m10v_isp_effects_imprint_word(s->reserved):0u;
+}
+static inline int m10v_isp_effects_set_imprint(m10v_isp_effects_settings *s,uint32_t style){
+    if(!s||style>7u)return 0;
+    s->reserved=M10V_ISP_EFFECT_PREF_TAG|(s->reserved&127u)|(style<<7);return 1;
+}
 
 typedef struct {
     m10v_isp_effects_settings settings;

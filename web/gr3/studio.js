@@ -60,7 +60,7 @@ const definitions = [
   ['halation', '光晕', '让亮部产生溢出或横向拉丝。开启后，在机内图像控制中选胶卷，按 FN 调整模式和强度；不显示在取景中，可能增加保存等待。', 'GR III / IIIx · 静态 JPEG'],
   ['digitalHdf', 'HDF 模拟', '为照片增加数字柔焦。开启后在下方选初始档位，机内 MENU → 设置 → HDF 模拟也可调整；可单独使用。', 'GR III / IIIx · 静态 JPEG'],
   ['border', '边框', '为照片添加拍立得或 135 胶卷边框。开启后到机内 MENU → 设置 → 效果 → 边框选择样式；向外扩展画布，保留完整构图。', 'GR III / IIIx · 静态 JPEG'],
-  ['ispEffects', '逐卷胶片效果', '在胶卷 FN 页面独立调整颗粒、漏光和模糊。构建时包含 HDF 模拟和边框组件，两者在 MENU 内独立设置。', 'GR III 2.10 / IIIx 1.60 · 静态 JPEG'],
+  ['ispEffects', '逐卷胶片效果', '在胶卷 FN 页面独立调整颗粒、漏光和模糊。MENU → 设置 → 效果中可选择胶卷印花、HDF 模拟和边框。', 'GR III 2.10 / IIIx 1.60 · 静态 JPEG'],
   ['timestamp', '时间与胶卷名称水印', '将拍摄日期、时间或胶卷名称印在 JPEG 上。开启后在下方选样式，也可到机内 MENU → 设置 → 时间水印调整。', '相机时钟 · 四角位置'],
   ['aspect', '画幅比例', '增加 4:3、16:9、6x7、XPan 画幅及取景蒙版。开启后在机内拍摄菜单的裁切设置中选择比例。', '4:3 / 16:9 / 6x7 / XPan'],
   ['negativeGrain', '原厂负片颗粒', '为原厂负片风格开放颗粒调节。开启后选负片风格，进入图像控制详细设置调整颗粒档位。', '原厂负片 · 机内调整'],
@@ -325,7 +325,7 @@ function renderFeatures() {
         ['关闭','弱','中','强'].forEach((label,value)=>{const b=textNode('button',label);b.type='button';b.dataset.imagingField='hdf-level-'+value;b.setAttribute('aria-pressed',String(state.nativeConfig.hdf===value));b.onclick=()=>nativeEditor.setHdf(value);levels.append(b);});
         const filmToggle=textNode('button',state.features.has('film')?'关闭胶卷库，仅使用 HDF':'同时启用胶卷库','outline');filmToggle.type='button';filmToggle.onclick=()=>{if(state.features.has('film')){for(const id of ['film','halation','border','timestamp','abCompare','ispEffects','gremote'])state.features.delete(id);nativeEditor.setConfiguration({...state.nativeConfig,stamp:0,filmNameStamp:false,zoom:{...state.nativeConfig.zoom,write:false}},{globalHdf:true});}else{state.features.add('film');invalidate();}renderFeatures();};
         detail.append(levels,filmToggle,textNode('p','这是固件初始档位。机内 HDF 菜单独立保存设置，换卷与重置胶卷不会改变它。'));
-      } else if (id === 'ispEffects') detail.append(textNode('p','ADJ → 滤镜 → FN：按卷保存颗粒、漏光和模糊。工作台可为已选胶卷设置初始值。'));
+      } else if (id === 'ispEffects') detail.append(textNode('p','ADJ → 滤镜 → FN：按卷保存颗粒、漏光和模糊。MENU → 设置 → 效果 → 胶卷印花：关闭、小猫吃鱼、樱花纷飞、绚烂彩虹、深海水母、小猫爪爪、呆头大鹅、宝可梦。印花默认为关闭。'));
       else if (id === 'gremote') {
         const label=document.createElement('label'),preserve=document.createElement('input');
         preserve.type='checkbox';preserve.checked=state.gremotePreserveSettings!==false;preserve.disabled=!gremoteAvailable();preserve.dataset.imagingField='gremote-preserve-settings';

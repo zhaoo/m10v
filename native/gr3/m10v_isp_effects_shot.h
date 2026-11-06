@@ -10,7 +10,8 @@
 enum {
     M10V_ISP_EFFECTS_NATIVE_GRAIN = 1,
     M10V_ISP_EFFECTS_NATIVE_LEAK = 2,
-    M10V_ISP_EFFECTS_NATIVE_BLUR = 4
+    M10V_ISP_EFFECTS_NATIVE_BLUR = 4,
+    M10V_ISP_EFFECTS_NATIVE_IMPRINT = 8
 };
 typedef struct {
     uint32_t magic,owner,ready,sequence;

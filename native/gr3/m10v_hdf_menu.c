@@ -20,6 +20,11 @@
 #ifndef M10V_PURE_ISP_EFFECTS
 #define M10V_PURE_ISP_EFFECTS 0
 #endif
+#if M10V_PURE_ISP_EFFECTS
+#include "m10v_isp_effects_camera.h"
+#include "m10v_isp_effects_resources.h"
+#define IMPRINT_CHILD 3u
+#endif
 #ifndef M10V_HDF_OWNER_OFFSET
 #define M10V_HDF_OWNER_OFFSET 0x193cu
 #endif
@@ -102,17 +107,51 @@ static void style_row(page *p,uint32_t i,uint32_t visible,uint32_t selected){
  /* Official glyph palette28 is dark; palette10 is yellow text. */
  ((fn2)0x5339658cu)(p->widgets[4+i],visible&&selected?28:31);
 }
+#if M10V_PURE_ISP_EFFECTS
+static int imprint_load(page *p){
+ m10v_isp_effects_settings settings;uint32_t sequence;
+ if(m10v_isp_effects_camera_refresh(ptr(p)-M10V_HDF_OWNER_OFFSET)||
+    !m10v_isp_effects_camera_snapshot(&settings,&sequence)||!m10v_isp_effects_validate(&settings))return -1;
+ p->value=p->saved=m10v_isp_effects_imprint(&settings);return 0;
+}
+static int imprint_save(page *p){
+ m10v_isp_effects_settings settings;uint32_t sequence;
+ if(!m10v_isp_effects_camera_snapshot(&settings,&sequence)||
+    !m10v_isp_effects_validate(&settings)||!m10v_isp_effects_set_imprint(&settings,p->value))return -1;
+ return m10v_isp_effects_camera_save(ptr(p)-M10V_HDF_OWNER_OFFSET,&settings);
+}
+#endif
 static void draw(page *p){
  if(p->count!=WORDS||!p->style)return;
 #if M10V_BORDER_ENABLED
  uint32_t border=!p->root&&p->child;
+#if M10V_PURE_ISP_EFFECTS
+ uint32_t imprint=!p->root&&p->child==IMPRINT_CHILD;
+ uint32_t first=imprint?(p->value/4u)*4u:0u;
+ if(imprint)border=0;
+#endif
  caption(p->widgets[2],p->root?1140:border?1155:970);caption(p->widgets[3],p->root?941:971);
+#if M10V_PURE_ISP_EFFECTS
+ if(imprint)caption(p->widgets[2],M10V_ISP_TEXT_IMPRINT);
+#endif
  for(uint32_t i=0;i<4;i++){
   uint32_t visible=p->root?i<(M10V_HDF_ENABLED?2u:1u):i<(border?3u:4u);
+#if M10V_PURE_ISP_EFFECTS
+  if(p->root)visible=i<(M10V_HDF_ENABLED?3u:2u);
+  if(imprint)visible=first+i<8u;
+#endif
   ((fn2)0x533ad3c0u)(p->widgets[4+i],visible);
   uint32_t id=p->root?(M10V_HDF_ENABLED&&i==0?1141:1155):border?(i==0?972:i==1?1156:1157):972+i;
+#if M10V_PURE_ISP_EFFECTS
+  if(p->root&&i==(M10V_HDF_ENABLED?2u:1u))id=M10V_ISP_TEXT_IMPRINT;
+  if(imprint)id=first+i?M10V_ISP_TEXT_IMPRINT_CATS+first+i-1u:M10V_ISP_TEXT_OFF;
+#endif
   caption(p->widgets[4+i],id);
-  style_row(p,i,visible,p->root?p->focus==i:p->value==i);
+  uint32_t selected=p->root?p->focus==i:p->value==i;
+#if M10V_PURE_ISP_EFFECTS
+  if(imprint)selected=p->value==first+i;
+#endif
+  style_row(p,i,visible,selected);
  }
 #else
  caption(p->widgets[2],p->root?1140:970);caption(p->widgets[3],p->root?941:971);
@@ -136,6 +175,9 @@ uint32_t m10v_hdf_menu_top_ctor(uint32_t owner){
  m10v_hdf_menu_parent_ctor(owner);page *p=(page *)(uintptr_t)(owner+M10V_HDF_OWNER_OFFSET);
  for(uint32_t i=0;i<(M10V_PURE_ISP_EFFECTS?0x200u:0x1c0u);i++)((uint8_t *)p)[i]=0;
  m10v_hdf_menu_cache_init(owner);
+#if M10V_PURE_ISP_EFFECTS
+ m10v_isp_effects_camera_init(owner);
+#endif
  ((fn1)0x5316c8d4u)(ptr(p));*(uint32_t *)p=m10v_hdf_menu_vtable();M10V_LOG(32,1,owner,ptr(p),*(uint32_t*)p);return owner;
 }
 uint32_t m10v_hdf_menu_destroy(page *p){
@@ -199,10 +241,21 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
  uint32_t key=*(const uint16_t *)(uintptr_t)event;
  if(p->root){
 #if M10V_BORDER_ENABLED
+#if M10V_PURE_ISP_EFFECTS
+  if(key==0xce||key==0xd0||key==0xd4){if(p->focus)p->focus--;draw(p);return 1;}
+  if(key==0xd1||key==0xd5){if(p->focus<(M10V_HDF_ENABLED?2u:1u))p->focus++;draw(p);return 1;}
+#else
   if(key==0xce||key==0xd0||key==0xd4){p->focus=0;draw(p);return 1;}
   if(key==0xd1||key==0xd5){p->focus=M10V_HDF_ENABLED?1:0;draw(p);return 1;}
+#endif
   if(key==0xd8||key==0xcf||key==0xd3){
    p->child=M10V_HDF_ENABLED?p->focus:1;
+#if M10V_PURE_ISP_EFFECTS
+   if(p->focus==(M10V_HDF_ENABLED?2u:1u)){
+    p->child=IMPRINT_CHILD;
+    if(imprint_load(p)){p->error=1;draw(p);return 1;}
+   }else
+#endif
    if(p->child)p->value=p->saved=p->border.style;
 #if M10V_HDF_ENABLED
    else {if(m10v_hdf_load(&p->saved)<0){p->error=1;draw(p);return 1;}p->value=p->saved;}
@@ -226,12 +279,19 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
   uint32_t max=3;
 #if M10V_BORDER_ENABLED
   if(p->child)max=2;
+#if M10V_PURE_ISP_EFFECTS
+  if(p->child==IMPRINT_CHILD)max=7;
+#endif
 #endif
   if(p->value<max)p->value++;p->error=0;
  }
  else if(key==0xd8){
   int result=-1;
 #if M10V_BORDER_ENABLED
+#if M10V_PURE_ISP_EFFECTS
+  if(p->child==IMPRINT_CHILD)result=imprint_save(p);
+  else
+#endif
   if(p->child){
    if(p->child==BORDER_DIRECT)M10V_EXIT_LOG(296,ptr(p),p->value,p->border.style,p->border.sequence);
    result=m10v_border_camera_save(ptr(p)-M10V_HDF_OWNER_OFFSET,p->value);
@@ -253,6 +313,10 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
     * Reconcile with the same journal reader used by capture, rather than
     * falsely showing the previous value. Stay open with the error visible. */
 #if M10V_BORDER_ENABLED
+#if M10V_PURE_ISP_EFFECTS
+   if(p->child==IMPRINT_CHILD){(void)imprint_load(p);}
+   else
+#endif
    if(p->child){if(m10v_border_camera_refresh(ptr(p)-M10V_HDF_OWNER_OFFSET)==0)p->saved=p->value=p->border.style;}
    else
 #endif

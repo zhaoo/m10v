@@ -80,7 +80,8 @@ static int pipeline_photo(uint32_t descriptor,uint32_t *width,uint32_t *height){
 static uint32_t pipeline_mask(const m10v_isp_effects_shot_snapshot *s){
     return (s->effective_grain_strength?M10V_ISP_EFFECTS_NATIVE_GRAIN:0u)|
         (s->settings.leak_gain?M10V_ISP_EFFECTS_NATIVE_LEAK:0u)|
-        (s->settings.blur_gain?M10V_ISP_EFFECTS_NATIVE_BLUR:0u);
+        (s->settings.blur_gain?M10V_ISP_EFFECTS_NATIVE_BLUR:0u)|
+        (m10v_isp_effects_imprint(&s->settings)?M10V_ISP_EFFECTS_NATIVE_IMPRINT:0u);
 }
 static int pipeline_params(uint32_t recipe,const void *params,
     m10v_isp_effects_shot_snapshot *shot){
@@ -197,7 +198,7 @@ int m10v_isp_effects_pipeline_execute(uint32_t recipe,uint32_t native_context,
     if((shot.native_completed&mask)==mask)return 1;
     failure=14;
     if(shot.native_completed&mask)goto failed;
-    if(mask&(M10V_ISP_EFFECTS_NATIVE_GRAIN|M10V_ISP_EFFECTS_NATIVE_LEAK)){
+    if(mask&(M10V_ISP_EFFECTS_NATIVE_GRAIN|M10V_ISP_EFFECTS_NATIVE_LEAK|M10V_ISP_EFFECTS_NATIVE_IMPRINT)){
         const uint32_t *photo=(const void*)(uintptr_t)pipeline_word(params,shot.stock_workspace_bytes?8u:4u);
         failure=15;
         if(m10v_isp_effects_render(native_context,photo,view,view_capacity,&shot)!=1)goto failed;
@@ -251,7 +252,8 @@ int m10v_isp_effects_pipeline_encoder_admit(uint32_t recipe,uint32_t si){
     if(!m10v_isp_effects_resolve_snapshot(&shot.settings,grain,&resolved))pipeline_hold(recipe,23,grain);
     uint32_t mask=(resolved.effective_grain_strength?M10V_ISP_EFFECTS_NATIVE_GRAIN:0u)|
         (shot.settings.leak_gain?M10V_ISP_EFFECTS_NATIVE_LEAK:0u)|
-        (shot.settings.blur_gain?M10V_ISP_EFFECTS_NATIVE_BLUR:0u);
+        (shot.settings.blur_gain?M10V_ISP_EFFECTS_NATIVE_BLUR:0u)|
+        (m10v_isp_effects_imprint(&shot.settings)?M10V_ISP_EFFECTS_NATIVE_IMPRINT:0u);
     if(!mask)return 1;
     if(shot.failed||!shot.planned||shot.source_si!=si||!shot.stock_query_valid||
        shot.effective_grain_strength!=resolved.effective_grain_strength||
