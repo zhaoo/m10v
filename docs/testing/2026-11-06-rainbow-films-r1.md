@@ -1,6 +1,6 @@
 # SHD50 / Revolog KOLOR / Pegasus — R1 candidate record
 
-Status: `BLOCKED_MISSING_OFFICIAL_FIRMWARE`
+Status: `WAITING_FOR_USER_VALIDATION`
 
 This record covers the implementation candidate only. It is not a camera acceptance record and does not claim 100% visual restoration before real GR III / GR IIIx output is compared with the accepted previews and references.
 
@@ -24,22 +24,37 @@ This record covers the implementation candidate only. It is not a camera accepta
 - ARM orchestration verifies four-way freeze, queued immutability, exact six-pass order, sensor-coordinate behavior, workspace reuse and fail-closed handling for every native non-success.
 - The Node build audit authenticates every rainbow asset descriptor against its packed address and rejects incomplete manifests.
 
-## Candidate generation blocker
+## Exact candidate identities
 
-The repository does not contain the two private official inputs required by the exact-source build and readback gates:
+Both candidates were generated from the exact official inputs accepted by the repository's built-in SHA-256 gates. The official GRLife compatibility runtime passed its complete integrity manifest before either build.
 
-- `bin/fwdc239b-gr3-official.bin`
-- `bin/fwdc243b-gr3x-official.bin`
+| Model | Candidate | Bytes | Verified hooks | Candidate SHA-256 |
+|---|---|---:|---:|---|
+| GR III 2.10 | `builds/rainbow-films-r1-gr3/fwdc239b.bin` | 46,724,444 | 327 | `45e0d71799a2cfe501284359db2a78a2a70074f0444a79b4b4ad2e1af3cd3eaf` |
+| GR IIIx 1.60 | `builds/rainbow-films-r1-gr3x/fwdc243b.bin` | 46,852,596 | 326 | `1110d2cd86a22dba6c22ac373d53ab2315dd43eb61e20c630f9ed231ae882d20` |
 
-Both candidate commands stop with `ENOENT` before any output is written:
+Shared source identities:
 
-```sh
-M10V_PYTHON=.venv/bin/python node scripts/export_gr3_m10v_native.mjs --pure-isp-effects --model=gr3 builds/rainbow-films-r1-gr3
-M10V_PYTHON=.venv/bin/python node scripts/export_gr3_m10v_native.mjs --pure-isp-effects --model=gr3x builds/rainbow-films-r1-gr3x
-```
+- Runtime source SHA-256: `0d655ccb64dc6d87f2f28c4e13369e8356764198c1366d7e7f0c33b4b596f238`.
+- Integration source SHA-256: `f9b25d239c96f95d4e84369ba7a38894116d792d1b818783ba259d776253a958`.
+- GR III configuration SHA-256: `fb602c265b2b59371eb411fc1e4fdba054756286fc0b4ec4cc456030ed61666c`.
+- GR IIIx configuration SHA-256: `850d99b014b10b3bc084d4ddc60522ab5425c160246fc945e1e19d0ea0a6c7d3`.
 
-No substitute firmware bytes are allowed. After the exact official inputs are supplied, regenerate both candidates, run final BIN/receipt/runtime readback and the delivered pure-ISP suite, then provide the labeled packages for physical-camera validation.
+Each output directory contains the final BIN, configuration, build receipt, runtime manifest, target relocation coverage and the exact linked runtime. The exporter decoded the final BIN and authenticated the linked runtime, resources, descriptor bindings and hook preimages before writing these packages.
+
+Install archives:
+
+- GR III: `builds/M10V-SHD50-KOLOR-Pegasus-r1-GRIII.zip`, SHA-256 `f3171682d06b331266e461d872092ed4eaea859d29e618078658ef9a0b788c6b`.
+- GR IIIx: `builds/M10V-SHD50-KOLOR-Pegasus-r1-GRIIIx.zip`, SHA-256 `1d3428bacf5533f779c3bffbb44e5d8bbc41f7e51a37b424a415071218a3c6ef`.
+
+## Verification status
+
+- GR III delivered pure-ISP candidate: final-BIN identity, runtime assets, SHD50 no-rainbow path, KOLOR/Pegasus six native sensor-coordinate passes, completion bit and JPEG admission pass. The rainbow fixture explicitly models the camera's owned ShootingInfo pool; an unauthenticated identity remains fail-closed.
+- GR III and GR IIIx delivered RAW test passes against both final BINs. KOLOR/Pegasus remain excluded from offline RAW redevelopment; RAW+JPEG applies their film stage only to JPEG.
+- Focused Node/Python fit, identity, SD compatibility, native asset, rainbow freeze/render, relocation and runtime-interpreter tests pass.
+- The broad historical current-pipeline matrix was stopped during its long all-profile ARM loop. Before the stop it exposed pre-existing custom-ISP persistence and Marlboro expectations outside this three-film scope; those results are not counted as candidate acceptance.
+- No host test proves physical DMA, native scalar arithmetic, performance or visual equivalence on camera. “100% restoration” therefore remains an acceptance target, not a claim.
 
 ## Release gate
 
-GitHub `main`/`develop` and Baota remain unchanged. Publication is allowed only after the user validates the exact candidate SHA/build receipt on camera. Preview approval is not a substitute for that physical-camera validation.
+GitHub `main`/`develop` and Baota remain unchanged. Publication is allowed only after the user validates the exact candidate SHA/build receipt on the matching camera model. Preview approval and host emulation are not substitutes for that physical-camera validation.

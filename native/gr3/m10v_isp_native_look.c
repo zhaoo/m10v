@@ -118,7 +118,7 @@ static __attribute__((noinline)) void apply_native_sectors(void *frame,uint32_t 
   const uint16_t final9[9]={77,150,29,469,427,128,128,405,491};
   for(uint32_t i=0;i<16;i++)t.boundaries[i]=boundaries[i];
   for(uint32_t i=0;i<20;i++)t.selectors[i]=selectors[i];
-  for(uint32_t i=0;i<60;i++)for(uint32_t j=0;j<9;j++)t.matrix12[i][j]=(uint32_t)h[(i/5)*9+j]&4095u;
+  for(uint32_t sector=0;sector<12;sector++)for(uint32_t repeat=0;repeat<5;repeat++)for(uint32_t j=0;j<9;j++)t.matrix12[sector*5+repeat][j]=(uint32_t)h[sector*9+j]&4095u;
   for(uint32_t i=0;i<40;i++)for(uint32_t j=0;j<9;j++)t.matrix10[i][j]=0;
   for(uint32_t i=0;i<21;i++){t.control[i*2]=(uint8_t)controls[i];t.control[i*2+1]=(uint8_t)(controls[i]>>8);}
   for(uint32_t i=0;i<9;i++)t.final9[i]=final9[i];

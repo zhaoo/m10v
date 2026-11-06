@@ -158,6 +158,14 @@ class DeliveredPureIspTests(unittest.TestCase):
         request = e.alloc(0x40)
         e.w32(recipe + 0x44C8, si)
         e.w32(recipe + 0x5C, request)
+        if film in (329,330):
+            # Rainbow freeze authenticates the exact saved-photo identity.
+            # Model the ProcessingManager's owned ShootingInfo pool before
+            # the real producer publishes that identity and freezes the shot.
+            pool = e.alloc(0x218)
+            e.w32(0x55345328, pool)
+            e.w32(pool + 0x20, 0x74280)
+            e.w32(pool + 0x88, si)
         e.u.reg_write(A.UC_ARM_REG_R0, recipe)
         e.u.reg_write(A.UC_ARM_REG_R4, recipe)
         e.u.emu_start(0x5350EB10, 0x5350EB38, count=1000)

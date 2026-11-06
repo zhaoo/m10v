@@ -430,20 +430,20 @@ function checkRuntime(runtime, manifest) {
       need(runtime.subarray(pixel-BASE,pixel-BASE+6400).equals(art),'native film artwork differs');
     }
   }
-  const unknownDescriptor=icons.descriptors+(descriptorCount-11-Number(halfFrame))*8,unknownAt=unknownDescriptor-BASE;
+  const unknownDescriptor=icons.descriptors+(descriptorCount-14-Number(halfFrame))*8,unknownAt=unknownDescriptor-BASE;
   const unknownPixels=runtime.readUInt32LE(unknownAt+4)*4;
   need(runtime.readUInt32LE(icons.table-BASE+876*4)===unknownDescriptor&&runtime.readUInt16LE(unknownAt)===40&&runtime.readUInt16LE(unknownAt+2)===40&&runtime.subarray(unknownPixels-BASE,unknownPixels-BASE+6400).equals(readFileSync(new URL('../native/gr3/m10v_unknown_film.rgba',import.meta.url))),'unknown recorded film artwork differs');
   {
     const art=readFileSync(new URL('../native/gr3/m10v_four_looks.rgba',import.meta.url));
     need(art.length===4*6400,'four ISP looks artwork extent differs');
     for(let i=0;i<4;i++){
-      const d=icons.descriptors+(descriptorCount-10+i)*8,at=d-BASE,pixel=runtime.readUInt32LE(at+4)*4;
+      const d=icons.descriptors+(descriptorCount-13+i)*8,at=d-BASE,pixel=runtime.readUInt32LE(at+4)*4;
       need(runtime.readUInt32LE(icons.table-BASE+(878+i)*4)===d&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&pixel>=BASE&&pixel+6400<=BASE+runtime.length&&runtime.subarray(pixel-BASE,pixel-BASE+6400).equals(art.subarray(i*6400,(i+1)*6400)),'four ISP looks artwork differs');
     }
   }
   const guideLabels=['黄金分割','黄金螺旋（左上）','黄金螺旋（右上）','黄金螺旋（左下）','黄金螺旋（右下）'];
   const adjLabels=['ADJ','设置 6','设置 7','设置 8','设置 9','构图线','胶卷库','逐卷效果','画幅','HDF 模拟','左右调整 OK 保存'];
-  const resourceCount=417; // Preserve ADJ1191..1201; Marlboro is1202.
+  const resourceCount=420; // Preserve ADJ1191..1201; Marlboro1202; three films1203..1205.
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   if(manifest.pure_isp_effects?.enabled){

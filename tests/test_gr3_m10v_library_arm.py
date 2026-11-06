@@ -517,10 +517,28 @@ class FilmLibraryArmTests(unittest.TestCase):
                 source.write_text('.syntax unified\n.arm\n.text\n.global m10v_resource_primary\n.type m10v_resource_primary,%function\nm10v_resource_primary: bx lr\n.global m10v_resource_secondary\n.type m10v_resource_secondary,%function\nm10v_resource_secondary: bx lr\n.section .rodata\n.word m10v_resource_secondary+'+str(addend)+'\n')
                 subprocess.run([compiler,'--target=armv7-none-eabi','-marm','-c',str(source),'-o',str(obj)],check=True,capture_output=True)
                 if addend:
-                    with self.assertRaisesRegex(ValueError,'leaves local ARM text'):link_object(obj.read_bytes(),0x540b6000,prefix='m10v_resource_')
+                    with self.assertRaisesRegex(ValueError,'leaves local immutable image'):link_object(obj.read_bytes(),0x540b6000,prefix='m10v_resource_')
                 else:
                     code,symbols=link_object(obj.read_bytes(),0x540b6000,prefix='m10v_resource_')
                     self.assertEqual(struct.unpack_from('<I',code,len(code)-4)[0],symbols['m10v_resource_secondary'])
+
+    def test_local_rodata_pointer_relocation_is_bounded_to_immutable_image(self):
+        import subprocess,shutil
+        from scripts.build_gr3_m10v_library import link_object
+        compiler='/opt/homebrew/opt/llvm/bin/clang'
+        if not Path(compiler).is_file():compiler=shutil.which('clang')
+        with tempfile.TemporaryDirectory() as folder:
+            folder=Path(folder)
+            for addend in (0,4096):
+                source=folder/'pointer.S';obj=folder/'pointer.o'
+                source.write_text('.syntax unified\n.arm\n.text\n.global m10v_resource_primary\n.type m10v_resource_primary,%function\nm10v_resource_primary: bx lr\n.word local_data+'+str(addend)+'\n.global m10v_resource_secondary\n.type m10v_resource_secondary,%function\nm10v_resource_secondary: bx lr\n.section .rodata\nlocal_data: .word 0x12345678\n')
+                subprocess.run([compiler,'--target=armv7-none-eabi','-marm','-c',str(source),'-o',str(obj)],check=True,capture_output=True)
+                if addend:
+                    with self.assertRaisesRegex(ValueError,'leaves local immutable image'):link_object(obj.read_bytes(),0x540b6000,prefix='m10v_resource_')
+                else:
+                    code,_=link_object(obj.read_bytes(),0x540b6000,prefix='m10v_resource_')
+                    target=struct.unpack_from('<I',code,4)[0]
+                    self.assertEqual(struct.unpack_from('<I',code,target-0x540b6000)[0],0x12345678)
 
     def test_parameter_lists_focus_saved_values_without_writing_on_open(self):
         u=self.machine();model=0x55068200;controller=0x55005000

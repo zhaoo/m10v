@@ -58,7 +58,7 @@ export async function runGr3Runtime(source, plan, action, runtimeDir, { signal, 
       writeFile(planPath, JSON.stringify(plan), { mode: 0o600 })]);
     let stdout;
     try {
-      ({ stdout } = await execFileAsync(process.env.M10V_PYTHON || '/opt/homebrew/bin/python3.12',
+      ({ stdout } = await execFileAsync(process.env.M10V_RUNTIME_PYTHON || process.env.M10V_PYTHON || '/opt/homebrew/bin/python3.12',
         [worker, action, sourcePath, planPath, outputPath], {
           signal, env: { ...process.env, PYTHONPATH: runtimeDir, M10V_HALF_FRAME:halfFrame?'1':'0' }, timeout: deadlineMs, maxBuffer: 1024 * 1024,
         }));

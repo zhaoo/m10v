@@ -70,7 +70,11 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
                 raise ValueError('unexpected allocated section: ' + name)
             cursor = (cursor + row[8] - 1) & ~(row[8] - 1)
             starts[index] = cursor; image_sections.append((index, row)); cursor += row[5]
-            if cursor > base + 65536: raise ValueError('runtime exceeds code budget')
+            if cursor > base + 65536:
+                raise ValueError(
+                    f'runtime exceeds code budget: section={name} '
+                    f'end={cursor - base} limit=65536 section_bytes={row[5]} align={row[8]}'
+                )
     image = bytearray((cursor - base + 3) & ~3)
     for index, row in image_sections:
         at = starts[index] - base
@@ -103,12 +107,14 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
             if value is None: raise ValueError('relocation targets unloaded section: ' + name)
             place = starts[target] + offset; out_at = place - base
             word = struct.unpack_from('<I', image, out_at)[0]
-            if kind == 2:  # R_ARM_ABS32: compiler-generated local ARM switch labels only
+            if kind == 2:  # R_ARM_ABS32: compiler-generated local immutable pointers only
                 target_address = value + word
-                text_ranges = [(starts[i], starts[i]+s[5]) for i,s in image_sections
-                               if names[s[0]:].split(b'\0',1)[0] == b'.text']
-                if target_address & 3 or not any(lo <= target_address < hi for lo,hi in text_ranges):
-                    raise ValueError(f'absolute switch relocation leaves local ARM text: {name} value={value:#x} addend={word:#x} place={place:#x}')
+                ranges = [(starts[i], starts[i]+s[5], names[s[0]:].split(b'\0',1)[0])
+                          for i,s in image_sections]
+                target_section = next((section for lo,hi,section in ranges
+                                       if lo <= target_address < hi), None)
+                if target_section is None or (target_section == b'.text' and target_address & 3):
+                    raise ValueError(f'absolute relocation leaves local immutable image: {name} value={value:#x} addend={word:#x} place={place:#x}')
                 word = target_address
             elif kind in (28, 29):  # R_ARM_CALL / R_ARM_JUMP24
                 # AAELF32: BL<cond> uses JUMP24, not CALL. Keep the
