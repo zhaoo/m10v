@@ -105,4 +105,3 @@
 - [ ] **Step 3: Wire final build/export inventories and explanatory web preview**, then generate both model candidates through the existing exporter.
 - [ ] **Step 4: Run GREEN and final verification:** targeted tests, full `npm test` with clean-main comparison, relevant Python/ARM suites, final BIN readback, manifest/source/config hashes and `git diff --check`.
 - [ ] **Step 5: Commit** `test: verify and package ISP rainbow films`; record status `WAITING_FOR_USER_VALIDATION` and do not publish.
-

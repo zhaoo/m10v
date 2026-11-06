@@ -50,4 +50,3 @@
 - Yodica 基底零售资料：<https://www.revelab.es/comprar/yodica-pegasus/>
 - SHD50 社区实拍与曝光讨论：<https://www.reddit.com/r/AnalogCommunity/comments/1rok0tc/lucky_shd50_is_a_weird_film/>
 - SHD50 社区测试：<https://www.talkphotography.co.uk/threads/lucky-shd50-35mm-film.774288/>
-
