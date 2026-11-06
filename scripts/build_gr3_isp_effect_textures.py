@@ -18,7 +18,9 @@ import zlib
 
 import numpy as np
 
-VERSION = 'gr3-build-textures-v4-legacy-leak'
+from scripts.build_gr3_three_film_preview import signed_fields
+
+VERSION = 'gr3-build-textures-v5-rainbow-fields'
 LEGACY_LEAK_COMMIT = '0818cfeb00d92b09c89a68d1795707560343c0de'
 LEGACY_LEAK_SEED = 0x5207250d
 LEGACY_SPREADS = {'narrow': 1, 'medium': 4, 'wide': 8}
@@ -31,9 +33,13 @@ MODULATION_MODEL = ('Scalar byte weights, not colors: Y=mask, selected Cb or Cr=
 
 
 def _runtime_names():
-    return ['grain_nv12'] + [f'leak_{position}_{spread}_{channel}_field{suffix}_nv12'
+    existing = ['grain_nv12'] + [f'leak_{position}_{spread}_{channel}_field{suffix}_nv12'
         for suffix in ('', '_vertical') for position in ('left', 'right', 'both')
         for spread in ('narrow', 'medium', 'wide') for channel in ('cb', 'cr')]
+    rainbow = [f'rainbow_{kind}_{variant}_{component}_{sign}_nv12'
+        for kind in ('kolor', 'pegasus') for variant in range(4)
+        for component in ('y', 'cb', 'cr') for sign in ('pos', 'neg')]
+    return existing + rainbow
 
 
 def _known_formats():
@@ -47,6 +53,11 @@ def _known_formats():
                                 ('_cb_field_vertical_nv12', MODULATION_FORMATS[0]),
                                 ('_cr_field_vertical_nv12', MODULATION_FORMATS[1])):
                 formats[name + suffix] = fmt
+    for kind in ('kolor', 'pegasus'):
+        for variant in range(4):
+            for component in ('y', 'cb', 'cr'):
+                for sign in ('pos', 'neg'):
+                    formats[f'rainbow_{kind}_{variant}_{component}_{sign}_nv12'] = MODULATION_FORMATS[component == 'cr']
     return formats
 
 
@@ -227,6 +238,18 @@ def build_resources(prefix, width=3072, height=2048, leak_width=256, leak_height
                        leak_height, leak_width, stride,
                        planes=[dict(offset=0, length=stride*leak_width, stride=stride),
                                dict(offset=stride*leak_width, length=stride*leak_width//2, stride=stride)])
+    for kind in ('kolor', 'pegasus'):
+        for variant in range(4):
+            fields = signed_fields(kind, variant)
+            for component in ('y', 'cb', 'cr'):
+                channel = int(component == 'cr')
+                for sign in ('pos', 'neg'):
+                    name = f'rainbow_{kind}_{variant}_{component}_{sign}_nv12'
+                    mask = fields[f'{component}_{sign}']
+                    raw, stride = _pack_modulation_nv12(mask, channel)
+                    append(name, raw, MODULATION_FORMATS[channel], mask.shape[1], mask.shape[0], stride,
+                           planes=[dict(offset=0, length=stride*mask.shape[0], stride=stride),
+                                   dict(offset=stride*mask.shape[0], length=stride*mask.shape[0]//2, stride=stride)])
     manifest = dict(schema=1, generator=VERSION, resource_set='experimental_full',
                     source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                     numpy_version=np.__version__, blob_file=blob_path.name,
@@ -244,7 +267,7 @@ def build_resources(prefix, width=3072, height=2048, leak_width=256, leak_height
 
 
 def pack_runtime_resources(manifest_path, output_prefix):
-    """Pack exactly grain NV12 +36 horizontal/vertical selective fields, raw/64-aligned, <=12MiB.
+    """Pack grain +36 leak +48 rainbow fields, raw/64-aligned, <=12MiB.
 
     Source manifest/blob hashes bind provenance. Resource bytes, layouts and
     identities are preserved; only blob offsets change. No DMA claim is made.

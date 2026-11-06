@@ -68,7 +68,7 @@ class TextureTests(unittest.TestCase):
             manifest = textures.verify_resources(manifest_path)
             data = blob_path.read_bytes()
             self.assertEqual(manifest['parameters']['seed'], 45)
-            self.assertEqual(len(manifest['assets']), 65)
+            self.assertEqual(len(manifest['assets']), 113)
             # Grain resources are independent of this leak fidelity revision.
             self.assertEqual(data[:18432],textures._pack_y8(textures.grain_plane(130,96,45))[0])
             for asset in manifest['assets']:
@@ -173,12 +173,12 @@ class TextureTests(unittest.TestCase):
                     if position=='left':self.assertGreater(expected[0].mean(),expected[-1].mean())
                     if position=='right':self.assertLess(expected[0].mean(),expected[-1].mean())
 
-    def test_runtime_pack_selects_only37_resources_and_preserves_content(self):
+    def test_runtime_pack_selects_legacy_and_rainbow_resources_and_preserves_content(self):
         with tempfile.TemporaryDirectory() as directory:
             path, blob = textures.build_resources(Path(directory)/'effects', seed=20261031)
             packed, packed_blob = textures.pack_runtime_resources(path,Path(directory)/'runtime')
             source=textures.verify_resources(path);manifest=textures.verify_resources(packed)
-            self.assertEqual(len(manifest['assets']),37)
+            self.assertEqual(len(manifest['assets']),85)
             self.assertLessEqual(packed_blob.stat().st_size,0xc00000)
             self.assertEqual(manifest['source_manifest_sha256'],hashlib.sha256(path.read_bytes()).hexdigest())
             self.assertEqual(manifest['source_blob_sha256'],source['blob_sha256'])
@@ -189,7 +189,8 @@ class TextureTests(unittest.TestCase):
                 self.assertEqual({k:v for k,v in a.items() if k!='offset'}, {k:v for k,v in old.items() if k!='offset'})
                 self.assertEqual(data[a['offset']:a['offset']+a['length']],original[old['offset']:old['offset']+old['length']])
             self.assertEqual(manifest['assets'][0]['name'],'grain_nv12')
-            self.assertTrue(all(('_field_nv12' in a['name'] or '_field_vertical_nv12' in a['name']) for a in manifest['assets'][1:]))
+            self.assertEqual([a['name'] for a in manifest['assets']], textures._runtime_names())
+            self.assertTrue(all('rainbow_' in a['name'] for a in manifest['assets'][37:]))
 
     def test_modulation_format_forgery_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
