@@ -1,7 +1,9 @@
 """Compile metadata-only experimental native ISP renderer; never emit firmware.
 
-bindings={'grain': {base,bytes,width,height,stride}, 'leaks': [[cb,cr], ...9], 'leaks_vertical': [[cb,cr], ...9]}.
+bindings={'grain': {base,bytes,width,height,stride}, 'leaks': [[cb,cr], ...9],
+ 'leaks_vertical': [[cb,cr], ...9], 'rainbows': [2][4][3][2]}.
 Nine leak pairs follow position(left/right/both), then spread(narrow/medium/wide).
+Rainbow order is KOLOR/Pegasus, variant, Y/Cb/Cr, positive/negative.
 externals binds transfer_plan_format, transfer_execute and granulation_owned.
 """
 import hashlib,shutil,struct,subprocess,tempfile
@@ -18,7 +20,7 @@ def _texture(t):
  return dict(t)
 def _validated(base,bindings,externals):
  if type(base)is not int or base&15 or not 0x540b6000<=base<=0x54ef0000:raise ValueError('invalid renderer code base')
- if not isinstance(bindings,dict) or set(bindings)!=set(('grain','leaks','leaks_vertical')) or not isinstance(bindings['leaks'],(list,tuple)) or len(bindings['leaks'])!=9 or not isinstance(bindings['leaks_vertical'],(list,tuple)) or len(bindings['leaks_vertical'])!=9:raise ValueError('one grain and nine leak pairs required')
+ if not isinstance(bindings,dict) or set(bindings)!=set(('grain','leaks','leaks_vertical','rainbows')) or not isinstance(bindings['leaks'],(list,tuple)) or len(bindings['leaks'])!=9 or not isinstance(bindings['leaks_vertical'],(list,tuple)) or len(bindings['leaks_vertical'])!=9:raise ValueError('grain, leak and rainbow bindings required')
  g=_texture(bindings['grain']);pairs=[]
  if g['width']<3000 or g['height']<2000:raise ValueError('grain binding must cover largest crop')
  for pair in bindings['leaks']:
@@ -34,13 +36,28 @@ def _validated(base,bindings,externals):
  for horizontal,v in zip(pairs,vertical):
   for h,t in zip(horizontal,v):
    if (t['width'],t['height'])!=(h['height'],h['width']):raise ValueError('vertical field geometry must transpose horizontal dimensions')
- all_t=[g]+[t for p in pairs+vertical for t in p]
+ rainbows=[]
+ if not isinstance(bindings['rainbows'],(list,tuple)) or len(bindings['rainbows'])!=2:raise ValueError('two rainbow film banks required')
+ for bank in bindings['rainbows']:
+  if not isinstance(bank,(list,tuple)) or len(bank)!=4:raise ValueError('four rainbow variants required')
+  variants=[]
+  for variant in bank:
+   if not isinstance(variant,(list,tuple)) or len(variant)!=3:raise ValueError('three rainbow components required')
+   components=[]
+   for component in variant:
+    if not isinstance(component,(list,tuple)) or len(component)!=2:raise ValueError('signed rainbow pair required')
+    signed=[_texture(t) for t in component]
+    if any((t['width'],t['height'],t['stride'])!=(128,64,128) for t in signed):raise ValueError('rainbow field geometry differs')
+    components.append(signed)
+   variants.append(components)
+  rainbows.append(variants)
+ all_t=[g]+[t for p in pairs+vertical for t in p]+[t for b in rainbows for v in b for c in v for t in c]
  for i,t in enumerate(all_t):
   for q in all_t[:i]:
    if t['base']<q['base']+q['bytes'] and q['base']<t['base']+t['bytes']:raise ValueError('overlapping immutable texture bindings')
  if not isinstance(externals,dict) or set(externals)!=set(EXTERNALS) or any(type(v)is not int or v&3 or not 0x540b6000<=v<0x55000000 for v in externals.values()) or len(set(externals.values()))!=4:raise ValueError('four distinct bound native exports required')
  if any(t['base']<=a<t['base']+t['bytes'] for a in externals.values() for t in all_t):raise ValueError('native export points into immutable texture bytes')
- return {'grain':g,'leaks':pairs,'leaks_vertical':vertical},dict(externals)
+ return {'grain':g,'leaks':pairs,'leaks_vertical':vertical,'rainbows':rainbows},dict(externals)
 def leak_curves():
  """A/C = upper endpoint, E/F = lower endpoint, B/D = weight curve.
  Under the polarity hypothesis below, r14 selects the effect at zero spatial
@@ -63,6 +80,10 @@ def leak_curves():
  # Select between mask and zero to obtain mask*(1-luma), on the ISP.
  profiles.append(([0]*256,a,a))
  return profiles
+def rainbow_curves():
+ """rainbow KOLOR/Pegasus signed Y/Cb/Cr immutable native endpoints."""
+ a=list(range(256))
+ return [([255]*256,a,a),([0]*256,a,a)]
 def _header(bindings):
  def row(t):return '{'+','.join(str(t[k])+'u' for k in FIELDS)+'}'
  out=['static const m10v_isp_effect_texture m10v_render_grain='+row(bindings['grain'])+';', 'static const m10v_isp_effect_texture m10v_render_leaks[9][2]={'+','.join('{'+','.join(row(t) for t in p)+'}' for p in bindings['leaks'])+'};']
@@ -70,7 +91,10 @@ def _header(bindings):
  for curve in leak_curves():
   profiles.append('{'+','.join('{'+','.join(map(str,v))+'}' for v in curve)+'}')
  out.append('static const m10v_isp_effect_texture m10v_render_leaks_vertical[9][2]={'+','.join('{'+','.join(row(t) for t in p)+'}' for p in bindings['leaks_vertical'])+'};')
- out.append('static const int16_t m10v_render_curves[10][3][256]={'+','.join(profiles)+'};')
+ out.append('static const m10v_isp_effect_texture m10v_render_rainbows[2][4][3][2]={'+','.join('{'+','.join('{'+','.join('{'+','.join(row(t) for t in c)+'}' for c in v)+'}' for v in b)+'}' for b in bindings['rainbows'])+'};')
+ for curve in rainbow_curves():
+  profiles.append('{'+','.join('{'+','.join(map(str,v))+'}' for v in curve)+'}')
+ out.append('static const int16_t m10v_render_curves[12][3][256]={'+','.join(profiles)+'};')
  return '\n'.join(out)+'\n'
 def _compile(base,bindings,externals):
  bindings,externals=_validated(base,bindings,externals)
@@ -93,18 +117,18 @@ def _compile(base,bindings,externals):
     for off in range(r[4],r[4]+r[5],16):
      n,v,_,info,_,section=struct.unpack_from('<IIIBBH',b,off);s=strings[n:].split(b'\0',1)[0].decode()
      if not section and s:raise ValueError('undefined symbol '+s)
-     if (info&15==2 and s=='m10v_isp_effects_render') or s in ('m10v_render_grain','m10v_render_leaks','m10v_render_leaks_vertical','m10v_render_curves'):symbols[s]=v
-  for d in [bindings['grain']]+[v for pair in bindings['leaks']+bindings['leaks_vertical'] for v in pair]:
+     if (info&15==2 and s=='m10v_isp_effects_render') or s in ('m10v_render_grain','m10v_render_leaks','m10v_render_leaks_vertical','m10v_render_rainbows','m10v_render_curves'):symbols[s]=v
+  for d in [bindings['grain']]+[v for pair in bindings['leaks']+bindings['leaks_vertical'] for v in pair]+[t for b in bindings['rainbows'] for v in b for c in v for t in c]:
    if base<d['base']+d['bytes'] and d['base']<base+len(image):raise ValueError('renderer overlaps immutable texture bytes')
   if any(base<=a<base+len(image) for a in externals.values()):raise ValueError('renderer overlaps bound native export')
-  if set(symbols)!=set(('m10v_isp_effects_render','m10v_render_grain','m10v_render_leaks','m10v_render_leaks_vertical','m10v_render_curves')):raise ValueError('renderer symbols differ')
+  if set(symbols)!=set(('m10v_isp_effects_render','m10v_render_grain','m10v_render_leaks','m10v_render_leaks_vertical','m10v_render_rainbows','m10v_render_curves')):raise ValueError('renderer symbols differ')
  return bytes(image),symbols
 def build(base=0x54e00000,bindings=None,externals=None,*,enabled=False):
  if type(enabled)is not bool:raise ValueError('explicit renderer boolean required')
  m=dict(schema='m10v-isp-effect-render/v1',enabled=False,code_bytes=0,symbols={},patches=[],firmware_emitted=False,camera_tested=False,pixel_math_proven=False)
  if not enabled:return b'',m
  bindings,externals=_validated(base,bindings,externals);code,symbols=_compile(base,bindings,externals)
- m.update(enabled=True,base=base,code_bytes=len(code),code_sha256=hashlib.sha256(code).hexdigest(),symbols=symbols,bindings=bindings,externals=externals,generated_header_sha256=hashlib.sha256(_header(bindings).encode()).hexdigest(),sources={p:hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in SOURCES},mutable_static_bytes=0,allocator_calls=0,cpu_pixel_access=False,cpu_rng=False,required_cache_maintenance={'entry':0x5383c8a8,'operation':'clean_invalidate','span':'complete destination workspace before every prepared=1 ISP enqueue','abi_pin':'enclosing border runtime cache_backend span','physical_cache_proven':False},grain_strength_arguments={'weak':3,'medium':2,'strong':1},execution_order=['native Clarity by caller','original luma gates Cb mask','leak Cb','original luma gates Cr mask','leak Cr','leak Y','stock grain'],saved_orientation={'1':'horizontal selected edge','3':'horizontal opposite edge','8':'vertical selected edge (top=left)','6':'vertical opposite edge'},cpu_frame_rotation=False,roi_views='owned descriptor snapshot shifts Y by top*stride+left and UV by format-correct top; complete stride*height cache spans must fit original allocations; pixels and input descriptors untouched',curve_profiles=10,curve_coefficients=10*3*256,leak_fit='pinned historical spatial field; source-dependent luma exposure and luma-gated chroma; separable BT.601 approximation, native scalar arithmetic pending camera acceptance',workspace='align16(width)*height*2 for 422 leak; *3/2 for NV12 leak or grain',acceptance_required='Real camera output, native scalar arithmetic and visual appearance remain unproven; strict native failures return output invalid with no CPU fallback.')
+ m.update(enabled=True,base=base,code_bytes=len(code),code_sha256=hashlib.sha256(code).hexdigest(),symbols=symbols,bindings=bindings,externals=externals,generated_header_sha256=hashlib.sha256(_header(bindings).encode()).hexdigest(),sources={p:hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in SOURCES},mutable_static_bytes=0,allocator_calls=0,cpu_pixel_access=False,cpu_rng=False,required_cache_maintenance={'entry':0x5383c8a8,'operation':'clean_invalidate','span':'complete destination workspace before every prepared=1 ISP enqueue','abi_pin':'enclosing border runtime cache_backend span','physical_cache_proven':False},grain_strength_arguments={'weak':3,'medium':2,'strong':1},execution_order=['native Clarity by caller','original luma gates Cb mask','leak Cb','original luma gates Cr mask','leak Cr','leak Y','rainbow Y+/Y-/Cb+/Cb-/Cr+/Cr-','stock grain'],saved_orientation={'1':'horizontal selected edge','3':'horizontal opposite edge','8':'vertical selected edge (top=left)','6':'vertical opposite edge','rainbow':'fixed sensor coordinates; no CPU or native frame rotation'},cpu_frame_rotation=False,roi_views='owned descriptor snapshot shifts Y by top*stride+left and UV by format-correct top; complete stride*height cache spans must fit original allocations; pixels and input descriptors untouched',curve_profiles=12,curve_coefficients=12*3*256,leak_fit='pinned historical spatial field; source-dependent luma exposure and luma-gated chroma; separable BT.601 approximation, native scalar arithmetic pending camera acceptance',rainbow_fit='48 immutable signed component fields; six Resize plus Granulation native passes; endpoint arithmetic pending camera acceptance',workspace='align16(width)*height*2 for 422 leak or rainbow; *3/2 for NV12 leak or grain',acceptance_required='Real camera output, native scalar arithmetic and visual appearance remain unproven; strict native failures return output invalid with no CPU fallback.')
  m['curve_endpoint_bindings']={'effect':'A/C: graph+5c/+64','identity':'E/F: graph+6c/+70','weight':'B/D: graph+60/+68'}
  m['polarity_evidence']='stock bound ordering and r14 whole-frame whitening; native endpoint output remains unmeasured'
  return code,m

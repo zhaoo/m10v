@@ -94,22 +94,27 @@ export function pureIspEffectPatches(runtime,m){
  fail(p.scope==='per-film'&&p.recipe_bytes===0x57d8&&JSON.stringify(p.menu_resource_ids)===JSON.stringify(Array.from({length:23},(_,i)=>1163+i)),'recipe/FN identity differs');
  fail(m.flags?.includes('-DM10V_PURE_ISP_EFFECTS=1')&&m.flags?.includes('-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778'),'compile ownership differs');
  const b=p.runtime_assets,a=b?.manifest;
- fail(Buffer.isBuffer(runtime)&&Number.isInteger(m.base)&&b?.base===0x54400000&&b.bytes===11206656&&b.sha256==='23dfbbfdd72c4a64cf2bc2556b2528df3be49c4c5dcbd501da4b1818093b1f5a','asset identity differs');
+ fail(Buffer.isBuffer(runtime)&&Number.isInteger(m.base)&&b?.base===0x54400000&&b.bytes===11796480&&b.sha256==='3c32368958396c4070ba2e9b5b042018919b3a50e40a7ca52a066619e394c6b7','asset identity differs');
  fail(a?.resource_set==='runtime_modulation'&&a.blob_length===b.bytes&&a.blob_sha256===b.sha256&&a.source_sha256===sha(readFileSync(new URL('../scripts/build_gr3_isp_effect_textures.py',import.meta.url)))&&a.parameters?.height===2048&&a.parameters?.leak_height===128&&a.parameters?.leak_width===256&&a.parameters?.seed===20261031&&a.parameters?.width===3072,'asset generator parameters differ');
  const offset=b.base-m.base;
  fail(offset>=0&&offset+b.bytes<=runtime.length&&sha(runtime.subarray(offset,offset+b.bytes))===b.sha256,'asset payload hash differs');
- const names=['grain_nv12',...['','_vertical'].flatMap(orientation=>['left','right','both'].flatMap(position=>['narrow','medium','wide'].flatMap(spread=>['cb','cr'].map(channel=>`leak_${position}_${spread}_${channel}_field${orientation}_nv12`))))];
+ const names=['grain_nv12',...['','_vertical'].flatMap(orientation=>['left','right','both'].flatMap(position=>['narrow','medium','wide'].flatMap(spread=>['cb','cr'].map(channel=>`leak_${position}_${spread}_${channel}_field${orientation}_nv12`)))),...['kolor','pegasus'].flatMap(kind=>[0,1,2,3].flatMap(variant=>['y','cb','cr'].flatMap(component=>['pos','neg'].map(sign=>`rainbow_${kind}_${variant}_${component}_${sign}_nv12`))))];
  fail(Array.isArray(a.assets)&&a.assets.length===names.length,'asset inventory differs');
  let next=0;
  for(let i=0;i<names.length;i++){
-  const asset=a.assets[i],grain=i===0,vertical=i>18,w=grain?3072:vertical?128:256,h=grain?2048:vertical?256:128,stride=w,n=stride*h;
-  const format=grain?'NV12':i%2?'NV12_MODULATION_Y_CB':'NV12_MODULATION_Y_CR';
+  const asset=a.assets[i],grain=i===0,rainbow=i>=37,vertical=!rainbow&&i>18,w=grain?3072:rainbow?128:vertical?128:256,h=grain?2048:rainbow?64:vertical?256:128,stride=w,n=stride*h;
+  const format=grain?'NV12':rainbow&&asset?.name.includes('_cr_')?'NV12_MODULATION_Y_CR':!rainbow&&i%2===0?'NV12_MODULATION_Y_CR':'NV12_MODULATION_Y_CB';
   fail(asset?.name===names[i]&&asset.format===format&&asset.width===w&&asset.height===h&&asset.stride===stride&&asset.offset===next&&asset.length===n*3/2,'asset layout differs');
   fail(asset.planes?.length===2&&asset.planes[0].length===n&&asset.planes[0].offset===0&&asset.planes[0].stride===stride&&asset.planes[1].length===n/2&&asset.planes[1].offset===n&&asset.planes[1].stride===stride,'asset plane layout differs');
   fail(asset.sha256===sha(runtime.subarray(offset+next,offset+next+asset.length)),'asset hash differs');
   next+=asset.length;
  }
  fail(next===b.bytes,'asset extent differs');
+ const r=p.render;
+ fail(r?.enabled===true&&r.cpu_pixel_access===false&&r.cpu_rng===false&&r.curve_profiles===12&&r.curve_coefficients===9216&&r.bindings?.rainbows?.length===2&&Number.isInteger(r.symbols?.m10v_render_rainbows),'rainbow renderer identity differs');
+ const rainbowAssets=a.assets.slice(37),rainbowBindings=r.bindings.rainbows.flat(3);
+ fail(rainbowAssets.length===48&&rainbowBindings.length===48,'rainbow binding inventory differs');
+ for(let i=0;i<48;i++)fail(rainbowBindings[i].base===b.base+rainbowAssets[i].offset&&rainbowBindings[i].bytes===rainbowAssets[i].length&&rainbowBindings[i].width===128&&rainbowBindings[i].height===64&&rainbowBindings[i].stride===128,'rainbow binding differs');
  const stock=new Map([[0x53771620,0xe51b12d4],[0x5367adac,0xe50be650],[0x5367ae14,0xeb003ec4],[0x5367b404,0xeb03c641],[0x5367b410,0xeb003c3e],[0x5367b41c,0xeb03c308],[0x535033e8,0xeb05f673]]);
  fail(Array.isArray(p.patches)&&p.patches.length>=stock.size,'patch inventory missing');
  const seen=new Set();

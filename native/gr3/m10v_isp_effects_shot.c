@@ -6,6 +6,7 @@
 #include "m10v_tone.h"
 #include "m10v_isp_recipe_color.h"
 #include "m10v_film_identity.h"
+#include "m10v_recorded_film.h"
 #endif
 #ifndef M10V_ISP_EFFECTS_SHOT_OFFSET
 #error "Builder must allocate the ISP effects shot tail and define its offset"
@@ -42,14 +43,15 @@ static int shot_geometry(uint32_t width,uint32_t height){
     return width>=2&&height>=2&&width<=6144&&height<=6144&&!((width|height)&1u);
 }
 static uint32_t shot_workspace(const m10v_isp_effects_settings *s,
-    uint32_t width,uint32_t height,uint32_t grain){
+    uint32_t width,uint32_t height,uint32_t grain,uint32_t rainbow){
     uint32_t plane=((width+15u)&~15u)*height;
-    return s->leak_gain?plane*2u:grain?plane*3u/2u:0;
+    return s->leak_gain||rainbow?plane*2u:grain?plane*3u/2u:0;
 }
 static uint32_t shot_enabled(const m10v_isp_effects_shot_snapshot *s){
     return (s->effective_grain_strength?M10V_ISP_EFFECTS_NATIVE_GRAIN:0u)|
         (s->settings.leak_gain?M10V_ISP_EFFECTS_NATIVE_LEAK:0u)|
-        (s->settings.blur_gain?M10V_ISP_EFFECTS_NATIVE_BLUR:0u);
+        (s->settings.blur_gain?M10V_ISP_EFFECTS_NATIVE_BLUR:0u)|
+        (s->rainbow?M10V_ISP_EFFECTS_NATIVE_RAINBOW:0u);
 }
 static int shot_si(uint32_t recipe,uint32_t si){
     return shot_ram(si,4)&&si==*(const volatile uint32_t*)(uintptr_t)(recipe+0x44c8u);
@@ -69,7 +71,8 @@ static int shot_valid(uint32_t recipe,const m10v_isp_effects_shot_snapshot *s){
        !m10v_isp_effects_validate(&s->settings)||s->planned>1||s->failed>1||
        s->stock_query_valid>1||(!s->stock_query_valid&&s->stock_workspace_bytes)||
        s->stock_workspace_bytes>0x2b000000u)return 0;
-    if(s->reserved||(s->saved_orientation!=1&&s->saved_orientation!=3&&s->saved_orientation!=6&&s->saved_orientation!=8)||
+    if((s->rainbow&&!m10v_isp_rainbow_valid(s->rainbow))||
+       (s->saved_orientation!=1&&s->saved_orientation!=3&&s->saved_orientation!=6&&s->saved_orientation!=8)||
        !shot_si(recipe,s->source_si))return 0;
     if(!s->planned)return !s->planned_width&&!s->planned_height&&!s->workspace_bytes&&
         !s->effective_grain_strength&&!s->native_completed&&!s->failed&&
@@ -79,7 +82,7 @@ static int shot_valid(uint32_t recipe,const m10v_isp_effects_shot_snapshot *s){
        s->effective_grain_strength>3||
        (s->settings.grain_mode&&s->effective_grain_strength!=s->settings.grain_mode-1u)||
        s->workspace_bytes!=shot_workspace(&s->settings,s->planned_width,s->planned_height,
-            s->effective_grain_strength)||(s->native_completed&~shot_enabled(s)))return 0;
+            s->effective_grain_strength,s->rainbow)||(s->native_completed&~shot_enabled(s)))return 0;
     return 1;
 }
 void m10v_isp_effects_shot_reserve(uint32_t recipe){
@@ -95,7 +98,7 @@ int m10v_isp_effects_shot_freeze(uint32_t recipe){
     if(!__atomic_compare_exchange_n(&s->ready,&expected,3,0,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE))
         return expected==1&&shot_valid(recipe,s);
     uint32_t si=*(const volatile uint32_t*)(uintptr_t)(recipe+0x44c8u);
-    m10v_isp_effects_settings frozen;uint32_t sequence=0;
+    m10v_isp_effects_settings frozen;uint32_t sequence=0,rainbow=0;
 #if M10V_PURE_ISP_EFFECTS
     m10v_isp_effects_defaults(&frozen);
     const m10v_isp_recipe_color *color=(const void*)(uintptr_t)(recipe+M10V_SAVE_COLOR_OFFSET);
@@ -108,6 +111,7 @@ int m10v_isp_effects_shot_freeze(uint32_t recipe){
            color->bytes==sizeof(*color)&&!color->busy&&color->selected_tone==tone&&
            color->sequence==color->state.sequence&&m10v_library_valid(&color->state)&&
            slot<M10V_SLOT_COUNT&&color->state.slots[slot].film){
+            uint32_t film=color->state.slots[slot].film;
             const m10v_film_effects *e=&color->state.effects[slot];
             uint32_t grain=color->state.slots[slot].grain;
             sequence=color->sequence;frozen.grain_mode=grain+1u;
@@ -125,6 +129,18 @@ int m10v_isp_effects_shot_freeze(uint32_t recipe){
                 frozen.blur_gain=e->leak_variation&3u;
                 frozen.blur_range=(e->leak_variation>>2)&3u;
             }
+            if(M10V_RAINBOW(film)){
+                const m10v_film_identity *identity=m10v_film_identity_owned(si);
+                uint32_t code=m10v_film_identity_read(si);
+                uint32_t generation=identity?identity->generation:0u;
+                if(!identity||code!=M10V_RECORDED_BUILTIN_BASE+film||
+                   generation!=identity->generation)valid=0;
+                else{
+                    uint32_t variant=(generation^film^sequence)&3u;
+                    uint32_t phase=((generation*0x9e3779b9u)^(si>>4)^sequence)&63u;
+                    rainbow=m10v_isp_rainbow_pack(film==M10V_KOLOR_ID?1u:2u,variant,phase,1u);
+                }
+            }
         }
     }
 #else
@@ -132,7 +148,7 @@ int m10v_isp_effects_shot_freeze(uint32_t recipe){
 #endif
     uint32_t orientation=valid?shot_orientation(recipe,si):0;
     valid=valid&&orientation;
-    if(valid){frozen.reserved=0;shot_copy(&s->settings,&frozen,sizeof(frozen));s->sequence=sequence;s->source_si=si;s->saved_orientation=orientation;}
+    if(valid){frozen.reserved=0;shot_copy(&s->settings,&frozen,sizeof(frozen));s->sequence=sequence;s->source_si=si;s->saved_orientation=orientation;s->rainbow=rainbow;}
     __atomic_store_n(&s->ready,valid?1u:2u,__ATOMIC_RELEASE);
     return valid;
 }
@@ -163,7 +179,7 @@ int m10v_isp_effects_shot_plan(uint32_t recipe,uint32_t si,uint32_t width,
     if(!__atomic_compare_exchange_n(&s->planned,&expected,2,0,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE))return 0;
     s->planned_width=width;s->planned_height=height;
     s->effective_grain_strength=resolved.effective_grain_strength;
-    s->workspace_bytes=shot_workspace(&s->settings,width,height,resolved.effective_grain_strength);
+    s->workspace_bytes=shot_workspace(&s->settings,width,height,resolved.effective_grain_strength,s->rainbow);
     s->source_si=si;
     __atomic_store_n(&s->planned,1,__ATOMIC_RELEASE);return 1;
 }

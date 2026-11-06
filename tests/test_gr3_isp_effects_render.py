@@ -11,7 +11,7 @@ def bindings():
  def t(w,h):
   nonlocal at
   s=(w+63)&~63;n=s*h*3//2;d=dict(base=at,bytes=n,width=w,height=h,stride=s);at+=n;return d
- return dict(grain=t(3072,2048),leaks=[[t(256,128),t(256,128)] for _ in range(9)],leaks_vertical=[[t(128,256),t(128,256)] for _ in range(9)])
+ return dict(grain=t(3072,2048),leaks=[[t(256,128),t(256,128)] for _ in range(9)],leaks_vertical=[[t(128,256),t(128,256)] for _ in range(9)],rainbows=[[[[t(128,64),t(128,64)] for _ in range(3)] for _ in range(4)] for _ in range(2)])
 class RenderTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):cls.code,cls.manifest=build.build(BASE,bindings(),EXT,enabled=True);cls.symbols=cls.manifest['symbols']
@@ -24,11 +24,11 @@ class RenderTests(unittest.TestCase):
   self.work,self.y,self.uv=0x63000000,0x60000000,0x61000000;self.w,self.h,self.stride=400,300,416;self.token=0x55012345
   self.calls=[];self.native_count=0;self.fail_at=0;self.fail_result=0;self.mutate=False;self.plan_result=1
   self.configure();self.u.hook_add(UC_HOOK_CODE,self.hook)
- def configure(self,fmt=1,grain=2,leak=2,size=1,pos=1,spread=2,orientation=1):
-  self.format=fmt;self.capacity=400*300*(2 if fmt==1 and leak else 3/2);self.capacity=int(self.capacity)
+ def configure(self,fmt=1,grain=2,leak=2,size=1,pos=1,spread=2,orientation=1,rainbow=0):
+  self.format=fmt;self.capacity=400*300*(2 if fmt==1 and (leak or rainbow) else 3/2);self.capacity=int(self.capacity)
   self.put(self.photo,0xabcd0000|fmt,self.y,self.uv,0,self.w|(self.h<<16),self.stride|(self.h<<16),0,2)
   # magic owner ready sequence; settings; plan metadata; state; reserved.
-  self.put(self.shot,0x31584653,0x55004000,1,7,leak,pos,spread,0,size,0,0,0,self.w,self.h,self.capacity,grain,1,0,0,self.token,0,0,orientation,0)
+  self.put(self.shot,0x31584653,0x55004000,1,7,leak,pos,spread,0,size,0,0,0,self.w,self.h,self.capacity,grain,1,0,0,self.token,0,0,orientation,rainbow)
  def hook(self,u,pc,size,data):
   if pc not in EXT.values():return
   args=[self.reg(i) for i in range(4)];sp=u.reg_read(A.UC_ARM_REG_SP)
@@ -128,11 +128,28 @@ class RenderTests(unittest.TestCase):
   for effective,native in ((1,3),(2,2),(3,1)):
    self.configure(grain=effective,leak=0);self.calls=[];self.assertEqual(self.invoke(),1)
    grain=[c for c in self.calls if c[0]=='granulation'];self.assertEqual(len(grain),1);self.assertEqual(grain[0][4],native)
+ def test_rainbow_executes_six_signed_native_passes_in_sensor_coordinates(self):
+  descriptor=0x52400000|(1<<12)|(37<<6)|(3<<4)|2
+  expected=[t['base'] for component in bindings()['rainbows'][1][3] for t in component]
+  for orientation in (1,3,6,8):
+   self.configure(grain=0,leak=0,orientation=orientation,rainbow=descriptor);self.calls=[];self.native_count=0
+   self.assertEqual(self.invoke(),1)
+   self.assertEqual([c[0] for c in self.calls],['plan','execute','granulation']*6)
+   plans=[c for c in self.calls if c[0]=='plan']
+   self.assertEqual([c[1][0] for c in plans],expected)
+   self.assertEqual([c[8] for c in plans],[37]*6)
+   gran=[c for c in self.calls if c[0]=='granulation']
+   self.assertEqual([c[5] for c in gran],[self.work,self.work,self.work+120000,self.work+120000,self.work+120000,self.work+120000])
+   self.assertEqual([c[4] for c in gran],[1]*6)
+  self.configure(grain=0,leak=0,rainbow=descriptor)
+  for at in range(1,13):
+   self.calls=[];self.native_count=0;self.fail_at=at;self.fail_result=0
+   self.assertEqual(self.invoke(),-4);self.assertEqual(self.native_count,at)
  def test_nv12_uv_has_half_height_and_all_profiles_are_build_time(self):
   self.configure(fmt=2);self.assertEqual(self.invoke(),1)
   gran=[c for c in self.calls if c[0]=='granulation'];self.assertEqual(gran[1][2][4]>>16,150);self.assertEqual(gran[1][6],60000)
-  curves=self.symbols['m10v_render_curves'];all_c=struct.unpack('<7680h',self.u.mem_read(curves,15360));self.assertTrue(all(0<=v<=255 for v in all_c))
-  self.assertEqual(all_c,tuple(v for profile in build.leak_curves() for row in profile for v in row))
+  curves=self.symbols['m10v_render_curves'];all_c=struct.unpack('<9216h',self.u.mem_read(curves,18432));self.assertTrue(all(0<=v<=255 for v in all_c))
+  self.assertEqual(all_c,tuple(v for profile in build.leak_curves()+build.rainbow_curves() for row in profile for v in row))
   self.assertEqual(all_c[255+256],255) # white luma remains white
   self.assertEqual(all_c[9*768:9*768+256],(0,)*256)
   for profile in range(9):self.assertEqual(all_c[profile*768+256:profile*768+512],tuple(range(256)))

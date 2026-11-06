@@ -1260,7 +1260,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         packed=verify_resources(packed_path)
         packed=json.loads(packed_path.read_text())
         asset_bytes=packed_blob.read_bytes();asset_base=0x54400000
-        if sha(asset_bytes)!='23dfbbfdd72c4a64cf2bc2556b2528df3be49c4c5dcbd501da4b1818093b1f5a':
+        if sha(asset_bytes)!='3c32368958396c4070ba2e9b5b042018919b3a50e40a7ca52a066619e394c6b7':
             raise ValueError('pure ISP build-time texture identity differs; use the pinned NumPy build environment')
         status_base=(base+len(image)+15)&~15
         status_code,status_report=build_effect_status(status_base,capture_stock_rtos(camera_model),border_component['guard'],enabled=True,camera_model=camera_model)
@@ -1284,7 +1284,10 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             for position in ('left','right','both') for spread in ('narrow','medium','wide')],
             'leaks_vertical':[
             [binding(f'leak_{position}_{spread}_{channel}_field_vertical_nv12') for channel in ('cb','cr')]
-            for position in ('left','right','both') for spread in ('narrow','medium','wide')]}
+            for position in ('left','right','both') for spread in ('narrow','medium','wide')],
+            'rainbows':[[[[binding(f'rainbow_{kind}_{variant}_{component}_{sign}_nv12')
+                for sign in ('pos','neg')] for component in ('y','cb','cr')]
+                for variant in range(4)] for kind in ('kolor','pegasus')]}
         render_base=(base+len(image)+15)&~15
         render_code,render_report=build_effect_render(render_base,bindings,{k:symbols[k] for k in EFFECT_RENDER_EXTERNALS},enabled=True)
         image+=bytes(render_base-base-len(image))+render_code;symbols.update(render_report['symbols'])

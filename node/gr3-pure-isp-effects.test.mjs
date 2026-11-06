@@ -62,7 +62,11 @@ test('trusted runtime modulation bytes and closed patch inventory survive readba
   const base=0x543ff000,runtime=Buffer.concat([Buffer.alloc(4096),raw]);
   const branch=(at,link)=>((link?0xeb000000:0xea000000)|(((base-at-8)>>2)&0xffffff))>>>0;
   const patches=[[0x53771620,0xe51b12d4,false],[0x5367adac,0xe50be650,false],[0x5367ae14,0xeb003ec4,true],[0x5367b404,0xeb03c641,true],[0x5367b410,0xeb003c3e,true],[0x5367b41c,0xeb03c308,true],[0x535033e8,0xeb05f673,true]].map(([address,expected,link])=>({address,expected,replacement:branch(address,link)}));
-  const manifest={base,camera_model:'gr3',film_library_enabled:true,hdf_enabled:true,border:{enabled:true},capture_lifecycle:{snapshot:{live_color:true},native_grain:{query_entry:base}},flags:['-DM10V_PURE_ISP_EFFECTS=1','-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778'],pure_isp_effects:{enabled:true,scope:'per-film',recipe_bytes:0x57d8,menu_resource_ids:Array.from({length:23},(_,i)=>1163+i),runtime_assets:{base:0x54400000,bytes:raw.length,sha256:assets.blob_sha256,manifest:assets},patches}};
+  const byName=new Map(assets.assets.map(asset=>[asset.name,asset]));
+  const binding=name=>{const a=byName.get(name);return {base:0x54400000+a.offset,bytes:a.length,width:a.width,height:a.height,stride:a.stride};};
+  const rainbows=['kolor','pegasus'].map(kind=>[0,1,2,3].map(variant=>['y','cb','cr'].map(component=>['pos','neg'].map(sign=>binding(`rainbow_${kind}_${variant}_${component}_${sign}_nv12`)))));
+  const render={enabled:true,cpu_pixel_access:false,cpu_rng:false,curve_profiles:12,curve_coefficients:9216,symbols:{m10v_render_rainbows:base},bindings:{rainbows}};
+  const manifest={base,camera_model:'gr3',film_library_enabled:true,hdf_enabled:true,border:{enabled:true},capture_lifecycle:{snapshot:{live_color:true},native_grain:{query_entry:base}},flags:['-DM10V_PURE_ISP_EFFECTS=1','-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778'],pure_isp_effects:{enabled:true,scope:'per-film',recipe_bytes:0x57d8,menu_resource_ids:Array.from({length:23},(_,i)=>1163+i),runtime_assets:{base:0x54400000,bytes:raw.length,sha256:assets.blob_sha256,manifest:assets},render,patches}};
   assert.equal(pureIspEffectPatches(runtime,manifest).length,7);
   const original=patches[0].replacement;patches[0].replacement=branch(patches[0].address,true);
   assert.throws(()=>pureIspEffectPatches(runtime,manifest),/branch kind/);patches[0].replacement=original;

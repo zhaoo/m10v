@@ -18,10 +18,11 @@ int m10v_isp_effects_render(uint32_t ctx,const uint32_t photo[8],uint32_t work,u
  copy_words((uint32_t*)&frozen,(const uint32_t*)shot,sizeof(frozen)/4u);
  const m10v_isp_effects_settings *s=&frozen.settings;
  if(frozen.magic!=M10V_ISP_EFFECTS_SHOT_MAGIC||!ram(frozen.owner,4)||frozen.ready!=1||frozen.planned!=1||!frozen.source_si||frozen.failed||
-    frozen.effective_grain_strength>3||s->leak_gain>3||s->leak_position>4||s->leak_spread>2||s->grain_mode>4||s->grain_size>2||s->blur_gain>3||s->blur_range>2||s->reserved||frozen.reserved||
+    frozen.effective_grain_strength>3||s->leak_gain>3||s->leak_position>4||s->leak_spread>2||s->grain_mode>4||s->grain_size>2||s->blur_gain>3||s->blur_range>2||s->reserved||
+    (frozen.rainbow&&!m10v_isp_rainbow_valid(frozen.rainbow))||
     (frozen.saved_orientation!=1&&frozen.saved_orientation!=3&&frozen.saved_orientation!=6&&frozen.saved_orientation!=8)||
     (s->grain_mode&&frozen.effective_grain_strength!=s->grain_mode-1u))return -1;
- if(!s->leak_gain&&!frozen.effective_grain_strength)return 1;
+ if(!s->leak_gain&&!frozen.effective_grain_strength&&!frozen.rainbow)return 1;
  if(!ram(U(photo),32)||!ram(ctx,0x40))return -1;
  uint32_t p[8];copy_words(p,photo,8);
  uint32_t format=p[0]&255u,w=p[4]&65535u,h=p[4]>>16,stride=p[5]&65535u,rows=p[5]>>16;
@@ -31,7 +32,7 @@ int m10v_isp_effects_render(uint32_t ctx,const uint32_t photo[8],uint32_t work,u
  uint32_t original_y=p[1],original_uv=p[2],allocation_y=stride*rows,allocation_uv=format==1?allocation_y:allocation_y/2u;
  uint32_t yoffset=top*stride+left,uvoffset=(format==1?top:top/2u)*stride+left;
  uint32_t y=stride*h,uv=stride*uvh,noise_stride=(w+15u)&~15u,noise_y=noise_stride*h;
- uint32_t needed=s->leak_gain&&format==1?noise_y*2u:noise_y+noise_y/2u;
+ uint32_t needed=(s->leak_gain||frozen.rainbow)&&format==1?noise_y*2u:noise_y+noise_y/2u;
  /* Original Granulation ignores ROI offsets and its native cache helper covers
   * stride*height from the bound plane, including the final row's padding.
   * Shift only our descriptor snapshot, and prove THAT complete native span
@@ -75,6 +76,25 @@ int m10v_isp_effects_render(uint32_t ctx,const uint32_t photo[8],uint32_t work,u
   /* Original Y stays intact for BOTH chroma gates. Last Resize retained the
    * identical spatial Y mask; finish exposure only after both luma reads. */
   if(m10v_isp_effect_granulation_owned((void*)(uintptr_t)ctx,p,p,1,(void*)(uintptr_t)work,noise_y,m10v_render_curves[profile])!=1)return -4;
+ }
+ if(frozen.rainbow){
+  uint32_t kind=m10v_isp_rainbow_kind(frozen.rainbow)-1u;
+  uint32_t variant=m10v_isp_rainbow_variant(frozen.rainbow);
+  uint32_t phase=m10v_isp_rainbow_phase(frozen.rainbow);
+  uint32_t strength=m10v_isp_rainbow_strength(frozen.rainbow);
+  const m10v_isp_effect_texture (*fields)[2]=m10v_render_rainbows[kind][variant];
+  copy_words(uvview,p,8);uvview[1]=p[2];uvview[2]=0;
+  uvview[4]=w|(uvh<<16);uvview[5]=stride|(uvh<<16);
+  for(uint32_t component=0;component<3;component++){
+   for(uint32_t sign=0;sign<2;sign++){
+    const m10v_isp_effect_texture *field=&fields[component][sign];
+    if(prepare(field,work,capacity,w,h,field->width,field->height,phase,format,&plan,frozen.source_si)!=1)return -4;
+    void *plane=(void*)(uintptr_t)(component?work+noise_y:work);
+    uint32_t bytes=component?noise_stride*uvh:noise_y;
+    void *view=component?(void*)uvview:(void*)p;
+    if(m10v_isp_effect_granulation_owned((void*)(uintptr_t)ctx,view,view,strength,plane,bytes,m10v_render_curves[10u+sign])!=1)return -4;
+   }
+  }
  }
  if(frozen.effective_grain_strength){
   static const uint16_t crops[3][2]={{3000,2000},{1500,1000},{1008,672}};
