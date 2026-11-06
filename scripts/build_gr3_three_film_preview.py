@@ -252,6 +252,17 @@ def build_reference():
     }
 
 
+def native_header(reference):
+    luma = reference['shd50']['luma_weights_q13']
+    curve = [value * 64 for value in reference['shd50']['curve_u8']]
+    return (
+        '/* Generated from three-film-reference.json; SHD50 native ISP base. */\n'
+        'static const int16_t native_shd50_luma[3]={' + ','.join(map(str, luma)) + '};\n'
+        'static const uint16_t native_shd50_curve[256]={' + ','.join(map(str, curve)) + '};\n'
+        '#define M10V_RAINBOW_COLORPLUS_INDEX 3u\n'
+    )
+
+
 def _label(image, text):
     result = image.copy()
     draw = ImageDraw.Draw(result, 'RGBA')
@@ -296,6 +307,7 @@ def main():
     args = parser.parse_args()
     report = generate_previews(args.output)
     args.reference.write_text(json.dumps(report['reference'], indent=2, sort_keys=True) + '\n')
+    (ROOT / 'native/gr3/m10v_three_films_native_profile.h').write_text(native_header(report['reference']))
     print(json.dumps({'output': str(args.output), 'reference': str(args.reference), 'sha256': report['sha256']}, sort_keys=True))
 
 

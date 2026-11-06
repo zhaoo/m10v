@@ -12,8 +12,24 @@
 #define M10V_MARLBORO_ID 327u
 #define M10V_MARLBORO_ICON 887u
 #define M10V_MARLBORO_NAME 1202u
+#define M10V_SHD50_ID 328u
+#define M10V_KOLOR_ID 329u
+#define M10V_PEGASUS_ID 330u
+#define M10V_SHD50_ICON 888u
+#define M10V_KOLOR_ICON 889u
+#define M10V_PEGASUS_ICON 890u
+#define M10V_SHD50_NAME 1203u
+#define M10V_KOLOR_NAME 1204u
+#define M10V_PEGASUS_NAME 1205u
+#define M10V_RAINBOW(id) ((id)==M10V_KOLOR_ID||(id)==M10V_PEGASUS_ID)
+#define M10V_THREE_FILM(id) ((id)>=M10V_SHD50_ID&&(id)<=M10V_PEGASUS_ID)
+#define M10V_THREE_FILM_ICON(id) (M10V_SHD50_ICON+(id)-M10V_SHD50_ID)
+#define M10V_THREE_FILM_NAME(id) (M10V_SHD50_NAME+(id)-M10V_SHD50_ID)
 #ifndef M10V_MARLBORO_NATIVE
 #define M10V_MARLBORO_NATIVE 0
+#endif
+#ifndef M10V_THREE_FILM_NATIVE
+#define M10V_THREE_FILM_NATIVE 0
 #endif
 static inline uint32_t m10v_800t_halation_film(uint32_t film){return film==33||film==M10V_MARLBORO_ID;}
 #define M10V_HALO_OFF 6u
@@ -74,7 +90,7 @@ static inline uint32_t m10v_halo_workspace_planes(uint32_t film,uint32_t profile
 #define M10V_ANIME_VALUE_FIRST 864u
 #define M10V_ANIME_SCALE_ICON 868u
 #define M10V_ANIME_CAPTION 1148u
-#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_MARLBORO_ID || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID || (id)==M10V_5213_ID || M10V_STYLE(id) || M10V_D76(id) || M10V_ANIME_E6(id)||M10V_C41(id)||M10V_EXTRA_FILM(id)||M10V_FOUR_LOOKS(id)))
+#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_MARLBORO_ID || M10V_THREE_FILM(id) || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID || (id)==M10V_5213_ID || M10V_STYLE(id) || M10V_D76(id) || M10V_ANIME_E6(id)||M10V_C41(id)||M10V_EXTRA_FILM(id)||M10V_FOUR_LOOKS(id)))
 #define M10V_CUSTOM(id) ((id)>M10V_FILM_COUNT && (id)<=M10V_CUSTOM_MAX_ID)
 #define M10V_SLOT_COUNT 10u
 #define M10V_CUSTOM_IMMUTABLE_FIRST 21u

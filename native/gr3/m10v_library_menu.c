@@ -125,6 +125,7 @@ static uint32_t resource(uint32_t tone) {
 }
 static uint32_t film_resource(uint32_t film) {
     if(film==M10V_MARLBORO_ID)return M10V_MARLBORO_NAME;
+    if(M10V_THREE_FILM(film))return M10V_THREE_FILM_NAME(film);
     if(M10V_FOUR_LOOKS(film))return M10V_FOUR_LOOKS_NAME(film);
     if(M10V_EXTRA_FILM(film))return M10V_EXTRA_FILM_NAME(film);
     if(M10V_C41(film))return M10V_C41_NAME(film);
@@ -190,6 +191,7 @@ uint32_t m10v_menu_icon(uint32_t translator, uint32_t tone) {
             if(M10V_CUSTOM(state.slots[i].film))return 754;
 #endif
             if(state.slots[i].film==M10V_MARLBORO_ID)return M10V_MARLBORO_ICON;
+            if(M10V_THREE_FILM(state.slots[i].film))return M10V_THREE_FILM_ICON(state.slots[i].film);
             if(M10V_FOUR_LOOKS(state.slots[i].film))return M10V_FOUR_LOOKS_ICON(state.slots[i].film);
             if(M10V_EXTRA_FILM(state.slots[i].film))return M10V_EXTRA_FILM_ICON(state.slots[i].film);
             if(M10V_C41(state.slots[i].film))return M10V_C41_ICON(state.slots[i].film);
@@ -215,6 +217,7 @@ uint32_t m10v_menu_recorded_icon(uint32_t tag){
  if(recorded.bank)return 754;
  uint32_t film=recorded.id;
  if(film==M10V_MARLBORO_ID)return M10V_MARLBORO_ICON;
+ if(M10V_THREE_FILM(film))return M10V_THREE_FILM_ICON(film);
  if(M10V_FOUR_LOOKS(film))return M10V_FOUR_LOOKS_ICON(film);
  if(M10V_EXTRA_FILM(film))return M10V_EXTRA_FILM_ICON(film);
  if(M10V_C41(film))return M10V_C41_ICON(film);

@@ -158,7 +158,10 @@ def artwork(name,i,spec=None):
  324:('FUJIFILM','NATURA','1600','#eee8d6','#245f41','#69a46f',8),
  325:('LOMOGRAPHY','REDSCALE','XR 50-200','#bd472b','#f4dcaa','#772a24',6),
  326:('AGFA','VISTA','200','#c83c4c','#f1e4c8','#507594',5),
- 327:('M10V','MARLBORO','B&W RED','#edece8','#181818','#b51c2b',8)}
+ 327:('M10V','MARLBORO','B&W RED','#edece8','#181818','#b51c2b',8),
+ 328:('LUCKY','SHD50','ISO 50','#eceae2','#161719','#a8a7a0',4),
+ 329:('REVOLOG','KOLOR','200','#e9d75d','#271b49','#e4527f',11),
+ 330:('YODICA','PEGASUS','400','#202338','#f4ead1','#55bddd',11)}
  if i in curated:brand,title,code,paper,ink,accent,motif=curated[i]
  return brand,title,code,paper,ink,accent,motif
 
@@ -242,6 +245,16 @@ def box_icon(name,i,size=40,spec=None):
    label_at(code,8,73,27 if len(code)<=4 else 16,ink)
  return im.resize((size,size),Image.Resampling.LANCZOS)
 
+THREE_FILM_SPECS=(
+ {'id':328,'name':'SHD50','title':'SHD50','code':'ISO 50','color':'#eceae2'},
+ {'id':329,'name':'Revolog KOLOR','title':'KOLOR','code':'200','color':'#e9d75d'},
+ {'id':330,'name':'Pegasus','title':'PEGASUS','code':'400','color':'#202338'},
+)
+
+def three_film_artifacts():
+ """Original sparse artwork; independent of the official firmware fixture."""
+ return [(dict(spec),box_icon(spec['name'],spec['id']),box_icon(spec['name'],spec['id'],160)) for spec in THREE_FILM_SPECS]
+
 def generate():
  names=re.findall(r'\{"([^"\n]+)",[-0-9]',(ROOT/'native/gr3/m10v_library.c').read_text())
  names += [v['name'] for v in json.loads((ROOT/'web/gr3/film-catalog.json').read_text())['looks']]
@@ -322,6 +335,12 @@ def generate():
   im.save(out/f"{spec['id']}.png",optimize=True);box_icon(spec['name'],spec['id'],160,spec).save(out/f"{spec['id']}-large.png",optimize=True)
   meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
  (ROOT/'native/gr3/m10v_marlboro.rgba').write_bytes(marlboro_pixels)
+ three_pixels=bytearray()
+ for spec,im,large in three_film_artifacts():
+  raw=im.tobytes();three_pixels+=raw
+  im.save(out/f"{spec['id']}.png",optimize=True);large.save(out/f"{spec['id']}-large.png",optimize=True)
+  meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
+ (ROOT/'native/gr3/m10v_three_films.rgba').write_bytes(three_pixels)
  for row in meta:
   large=out/f"{row['id']:02d}-large.png"
   revision=hashlib.sha256(large.read_bytes()).hexdigest()[:12]

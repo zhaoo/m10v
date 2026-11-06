@@ -120,6 +120,14 @@
         {
           "id": 326,
           "name": "Agfa Vista 200"
+        },
+        {
+          "id": 329,
+          "name": "Revolog KOLOR"
+        },
+        {
+          "id": 330,
+          "name": "Pegasus"
         }
       ]
     },
@@ -186,6 +194,10 @@
         {
           "id": 315,
           "name": "Double-X 5222"
+        },
+        {
+          "id": 328,
+          "name": "SHD50"
         }
       ]
     },

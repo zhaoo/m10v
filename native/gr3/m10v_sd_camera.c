@@ -108,6 +108,7 @@ static int persist(const uint8_t *record,uint32_t id){
  uint32_t fs=*(const uint32_t *)(uintptr_t)app;if(!ram(fs,0x24)||!((const uint8_t *)(uintptr_t)fs)[0x20])return 0;
  char name[]="M10VS00.bin",primary[]="F:\\M10VS00.bin";
  if(id==M10V_MARLBORO_ID)id=84;
+ if(M10V_THREE_FILM(id))id=id-M10V_SHD50_ID+85;
  if(M10V_FOUR_LOOKS(id))id=id-318+29;
  if(M10V_EXTRA_FILM(id))id=id-314+25;
  if(M10V_C41(id))id=id>=322?id-322+79:id-312+23;

@@ -34,6 +34,8 @@ static const struct {uint16_t id;uint8_t group;char name[24];} m10v_directory[]=
 {324,1,"Fujifilm Natura 1600"},
 {325,1,"Lomo Redscale XR"},
 {326,1,"Agfa Vista 200"},
+{329,1,"Revolog KOLOR"},
+{330,1,"Pegasus"},
 {294,2,"Fuji Velvia 50"},
 {309,2,"Fuji Provia 100F"},
 {310,2,"Kodak Ektachrome E100"},
@@ -48,6 +50,7 @@ static const struct {uint16_t id;uint8_t group;char name[24];} m10v_directory[]=
 {305,3,"CatLABS X Film 80"},
 {314,3,"ACROS II 100"},
 {315,3,"Double-X 5222"},
+{328,3,"SHD50"},
 {289,4,"Kodak Charmera"},
 {72,4,"CCD"},
 {293,4,"Polaroid"},
@@ -64,6 +67,6 @@ static const struct {uint16_t id;uint8_t group;char name[24];} m10v_directory[]=
 {319,5,"Classic Negative"},
 {320,5,"Classic Chrome"},
 };
-static const uint8_t m10v_directory_first[7]={0,7,28,32,42,52,57};
+static const uint8_t m10v_directory_first[7]={0,7,30,34,45,55,60};
 static inline const char *m10v_directory_name(uint32_t id){for(uint32_t i=0;i<M10V_DIRECTORY_COUNT;i++)if(m10v_directory[i].id==id)return m10v_directory[i].name;return 0;}
 #endif

@@ -1252,5 +1252,38 @@
     "sha256": "c0bcc3f9bf7860c5bfb72f2c0530071f19f90f694751661d709223275466af41",
     "icon_compact_url": "/gr3/film-icons/327.png?v=c0bcc3f9bf78",
     "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 328,
+    "name": "SHD50",
+    "title": "SHD50",
+    "code": "ISO 50",
+    "color": "#eceae2",
+    "icon_url": "/gr3/film-icons/328-large.png?v=5623dd9afb2f",
+    "icon_compact_url": "/gr3/film-icons/328.png?v=21792998b883",
+    "sha256": "21792998b88392eab6b8054e112049d90272e0f1b5b25b7264b218dc995b869d",
+    "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 329,
+    "name": "Revolog KOLOR",
+    "title": "KOLOR",
+    "code": "200",
+    "color": "#e9d75d",
+    "icon_url": "/gr3/film-icons/329-large.png?v=522549971278",
+    "icon_compact_url": "/gr3/film-icons/329.png?v=6c733e0dc4e4",
+    "sha256": "6c733e0dc4e4fe6b2b95f6b65a05b8a0266acb2d72c14912bcb7e946407b3101",
+    "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 330,
+    "name": "Pegasus",
+    "title": "PEGASUS",
+    "code": "400",
+    "color": "#202338",
+    "icon_url": "/gr3/film-icons/330-large.png?v=e3935f0c1bf0",
+    "icon_compact_url": "/gr3/film-icons/330.png?v=b4539acedb3e",
+    "sha256": "b4539acedb3e63d8e50aaaa77f6f173586c16775c064f6039bae391bf3906142",
+    "artwork_revision": "classic-square-v1"
   }
 ]

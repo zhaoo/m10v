@@ -15,7 +15,7 @@ export function normalizeConfiguration(value=defaultConfiguration()){
  const hdf=value.hdf===undefined?0:value.hdf;if(!int(hdf,0,3))throw Error('HDF 模拟档位无效');
  const slots=value.slots.map(s=>{
   const {filmEffects,...legacy}=s??{};
-  if(!(exact(legacy,['film','grain','soft','halo'])||exact(legacy,['film','grain','soft'])||exact(legacy,['film','grain','soft','halo','effects']))||!(int(s.film,1,78)||(int(s.film,289,305)||int(s.film,309,327)))||!int(s.grain,0,3)||!int(s.soft,0,3))throw Error('胶卷或质感档位无效');
+  if(!(exact(legacy,['film','grain','soft','halo'])||exact(legacy,['film','grain','soft'])||exact(legacy,['film','grain','soft','halo','effects']))||!(int(s.film,1,78)||(int(s.film,289,305)||int(s.film,309,330)))||!int(s.grain,0,3)||!int(s.soft,0,3))throw Error('胶卷或质感档位无效');
   if(filmEffects!==undefined&&(!exact(filmEffects,Object.keys(defaultFilmEffects()))||!int(filmEffects.leakGain,0,3)||!int(filmEffects.leakPosition,0,4)||!int(filmEffects.leakSpread,0,2)||!int(filmEffects.blur,0,3)))throw Error('胶片效果档位无效');
   const h=s.halo??defaultHalo(s.film);if(!exact(h,['gain','spread','threshold','profile'])||!int(h.gain,0,8)||!int(h.spread,0,8)||!int(h.threshold,0,8)||!int(h.profile,0,6))throw Error('胶卷光晕参数无效');
   const inputEffects=s.effects??defaultEffects(),oldKeys=['grainSize','leakGain','leakPosition','leakSpread','leakVariation'];

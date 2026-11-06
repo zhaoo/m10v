@@ -143,7 +143,7 @@ static int thumb_render(m10v_library_image *image,const m10v_library_state *stat
 #else
     (void)record;
 #endif
-    return m10v_library_render_native(image,state,slot,0,0,scratch,scratch_bytes,(state->slots[slot].film==M10V_MARLBORO_ID||M10V_FOUR_LOOKS(state->slots[slot].film)||M10V_ANIME_E6(state->slots[slot].film)||M10V_C41(state->slots[slot].film)||M10V_EXTRA_FILM(state->slots[slot].film))?M10V_NATIVE_ALL:M10V_NATIVE_ALL&~M10V_NATIVE_COLOR);
+    return m10v_library_render_native(image,state,slot,0,0,scratch,scratch_bytes,(state->slots[slot].film==M10V_MARLBORO_ID||M10V_THREE_FILM(state->slots[slot].film)||M10V_FOUR_LOOKS(state->slots[slot].film)||M10V_ANIME_E6(state->slots[slot].film)||M10V_C41(state->slots[slot].film)||M10V_EXTRA_FILM(state->slots[slot].film))?M10V_NATIVE_ALL:M10V_NATIVE_ALL&~M10V_NATIVE_COLOR);
 }
 static void capture_thumbnails(uint32_t recipe,const m10v_library_state *state,uint32_t slot,
                                uint32_t raw,uint32_t raw_bytes,uint32_t raw_dims,
@@ -348,6 +348,7 @@ int m10v_capture_library(uint32_t context) {
      * cache maintenance, image allocation or residual spatial work if the
      * actual Still owner did not authenticate this shot's native color. */
     if(state.slots[slot].film==M10V_MARLBORO_ID&&(!M10V_MARLBORO_NATIVE||!(completed&M10V_NATIVE_COLOR)))REJECT(-5,16,completed,state.slots[slot].film);
+    if(M10V_THREE_FILM(state.slots[slot].film)&&(!M10V_THREE_FILM_NATIVE||!(completed&M10V_NATIVE_COLOR)))REJECT(-5,16,completed,state.slots[slot].film);
     if(M10V_FOUR_LOOKS(state.slots[slot].film)&&(!M10V_FOUR_LOOKS_NATIVE||!(completed&M10V_NATIVE_COLOR)))REJECT(-5,16,completed,state.slots[slot].film);
     uint32_t cpu_stages=m10v_library_cpu_stages(&state,slot,completed);
     CAPTURE_LOG(138,context,completed,cpu_stages,state.slots[slot].film);
