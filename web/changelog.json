@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.06.2",
+      "date": "2026-11-06",
+      "title": "新增 SHD50、Revolog KOLOR 与 Pegasus",
+      "changes": [
+        "GR III 2.10 和 GR IIIx 1.60 的 C41 胶卷库新增 SHD50、Revolog KOLOR 与 Pegasus，保留已有胶卷编号、配置和七款胶卷印花。",
+        "SHD50 使用原生 ISP 呈现高反差黑白与柔和高光；KOLOR 和 Pegasus 使用相机原生 Resize 与 Granulation 管线叠加彩虹色彩变化。",
+        "三款胶卷的保存成片不执行 CPU LUT、CPU 随机纹理或 CPU 整图调色；KOLOR、Pegasus 可与全局胶卷印花在同一曝光中分别完成。"
+      ],
+      "notice": "合并七款胶卷印花后的 R2 候选已按精确 GR III / GR IIIx 固件身份获得用户确认并授权发布。请使用与机型匹配的官方 2.10 / 1.60 来源生成固件。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.06.1",
       "date": "2026-11-06",
       "title": "新增七款彩色胶卷印花",
@@ -11,9 +25,9 @@
         "相机原生 ISP 负责印花像素合成。r8 使用更高分辨率的纹理和独立的色度混合，改善轮廓清晰度与深色背景的显色。"
       ],
       "notice": "r8 候选已获用户验收。请在工作台开启「逐卷胶片效果」，按对应机型生成固件。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "7a40360b361957a441c3ba23b67a5f7e0cb4664f",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/42236753250"
     },
     {
       "version": "2026.11.05.5",

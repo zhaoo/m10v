@@ -1,6 +1,8 @@
 # SHD50 / Revolog KOLOR / Pegasus — R2 merged-main candidate
 
-Status: `WAITING_FOR_USER_VALIDATION`
+Status: `USER_VALIDATED`
+
+On 2026-11-06, after receiving the exact R2 GR III and GR IIIx packages and hashes below, the user explicitly directed that the latest GitHub state be merged and the result published to GitHub and Baota. The later GitHub update was only the successful deployment/tag for `7a40360b361957a441c3ba23b67a5f7e0cb4664f`; `main` and `develop` did not gain another source commit, so the R2 firmware identities remained unchanged.
 
 R1 was explicitly accepted by the user. Before publication, GitHub `main` and `develop` advanced from `49d63c0d6be9ffbd52e0532a1eec3bd1ed353f60` to `7a40360b361957a441c3ba23b67a5f7e0cb4664f`, adding seven global film imprints and changing the same native ISP renderer, shot snapshot, texture pack, resources and build audit. R2 merges both features without publishing them. Because the runtime and BIN identities changed, R1 camera acceptance cannot be transferred to R2.
 
@@ -39,4 +41,4 @@ Shared source identities:
 
 Install only the matching R2 BIN. With global film imprint off and leak/grain/blur/HDF off, compare SHD50, KOLOR and Pegasus against the accepted R1 output. Check immediate playback, album view and at least three continuous frames. Then enable one global imprint on KOLOR and Pegasus to confirm both native completion stages compose without a stalled save. Keep the accepted R1 package as the recovery comparison.
 
-GitHub `main`/`develop` and Baota must remain unchanged until the user explicitly accepts these exact R2 hashes.
+This exact R2 identity is authorized for GitHub `main`/`develop` and Baota publication. Any later native, asset, configuration or build-parameter change requires a new candidate identity and another validation cycle.
