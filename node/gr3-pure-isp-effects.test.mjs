@@ -68,6 +68,9 @@ test('trusted runtime modulation bytes and closed patch inventory survive readba
   const render={enabled:true,cpu_pixel_access:false,cpu_rng:false,curve_profiles:12,curve_coefficients:9216,symbols:{m10v_render_rainbows:base},bindings:{rainbows}};
   const manifest={base,camera_model:'gr3',film_library_enabled:true,hdf_enabled:true,border:{enabled:true},capture_lifecycle:{snapshot:{live_color:true},native_grain:{query_entry:base}},flags:['-DM10V_PURE_ISP_EFFECTS=1','-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778'],pure_isp_effects:{enabled:true,scope:'per-film',recipe_bytes:0x57d8,menu_resource_ids:Array.from({length:23},(_,i)=>1163+i),runtime_assets:{base:0x54400000,bytes:raw.length,sha256:assets.blob_sha256,manifest:assets},render,patches}};
   assert.equal(pureIspEffectPatches(runtime,manifest).length,7);
+  manifest.pure_isp_effects.imprint={enabled:true};
+  assert.throws(()=>pureIspEffectPatches(runtime,manifest),/imprint/);
+  delete manifest.pure_isp_effects.imprint;
   const original=patches[0].replacement;patches[0].replacement=branch(patches[0].address,true);
   assert.throws(()=>pureIspEffectPatches(runtime,manifest),/branch kind/);patches[0].replacement=original;
   patches.push({...patches[0]});assert.throws(()=>pureIspEffectPatches(runtime,manifest),/duplicate/);patches.pop();

@@ -33,4 +33,7 @@ int m10v_isp_effects_camera_save(uint32_t owner,
  * outputs unchanged. Outputs must be distinct and outside the owner cache. */
 int m10v_isp_effects_camera_snapshot(m10v_isp_effects_settings *out,
     uint32_t *sequence);
+/* One atomically published committed selector; remains readable while the
+ * unrelated full cache is publishing. Cold/unowned output remains unchanged. */
+int m10v_isp_effects_camera_imprint_snapshot(uint32_t *style);
 #endif

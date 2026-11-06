@@ -23,6 +23,10 @@ const binary=await readFile(resolve(input,filename)),runtime=await readFile(reso
 if(sha(binary)!==receipt.candidate_sha256||binary.length!==receipt.candidate_bytes||sha(runtime)!==manifest.code_sha256)
  throw Error('export BIN/runtime identity mismatch');
 const sources={};
+async function optionalSource(p){
+ try{sources[p]=await readFile(p);}
+ catch(error){if(error.code!=='ENOENT')throw error;}
+}
 for(const [p,expected]of Object.entries(manifest.sources)){
  const b=await readFile(p);
  if(sha(b)!==expected)throw Error('source changed since export: '+p);
@@ -33,11 +37,22 @@ for(const p of ['node/gr3-isp-effect-options.mjs','node/gr3-native-library.mjs',
  'node/server.mjs','web/gr3/model-capabilities.mjs','web/gr3/workbench-state.mjs','web/gr3/studio.js',
  'scripts/build_gr3_device_candidate.mjs','scripts/check_gr3x_release.mjs'])sources[p]=await readFile(p);
 const perFilm=manifest.pure_isp_effects.scope==='per-film';
-const validationPath=perFilm?'docs/testing/2026-11-04-per-film-effects.md':'docs/testing/gr3-pure-isp-effects-20261031.md';
+const imprint=manifest.pure_isp_effects.imprint?.enabled===true;
+let validationPath='docs/testing/gr3-pure-isp-effects-20261031.md';
+if(perFilm)validationPath='docs/testing/2026-11-04-per-film-effects.md';
+if(imprint)validationPath='docs/testing/gr3-film-imprint-20261106.md';
+if(manifest.pure_isp_effects.imprint?.assets?.manifest?.schema==='m10v-film-imprints/v2'){
+ validationPath='docs/testing/gr3-film-imprint-r8-20261106.md';
+}
 for(const p of ['scripts/package_gr3_pure_isp_candidate.mjs',validationPath,'docs/superpowers/specs/2026-10-31-gr3-pure-isp-effects-design.md',
  'docs/superpowers/plans/2026-10-31-gr3-pure-isp-effects.md'])sources[p]=await readFile(p);
 for(const p of await readdir('tests'))if(p.startsWith('test_gr3_isp_effect')||p.startsWith('test_gr3_pure_isp'))
  sources['tests/'+p]=await readFile('tests/'+p);
+if(imprint){
+ for(const p of await readdir('tests'))if(p.startsWith('test_gr3_film_imprint'))sources['tests/'+p]=await readFile('tests/'+p);
+ for(const p of ['docs/superpowers/specs/2026-11-06-film-imprint-design.md','docs/superpowers/plans/2026-11-06-film-imprint.md',
+  'native/gr3/film-imprints/pokemon/NOTICE.md','node/gr3-film-imprint.test.mjs','tests/test_gr3_film_pipeline_current.py'])await optionalSource(p);
+}
 sources['node/gr3-pure-isp-effects.test.mjs']=await readFile('node/gr3-pure-isp-effects.test.mjs');
 for(const p of ['tests/test_gr3_module_dispatch_trace.py','tests/test_gr3_debug.py',
  'tests/test_gr3_capture_lifecycle_integration.py','scripts/analyze_gr3_800t_mapping.py',
@@ -68,6 +83,7 @@ const files={[filename]:binary,'README.txt':Buffer.from(readme),'SD/M10V/FILMS.M
  'evidence/provenance.json':json(provenance),'evidence/source-snapshot.zip':encodeZip(sources),
  'evidence/validation.md':await readFile(validationPath),
  'LICENSE':await readFile('LICENSE'),'THIRD_PARTY_NOTICES.md':await readFile('THIRD_PARTY_NOTICES.md')};
+if(imprint)files['licenses/pokemon-artwork-NOTICE.md']=await readFile('native/gr3/film-imprints/pokemon/NOTICE.md');
 for(const p of ['third_party/curated-film-luts/LICENSE','third_party/spectral-film-lut/LICENSE',
  'third_party/style-filter-luts/street-license','third_party/style-filter-luts/film-luts-license',
  'third_party/style-filter-luts/README.md'])files['licenses/'+p.replaceAll('/','-')]=await readFile(p);

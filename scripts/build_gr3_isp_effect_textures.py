@@ -20,12 +20,14 @@ import numpy as np
 
 from scripts.build_gr3_three_film_preview import signed_fields
 
-VERSION = 'gr3-build-textures-v5-rainbow-fields'
+VERSION = 'gr3-build-textures-v6-compact-rainbow-fields'
 LEGACY_LEAK_COMMIT = '0818cfeb00d92b09c89a68d1795707560343c0de'
 LEGACY_LEAK_SEED = 0x5207250d
 LEGACY_SPREADS = {'narrow': 1, 'medium': 4, 'wide': 8}
 MAX_PIXELS = 3072 * 2048
 RUNTIME_MAX_BYTES = 0xc00000
+RAINBOW_WIDTH = 32
+RAINBOW_HEIGHT = 16
 MODULATION_FORMATS = ('NV12_MODULATION_Y_CB', 'NV12_MODULATION_Y_CR')
 MODULATION_MODEL = ('Scalar byte weights, not colors: Y=mask, selected Cb or Cr=rounded 2x2 mask mean, '
                     'other UV byte=0; all padding=0. No 128 chroma center. Optical/math appearance '
@@ -166,6 +168,15 @@ def _pack_modulation_nv12(mask, channel):
     return y + uv.tobytes(), stride
 
 
+def _compact_rainbow(mask):
+    """Block-average the 128x64 signed field before immutable ISP scaling."""
+    height, width = mask.shape
+    if (height, width) != (64, 128):
+        raise ValueError('rainbow source field geometry differs')
+    compact = mask.astype(np.uint16).reshape(RAINBOW_HEIGHT, 4, RAINBOW_WIDTH, 4)
+    return np.rint(compact.mean(axis=(1, 3))).astype(np.uint8)
+
+
 def build_resources(prefix, width=3072, height=2048, leak_width=256, leak_height=128, seed=0):
     """Write PREFIX.json and PREFIX.raw; return their Paths.
 
@@ -245,7 +256,7 @@ def build_resources(prefix, width=3072, height=2048, leak_width=256, leak_height
                 channel = int(component == 'cr')
                 for sign in ('pos', 'neg'):
                     name = f'rainbow_{kind}_{variant}_{component}_{sign}_nv12'
-                    mask = fields[f'{component}_{sign}']
+                    mask = _compact_rainbow(fields[f'{component}_{sign}'])
                     raw, stride = _pack_modulation_nv12(mask, channel)
                     append(name, raw, MODULATION_FORMATS[channel], mask.shape[1], mask.shape[0], stride,
                            planes=[dict(offset=0, length=stride*mask.shape[0], stride=stride),
@@ -254,7 +265,8 @@ def build_resources(prefix, width=3072, height=2048, leak_width=256, leak_height
                     source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                     numpy_version=np.__version__, blob_file=blob_path.name,
                     blob_length=len(blob), blob_sha256=hashlib.sha256(blob).hexdigest(),
-                    parameters=dict(width=width, height=height, leak_width=leak_width, leak_height=leak_height, seed=seed),
+                    parameters=dict(width=width, height=height, leak_width=leak_width, leak_height=leak_height,
+                                    rainbow_width=RAINBOW_WIDTH, rainbow_height=RAINBOW_HEIGHT, seed=seed),
                     model=dict(legacy_leak_commit=LEGACY_LEAK_COMMIT,legacy_leak_seed=LEGACY_LEAK_SEED,
                                legacy_spreads=LEGACY_SPREADS,grain='PCG64 multiscale correlated single density channel; uncalibrated',
                                warm_rgb=[255, 112, 32], color='BT.601 full range, NV12 CbCr, RGB premultiplied against black',
@@ -267,7 +279,7 @@ def build_resources(prefix, width=3072, height=2048, leak_width=256, leak_height
 
 
 def pack_runtime_resources(manifest_path, output_prefix):
-    """Pack grain +36 leak +48 rainbow fields, raw/64-aligned, <=12MiB.
+    """Pack grain +36 leak +48 compact rainbow fields, raw/64-aligned, <=12MiB.
 
     Source manifest/blob hashes bind provenance. Resource bytes, layouts and
     identities are preserved; only blob offsets change. No DMA claim is made.

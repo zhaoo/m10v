@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.06.1",
+      "date": "2026-11-06",
+      "title": "新增七款彩色胶卷印花",
+      "changes": [
+        "GR III 2.10 和 GR IIIx 1.60 在「设置 → 效果 → 胶卷印花」新增小猫吃鱼、樱花纷飞、绚烂彩虹、深海水母、小猫爪爪、呆头大鹅、宝可梦七款印花。",
+        "宝可梦款包含皮卡丘、妙蛙种子、小火龙和杰尼龟。各款图案沿画面边缘错落排布。",
+        "相机原生 ISP 负责印花像素合成。r8 使用更高分辨率的纹理和独立的色度混合，改善轮廓清晰度与深色背景的显色。"
+      ],
+      "notice": "r8 候选已获用户验收。请在工作台开启「逐卷胶片效果」，按对应机型生成固件。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.05.5",
       "date": "2026-11-05",
       "title": "修复复杂方案生成超时",
@@ -11,9 +25,9 @@
         "超过单阶段限时会明确提示超时，便于区分构建失败和等待超时。"
       ],
       "notice": "本次仅调整网站任务的时间限制和错误提示，固件内容、配置与机内功能保持不变。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "49d63c0d6be9ffbd52e0532a1eec3bd1ed353f60",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/42032316321"
     },
     {
       "version": "2026.11.05.4",

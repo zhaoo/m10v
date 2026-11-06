@@ -84,7 +84,32 @@ export const pureIspEffectSources=[
  'scripts/build_gr3_isp_effect_blur.py','scripts/build_gr3_isp_effect_granulation.py',
  'scripts/build_gr3_isp_effect_render.py','scripts/build_gr3_isp_effect_resize_status.py',
  'scripts/build_gr3_isp_effect_textures.py'];
-export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/gr3_target_relocations.py','node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources,...cameraExtensionSources,...rawDevelopmentSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
+export const filmImprintSources=['scripts/build_gr3_film_imprints.py','scripts/render_film_imprint_assets.mjs','web/shared/film-imprints.mjs',...Array.from({length:7},(_,i)=>`native/gr3/film-imprints/${i+1}.png`),...['025','001','004','007'].map(id=>`native/gr3/film-imprints/pokemon/${id}.png`)];
+export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/gr3_target_relocations.py','node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources,...filmImprintSources,...cameraExtensionSources,...rawDevelopmentSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
+export function validateFilmImprintAssets(runtime,m){
+ const p=m.pure_isp_effects,imprint=p?.imprint;if(imprint===undefined)return;
+ const fail=(v,s)=>need(v,'pure ISP imprint: '+s),a=imprint.assets,manifest=a?.manifest;
+ fail(imprint.enabled===true&&imprint.scope==='global'&&imprint.initial_style===0&&imprint.cpu_pixel_processing===false&&imprint.exact_rgb_screen===false,'capability differs');
+ fail(JSON.stringify(imprint.menu_resource_ids)===JSON.stringify([1203,1204,1205,1206,1207,1208,1209,1210]),'menu resources differ');
+ fail(a?.base===p.runtime_assets.base+p.runtime_assets.bytes&&a.bytes===3268608&&a.base+a.bytes<=0x55000000&&a.sha256==='adfc792bdf010de0bebde30168b33aed6d228143fbe5f6e8bb8bbf3d1b72936a','immutable extent/identity differs');
+ fail(manifest?.schema==='m10v-film-imprints/v2'&&manifest.blob_length===a.bytes&&manifest.blob_sha256===a.sha256&&manifest.format==='NV12_IMPRINT_Y_SPLIT_UNSIGNED_CBCR','manifest differs');
+ fail(manifest.sources&&Object.keys(manifest.sources).length===filmImprintSources.length,'source inventory differs');
+ for(const name of filmImprintSources)fail(manifest.sources[name]===sha(readFileSync(new URL('../'+name,import.meta.url))),'source identity differs: '+name);
+ const offset=a.base-m.base;
+ fail(offset>=0&&offset+a.bytes<=runtime.length&&sha(runtime.subarray(offset,offset+a.bytes))===a.sha256,'payload hash differs');
+ fail(Array.isArray(manifest.assets)&&manifest.assets.length===14&&manifest.coordinates==='sensor-fixed; EXIF rotates photo and print together','style inventory differs');
+ const bindings=p.render?.symbols?.m10v_render_imprints;
+ fail(Number.isInteger(bindings)&&bindings>=m.base&&bindings+14*20<=p.code_end_exclusive&&p.code_end_exclusive<=p.runtime_assets.base,'binding table extent differs');
+ let next=0;
+ for(let i=0;i<14;i++){
+  const asset=manifest.assets[i],w=512,h=304,stride=512,n=stride*h*3/2;
+  fail(asset.style===Math.floor(i/2)+1&&asset.polarity===(i%2?'negative':'positive')&&asset.width===w&&asset.height===h&&asset.stride===stride&&asset.offset===next&&asset.length===n,'texture layout differs');
+  const bindingOffset=bindings-m.base+i*20;
+  fail([a.base+next,n,w,h,stride].every((value,j)=>runtime.readUInt32LE(bindingOffset+j*4)===value),'compiled field binding differs');
+  fail(sha(runtime.subarray(offset+next,offset+next+n))===asset.sha256,'texture hash differs');next+=n;
+ }
+ fail(next===a.bytes&&p.code_end_exclusive<=p.runtime_assets.base,'code/assets overlap');
+}
 export function pureIspEffectPatches(runtime,m){
  const p=m.pure_isp_effects;
  need(m.flags?.includes('-DM10V_PURE_ISP_EFFECTS=1')===!!p?.enabled,'pure ISP compile flag differs');
@@ -94,15 +119,16 @@ export function pureIspEffectPatches(runtime,m){
  fail(p.scope==='per-film'&&p.recipe_bytes===0x57d8&&JSON.stringify(p.menu_resource_ids)===JSON.stringify(Array.from({length:23},(_,i)=>1163+i)),'recipe/FN identity differs');
  fail(m.flags?.includes('-DM10V_PURE_ISP_EFFECTS=1')&&m.flags?.includes('-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778'),'compile ownership differs');
  const b=p.runtime_assets,a=b?.manifest;
- fail(Buffer.isBuffer(runtime)&&Number.isInteger(m.base)&&b?.base===0x54400000&&b.bytes===11796480&&b.sha256==='3c32368958396c4070ba2e9b5b042018919b3a50e40a7ca52a066619e394c6b7','asset identity differs');
- fail(a?.resource_set==='runtime_modulation'&&a.blob_length===b.bytes&&a.blob_sha256===b.sha256&&a.source_sha256===sha(readFileSync(new URL('../scripts/build_gr3_isp_effect_textures.py',import.meta.url)))&&a.parameters?.height===2048&&a.parameters?.leak_height===128&&a.parameters?.leak_width===256&&a.parameters?.seed===20261031&&a.parameters?.width===3072,'asset generator parameters differ');
+ validateFilmImprintAssets(runtime,m);
+ fail(Buffer.isBuffer(runtime)&&Number.isInteger(m.base)&&b?.base===(p.imprint?0x54220000:0x54400000)&&b.bytes===11280384&&b.sha256==='fd542db7b7ec99fceb8e6bbc2f15578ca5076a0a3ddbed2463ecc8fbead23d23','asset identity differs');
+ fail(a?.resource_set==='runtime_modulation'&&a.blob_length===b.bytes&&a.blob_sha256===b.sha256&&a.source_sha256===sha(readFileSync(new URL('../scripts/build_gr3_isp_effect_textures.py',import.meta.url)))&&a.parameters?.height===2048&&a.parameters?.leak_height===128&&a.parameters?.leak_width===256&&a.parameters?.rainbow_height===16&&a.parameters?.rainbow_width===32&&a.parameters?.seed===20261031&&a.parameters?.width===3072,'asset generator parameters differ');
  const offset=b.base-m.base;
  fail(offset>=0&&offset+b.bytes<=runtime.length&&sha(runtime.subarray(offset,offset+b.bytes))===b.sha256,'asset payload hash differs');
  const names=['grain_nv12',...['','_vertical'].flatMap(orientation=>['left','right','both'].flatMap(position=>['narrow','medium','wide'].flatMap(spread=>['cb','cr'].map(channel=>`leak_${position}_${spread}_${channel}_field${orientation}_nv12`)))),...['kolor','pegasus'].flatMap(kind=>[0,1,2,3].flatMap(variant=>['y','cb','cr'].flatMap(component=>['pos','neg'].map(sign=>`rainbow_${kind}_${variant}_${component}_${sign}_nv12`))))];
  fail(Array.isArray(a.assets)&&a.assets.length===names.length,'asset inventory differs');
  let next=0;
  for(let i=0;i<names.length;i++){
-  const asset=a.assets[i],grain=i===0,rainbow=i>=37,vertical=!rainbow&&i>18,w=grain?3072:rainbow?128:vertical?128:256,h=grain?2048:rainbow?64:vertical?256:128,stride=w,n=stride*h;
+  const asset=a.assets[i],grain=i===0,rainbow=i>=37,vertical=!rainbow&&i>18,w=grain?3072:rainbow?32:vertical?128:256,h=grain?2048:rainbow?16:vertical?256:128,stride=rainbow?64:w,n=stride*h;
   const format=grain?'NV12':rainbow&&asset?.name.includes('_cr_')?'NV12_MODULATION_Y_CR':!rainbow&&i%2===0?'NV12_MODULATION_Y_CR':'NV12_MODULATION_Y_CB';
   fail(asset?.name===names[i]&&asset.format===format&&asset.width===w&&asset.height===h&&asset.stride===stride&&asset.offset===next&&asset.length===n*3/2,'asset layout differs');
   fail(asset.planes?.length===2&&asset.planes[0].length===n&&asset.planes[0].offset===0&&asset.planes[0].stride===stride&&asset.planes[1].length===n/2&&asset.planes[1].offset===n&&asset.planes[1].stride===stride,'asset plane layout differs');
@@ -114,7 +140,7 @@ export function pureIspEffectPatches(runtime,m){
  fail(r?.enabled===true&&r.cpu_pixel_access===false&&r.cpu_rng===false&&r.curve_profiles===12&&r.curve_coefficients===9216&&r.bindings?.rainbows?.length===2&&Number.isInteger(r.symbols?.m10v_render_rainbows),'rainbow renderer identity differs');
  const rainbowAssets=a.assets.slice(37),rainbowBindings=r.bindings.rainbows.flat(3);
  fail(rainbowAssets.length===48&&rainbowBindings.length===48,'rainbow binding inventory differs');
- for(let i=0;i<48;i++)fail(rainbowBindings[i].base===b.base+rainbowAssets[i].offset&&rainbowBindings[i].bytes===rainbowAssets[i].length&&rainbowBindings[i].width===128&&rainbowBindings[i].height===64&&rainbowBindings[i].stride===128,'rainbow binding differs');
+ for(let i=0;i<48;i++)fail(rainbowBindings[i].base===b.base+rainbowAssets[i].offset&&rainbowBindings[i].bytes===rainbowAssets[i].length&&rainbowBindings[i].width===32&&rainbowBindings[i].height===16&&rainbowBindings[i].stride===64,'rainbow binding differs');
  const stock=new Map([[0x53771620,0xe51b12d4],[0x5367adac,0xe50be650],[0x5367ae14,0xeb003ec4],[0x5367b404,0xeb03c641],[0x5367b410,0xeb003c3e],[0x5367b41c,0xeb03c308],[0x535033e8,0xeb05f673]]);
  fail(Array.isArray(p.patches)&&p.patches.length>=stock.size,'patch inventory missing');
  const seen=new Set();
@@ -201,7 +227,7 @@ function checkRuntime(runtime, manifest) {
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');
   need(manifest.film_count === 110 && manifest.slots === 10 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
-  const expectedSources=[...new Set([...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.raw_development?rawDevelopmentSources:[]),...(manifest.adj_extra?cameraExtensionSources:[]),...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[]),...(manifest.border?.enabled?borderSources:[]),...(manifest.half_pair?.enabled?halfPairSources:[]),...(manifest.pure_isp_effects?.enabled?pureIspEffectSources:[]),...(manifest.companion?companionNativeSources:[])])];
+  const expectedSources=[...new Set([...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.raw_development?rawDevelopmentSources:[]),...(manifest.adj_extra?cameraExtensionSources:[]),...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[]),...(manifest.border?.enabled?borderSources:[]),...(manifest.half_pair?.enabled?halfPairSources:[]),...(manifest.pure_isp_effects?.enabled?pureIspEffectSources:[]),...(manifest.pure_isp_effects?.imprint?filmImprintSources:[]),...(manifest.companion?companionNativeSources:[])])];
   borderPatches(runtime,manifest);
   halfPairIipPatches(runtime,manifest);
   pureIspEffectPatches(runtime,manifest);
@@ -358,7 +384,8 @@ function checkRuntime(runtime, manifest) {
       need(runtime.readUInt32LE(icons.table-BASE+(888+i)*4)===d&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&
         pixels>=BASE&&pixels+6400<=BASE+runtime.length&&runtime.subarray(pixels-BASE,pixels-BASE+6400).equals(art.subarray(i*6400,(i+1)*6400)),
         'three-film icon readback differs');
-      need(manifest.resources.texts[1203+i-786]===names[i],'three-film caption identity differs');
+      const captionId=1203+(manifest.pure_isp_effects?.imprint?8:0)+i;
+      need(manifest.resources.texts[captionId-786]===names[i],'three-film caption identity differs');
     }
   }
   const styleArt=readFileSync(new URL('../native/gr3/m10v_style_filters.rgba',import.meta.url)),styleAt=manifest.style_icons?.pixels;
@@ -443,7 +470,7 @@ function checkRuntime(runtime, manifest) {
   }
   const guideLabels=['黄金分割','黄金螺旋（左上）','黄金螺旋（右上）','黄金螺旋（左下）','黄金螺旋（右下）'];
   const adjLabels=['ADJ','设置 6','设置 7','设置 8','设置 9','构图线','胶卷库','逐卷效果','画幅','HDF 模拟','左右调整 OK 保存'];
-  const resourceCount=420; // Preserve ADJ1191..1201; Marlboro1202; three films1203..1205.
+  const resourceCount=420+(manifest.pure_isp_effects?.imprint?8:0); // Marlboro1202, imprint1203..1210, three films1211..1213.
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   if(manifest.pure_isp_effects?.enabled){
@@ -453,6 +480,8 @@ function checkRuntime(runtime, manifest) {
   }
   need(JSON.stringify(manifest.resources.texts.slice(400,405))===JSON.stringify(['Harman Phoenix 200','Kodak ColorPlus 200','Fujifilm Natura 1600','Lomo Redscale XR','Agfa Vista 200']),'five C41 resource identity differs');
   if(manifest.adj_extra)need(JSON.stringify(manifest.resources.texts.slice(405,416))===JSON.stringify(adjLabels),'ADJ settings captions differ');
+  if(manifest.pure_isp_effects?.imprint)need(JSON.stringify(manifest.resources.texts.slice(417,425))===JSON.stringify(['胶卷印花','小猫吃鱼','樱花纷飞','绚烂彩虹','深海水母','小猫爪爪','呆头大鹅','宝可梦']),'imprint captions differ');
+  need(JSON.stringify(manifest.resources.texts.slice(resourceCount-3))===JSON.stringify(['SHD50','Revolog KOLOR','Pegasus']),'three-film captions differ');
   for (let i=0;i<resourceCount;i++) {
     const at = manifest.resources.descriptors[i] - BASE, text = manifest.resources.texts[i];
     need(Number.isInteger(at) && at >= 0 && at + 8 < runtime.length && typeof text === 'string', 'native text pointer invalid');

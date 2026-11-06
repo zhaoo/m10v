@@ -75,12 +75,12 @@ class EffectsMenuTests(unittest.TestCase):
  def child(self,index):
   for _ in range(index):self.key(0xd1)
   self.key(0xd8)
- def test_effects_root_only_shows_hdf_and_border(self):
+ def test_effects_root_shows_hdf_border_and_global_imprint(self):
   self.ready();self.call('m10v_hdf_menu_enter',self.page,0,0)
   for _ in range(4):self.key(0xd1)
-  self.assertEqual(self.get(self.page+0x1a4),1)
-  self.assertEqual(self.rows()[:2],[1141,1155])
-  self.assertFalse(any('isp_effects' in event for event in self.camera_events))
+  self.assertEqual(self.get(self.page+0x1a4),2)
+  self.assertEqual(self.rows()[:3],[1141,1155,1203])
+  self.assertEqual([event for event in self.camera_events if 'isp_effects' in event],['m10v_isp_effects_camera_init'])
  def test_resources_keep_fn_labels_and_direction_choices(self):
   words=json.loads((ROOT/'native/gr3/m10v_isp_effects_resources.json').read_text())
   self.assertEqual(len(words),23)

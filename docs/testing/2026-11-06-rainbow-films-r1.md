@@ -1,6 +1,8 @@
 # SHD50 / Revolog KOLOR / Pegasus — R1 candidate record
 
-Status: `WAITING_FOR_USER_VALIDATION`
+Status: `SUPERSEDED_AFTER_MAIN_MERGE`
+
+The user validated this exact R1 candidate, but GitHub `main` subsequently advanced to `7a40360b361957a441c3ba23b67a5f7e0cb4664f` with overlapping native ISP, resource and build changes. The merged release candidate is R2; this R1 acceptance does not authorize publishing R2.
 
 This record covers the implementation candidate only. It is not a camera acceptance record and does not claim 100% visual restoration before real GR III / GR IIIx output is compared with the accepted previews and references.
 

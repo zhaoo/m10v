@@ -586,7 +586,7 @@ class DeliveredPureIspTests(unittest.TestCase):
                 execution,_=e.params();self.at(e,0x53503AA0,digital,execution,si,1)
                 e.w32(execution+0x30,int.from_bytes(e.u.mem_read(queried,4),'little'))
                 self.assertEqual(self.at(e,0x53503AB4,digital,native,execution,0),1)
-                self.assertEqual(int.from_bytes(e.u.mem_read(recipe+0x5778+68,4),'little'),8)
+                self.assertEqual(int.from_bytes(e.u.mem_read(recipe+0x5778+68,4),'little'),16)
                 self.assertEqual(e.resize_dispatches,6)
                 self.assertEqual(e.events.count(self.symbols['m10v_isp_effect_granulation_owned']),6)
                 self.assertEqual(e.events.count(self.symbols['m10v_isp_effect_granulation_luma']),0)

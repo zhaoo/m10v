@@ -50,7 +50,12 @@ static int effect_publish(m10v_isp_effects_camera_cache *c,
     uint32_t version=expected;
     if(!__atomic_compare_exchange_n(&c->version,&version,expected+1u,0,
         __ATOMIC_ACQ_REL,__ATOMIC_RELAXED))return -1;
-    c->settings=*settings;c->sequence=sequence;c->magic=M10V_ISP_EFFECT_CACHE_MAGIC;
+    /* Only fully verified journal winners reach publication. The imprint is
+     * a complete aligned word, so capture may safely use its old or new
+     * committed selector while the other seven settings words are busy. */
+    for(uint32_t i=0;i<7u;i++)((volatile uint32_t*)&c->settings)[i]=((const uint32_t*)settings)[i];
+    __atomic_store_n(&c->settings.reserved,settings->reserved,__ATOMIC_RELEASE);
+    c->sequence=sequence;c->magic=M10V_ISP_EFFECT_CACHE_MAGIC;
     uint32_t published=expected+2u;
     __atomic_store_n(&c->version,published?published:2u,__ATOMIC_RELEASE);
     return 0;
@@ -158,4 +163,17 @@ int m10v_isp_effects_camera_snapshot(m10v_isp_effects_settings *out,uint32_t *se
        !(*(const volatile uint32_t*)0x55063910u&1u)||
        owner!=__atomic_load_n((const uint32_t*)0x55063988u,__ATOMIC_ACQUIRE))return 0;
     *out=local;*sequence=seq;return 1;
+}
+int m10v_isp_effects_camera_imprint_snapshot(uint32_t *out){
+    if(!effect_ram((uintptr_t)out,4)||!(*(const volatile uint32_t*)0x55063910u&1u))return 0;
+    uint32_t owner=__atomic_load_n((const uint32_t*)0x55063988u,__ATOMIC_ACQUIRE);
+    m10v_isp_effects_camera_cache *c=effect_cache(owner);
+    if(!c||c->magic!=M10V_ISP_EFFECT_CACHE_MAGIC||!__atomic_load_n(&c->version,__ATOMIC_ACQUIRE)||
+       effect_overlap((uintptr_t)out,4,(uintptr_t)c,sizeof(*c)))return 0;
+    m10v_isp_effects_settings local;m10v_isp_effects_defaults(&local);
+    local.reserved=__atomic_load_n(&c->settings.reserved,__ATOMIC_ACQUIRE);
+    if(!m10v_isp_effects_validate(&local)||c->magic!=M10V_ISP_EFFECT_CACHE_MAGIC||
+       !(*(const volatile uint32_t*)0x55063910u&1u)||
+       owner!=__atomic_load_n((const uint32_t*)0x55063988u,__ATOMIC_ACQUIRE))return 0;
+    *out=m10v_isp_effects_imprint(&local);return 1;
 }

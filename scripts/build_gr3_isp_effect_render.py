@@ -47,7 +47,7 @@ def _validated(base,bindings,externals):
    for component in variant:
     if not isinstance(component,(list,tuple)) or len(component)!=2:raise ValueError('signed rainbow pair required')
     signed=[_texture(t) for t in component]
-    if any((t['width'],t['height'],t['stride'])!=(128,64,128) for t in signed):raise ValueError('rainbow field geometry differs')
+    if any((t['width'],t['height'],t['stride'])!=(32,16,64) for t in signed):raise ValueError('rainbow field geometry differs')
     components.append(signed)
    variants.append(components)
   rainbows.append(variants)
@@ -84,7 +84,26 @@ def rainbow_curves():
  """rainbow KOLOR/Pegasus signed Y/Cb/Cr immutable native endpoints."""
  a=list(range(256))
  return [([255]*256,a,a),([0]*256,a,a)]
-def _header(bindings):
+def imprint_curves():
+ a=list(range(256))
+ return [([min(255,n+128) for n in a],a,a),
+  ([max(0,n-128) for n in a],a,a),
+  ([n+round((255-n)*.75) for n in a],a,a)]
+def _imprints(imprints,bindings,externals):
+ if imprints is None:return None
+ if not isinstance(imprints,(list,tuple)) or len(imprints)!=7:raise ValueError('seven imprint styles required')
+ out=[];all_t=[bindings['grain']]+[t for p in bindings['leaks']+bindings['leaks_vertical'] for t in p]+[t for b in bindings['rainbows'] for v in b for c in v for t in c]
+ for pair in imprints:
+  if not isinstance(pair,(list,tuple)) or len(pair)!=2:raise ValueError('imprint requires positive and negative fields')
+  fields=[_texture(value) for value in pair]
+  if any(fields[0][key]!=fields[1][key] for key in ('width','height','stride')):raise ValueError('imprint field geometry differs')
+  for t in fields:
+   if any(t['base']<q['base']+q['bytes'] and q['base']<t['base']+t['bytes'] for q in all_t):raise ValueError('imprint textures overlap')
+   if any(t['base']<=a<t['base']+t['bytes'] for a in externals.values()):raise ValueError('imprint overlaps native export')
+   all_t.append(t)
+  out.append(fields)
+ return out
+def _header(bindings,imprints=None):
  def row(t):return '{'+','.join(str(t[k])+'u' for k in FIELDS)+'}'
  out=['static const m10v_isp_effect_texture m10v_render_grain='+row(bindings['grain'])+';', 'static const m10v_isp_effect_texture m10v_render_leaks[9][2]={'+','.join('{'+','.join(row(t) for t in p)+'}' for p in bindings['leaks'])+'};']
  profiles=[]
@@ -95,13 +114,18 @@ def _header(bindings):
  for curve in rainbow_curves():
   profiles.append('{'+','.join('{'+','.join(map(str,v))+'}' for v in curve)+'}')
  out.append('static const int16_t m10v_render_curves[12][3][256]={'+','.join(profiles)+'};')
+ out.append('#define M10V_ISP_IMPRINTS_BOUND '+str(int(imprints is not None)))
+ if imprints is not None:
+  out.append('static const m10v_isp_effect_texture m10v_render_imprints[7][2]={'+','.join('{'+','.join(row(t) for t in pair)+'}' for pair in imprints)+'};')
+  out.append('static const int16_t m10v_render_imprint_curves[3][3][256]={'+','.join('{'+','.join('{'+','.join(map(str,v))+'}' for v in c)+'}' for c in imprint_curves())+'};')
  return '\n'.join(out)+'\n'
-def _compile(base,bindings,externals):
+def _compile(base,bindings,externals,imprints=None):
  bindings,externals=_validated(base,bindings,externals)
+ imprints=_imprints(imprints,bindings,externals)
  clang,lld=shutil.which('clang'),shutil.which('ld.lld')
  if not clang or not lld:raise RuntimeError('clang and ld.lld required')
  with tempfile.TemporaryDirectory() as td:
-  t=Path(td);(t/'m10v_isp_effect_render_bindings.h').write_text(_header(bindings))
+  t=Path(td);(t/'m10v_isp_effect_render_bindings.h').write_text(_header(bindings,imprints))
   subprocess.run([clang,*guard.FLAGS,'-I',str(t),'-c',str(ROOT/SOURCES[0]),'-o',str(t/'render.o')],check=True,capture_output=True)
   link=' '.join(f'{n} = {a};' for n,a in externals.items())+f'SECTIONS {{ . = {base}; .text : {{ *(.text*) }} .rodata : {{ *(.rodata*) }} /DISCARD/ : {{ *(.ARM.exidx*) *(.ARM.extab*) *(.comment*) *(.note*) }} }}'
   (t/'render.ld').write_text(link)
@@ -117,18 +141,25 @@ def _compile(base,bindings,externals):
     for off in range(r[4],r[4]+r[5],16):
      n,v,_,info,_,section=struct.unpack_from('<IIIBBH',b,off);s=strings[n:].split(b'\0',1)[0].decode()
      if not section and s:raise ValueError('undefined symbol '+s)
-     if (info&15==2 and s=='m10v_isp_effects_render') or s in ('m10v_render_grain','m10v_render_leaks','m10v_render_leaks_vertical','m10v_render_rainbows','m10v_render_curves'):symbols[s]=v
-  for d in [bindings['grain']]+[v for pair in bindings['leaks']+bindings['leaks_vertical'] for v in pair]+[t for b in bindings['rainbows'] for v in b for c in v for t in c]:
+     if (info&15==2 and s=='m10v_isp_effects_render') or s in ('m10v_render_grain','m10v_render_leaks','m10v_render_leaks_vertical','m10v_render_rainbows','m10v_render_curves','m10v_render_imprints','m10v_render_imprint_curves'):symbols[s]=v
+  textures=[bindings['grain']]+[v for pair in bindings['leaks']+bindings['leaks_vertical'] for v in pair]+[t for b in bindings['rainbows'] for v in b for c in v for t in c]+[v for pair in (imprints or []) for v in pair]
+  for d in textures:
    if base<d['base']+d['bytes'] and d['base']<base+len(image):raise ValueError('renderer overlaps immutable texture bytes')
   if any(base<=a<base+len(image) for a in externals.values()):raise ValueError('renderer overlaps bound native export')
-  if set(symbols)!=set(('m10v_isp_effects_render','m10v_render_grain','m10v_render_leaks','m10v_render_leaks_vertical','m10v_render_rainbows','m10v_render_curves')):raise ValueError('renderer symbols differ')
+  expected={'m10v_isp_effects_render','m10v_render_grain','m10v_render_leaks','m10v_render_leaks_vertical','m10v_render_rainbows','m10v_render_curves'}
+  if imprints is not None:expected|={'m10v_render_imprints','m10v_render_imprint_curves'}
+  if set(symbols)!=expected:raise ValueError('renderer symbols differ')
  return bytes(image),symbols
-def build(base=0x54e00000,bindings=None,externals=None,*,enabled=False):
+def build(base=0x54e00000,bindings=None,externals=None,*,enabled=False,imprints=None):
  if type(enabled)is not bool:raise ValueError('explicit renderer boolean required')
  m=dict(schema='m10v-isp-effect-render/v1',enabled=False,code_bytes=0,symbols={},patches=[],firmware_emitted=False,camera_tested=False,pixel_math_proven=False)
  if not enabled:return b'',m
- bindings,externals=_validated(base,bindings,externals);code,symbols=_compile(base,bindings,externals)
- m.update(enabled=True,base=base,code_bytes=len(code),code_sha256=hashlib.sha256(code).hexdigest(),symbols=symbols,bindings=bindings,externals=externals,generated_header_sha256=hashlib.sha256(_header(bindings).encode()).hexdigest(),sources={p:hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in SOURCES},mutable_static_bytes=0,allocator_calls=0,cpu_pixel_access=False,cpu_rng=False,required_cache_maintenance={'entry':0x5383c8a8,'operation':'clean_invalidate','span':'complete destination workspace before every prepared=1 ISP enqueue','abi_pin':'enclosing border runtime cache_backend span','physical_cache_proven':False},grain_strength_arguments={'weak':3,'medium':2,'strong':1},execution_order=['native Clarity by caller','original luma gates Cb mask','leak Cb','original luma gates Cr mask','leak Cr','leak Y','rainbow Y+/Y-/Cb+/Cb-/Cr+/Cr-','stock grain'],saved_orientation={'1':'horizontal selected edge','3':'horizontal opposite edge','8':'vertical selected edge (top=left)','6':'vertical opposite edge','rainbow':'fixed sensor coordinates; no CPU or native frame rotation'},cpu_frame_rotation=False,roi_views='owned descriptor snapshot shifts Y by top*stride+left and UV by format-correct top; complete stride*height cache spans must fit original allocations; pixels and input descriptors untouched',curve_profiles=12,curve_coefficients=12*3*256,leak_fit='pinned historical spatial field; source-dependent luma exposure and luma-gated chroma; separable BT.601 approximation, native scalar arithmetic pending camera acceptance',rainbow_fit='48 immutable signed component fields; six Resize plus Granulation native passes; endpoint arithmetic pending camera acceptance',workspace='align16(width)*height*2 for 422 leak or rainbow; *3/2 for NV12 leak or grain',acceptance_required='Real camera output, native scalar arithmetic and visual appearance remain unproven; strict native failures return output invalid with no CPU fallback.')
+ bindings,externals=_validated(base,bindings,externals);imprints=_imprints(imprints,bindings,externals);code,symbols=_compile(base,bindings,externals,imprints)
+ m.update(enabled=True,base=base,code_bytes=len(code),code_sha256=hashlib.sha256(code).hexdigest(),symbols=symbols,bindings=bindings,externals=externals,generated_header_sha256=hashlib.sha256(_header(bindings,imprints).encode()).hexdigest(),sources={p:hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in SOURCES},mutable_static_bytes=0,allocator_calls=0,cpu_pixel_access=False,cpu_rng=False,required_cache_maintenance={'entry':0x5383c8a8,'operation':'clean_invalidate','span':'complete destination workspace before every prepared=1 ISP enqueue','abi_pin':'enclosing border runtime cache_backend span','physical_cache_proven':False},grain_strength_arguments={'weak':3,'medium':2,'strong':1},execution_order=['native Clarity by caller','original luma gates Cb mask','leak Cb','original luma gates Cr mask','leak Cr','leak Y','film imprint UV+/UV-/Y','rainbow Y+/Y-/Cb+/Cb-/Cr+/Cr-','stock grain'],saved_orientation={'1':'horizontal selected edge','3':'horizontal opposite edge','8':'vertical selected edge (top=left)','6':'vertical opposite edge','imprint':'fixed sensor coordinates; EXIF rotates photo and print together','rainbow':'fixed sensor coordinates; no CPU or native frame rotation'},cpu_frame_rotation=False,roi_views='owned descriptor snapshot shifts Y by top*stride+left and UV by format-correct top; complete stride*height cache spans must fit original allocations; pixels and input descriptors untouched',curve_profiles=12,curve_coefficients=12*3*256,leak_fit='pinned historical spatial field; source-dependent luma exposure and luma-gated chroma; separable BT.601 approximation, native scalar arithmetic pending camera acceptance',rainbow_fit='48 immutable signed component fields; six Resize plus Granulation native passes; endpoint arithmetic pending camera acceptance',workspace='align16(width)*height*2 for 422 leak, imprint or rainbow; *3/2 for NV12 leak or grain',acceptance_required='Real camera output, native scalar arithmetic and visual appearance remain unproven; strict native failures return output invalid with no CPU fallback.')
  m['curve_endpoint_bindings']={'effect':'A/C: graph+5c/+64','identity':'E/F: graph+6c/+70','weight':'B/D: graph+60/+68'}
  m['polarity_evidence']='stock bound ordering and r14 whole-frame whitening; native endpoint output remains unmeasured'
+ if imprints is not None:
+  m['imprint']=dict(styles=7,orientations=[1,3,6,8],coordinates='sensor-fixed; EXIF rotates photo and print together',bindings=imprints,cpu_pixel_access=False,camera_tested=False,exact_rgb_screen=False,
+   native_jobs=5,order=['resize positive UV field','positive UV','resize negative UV and Y field','negative UV','Y exposure'],
+   zero_mask={'Y':0,'UV':0},model='separate unsigned UV weights, identity weight LUTs and 75% Y exposure endpoint')
  return code,m

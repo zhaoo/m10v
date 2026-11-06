@@ -46,4 +46,5 @@ def build_hooks(base,symbols,settings,film_library=True,live_color=False,custom_
         metadata['effects_cache_owner_offset']=offset+0x200
         metadata['effects_cache_bytes']=44
         metadata['resource_ids']+=list(range(1159,1180))
+        metadata['resource_ids']+=list(range(1203,1211))
     return bytes(image),metadata

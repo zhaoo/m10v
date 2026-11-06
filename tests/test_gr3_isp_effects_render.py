@@ -11,7 +11,7 @@ def bindings():
  def t(w,h):
   nonlocal at
   s=(w+63)&~63;n=s*h*3//2;d=dict(base=at,bytes=n,width=w,height=h,stride=s);at+=n;return d
- return dict(grain=t(3072,2048),leaks=[[t(256,128),t(256,128)] for _ in range(9)],leaks_vertical=[[t(128,256),t(128,256)] for _ in range(9)],rainbows=[[[[t(128,64),t(128,64)] for _ in range(3)] for _ in range(4)] for _ in range(2)])
+ return dict(grain=t(3072,2048),leaks=[[t(256,128),t(256,128)] for _ in range(9)],leaks_vertical=[[t(128,256),t(128,256)] for _ in range(9)],rainbows=[[[[t(32,16),t(32,16)] for _ in range(3)] for _ in range(4)] for _ in range(2)])
 class RenderTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):cls.code,cls.manifest=build.build(BASE,bindings(),EXT,enabled=True);cls.symbols=cls.manifest['symbols']

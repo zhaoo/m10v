@@ -25,6 +25,7 @@ class RainbowShotTests(unittest.TestCase):
         src.write_text(f'''#include "{ROOT / 'native/gr3/m10v_isp_effects_state.c'}"
 #include "{ROOT / 'native/gr3/m10v_library.h'}"
 int m10v_library_valid(const m10v_library_state *s) {{ return s && s->magic == 0x5630314du; }}
+int m10v_isp_effects_camera_imprint_snapshot(uint32_t *out) {{ *out=0;return 1; }}
 #include "{ROOT / 'native/gr3/m10v_isp_effects_shot.c'}"
 void rainbow_test_seed(uint32_t recipe,uint32_t si,uint32_t film,uint32_t generation,uint32_t identity) {{
  m10v_isp_recipe_color *c=(void *)(uintptr_t)(recipe+M10V_SAVE_COLOR_OFFSET);
@@ -110,8 +111,8 @@ void rainbow_test_seed(uint32_t recipe,uint32_t si,uint32_t film,uint32_t genera
         self.assertEqual(self.call('m10v_isp_effects_shot_freeze', RECIPE), 1)
         self.assertEqual(self.call('m10v_isp_effects_shot_plan', RECIPE, SI, 162, 24, 0), 1)
         self.assertEqual(self.word(SHOT + 56), 8448)
-        self.assertEqual(self.call('m10v_isp_effects_shot_complete', RECIPE, SI, 8), 1)
-        self.assertEqual(self.word(SHOT + 68), 8)
+        self.assertEqual(self.call('m10v_isp_effects_shot_complete', RECIPE, SI, 16), 1)
+        self.assertEqual(self.word(SHOT + 68), 16)
 
 
 def m10v_rainbow_valid(value):

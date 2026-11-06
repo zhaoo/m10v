@@ -11,7 +11,8 @@ enum {
     M10V_ISP_EFFECTS_NATIVE_GRAIN = 1,
     M10V_ISP_EFFECTS_NATIVE_LEAK = 2,
     M10V_ISP_EFFECTS_NATIVE_BLUR = 4,
-    M10V_ISP_EFFECTS_NATIVE_RAINBOW = 8
+    M10V_ISP_EFFECTS_NATIVE_IMPRINT = 8,
+    M10V_ISP_EFFECTS_NATIVE_RAINBOW = 16
 };
 #define M10V_ISP_RAINBOW_TAG 0x52400000u
 #define M10V_ISP_RAINBOW_TAG_MASK 0xffc00000u
@@ -54,9 +55,9 @@ int m10v_isp_effects_shot_freeze(uint32_t recipe);
  * A ready valid off snapshot returns1. Output must be outside recipe storage. */
 int m10v_isp_effects_shot_read(uint32_t recipe,m10v_isp_effects_shot_snapshot *out);
 /* Plan only frozen metadata, with saved SI identity and even sizes2..6144.
- * Grain texture workspace is align16(width)*height*3/2; leak or rainbow
- * reserves *2 for the original full-height YUV422 chroma plane. Blur uses
- * original Clarity workspace. This API never allocates or marks completion. */
+ * Grain texture workspace is align16(width)*height*3/2; leak, imprint or
+ * rainbow reserves *2 for the original full-height YUV422 chroma plane. Blur
+ * uses original Clarity workspace. This API never allocates or marks completion. */
 int m10v_isp_effects_shot_plan(uint32_t recipe,uint32_t si,uint32_t width,
     uint32_t height,uint32_t slot_grain_strength);
 /* Owning executor calls only after actual native success; this records its

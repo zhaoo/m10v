@@ -55,6 +55,10 @@ class CurrentFilmPipelineTests(unittest.TestCase):
         recipe = e.alloc(self.manifest['capture_lifecycle']['owner']['storage']['extended_recipe_bytes'])
         e.w32(recipe, 0x53d0fc90)
         e.w32(recipe + 0x4778, 0x31545653)
+        if self.manifest.get('pure_isp_effects',{}).get('enabled'):
+            # This fixture replaces the native allocation, so initialize its
+            # owned empty tail through the allocator's actual helper.
+            self.call(e,'m10v_isp_effects_shot_reserve',recipe)
         obj = e.cursor
         e.make(25 + slot, stage)
         frame = obj + 0x1400
@@ -88,6 +92,19 @@ class CurrentFilmPipelineTests(unittest.TestCase):
         e.w32(owner + 0x213c, 0x3856504d)
         e.w32(owner + 0x2140, 2)
         e.u.mem_write(owner + 0x2144, bytes(e.u.mem_read(data, 184)))
+        if self.manifest.get('pure_isp_effects',{}).get('enabled'):
+            # Native UI construction authenticates the independent off cache
+            # before ordinary capture. Use its real reader, not cache writes.
+            manager,slot,filesystem=e.alloc(12),e.alloc(4),e.alloc(0x24)
+            e.w32(manager+8,slot);e.w32(slot,filesystem);e.u.mem_write(filesystem+0x20,b'\1')
+            def empty_journal(u,at,size,unused):
+                if at==0x53828014:result=manager
+                elif at==0x53825648:result=0
+                else:return
+                u.reg_write(A.UC_ARM_REG_R0,result);u.reg_write(A.UC_ARM_REG_PC,u.reg_read(A.UC_ARM_REG_LR))
+            hook=e.u.hook_add(UC_HOOK_CODE,empty_journal)
+            self.call(e,'m10v_isp_effects_camera_init',owner)
+            e.u.hook_del(hook)
         return owner
 
     def test_owner_query_matches_inline_custom_cache_allocation(self):
@@ -226,6 +243,50 @@ const v=await exportSdFilms({ids:[],customFilms:[{name:'Warm',filename:'warm.cub
                     self.make(e, recipe, obj, frame)
                     self.assertEqual(self.call(e, 'm10v_isp_frame_recipe_completed', recipe, si, 25, data), 1)
                     self.assertEqual(self.capture(e, recipe, si, request), 0)
+
+    def test_real_task_producer_freezes_global_imprint_from_actual_ui_journal_cache(self):
+        if not self.manifest.get('pure_isp_effects',{}).get('imprint'):
+            self.skipTest('requires the identifiable imprint delivery candidate')
+        for style in (0,7):
+            e,recipe,obj,frame,si,request,data=self.fixture(66)
+            # Remove the fixture's color snapshot; the original task producer
+            # must construct the real frozen state from the authenticated owner.
+            e.u.mem_write(recipe+0x4a08,bytes(1796))
+            owner=self.publish_owner(e,data)
+            manager,slot,filesystem=e.alloc(12),e.alloc(4),e.alloc(0x24)
+            e.w32(manager+8,slot);e.w32(slot,filesystem);e.u.mem_write(filesystem+0x20,b'\1')
+            word=0x46580000|(style<<7) if style else 0
+            body=struct.pack('<11I',0x31505349,3 if style else 1,2,0,0,0,0,0,0,0,word)
+            record=body+struct.pack('<I',zlib.crc32(body))
+            def storage(u,at,size,unused):
+                if at==0x53828014:result=manager
+                elif at==0x53825648:
+                    name=bytes(u.mem_read(u.reg_read(A.UC_ARM_REG_R1),12)).split(b'\0')[0]
+                    self.assertEqual(u.reg_read(A.UC_ARM_REG_R2),48)
+                    result=int(name==b'ISPFXA.BIN')
+                    if result:u.mem_write(u.reg_read(A.UC_ARM_REG_R3),record)
+                else:return
+                u.reg_write(A.UC_ARM_REG_R0,result);u.reg_write(A.UC_ARM_REG_PC,u.reg_read(A.UC_ARM_REG_LR))
+            hook=e.u.hook_add(UC_HOOK_CODE,storage)
+            self.call(e,'m10v_isp_effects_camera_init',owner)
+            e.u.hook_del(hook)
+            # The fixture allocates the recipe directly, so run the same
+            # empty-tail initializer as the audited original factory shim.
+            # No shot settings or completion bit is injected here.
+            self.call(e,'m10v_isp_effects_shot_reserve',recipe)
+            self.enqueue(e,recipe,19)
+            out=e.alloc(96)
+            self.assertEqual(self.call(e,'m10v_isp_effects_shot_read',recipe,out),1)
+            self.assertEqual(int.from_bytes(e.u.mem_read(out+44,4),'little'),word)
+            # A later independently committed cache selector cannot change it.
+            cache=self.manifest['hdf_menu']['effects_cache_owner_offset']
+            e.w32(owner+cache+40,0x46580000|(2<<7))
+            self.enqueue(e,recipe,0)
+            self.assertEqual(self.call(e,'m10v_isp_effects_shot_read',recipe,out),1)
+            self.assertEqual(int.from_bytes(e.u.mem_read(out+44,4),'little'),word)
+            if not style:
+                self.make(e,recipe,obj,frame)
+                self.assertEqual(self.capture(e,recipe,si,request),0)
 
     def make(self, e, recipe, obj, frame):
         for reg, value in ((0, obj), (1, frame), (3, 0x536dd8f0), (6, recipe + 0x96c)):
@@ -577,6 +638,9 @@ writeFileSync(process.argv[1]+'/manifest.json',JSON.stringify(r.manifest));
         for film in (77, 298, *range(291, 298), *range(299, 306), *range(309,317)):
             with self.subTest(film=film):
                 e, recipe, obj, frame, si, request, data = self.fixture(film)
+                if self.manifest.get('pure_isp_effects',{}).get('enabled'):
+                    self.publish_owner(e,data)
+                    self.enqueue(e,recipe,19)
                 self.make(e, recipe, obj, frame)
                 self.assertEqual(self.call(e, 'm10v_isp_frame_recipe_completed', recipe, si, 25, data), 1)
                 self.assertEqual(self.capture(e, recipe, si, request), 0)
@@ -611,6 +675,8 @@ writeFileSync(process.argv[1]+'/manifest.json',JSON.stringify(r.manifest));
                 e, recipe, obj, frame, si, request, data = self.fixture(62)
                 e.u.mem_write(si + 0x77c, bytes([tone]))
                 e.u.mem_write(si + 0x71248 + 0x77c, bytes([tone]))
+                if self.manifest.get('pure_isp_effects',{}).get('enabled'):
+                    self.enqueue(e,recipe,19)
                 self.make(e, recipe, obj, frame)
                 self.assertEqual(self.call(e, 'm10v_isp_frame_recipe_completed', recipe, si, tone, data), 0)
                 self.assertEqual(self.capture(e, recipe, si, request), 0xfffffffc)

@@ -196,7 +196,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_adj_extra_': {'m10v_adj_extra_'+n for n in ('encode','decode','select_newest','open','close','function')},
         'm10v_adj_extra_camera_': {'m10v_adj_extra_camera_'+n for n in ('init','dispose','load','assign','refresh','after_route_leave','retire','suspend','event','slot_type','initial_render','enter','trace_keys','trace_aux_key','trace_touch','trace_canvas','trace_timer','trace_area','trace_rect','trace_layout','trace_children','trace_invalidate','trace_finish','trace_primary','trace_fallback','trace_list','trace_frame','trace_selection','trace_title','trace_detail','trace_footer','virtual_focus','lever_pending',*(f'touch{i}' for i in range(5)))},
         'm10v_isp_effects_': {'m10v_isp_effects_defaults','m10v_isp_effects_validate','m10v_isp_effects_encode','m10v_isp_effects_decode','m10v_isp_effects_select_newest','m10v_isp_effects_resolve_snapshot','m10v_isp_effects_enabled','m10v_isp_effects_strength','m10v_isp_effects_set_enabled','m10v_isp_effects_set_strength'},
-        'm10v_isp_effects_camera_': {'m10v_isp_effects_camera_init','m10v_isp_effects_camera_refresh','m10v_isp_effects_camera_save','m10v_isp_effects_camera_snapshot'},
+        'm10v_isp_effects_camera_': {'m10v_isp_effects_camera_init','m10v_isp_effects_camera_refresh','m10v_isp_effects_camera_save','m10v_isp_effects_camera_snapshot','m10v_isp_effects_camera_imprint_snapshot'},
         'm10v_isp_effects_shot_': {'m10v_isp_effects_shot_'+n for n in ('reserve','freeze','read','plan','complete','fail','stock_query','unavailable')},
         'm10v_isp_effects_pipeline_': {'m10v_isp_effects_pipeline_'+n for n in ('settings','workspace','execute','encoder_admit')},
         'm10v_isp_effect_transfer_plan': {'m10v_isp_effect_transfer_plan','m10v_isp_effect_transfer_plan_format'},
@@ -714,7 +714,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             from scripts.build_gr3_hdf_menu import build_hooks as build_hdf_menu
             hook_start=(start+len(provisional)+15)&~15
             hook,hdf_menu_report=build_hdf_menu(hook_start,{**symbols,**entries},settings_report,film_library,live_color=owner_cache,custom_zoom=custom_zoom,pure_isp_effects=pure_isp_effects,companion=companion,extra_owner_bytes=extra_owner_bytes,adj_extra=camera_extensions)
-            if border_enabled:hdf_menu_report.update(border_enabled=True,hdf_enabled=hdf_enabled,border_resource_ids=[1155,1156,1157],effects_children=(['HDF'] if hdf_enabled else [])+['Border'])
+            if border_enabled:hdf_menu_report.update(border_enabled=True,hdf_enabled=hdf_enabled,border_resource_ids=[1155,1156,1157],effects_children=(['HDF'] if hdf_enabled else [])+['Border']+(['FilmImprint'] if pure_isp_effects else []))
             code,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**hdf_menu_report['exports']},'m10v_hdf_menu_')
             image+=bytes(start-base-len(image))+code+bytes(hook_start-start-len(code))+hook;symbols.update(entries)
             # Compose the added ADJ function with the already audited A/B
@@ -859,7 +859,12 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             texts+=ADJ_CAPTIONS
         if 786+len(texts)<1202:texts+=['']*(1202-786-len(texts))
         if 786+len(texts)!=1202:raise ValueError('Marlboro resource allocation differs')
-        texts+=['Marlboro','SHD50','Revolog KOLOR','Pegasus']
+        texts+=['Marlboro']
+        if pure_isp_effects:
+            if 786+len(texts)!=1203:raise ValueError('imprint resource allocation differs')
+            texts+=['胶卷印花','小猫吃鱼','樱花纷飞','绚烂彩虹','深海水母','小猫爪爪','呆头大鹅','宝可梦']
+        if 786+len(texts)!=(1211 if pure_isp_effects else 1203):raise ValueError('three-film resource allocation differs')
+        texts+=['SHD50','Revolog KOLOR','Pegasus']
         last_resource=786+len(texts)-1
         if sd_library:
             from scripts.generate_m10v_card_captions import resource as caption_resource
@@ -1266,9 +1271,14 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         packed_path,packed_blob=pack_runtime_resources(full_manifest,texture_dir/'runtime')
         packed=verify_resources(packed_path)
         packed=json.loads(packed_path.read_text())
-        asset_bytes=packed_blob.read_bytes();asset_base=0x54400000
-        if sha(asset_bytes)!='3c32368958396c4070ba2e9b5b042018919b3a50e40a7ca52a066619e394c6b7':
+        asset_bytes=packed_blob.read_bytes();asset_base=0x54220000
+        if len(asset_bytes)!=11280384 or sha(asset_bytes)!='fd542db7b7ec99fceb8e6bbc2f15578ca5076a0a3ddbed2463ecc8fbead23d23':
             raise ValueError('pure ISP build-time texture identity differs; use the pinned NumPy build environment')
+        from scripts.build_gr3_film_imprints import build as build_imprints
+        imprint_manifest,imprint_bytes=build_imprints(texture_dir/'imprints')
+        imprint_base=asset_base+len(asset_bytes)
+        fields=[dict(base=imprint_base+a['offset'],bytes=a['length'],width=a['width'],height=a['height'],stride=a['stride']) for a in imprint_manifest['assets']]
+        imprint_bindings=[fields[i:i+2] for i in range(0,len(fields),2)]
         status_base=(base+len(image)+15)&~15
         status_code,status_report=build_effect_status(status_base,capture_stock_rtos(camera_model),border_component['guard'],enabled=True,camera_model=camera_model)
         image+=bytes(status_base-base-len(image))+status_code
@@ -1296,16 +1306,16 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 for sign in ('pos','neg')] for component in ('y','cb','cr')]
                 for variant in range(4)] for kind in ('kolor','pegasus')]}
         render_base=(base+len(image)+15)&~15
-        render_code,render_report=build_effect_render(render_base,bindings,{k:symbols[k] for k in EFFECT_RENDER_EXTERNALS},enabled=True)
+        render_code,render_report=build_effect_render(render_base,bindings,{k:symbols[k] for k in EFFECT_RENDER_EXTERNALS},enabled=True,imprints=imprint_bindings)
         image+=bytes(render_base-base-len(image))+render_code;symbols.update(render_report['symbols'])
         final_pipeline,final_entries=link_object(pure_pipeline_object,pure_pipeline_base,symbols,'m10v_isp_effects_pipeline_')
         if len(final_pipeline)!=pure_pipeline_bytes or any(symbols[k]!=v for k,v in final_entries.items()):
             raise ValueError('pure ISP deferred pipeline layout changed')
         image[pure_pipeline_base-base:pure_pipeline_base-base+pure_pipeline_bytes]=final_pipeline
         code_end=base+len(image)
-        if code_end>asset_base or asset_base+len(asset_bytes)>0x55000000:
+        if code_end>asset_base or imprint_base+len(imprint_bytes)>0x55000000:
             raise ValueError('pure ISP code and immutable texture append range overlap')
-        image+=bytes(asset_base-base-len(image))+asset_bytes
+        image+=bytes(asset_base-base-len(image))+asset_bytes+imprint_bytes
         query_source=lifecycle_report['native_grain']['pure_isp_query_patch']
         query_patch={'address':query_source['address'],
             'expected':struct.unpack('<I',bytes.fromhex(query_source['expected_hex']))[0],
@@ -1314,6 +1324,9 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         pure_report={'enabled':True,'scope':'per-film','recipe_bytes':0x57d8,'shot_offset':0x5778,'shot_bytes':96,
             'menu_resource_ids':list(range(1163,1186)),
             'runtime_assets':{'base':asset_base,'bytes':len(asset_bytes),'sha256':sha(asset_bytes),'manifest':packed},
+            'imprint':{'enabled':True,'scope':'global','initial_style':0,'menu_resource_ids':list(range(1203,1211)),
+                'assets':{'base':imprint_base,'bytes':len(imprint_bytes),'sha256':sha(imprint_bytes),'manifest':imprint_manifest},
+                'cpu_pixel_processing':False,'camera_tested':False,'exact_rgb_screen':False},
             'patches':status_report['patches']+gran_report['patches']+[query_patch],
             'status':status_report,'granulation':gran_report,'render':render_report,
             'transfer':{'base':runtime_base,'bytes':len(runtime_code),'symbols':runtime_symbols},
@@ -1396,6 +1409,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['experimental_capture']={'candidate_color':candidate_color,'spatial_neon':spatial_neon,'full_isp_effects':False,'save_chain_fixed':False}
     if pure_report:
         manifest['pure_isp_effects']=pure_report
+        manifest['sources'].update(imprint_manifest['sources'])
         manifest['experimental_capture']['full_isp_effects']=True
         pure_sources=[str(p.relative_to(ROOT)) for p in (ROOT/'native/gr3').glob('m10v_isp_effect*') if p.suffix in ('.c','.h','.json')]
         pure_sources += [str(p.relative_to(ROOT)) for p in (ROOT/'scripts').glob('build_gr3_isp_effect_*.py')]
