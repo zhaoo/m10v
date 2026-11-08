@@ -122,18 +122,21 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
    uint32_t icon=id==M10V_MARLBORO_ID?M10V_MARLBORO_ICON:M10V_THREE_FILM(id)?M10V_THREE_FILM_ICON(id):M10V_FOUR_LOOKS(id)?M10V_FOUR_LOOKS_ICON(id):M10V_EXTRA_FILM(id)?M10V_EXTRA_FILM_ICON(id):M10V_C41(id)?M10V_C41_ICON(id):M10V_ANIME_E6(id)?M10V_ANIME_E6_ICON_FIRST+id-306:M10V_D76(id)?775+id-M10V_D76_FIRST:id==M10V_5213_ID?774:M10V_STYLE(id)?762+id-M10V_STYLE_FIRST:id==M10V_PIXEL_ID?761:id==M10V_CHAR_ID?755:M10V_CUSTOM(id)?754:670+id;
    if(v->widgets[M10V_VIEW_HEAP]){
     uint32_t *pixels=(uint32_t *)(uintptr_t)(v->widgets[M10V_VIEW_HEAP]+i*M10V_CARD_PIXELS*4);
+    int rendered;
     if(M10V_CUSTOM(id)){
      char name[24];uint32_t index=first+((s->index-first)/10)*10+i;
      int ok=s->screen==M10V_SETTINGS_CATALOG?
       m10v_sd_camera_catalog_name(index,id,name,sizeof(name)):
       m10v_sd_camera_custom_name(&s->saved,i,name,sizeof(name));
-     m10v_film_card_custom(pixels,ok?name:"LUT",i,enabled);
-    }else m10v_film_card_render(pixels,id,i,enabled);
+     rendered=m10v_film_card_custom(pixels,ok?name:"LUT",i,enabled);
+    }else rendered=m10v_film_card_render(pixels,id,i,enabled);
+    if(!rendered){
     uint32_t *d=card_descriptors(v)+i*2;
     uint32_t *directory=(uint32_t *)(uintptr_t)(v->widgets[M10V_VIEW_HEAP]+M10V_CARD_DIRECTORY_OFFSET);
     d[0]=M10V_CARD_WIDTH|(M10V_CARD_HEIGHT<<16);d[1]=ptr(pixels)/4;
     directory[M10V_CARD_ID(i)-M10V_CARD_FIRST]=ptr(d);
     icon=M10V_CARD_ID(i);
+    }
    }
    ((fn2)0x5339a9a0u)(v->widgets[ICON+i],icon);
 

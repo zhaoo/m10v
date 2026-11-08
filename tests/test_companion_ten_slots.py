@@ -2,6 +2,15 @@ import ctypes as C,json,subprocess,tempfile,unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 class TenSlots(unittest.TestCase):
+ def test_latest_sixty_film_ids_parse_and_future_id_is_rejected(self):
+  p={'protocol':1,'requestId':'11'*16,'bootId':'22'*16,'baseRevision':'33'*32,'catalogHash':'44'*32,'rendererHash':'55'*32,'activateSlot':None}
+  self.lib.parse_ten_film.argtypes=[C.c_char_p,C.c_uint,C.c_uint]
+  for film in range(327,331):
+   p['patch']=[{'slot':9,'filmId':film,'grain':1}];raw=json.dumps(p).encode()
+   with self.subTest(film=film):self.assertEqual(self.lib.parse_ten_film(raw,len(raw),film),0)
+  p['patch']=[{'slot':9,'filmId':331}];raw=json.dumps(p).encode()
+  self.assertNotEqual(self.lib.parse_ten(raw,len(raw)),0)
+
  @classmethod
  def setUpClass(cls):
   cls.tmp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.tmp.cleanup);out=Path(cls.tmp.name)/'ten.dylib'
@@ -34,4 +43,4 @@ class TenSlots(unittest.TestCase):
    p['patch']=[{'slot':9,'filmId':film,'grain':1}];raw=json.dumps(p).encode()
    self.lib.parse_ten_film.argtypes=[C.c_char_p,C.c_uint,C.c_uint]
    with self.subTest(film=film):self.assertEqual(self.lib.parse_ten_film(raw,len(raw),film),0)
-  p['patch']=[{'slot':9,'filmId':327}];raw=json.dumps(p).encode();self.assertNotEqual(self.lib.parse_ten(raw,len(raw)),0)
+  p['patch']=[{'slot':9,'filmId':331}];raw=json.dumps(p).encode();self.assertNotEqual(self.lib.parse_ten(raw,len(raw)),0)

@@ -95,11 +95,24 @@ def page_records(data):
                 0x46583032:('leak_gain','blur_gain'),0x46583033:('planned','native_completed'),
                 0x46583034:('failed','source_si'),0x46583035:('stock_workspace_bytes','stock_query_valid'),
                 0x46583036:('effective_grain_strength','grain_mode'),0x46583037:('current_si','native_flags'),
-                0x46583038:('planned_width','planned_height'),0x46583039:('workspace_bytes','saved_orientation')}
+                0x46583038:('planned_width','planned_height'),0x46583039:('workspace_bytes','saved_orientation'),
+                0x4658303a:('effect_selector','rainbow')}
             if tag in fields:
                 first,second=fields[tag]
                 record['isp_effects']={'recipe':hex(recipe),'tag':f'{tag:08x}',first:a,second:b,
                     'diagnostic_only':True}
+                if tag==0x4658303a:record['isp_effects']['imprint_style']=(a>>7)&7
+            elif tag==0x46584900:
+                stages={1:'resize-positive',2:'positive-UV',3:'resize-negative',4:'negative-UV',5:'Y-exposure',6:'complete'}
+                record['imprint']={'recipe':hex(recipe),'stage':stages.get(a&127,'unknown'),
+                    'state':'returned-error' if a&128 else 'completed' if a==6 else 'before-native-job',
+                    'detail':hex(b),'diagnostic_only':True}
+                if a&128:record['imprint']['result']=b-(1<<32) if b&(1<<31) else b
+            elif tag in range(0x46584901,0x46584905):
+                fields={0x46584901:('style','workspace_capacity'),0x46584902:('size','stride_rows'),
+                    0x46584903:('Y','UV'),0x46584904:('context','workspace')}
+                first,second=fields[tag]
+                record['imprint']={'recipe':hex(recipe),first:a,second:b,'diagnostic_only':True}
             elif tag==0x46584800:
                 names={1:'settings.ready.before-native',2:'workspace.query.return',3:'stock.execution.return',
                     4:'effects.completed',10:'hold.invalid-execution-parameters',11:'hold.stock-result-or-query',

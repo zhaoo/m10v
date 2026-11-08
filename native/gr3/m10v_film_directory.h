@@ -2,7 +2,7 @@
 #ifndef M10V_FILM_DIRECTORY_H
 #define M10V_FILM_DIRECTORY_H
 #include <stdint.h>
-#define M10V_DIRECTORY_COUNT 57u
+#define M10V_DIRECTORY_COUNT 60u
 #define M10V_DIRECTORY_GROUPS 6u
 #define M10V_DIRECTORY_GROUP_RESOURCE 1129u
 static const struct {uint16_t id;uint8_t group;char name[24];} m10v_directory[]={
@@ -67,6 +67,7 @@ static const struct {uint16_t id;uint8_t group;char name[24];} m10v_directory[]=
 {319,5,"Classic Negative"},
 {320,5,"Classic Chrome"},
 };
+_Static_assert(sizeof(m10v_directory)/sizeof(m10v_directory[0])==M10V_DIRECTORY_COUNT,"film directory count differs");
 static const uint8_t m10v_directory_first[7]={0,7,30,34,45,55,60};
 static inline const char *m10v_directory_name(uint32_t id){for(uint32_t i=0;i<M10V_DIRECTORY_COUNT;i++)if(m10v_directory[i].id==id)return m10v_directory[i].name;return 0;}
 #endif

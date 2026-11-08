@@ -2,6 +2,21 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.08.1",
+      "date": "2026-11-08",
+      "title": "完善 GRemote 联动与六十款机内胶卷",
+      "changes": [
+        "GR III 2.10 配套 GRemote 1.2.6，支持读取十槽、无线装卷、启用胶卷与扩展设置，补齐胶卷印花控制。",
+        "修复机身冷启动时 ISP 设置未就绪导致扩展暂不可读，保持已有拍摄与原生 ISP 管线。",
+        "修正六十款胶卷的目录计数和机内资源映射，保留历史 SD 胶卷包兼容校验。",
+        "GRemote 移除官网手机预设版本造成的装卷误拦截，确认装卷期间暂停页面轮询。"
+      ],
+      "notice": "用户已确认 GR III 配套候选的连接、胶卷库、扩展设置及 App 体验修复可用并授权发布；其他机型未获得本次设备验收。使用 GRemote 联动仍需配套 SD 服务并启用机身脚本。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.07.1",
       "date": "2026-11-07",
       "title": "修正胶片印花标题并发布三款胶卷",
@@ -11,9 +26,9 @@
         "沿用已确认的 R2 固件候选身份；本次文案修正不改变固件、ISP 资源或机内功能。"
       ],
       "notice": "本次发布包含已获用户确认的三款胶卷与网页标题修正。请使用与机型匹配的官方 GR III 2.10 / GR IIIx 1.60 来源生成固件。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "f05518cbd3c888798f746363b9a03c1b073c8f18",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/42251434031"
     },
     {
       "version": "2026.11.06.2",

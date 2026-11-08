@@ -23,7 +23,7 @@ static void pipeline_diagnostic(uint32_t recipe,uint32_t stage,uint32_t detail){
     /* Worker-only bounded checkpoint, never task ingress or a wait loop.
      * All calls precede our submissions or follow returned native calls.
      * A diagnostic error never authorizes completion or resource release. */
-    uint32_t records[11][5],count=1;
+    uint32_t records[12][5],count=1;
     records[0][0]=198;records[0][1]=recipe;records[0][2]=0x46584800u;
     records[0][3]=stage;records[0][4]=detail;
     if(pipeline_ram(recipe,M10V_SAVE_RECIPE_EXTENDED_BYTES)&&
@@ -34,12 +34,13 @@ static void pipeline_diagnostic(uint32_t recipe,uint32_t stage,uint32_t detail){
         if(pipeline_ram(si,0x94c)){
             const uint8_t *p=(const void*)(uintptr_t)si;native=p[0x77c]|((uint32_t)p[0x795]<<16);
         }
-        const uint32_t pairs[10][2]={{s->magic,s->owner},{s->ready,s->sequence},
+        const uint32_t pairs[11][2]={{s->magic,s->owner},{s->ready,s->sequence},
             {s->settings.leak_gain,s->settings.blur_gain},{s->planned,s->native_completed},
             {s->failed,s->source_si},{s->stock_workspace_bytes,s->stock_query_valid},
             {s->effective_grain_strength,s->settings.grain_mode},{si,native},
-            {s->planned_width,s->planned_height},{s->workspace_bytes,s->saved_orientation}};
-        for(uint32_t i=0;i<10;i++){
+            {s->planned_width,s->planned_height},{s->workspace_bytes,s->saved_orientation},
+            {s->settings.reserved,s->rainbow}};
+        for(uint32_t i=0;i<11;i++){
             uint32_t *r=records[count++];r[0]=198;r[1]=recipe;r[2]=0x46583030u+i;
             r[3]=pairs[i][0];r[4]=pairs[i][1];
         }

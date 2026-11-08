@@ -147,6 +147,13 @@
       "min": 0,
       "max": 6,
       "persistence": "runtime"
+    },
+    {
+      "id": 21,
+      "key": "imprint",
+      "min": 0,
+      "max": 7,
+      "persistence": "persistent"
     }
   ],
   "powerImages": {

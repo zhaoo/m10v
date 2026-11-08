@@ -53,3 +53,52 @@ class ImprintRenderTests(RenderTests):
         self.imprint()
         self.assertEqual(self.invoke(capacity=239999),-1)
         self.assertEqual(self.calls,[])
+
+class ImprintDiagnosticTests(ImprintRenderTests):
+    """Only the SD logger is doubled; native pixels remain unmapped."""
+    TRACE = 0x54d00400
+    @classmethod
+    def setUpClass(cls):
+        cls.code,cls.manifest=build.build(BASE,bindings(),EXT,enabled=True,
+            imprints=imprint_bindings(),trace_batch=cls.TRACE)
+        cls.symbols=cls.manifest['symbols']
+    def setUp(self):
+        super().setUp()
+        self.checkpoints=[]
+    def hook(self,u,pc,size,data):
+        if pc==self.TRACE:
+            self.checkpoints.extend(self.words(self.reg(0)+i*20,5) for i in range(self.reg(1)))
+            # Failed logging must never affect photo processing.
+            u.reg_write(self.A_R0,0)
+            u.reg_write(self.A_PC,u.reg_read(self.A_LR))
+            return
+        return super().hook(u,pc,size,data)
+    from unicorn.arm_const import UC_ARM_REG_R0 as A_R0, UC_ARM_REG_PC as A_PC, UC_ARM_REG_LR as A_LR
+    def test_each_real_imprint_job_has_a_pre_submit_checkpoint_even_if_logger_fails(self):
+        self.imprint()
+        self.assertEqual(self.invoke(),1)
+        stages=[r[3] for r in self.checkpoints if r[2]==0x46584900]
+        self.assertEqual(stages,[1,2,3,4,5,6])
+        self.assertTrue(all(r[0]==198 and r[1]==0x55004000 for r in self.checkpoints))
+    def test_failed_job_is_identified_without_submitting_later_jobs(self):
+        for job in range(1,6):
+            self.imprint();self.checkpoints=[];self.native_count=0;self.fail_at=job
+            self.assertEqual(self.invoke(),-4)
+            stages=[r[3] for r in self.checkpoints if r[2]==0x46584900]
+            self.assertEqual(stages,list(range(1,job+1))+[0x80|job])
+    def test_off_has_no_diagnostic_filesystem_calls_or_native_jobs(self):
+        self.configure(grain=0,leak=0)
+        self.assertEqual(self.invoke(0,0),1)
+        self.assertEqual(self.checkpoints,[])
+        self.assertEqual(self.calls,[])
+    def test_24mp_422_reports_full_workspace_and_both_photo_planes_without_cpu_pixels(self):
+        self.w,self.h,self.stride=6000,4000,6016
+        # Deliberately non-overlapping 24MP planes, none mapped for CPU use.
+        self.y,self.uv,self.work=0x60000000,0x64000000,0x70000000
+        self.imprint(style=7)
+        self.capacity=48000000;self.put(self.shot+56,self.capacity)
+        self.assertEqual(self.invoke(),1)
+        facts={r[2]:r[3:] for r in self.checkpoints if r[2]!=0x46584900}
+        self.assertEqual(facts[0x46584901],(7,48000000))
+        self.assertEqual(facts[0x46584902],(6000|(4000<<16),6016|(4000<<16)))
+        self.assertEqual(facts[0x46584903],(0x60000000,0x64000000))

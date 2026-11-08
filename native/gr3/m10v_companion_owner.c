@@ -21,7 +21,7 @@ typedef uint32_t (*fn2)(uint32_t,uint32_t);
 typedef uint32_t (*fn3)(uint32_t,uint32_t,uint32_t);
 typedef void (*cache_fn)(void*,uint32_t);
 typedef struct {
- uint32_t vtable,ui_owner,timer_id,session_bound,vtable_words[3],locked,store_depth,store_generation,zoom_prime_retry,zoom_primed;
+ uint32_t vtable,ui_owner,timer_id,session_bound,vtable_words[3],locked,store_depth,store_generation,zoom_prime_retry,zoom_primed,isp_prime_retry;
  _Alignas(128) m10v_resident_wire wire;
  m10v_resident_consumer consumer;
  m10v_companion_owner transaction;
@@ -184,6 +184,21 @@ uint32_t m10v_companion_ui_timer(uint32_t value,uint32_t timer,uint32_t ignored)
   if(c->zoom_prime_retry)c->zoom_prime_retry--;
   else if(!m10v_zoom_camera_prime())c->zoom_primed=1;
   else c->zoom_prime_retry=9;
+  if(!current(c))return 0;
+ }
+#endif
+ /* A cold constructor may precede the mounted filesystem. Prime metadata on
+  * AppMain, never inside GET or capture, and leave a warm cache untouched. */
+#if M10V_COMPANION_EXT_ISP
+ if(c->session_bound&&!c->locked&&!c->store_depth&&!c->transaction.pending.present&&!c->extensions.pending.present&&!extension_busy(c)){
+  if(c->isp_prime_retry)c->isp_prime_retry--;
+  else {
+   m10v_isp_effects_settings fx;uint32_t sequence;
+   if(!m10v_isp_effects_camera_snapshot(&fx,&sequence)){
+    (void)m10v_isp_effects_camera_refresh(c->ui_owner);
+    c->isp_prime_retry=9;
+   }
+  }
   if(!current(c))return 0;
  }
 #endif

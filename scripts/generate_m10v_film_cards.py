@@ -3,7 +3,7 @@ import json,re,sys,base64,hashlib,struct
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from scripts.generate_m10v_icons import artwork,FONT
+from scripts.generate_m10v_icons import artwork,FONT,THREE_FILM_SPECS
 
 def canonical_raster():
  """Pinned coverage avoids FreeType/RAQM differences across build hosts."""
@@ -30,6 +30,7 @@ def generate():
  specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/four-looks-luts.json').read_text())['stocks']]
  specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/c41-luts.json').read_text())['stocks'] if v['id']>=322]
  specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/marlboro-luts.json').read_text())['stocks']]
+ specs += [(v['id'],v['name'],v) for v in THREE_FILM_SPECS]
  rows=['static const struct { uint8_t brand,main,sub,header,color,ink,accent,motif; } box_cards[]={'];palette=[];words=[]
  for i,name,spec in specs:
   brand,title,code,paper,ink,accent,motif=artwork(name,i,spec)
@@ -53,7 +54,7 @@ def generate():
  for i in range(95):compressed.extend(packbits(glyphs[i*320:(i+1)*320]));glyph_offsets.append(len(compressed))
  rows+=['static const uint16_t glyph_offsets[]={'+','.join(map(str,glyph_offsets))+'};',
         'static const uint8_t glyph_data[]={'+','.join(map(str,compressed))+'};']
- return '\n'.join(rows)
+ return '\n'.join(rows)+'\n'
 
 def caption_data():
  captions=json.loads((ROOT/'native/gr3/m10v_card_captions.json').read_text())

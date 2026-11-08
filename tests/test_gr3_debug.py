@@ -186,6 +186,16 @@ class DebugLogArmTests(unittest.TestCase):
         from scripts.read_gr3_debug_log import decode_logs
         return decode_logs(list(self.files.values()))
 
+    def test_imprint_checkpoint_identifies_failed_native_job_and_frozen_selector(self):
+        self.assertEqual(self.log(198,0x55005000,0x46584900,0x84,0xfffffffc),1)
+        self.assertEqual(self.log(198,0x55005000,0x4658303a,0x46580380,0),1)
+        records=self.decoded()['records']
+        self.assertEqual(records[0]['imprint']['stage'],'negative-UV')
+        self.assertEqual(records[0]['imprint']['state'],'returned-error')
+        self.assertEqual(records[0]['imprint']['result'],-4)
+        self.assertEqual(records[1]['isp_effects']['imprint_style'],7)
+        self.assertEqual(records[1]['isp_effects']['rainbow'],0)
+
     def test_arm_writes_history_with_payload_build_identity_and_balanced_close(self):
         self.assertEqual(self.log(),1);self.assertEqual(self.log(31),1)
         result=self.decoded();records=result['records']

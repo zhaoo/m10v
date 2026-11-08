@@ -47,7 +47,8 @@ static int extension_read(void*v,m10v_extension_snapshot*out){
  if(!m10v_isp_effects_camera_snapshot(&fx,&generations[3]))return M10V_ERROR_BRIDGE_UNAVAILABLE;
  out->values[5]=fx.grain_mode;out->values[6]=fx.grain_size;out->values[7]=fx.leak_gain;
  out->values[8]=fx.leak_position;out->values[9]=fx.leak_spread;out->values[10]=fx.blur_gain;out->values[11]=fx.blur_range;
- out->available|=((1u<<12)-(1u<<5));
+ out->values[21]=m10v_isp_effects_imprint(&fx);
+ out->available|=((1u<<12)-(1u<<5))|(1u<<21);
 #endif
 #if M10V_COMPANION_EXT_ZOOM
  m10v_zoom_state zoom;
@@ -84,6 +85,11 @@ static int extension_write(void*v,uint32_t field,uint32_t value){
  if(field==4)return m10v_border_camera_save(c->ui_owner,value)?M10V_IO_UNCERTAIN:M10V_IO_OK;
 #endif
 #if M10V_COMPANION_EXT_ISP
+ if(field==21){
+  m10v_isp_effects_settings fx;uint32_t sequence;
+  if(!m10v_isp_effects_camera_snapshot(&fx,&sequence)||!m10v_isp_effects_set_imprint(&fx,value))return M10V_IO_NOT_WRITTEN;
+  return m10v_isp_effects_camera_save(c->ui_owner,&fx)?M10V_IO_UNCERTAIN:M10V_IO_OK;
+ }
  if(field>=5&&field<=11){
   m10v_isp_effects_settings fx;uint32_t sequence;
   if(!m10v_isp_effects_camera_snapshot(&fx,&sequence))return M10V_IO_NOT_WRITTEN;

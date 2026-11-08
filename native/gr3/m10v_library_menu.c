@@ -125,7 +125,8 @@ static uint32_t resource(uint32_t tone) {
 }
 static uint32_t film_resource(uint32_t film) {
     if(film==M10V_MARLBORO_ID)return M10V_MARLBORO_NAME;
-    if(M10V_THREE_FILM(film))return M10V_THREE_FILM_NAME(film);
+    /* The imprint build inserts eight settings strings before these names. */
+    if(M10V_THREE_FILM(film))return M10V_THREE_FILM_NAME(film)+(M10V_PURE_ISP_EFFECTS?8u:0u);
     if(M10V_FOUR_LOOKS(film))return M10V_FOUR_LOOKS_NAME(film);
     if(M10V_EXTRA_FILM(film))return M10V_EXTRA_FILM_NAME(film);
     if(M10V_C41(film))return M10V_C41_NAME(film);

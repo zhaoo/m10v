@@ -81,19 +81,19 @@ class DebugPackageTests(unittest.TestCase):
 class ExtensionDeliveryContractTests(unittest.TestCase):
  def native(self):
   contract=(ROOT/'contracts/extensions-v1.json').read_bytes()
-  return {'companion':{'extensions':{'schema':'m10v.extensions/v1','available':(1<<21)-1,'features':dict.fromkeys(['ab','hdf','border','isp','zoom','aspect'],True),'powerImages':'firmwareBuildOnly'},'sources':{'contracts/extensions-v1.json':hashlib.sha256(contract).hexdigest()}}}
+  return {'companion':{'extensions':{'schema':'m10v.extensions/v1','available':(1<<22)-1,'features':dict.fromkeys(['ab','hdf','border','isp','zoom','aspect'],True),'powerImages':'firmwareBuildOnly'},'sources':{'contracts/extensions-v1.json':hashlib.sha256(contract).hexdigest()}}}
  def test_legacy_marker_absence_keeps_v2_delivery(self):
   self.assertTrue(hasattr(module,'_extension_info'),'packager must recognize extension marker independently')
   self.assertIsNone(module._extension_info({'companion':{}}))
  def test_extension_marker_binds_exact_independent_contract(self):
   self.assertTrue(hasattr(module,'_extension_info'),'packager must recognize extension marker independently')
   info=module._extension_info(self.native())
-  self.assertEqual(info['contractHash'],'9df047418574e23fd399a0c59491aecc9ea212dbf119a79ff29532aec6493628')
-  self.assertEqual(info['available'],(1<<21)-1)
+  self.assertEqual(info['contractHash'],'8014c8d909a7427519c41c524088912a426bb27a1ec7168e82f4659c5ba113cd')
+  self.assertEqual(info['available'],(1<<22)-1)
   for change in ['schema','available','source']:
    native=self.native()
    if change=='schema':native['companion']['extensions']['schema']='future'
-   if change=='available':native['companion']['extensions']['available']=1<<21
+   if change=='available':native['companion']['extensions']['available']=1<<22
    if change=='source':native['companion']['sources']['contracts/extensions-v1.json']='00'*32
    with self.subTest(change=change),self.assertRaisesRegex(ValueError,'extension'):
     module._extension_info(native)

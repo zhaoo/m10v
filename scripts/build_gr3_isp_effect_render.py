@@ -119,14 +119,14 @@ def _header(bindings,imprints=None):
   out.append('static const m10v_isp_effect_texture m10v_render_imprints[7][2]={'+','.join('{'+','.join(row(t) for t in pair)+'}' for pair in imprints)+'};')
   out.append('static const int16_t m10v_render_imprint_curves[3][3][256]={'+','.join('{'+','.join('{'+','.join(map(str,v))+'}' for v in c)+'}' for c in imprint_curves())+'};')
  return '\n'.join(out)+'\n'
-def _compile(base,bindings,externals,imprints=None):
+def _compile(base,bindings,externals,imprints=None,trace_batch=0):
  bindings,externals=_validated(base,bindings,externals)
  imprints=_imprints(imprints,bindings,externals)
  clang,lld=shutil.which('clang'),shutil.which('ld.lld')
  if not clang or not lld:raise RuntimeError('clang and ld.lld required')
  with tempfile.TemporaryDirectory() as td:
   t=Path(td);(t/'m10v_isp_effect_render_bindings.h').write_text(_header(bindings,imprints))
-  subprocess.run([clang,*guard.FLAGS,'-I',str(t),'-c',str(ROOT/SOURCES[0]),'-o',str(t/'render.o')],check=True,capture_output=True)
+  subprocess.run([clang,*guard.FLAGS,f'-DM10V_ISP_IMPRINT_TRACE_BATCH={trace_batch}u','-I',str(t),'-c',str(ROOT/SOURCES[0]),'-o',str(t/'render.o')],check=True,capture_output=True)
   link=' '.join(f'{n} = {a};' for n,a in externals.items())+f'SECTIONS {{ . = {base}; .text : {{ *(.text*) }} .rodata : {{ *(.rodata*) }} /DISCARD/ : {{ *(.ARM.exidx*) *(.ARM.extab*) *(.comment*) *(.note*) }} }}'
   (t/'render.ld').write_text(link)
   subprocess.run([lld,'-T',str(t/'render.ld'),'--entry=m10v_isp_effects_render',str(t/'render.o'),'-o',str(t/'render.elf')],check=True,capture_output=True)
@@ -150,11 +150,19 @@ def _compile(base,bindings,externals,imprints=None):
   if imprints is not None:expected|={'m10v_render_imprints','m10v_render_imprint_curves'}
   if set(symbols)!=expected:raise ValueError('renderer symbols differ')
  return bytes(image),symbols
-def build(base=0x54e00000,bindings=None,externals=None,*,enabled=False,imprints=None):
+def build(base=0x54e00000,bindings=None,externals=None,*,enabled=False,imprints=None,trace_batch=0):
  if type(enabled)is not bool:raise ValueError('explicit renderer boolean required')
+ if type(trace_batch)is not int or (trace_batch and (trace_batch&3 or not 0x540b6000<=trace_batch<0x55000000)):
+  raise ValueError('trace requires an aligned bound append-RX batch logger')
  m=dict(schema='m10v-isp-effect-render/v1',enabled=False,code_bytes=0,symbols={},patches=[],firmware_emitted=False,camera_tested=False,pixel_math_proven=False)
  if not enabled:return b'',m
- bindings,externals=_validated(base,bindings,externals);imprints=_imprints(imprints,bindings,externals);code,symbols=_compile(base,bindings,externals,imprints)
+ bindings,externals=_validated(base,bindings,externals);imprints=_imprints(imprints,bindings,externals)
+ if trace_batch:
+  textures=[bindings['grain']]+[t for p in bindings['leaks']+bindings['leaks_vertical'] for t in p]+[t for b in bindings['rainbows'] for v in b for c in v for t in c]+[t for p in (imprints or []) for t in p]
+  if any(t['base']<=trace_batch<t['base']+t['bytes'] for t in textures):raise ValueError('trace logger overlaps immutable pixels')
+ code,symbols=_compile(base,bindings,externals,imprints,trace_batch)
+ if trace_batch and base<=trace_batch<base+len(code):raise ValueError('trace logger overlaps renderer')
+ m['trace_batch']=trace_batch
  m.update(enabled=True,base=base,code_bytes=len(code),code_sha256=hashlib.sha256(code).hexdigest(),symbols=symbols,bindings=bindings,externals=externals,generated_header_sha256=hashlib.sha256(_header(bindings,imprints).encode()).hexdigest(),sources={p:hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in SOURCES},mutable_static_bytes=0,allocator_calls=0,cpu_pixel_access=False,cpu_rng=False,required_cache_maintenance={'entry':0x5383c8a8,'operation':'clean_invalidate','span':'complete destination workspace before every prepared=1 ISP enqueue','abi_pin':'enclosing border runtime cache_backend span','physical_cache_proven':False},grain_strength_arguments={'weak':3,'medium':2,'strong':1},execution_order=['native Clarity by caller','original luma gates Cb mask','leak Cb','original luma gates Cr mask','leak Cr','leak Y','film imprint UV+/UV-/Y','rainbow Y+/Y-/Cb+/Cb-/Cr+/Cr-','stock grain'],saved_orientation={'1':'horizontal selected edge','3':'horizontal opposite edge','8':'vertical selected edge (top=left)','6':'vertical opposite edge','imprint':'fixed sensor coordinates; EXIF rotates photo and print together','rainbow':'fixed sensor coordinates; no CPU or native frame rotation'},cpu_frame_rotation=False,roi_views='owned descriptor snapshot shifts Y by top*stride+left and UV by format-correct top; complete stride*height cache spans must fit original allocations; pixels and input descriptors untouched',curve_profiles=12,curve_coefficients=12*3*256,leak_fit='pinned historical spatial field; source-dependent luma exposure and luma-gated chroma; separable BT.601 approximation, native scalar arithmetic pending camera acceptance',rainbow_fit='48 immutable signed component fields; six Resize plus Granulation native passes; endpoint arithmetic pending camera acceptance',workspace='align16(width)*height*2 for 422 leak, imprint or rainbow; *3/2 for NV12 leak or grain',acceptance_required='Real camera output, native scalar arithmetic and visual appearance remain unproven; strict native failures return output invalid with no CPU fallback.')
  m['curve_endpoint_bindings']={'effect':'A/C: graph+5c/+64','identity':'E/F: graph+6c/+70','weight':'B/D: graph+60/+68'}
  m['polarity_evidence']='stock bound ordering and r14 whole-frame whitening; native endpoint output remains unmeasured'

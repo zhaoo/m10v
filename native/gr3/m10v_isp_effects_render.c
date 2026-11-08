@@ -5,6 +5,26 @@
 #include "m10v_isp_effect_render_bindings.h"
 #include "m10v_isp_effect_memory.h"
 #define U(p) ((uint32_t)(uintptr_t)(p))
+#ifndef M10V_ISP_IMPRINT_TRACE_BATCH
+#define M10V_ISP_IMPRINT_TRACE_BATCH 0u
+#endif
+#if M10V_ISP_IMPRINTS_BOUND
+static inline void imprint_trace(uint32_t recipe,uint32_t tag,uint32_t a,uint32_t b){
+#if M10V_ISP_IMPRINT_TRACE_BATCH
+ /* Only before a native submission or after its actual return. Never log
+  * from a DMA callback, wait/retry loop, or while holding native locks. */
+ const uint32_t row[5]={198u,recipe,tag,a,b};
+ (void)((int(*)(const uint32_t*,uint32_t))M10V_ISP_IMPRINT_TRACE_BATCH)(row,1);
+#else
+ (void)recipe;(void)tag;(void)a;(void)b;
+#endif
+}
+#define IMPRINT_JOB(step,detail,expression) do { \
+ imprint_trace(frozen.owner,0x46584900u,(step),(detail)); \
+ int result=(expression); \
+ if(result!=1){imprint_trace(frozen.owner,0x46584900u,0x80u|(step),(uint32_t)result);return -4;} \
+} while(0)
+#endif
 static int ram(uint32_t p,uint32_t n){return !(p&3u)&&p>=0x55000000u&&n<=0x30000000u&&p<=0x80000000u-n;}
 static int overlap(uint32_t a,uint32_t an,uint32_t b,uint32_t bn){return a<b+bn&&b<a+an;}
 static void copy_words(uint32_t *out,const uint32_t *in,uint32_t n){for(uint32_t k=0;k<n;k++)out[k]=in[k];}
@@ -86,14 +106,19 @@ int m10v_isp_effects_render(uint32_t ctx,const uint32_t photo[8],uint32_t work,u
   /* Physical-film coordinates: saved EXIF turns the completed photo and its
    * print together. Never stretch a transposed portrait mask into this plane. */
   copy_words(uvview,p,8);uvview[1]=p[2];uvview[2]=0;uvview[4]=w|(uvh<<16);uvview[5]=stride|(uvh<<16);
+  imprint_trace(frozen.owner,0x46584901u,imprint,capacity);
+  imprint_trace(frozen.owner,0x46584902u,p[4],p[5]);
+  imprint_trace(frozen.owner,0x46584903u,p[1],p[2]);
+  imprint_trace(frozen.owner,0x46584904u,ctx,work);
   /* Both passes use the native leak convention: zero means no change, with
    * identity weight LUTs. Resize overwrites the workspace between signs. */
   for(uint32_t sign=0;sign<2;sign++){
    const m10v_isp_effect_texture *field=&m10v_render_imprints[imprint-1u][sign];
-   if(prepare(field,work,capacity,w,h,field->width,field->height,0,format,&plan,frozen.source_si)!=1)return -4;
-   if(m10v_isp_effect_granulation_owned((void*)(uintptr_t)ctx,uvview,uvview,1,(void*)(uintptr_t)(work+noise_y),noise_stride*uvh,m10v_render_imprint_curves[sign])!=1)return -4;
+   IMPRINT_JOB(1u+sign*2u,field->base,prepare(field,work,capacity,w,h,field->width,field->height,0,format,&plan,frozen.source_si));
+   IMPRINT_JOB(2u+sign*2u,work+noise_y,m10v_isp_effect_granulation_owned((void*)(uintptr_t)ctx,uvview,uvview,1,(void*)(uintptr_t)(work+noise_y),noise_stride*uvh,m10v_render_imprint_curves[sign]));
   }
-  if(m10v_isp_effect_granulation_owned((void*)(uintptr_t)ctx,p,p,1,(void*)(uintptr_t)work,noise_y,m10v_render_imprint_curves[2])!=1)return -4;
+  IMPRINT_JOB(5u,work,m10v_isp_effect_granulation_owned((void*)(uintptr_t)ctx,p,p,1,(void*)(uintptr_t)work,noise_y,m10v_render_imprint_curves[2]));
+  imprint_trace(frozen.owner,0x46584900u,6u,1u);
  }
 #endif
  if(frozen.rainbow){

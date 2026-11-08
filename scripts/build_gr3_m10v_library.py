@@ -180,6 +180,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_icon_': {'m10v_icon_pixels'},
         'm10v_film_card_': {'m10v_film_card_render','m10v_film_card_custom'},
         'm10v_sd_': {'m10v_sd_u32','m10v_sd_crc','m10v_sd_header','m10v_sd_record'},
+        'm10v_sd_previous_hash': {'m10v_sd_previous_hash'},
         'm10v_sd_camera_': {'m10v_sd_camera_directory_extent','m10v_sd_camera_directory_item','m10v_sd_camera_directory_install','m10v_sd_camera_item','m10v_sd_camera_install','m10v_sd_camera_custom_record','m10v_sd_camera_custom_name','m10v_sd_camera_catalog_name'},
         'm10v_debug_': {'m10v_debug_log','m10v_debug_batch'},
         'm10v_settings_': {'m10v_settings_open','m10v_settings_key'},
@@ -476,9 +477,9 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if not node:
                 raise RuntimeError('Node.js is unavailable; set M10V_NODE to its absolute executable path')
             subprocess.run([node,'scripts/generate_gr3_sd_contract.mjs','--check'],cwd=ROOT,check=True,capture_output=True)
-            for sd_source,sd_prefix in [('m10v_sd_library.c','m10v_sd_'),('m10v_sd_camera.c','m10v_sd_camera_')]:
+            for sd_source,sd_prefix in [('m10v_sd_previous_hash.c','m10v_sd_previous_hash'),('m10v_sd_library.c','m10v_sd_'),('m10v_sd_camera.c','m10v_sd_camera_')]:
                 sd_obj=folder/(sd_source+'.o')
-                subprocess.run([compiler,*compile_flags,'-c',str(ROOT/'native/gr3'/sd_source),'-o',str(sd_obj)],check=True,capture_output=True)
+                subprocess.run([compiler,*compile_flags,'-DM10V_SD_SEPARATE_PREVIOUS_HASH=1','-c',str(ROOT/'native/gr3'/sd_source),'-o',str(sd_obj)],check=True,capture_output=True)
                 sd_base=(base+len(image)+15)&~15
                 sd_code,sd_symbols=link_object(sd_obj.read_bytes(),sd_base,symbols,sd_prefix)
                 image+=bytes(sd_base-base-len(image))+sd_code;symbols.update(sd_symbols)
@@ -577,7 +578,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         companion_report=None
         if companion:
             from scripts.build_gr3_companion_owner import build_companion_owner
-            companion_features={'ab':ab_enabled,'hdf':bool(hdf_enabled),'border':border_enabled,'isp':False,'zoom':custom_zoom,'aspect':base>=0x540be000}
+            companion_features={'ab':ab_enabled,'hdf':bool(hdf_enabled),'border':border_enabled,'isp':pure_isp_effects,'zoom':custom_zoom,'aspect':base>=0x540be000}
             remote_names=['m10v_settings_controller_remote_'+n for n in ['busy','ab_read','ab_write','aspect_read','aspect_write']]
             remote_names+=['m10v_zoom_camera_snapshot','m10v_zoom_camera_prime','m10v_zoom_camera_save','m10v_zoom_live_slot','m10v_zoom_live_apply'] if custom_zoom else []
             companion_imports={**symbols,**dict.fromkeys(remote_names,base)}
@@ -1306,7 +1307,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 for sign in ('pos','neg')] for component in ('y','cb','cr')]
                 for variant in range(4)] for kind in ('kolor','pegasus')]}
         render_base=(base+len(image)+15)&~15
-        render_code,render_report=build_effect_render(render_base,bindings,{k:symbols[k] for k in EFFECT_RENDER_EXTERNALS},enabled=True,imprints=imprint_bindings)
+        render_code,render_report=build_effect_render(render_base,bindings,{k:symbols[k] for k in EFFECT_RENDER_EXTERNALS},enabled=True,imprints=imprint_bindings,
+            trace_batch=symbols['m10v_debug_batch'] if debug_mode else 0)
         image+=bytes(render_base-base-len(image))+render_code;symbols.update(render_report['symbols'])
         final_pipeline,final_entries=link_object(pure_pipeline_object,pure_pipeline_base,symbols,'m10v_isp_effects_pipeline_')
         if len(final_pipeline)!=pure_pipeline_bytes or any(symbols[k]!=v for k,v in final_entries.items()):
@@ -1364,7 +1366,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         'native/gr3/m10v_marlboro_native_profile.h','native/gr3/m10v_marlboro.rgba','web/gr3/marlboro-luts.json','node/gr3-sd-pre-marlboro-contract.json',
         'scripts/build_gr3_three_film_preview.py','native/gr3/three-film-reference.json',
         'native/gr3/m10v_three_films_native_profile.h','native/gr3/m10v_three_films.rgba',
-        'node/gr3-sd-pre-three-films-contract.json']})
+        'node/gr3-sd-pre-three-films-contract.json','node/gr3-sd-pre-directory-count-contract.json']})
+    if sd_library:manifest['sources']['native/gr3/m10v_sd_previous_hash.c']=sha((ROOT/'native/gr3/m10v_sd_previous_hash.c').read_bytes())
     if sd_library:
         manifest['custom_isp']={'schema':'m10v-custom-isp/v1','record_offset':6688,'payload_bytes':1572,
             'preview_offset':0x213c,'preview_bytes':0x4000,'storage':'inline TopMenu allocation',

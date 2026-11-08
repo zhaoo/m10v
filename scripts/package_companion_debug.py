@@ -11,14 +11,14 @@ def _extension_info(native):
  marker=native.get('companion',{}).get('extensions')
  if marker is None:return None
  need(isinstance(marker,dict) and marker.get('schema')=='m10v.extensions/v1','extension schema differs')
- need(type(marker.get('available'))is int and 0<=marker['available']<(1<<21),'extension availability differs')
+ need(type(marker.get('available'))is int and 0<=marker['available']<(1<<22),'extension availability differs')
  need(isinstance(marker.get('features'),dict) and set(marker['features'])=={'ab','hdf','border','isp','zoom','aspect'} and all(type(v)is bool for v in marker['features'].values()),'extension features differ')
  need(marker.get('powerImages')=='firmwareBuildOnly','extension power images boundary differs')
  contract=(ROOT/'contracts/extensions-v1.json').read_bytes()
  need(native.get('companion',{}).get('sources',{}).get('contracts/extensions-v1.json')==sha(contract),'extension contract source differs')
  value=json.loads(contract);canonical=json.dumps(value,sort_keys=True,separators=(',',':')).encode()
  digest=sha(canonical)
- need(value.get('schema')==marker['schema'] and digest=='9df047418574e23fd399a0c59491aecc9ea212dbf119a79ff29532aec6493628','extension contract identity differs')
+ need(value.get('schema')==marker['schema'] and digest=='8014c8d909a7427519c41c524088912a426bb27a1ec7168e82f4659c5ba113cd','extension contract identity differs')
  return {**marker,'contractHash':digest}
 
 def _extensions_readme(identity,extensions,retained,has_film):
@@ -40,9 +40,9 @@ def _extensions_readme(identity,extensions,retained,has_film):
 7. 安装 GRemote.apk，保留应用数据。'''+pairing+'\n8. '+film+'''
 9. 装回卡并正常开机，手机连接相机 Wi-Fi。在 App「相机 → 扩展」先读取机身状态，再修改一项并等待机身读回确认。
 
-21 项扩展设置（是否可用以本包已安装组件及 App 读取的机身可用项为准）
+22 项扩展设置（是否可用以本包已安装组件及 App 读取的机身可用项为准）
 功能：快切开关、快切 A、快切 B。
-效果：HDF、边框、颗粒模式、颗粒尺寸、漏光强度、漏光位置、漏光范围、模糊强度、模糊范围。
+效果：胶卷印花（关闭或七种样式）、HDF、边框、颗粒模式、颗粒尺寸、漏光强度、漏光位置、漏光范围、模糊强度、模糊范围。
 水印：时间水印、日期格式、水印位置、水印颜色、胶卷名称。
 焦距：第一档焦距、第二档焦距、当前焦距档；GR III 两档范围均为 28–50 mm。
 画幅：3:2、1:1、4:3、16:9、XPan、6×7、Half 3:4。
