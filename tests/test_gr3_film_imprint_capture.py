@@ -20,7 +20,7 @@ class PureImprintShotTests(unittest.TestCase):
  def hook(self,u,pc,size,data):
   if pc==0x53000100:
    self.calls+=1
-   if self.available:self.put(u.reg_read(A.UC_ARM_REG_R0),(self.settings[7]>>7)&7)
+   if self.available:self.put(u.reg_read(A.UC_ARM_REG_R0),((self.settings[7]>>7)&7)|(self.settings[7]&0x1c00))
    u.reg_write(A.UC_ARM_REG_R0,int(self.available))
   elif pc==0x53000104:u.reg_write(A.UC_ARM_REG_R0,1)
   else:return
@@ -42,3 +42,12 @@ class PureImprintShotTests(unittest.TestCase):
   self.available=True
   self.assertEqual(self.call('freeze',shot.RECIPE),0)
   self.assertEqual(self.calls,1)
+
+ def test_vignette_freezes_global_switch_and_grade_without_workspace(self):
+  self.settings=(0,)*7+(0x46580000|0x1400,)
+  self.assertEqual(self.call('freeze',shot.RECIPE),1)
+  self.settings=(0,)*8
+  self.assertEqual(self.call('read',shot.RECIPE,shot.OUT),1)
+  self.assertEqual(self.word(shot.OUT+44),0x46581400)
+  self.assertEqual(self.call('plan',shot.RECIPE,shot.SI,6000,4000,0),1)
+  self.assertEqual(self.word(shot.SHOT+56),0)

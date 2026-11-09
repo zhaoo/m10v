@@ -7,8 +7,8 @@ class Extensions(unittest.TestCase):
   path=ROOT/'contracts/extensions-v1.json'
   self.assertTrue(path.exists(),'extension contract must be independent of film renderer')
   value=json.loads(path.read_text());self.assertEqual(value['schema'],'m10v.extensions/v1')
-  self.assertEqual(len(value['fields']),22)
-  self.assertEqual([f['id'] for f in value['fields']],list(range(22)))
+  self.assertEqual(len(value['fields']),24)
+  self.assertEqual([f['id'] for f in value['fields']],list(range(24)))
   self.assertEqual([f['persistence'] for f in value['fields'] if f['key'] in ('quickSwitch','focalSlot','aspect')],['runtime']*3)
   header=(ROOT/'native/companion/extensions.h').read_text()
   canonical=json.dumps(value,sort_keys=True,separators=(',',':')).encode()

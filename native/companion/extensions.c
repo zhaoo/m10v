@@ -5,11 +5,11 @@
 _Static_assert(sizeof(m10v_extension_patch)<=M10V_RESIDENT_PAYLOAD,"extension patch fits resident frame");
 _Static_assert(sizeof(m10v_extension_result)<=M10V_RESIDENT_PAYLOAD,"extension result fits resident frame");
 #if !M10V_COMPANION_RTOS_ONLY
-const char *const m10v_extension_names[M10V_EXTENSION_FIELDS]={"quickSwitch","quickSwitchA","quickSwitchB","hdf","border","grainMode","grainSize","leakGain","leakPosition","leakSpread","blurGain","blurRange","stamp","stampFormat","stampCorner","stampColor","filmNameStamp","focalA","focalB","focalSlot","aspect","imprint"};
+const char *const m10v_extension_names[M10V_EXTENSION_FIELDS]={"quickSwitch","quickSwitchA","quickSwitchB","hdf","border","grainMode","grainSize","leakGain","leakPosition","leakSpread","blurGain","blurRange","stamp","stampFormat","stampCorner","stampColor","filmNameStamp","focalA","focalB","focalSlot","aspect","imprint","vignetteEnabled","vignetteStrength"};
 #endif
-const uint8_t m10v_extension_min[M10V_EXTENSION_FIELDS]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,28,28,0,0,0};
-const uint8_t m10v_extension_max[M10V_EXTENSION_FIELDS]={1,21,21,3,2,4,2,3,2,2,3,2,2,3,3,3,1,50,50,2,6,7};
-const uint8_t m10v_extension_persistent[M10V_EXTENSION_FIELDS]={0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1};
+const uint8_t m10v_extension_min[M10V_EXTENSION_FIELDS]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,28,28,0,0,0,0,1};
+const uint8_t m10v_extension_max[M10V_EXTENSION_FIELDS]={1,21,21,3,2,4,2,3,2,2,3,2,2,3,3,3,1,50,50,2,6,7,1,3};
+const uint8_t m10v_extension_persistent[M10V_EXTENSION_FIELDS]={0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1};
 static void zero(void*p,unsigned n){for(unsigned i=0;i<n;i++)((uint8_t*)p)[i]=0;}
 static int equal(const void*a,const void*b,unsigned n){return m10v_constant_equal(a,b,n);}
 int m10v_extensions_valid(const m10v_extension_snapshot*s){if(!s||s->busy>1||(s->available&~M10V_EXTENSION_MASK))return 0;for(unsigned i=0;i<M10V_EXTENSION_FIELDS;i++)if((s->available&(1u<<i))&&(s->values[i]<m10v_extension_min[i]||s->values[i]>m10v_extension_max[i]))return 0;return 1;}

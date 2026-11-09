@@ -21,9 +21,14 @@
  * 0 off; 1 cats/fish, 2 sakura, 3 rainbow, 4 jellyfish, 5 paws,
  * 6 goose, 7 Pokemon (Pikachu/Bulbasaur/Charmander/Squirtle). */
 #define M10V_ISP_IMPRINT_MASK 0x380u
+#define M10V_ISP_VIGNETTE_MASK 0x1c00u
+/* V4: independent enable and remembered weak/medium/strong. */
+static inline uint32_t m10v_isp_vignette_enabled(uint32_t word){return (word>>10)&1u;}
+static inline uint32_t m10v_isp_vignette_strength(uint32_t word){return 1u+((word>>11)&3u);}
 static inline uint32_t m10v_isp_effects_imprint_word(uint32_t word){return (word>>7)&7u;}
 static inline uint32_t m10v_isp_effects_imprint_snapshot_word(uint32_t word){
-    return (word&M10V_ISP_IMPRINT_MASK)?M10V_ISP_EFFECT_PREF_TAG|(word&M10V_ISP_IMPRINT_MASK):0u;
+    uint32_t effects=word&(M10V_ISP_IMPRINT_MASK|M10V_ISP_VIGNETTE_MASK);
+    return effects?M10V_ISP_EFFECT_PREF_TAG|effects:0u;
 }
 
 enum {
@@ -49,7 +54,7 @@ static inline uint32_t m10v_isp_effects_imprint(const m10v_isp_effects_settings 
 }
 static inline int m10v_isp_effects_set_imprint(m10v_isp_effects_settings *s,uint32_t style){
     if(!s||style>7u)return 0;
-    s->reserved=M10V_ISP_EFFECT_PREF_TAG|(s->reserved&127u)|(style<<7);return 1;
+    s->reserved=M10V_ISP_EFFECT_PREF_TAG|(s->reserved&(127u|M10V_ISP_VIGNETTE_MASK))|(style<<7);return 1;
 }
 
 typedef struct {

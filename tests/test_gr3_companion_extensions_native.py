@@ -8,7 +8,7 @@ class NativeExtensions(unittest.TestCase):
   imports={n:0x54010000+i*64 for i,n in enumerate(names)}
   with tempfile.TemporaryDirectory() as tmp:
    code,report=build_companion_owner(0x54100000,imports,{'buildId':'11'*32,'catalogHash':'22'*32,'rendererHash':'33'*32},Path(tmp),extensions={'ab':True,'hdf':True,'border':True,'isp':True,'zoom':True,'aspect':True})
-   self.assertGreater(len(code),1024);self.assertEqual(report['extensions']['available'],(1<<22)-1)
+   self.assertGreater(len(code),1024);self.assertEqual(report['extensions']['available'],(1<<24)-1)
    self.assertIn('m10v_extensions_apply',report['symbols'])
    self.assertIn('native/companion/extensions.c',report['sources'])
 

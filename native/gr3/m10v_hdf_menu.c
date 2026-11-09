@@ -24,6 +24,9 @@
 #include "m10v_isp_effects_camera.h"
 #include "m10v_isp_effects_resources.h"
 #define IMPRINT_CHILD 3u
+#define VIGNETTE_CHILD 4u
+#define VIGNETTE_SWITCH 5u
+#define VIGNETTE_STRENGTH 6u
 #endif
 #ifndef M10V_HDF_OWNER_OFFSET
 #define M10V_HDF_OWNER_OFFSET 0x193cu
@@ -108,6 +111,22 @@ static void style_row(page *p,uint32_t i,uint32_t visible,uint32_t selected){
  ((fn2)0x5339658cu)(p->widgets[4+i],visible&&selected?28:31);
 }
 #if M10V_PURE_ISP_EFFECTS
+static int vignette_load(page *p){
+ m10v_isp_effects_settings settings;uint32_t sequence;
+ if(m10v_isp_effects_camera_refresh(ptr(p)-M10V_HDF_OWNER_OFFSET)||
+    !m10v_isp_effects_camera_snapshot(&settings,&sequence))return -1;
+ p->value=p->saved=p->child==VIGNETTE_SWITCH?m10v_isp_vignette_enabled(settings.reserved):
+     m10v_isp_vignette_strength(settings.reserved)-1u;return 0;
+}
+static int vignette_save(page *p){
+ m10v_isp_effects_settings settings;uint32_t sequence;
+ if(!m10v_isp_effects_camera_snapshot(&settings,&sequence))return -1;
+ uint32_t mask=p->child==VIGNETTE_SWITCH?0x400u:0x1800u;
+ settings.reserved=M10V_ISP_EFFECT_PREF_TAG|(settings.reserved&~mask)|
+     (p->child==VIGNETTE_SWITCH?p->value<<10:p->value<<11);
+ if(!m10v_isp_effects_validate(&settings))return -1;
+ return m10v_isp_effects_camera_save(ptr(p)-M10V_HDF_OWNER_OFFSET,&settings);
+}
 static int imprint_load(page *p){
  m10v_isp_effects_settings settings;uint32_t sequence;
  if(m10v_isp_effects_camera_refresh(ptr(p)-M10V_HDF_OWNER_OFFSET)||
@@ -133,17 +152,23 @@ static void draw(page *p){
  caption(p->widgets[2],p->root?1140:border?1155:970);caption(p->widgets[3],p->root?941:971);
 #if M10V_PURE_ISP_EFFECTS
  if(imprint)caption(p->widgets[2],M10V_ISP_TEXT_IMPRINT);
+ if(!p->root&&p->child>=VIGNETTE_CHILD)caption(p->widgets[2],1214);
 #endif
  for(uint32_t i=0;i<4;i++){
   uint32_t visible=p->root?i<(M10V_HDF_ENABLED?2u:1u):i<(border?3u:4u);
 #if M10V_PURE_ISP_EFFECTS
-  if(p->root)visible=i<(M10V_HDF_ENABLED?3u:2u);
+  if(p->root)visible=i<(M10V_HDF_ENABLED?4u:3u);
+  if(!p->root&&p->child>=VIGNETTE_CHILD)visible=i<(p->child==VIGNETTE_STRENGTH?3u:2u);
   if(imprint)visible=first+i<8u;
 #endif
   ((fn2)0x533ad3c0u)(p->widgets[4+i],visible);
   uint32_t id=p->root?(M10V_HDF_ENABLED&&i==0?1141:1155):border?(i==0?972:i==1?1156:1157):972+i;
 #if M10V_PURE_ISP_EFFECTS
   if(p->root&&i==(M10V_HDF_ENABLED?2u:1u))id=M10V_ISP_TEXT_IMPRINT;
+  if(p->root&&i==(M10V_HDF_ENABLED?3u:2u))id=1214;
+  if(!p->root&&p->child==VIGNETTE_CHILD)id=1215+i;
+  if(!p->root&&p->child==VIGNETTE_SWITCH)id=i?1217:M10V_ISP_TEXT_OFF;
+  if(!p->root&&p->child==VIGNETTE_STRENGTH)id=973+i;
   if(imprint)id=first+i?M10V_ISP_TEXT_IMPRINT_CATS+first+i-1u:M10V_ISP_TEXT_OFF;
 #endif
   caption(p->widgets[4+i],id);
@@ -243,7 +268,7 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
 #if M10V_BORDER_ENABLED
 #if M10V_PURE_ISP_EFFECTS
   if(key==0xce||key==0xd0||key==0xd4){if(p->focus)p->focus--;draw(p);return 1;}
-  if(key==0xd1||key==0xd5){if(p->focus<(M10V_HDF_ENABLED?2u:1u))p->focus++;draw(p);return 1;}
+  if(key==0xd1||key==0xd5){if(p->focus<(M10V_HDF_ENABLED?3u:2u))p->focus++;draw(p);return 1;}
 #else
   if(key==0xce||key==0xd0||key==0xd4){p->focus=0;draw(p);return 1;}
   if(key==0xd1||key==0xd5){p->focus=M10V_HDF_ENABLED?1:0;draw(p);return 1;}
@@ -251,7 +276,9 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
   if(key==0xd8||key==0xcf||key==0xd3){
    p->child=M10V_HDF_ENABLED?p->focus:1;
 #if M10V_PURE_ISP_EFFECTS
-   if(p->focus==(M10V_HDF_ENABLED?2u:1u)){
+   if(p->focus==(M10V_HDF_ENABLED?3u:2u)){
+    p->child=VIGNETTE_CHILD;p->value=p->saved=0;p->root=0;p->error=0;draw(p);return 1;
+   }else if(p->focus==(M10V_HDF_ENABLED?2u:1u)){
     p->child=IMPRINT_CHILD;
     if(imprint_load(p)){p->error=1;draw(p);return 1;}
    }else
@@ -268,6 +295,15 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
   if(key==0x86||key==0x89||key==0xda){((fn1)0x5316ca28u)(ptr(p));return 1;}
   return key==0xce||key==0xd0||key==0xd1||key==0xd4||key==0xd5;
  }
+ #if M10V_PURE_ISP_EFFECTS
+ if(p->child==VIGNETTE_CHILD&&(key==0xd8||key==0xcf||key==0xd3)){
+  p->child=p->value?VIGNETTE_STRENGTH:VIGNETTE_SWITCH;
+  p->error=vignette_load(p)!=0;draw(p);return 1;
+ }
+ if(p->child>=VIGNETTE_SWITCH&&(key==0x86||key==0x89||key==0xda)){
+  p->child=VIGNETTE_CHILD;p->value=p->saved=0;p->error=0;draw(p);return 1;
+ }
+#endif
  if((M10V_HDF_GROUPED||M10V_BORDER_ENABLED)&&(key==0x86||key==0x89||key==0xda)){
 #if M10V_BORDER_ENABLED
   if(p->child==BORDER_DIRECT){((fn1)0x5316ca28u)(ptr(p));return 1;}
@@ -281,6 +317,7 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
   if(p->child)max=2;
 #if M10V_PURE_ISP_EFFECTS
   if(p->child==IMPRINT_CHILD)max=7;
+  if(p->child==VIGNETTE_CHILD||p->child==VIGNETTE_SWITCH)max=1;
 #endif
 #endif
   if(p->value<max)p->value++;p->error=0;
@@ -289,7 +326,8 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
   int result=-1;
 #if M10V_BORDER_ENABLED
 #if M10V_PURE_ISP_EFFECTS
-  if(p->child==IMPRINT_CHILD)result=imprint_save(p);
+  if(p->child>=VIGNETTE_SWITCH)result=vignette_save(p);
+  else if(p->child==IMPRINT_CHILD)result=imprint_save(p);
   else
 #endif
   if(p->child){
@@ -314,7 +352,8 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
     * falsely showing the previous value. Stay open with the error visible. */
 #if M10V_BORDER_ENABLED
 #if M10V_PURE_ISP_EFFECTS
-   if(p->child==IMPRINT_CHILD){(void)imprint_load(p);}
+   if(p->child>=VIGNETTE_SWITCH){(void)vignette_load(p);}
+   else if(p->child==IMPRINT_CHILD){(void)imprint_load(p);}
    else
 #endif
    if(p->child){if(m10v_border_camera_refresh(ptr(p)-M10V_HDF_OWNER_OFFSET)==0)p->saved=p->value=p->border.style;}

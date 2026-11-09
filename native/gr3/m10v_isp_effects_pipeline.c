@@ -107,6 +107,8 @@ uint32_t m10v_isp_effects_pipeline_settings(uint32_t recipe,uint32_t si,
        !pipeline_photo(pipeline_word(params,8),&bw,&bh)||aw!=bw||ah!=bh||
        !m10v_isp_effects_shot_plan(recipe,si,aw,ah,slot_grain_strength)||
        !m10v_isp_effects_shot_read(recipe,&shot))return 0;
+    if(m10v_isp_vignette_enabled(shot.settings.reserved))
+        values[0]=-(int16_t)m10v_isp_vignette_strength(shot.settings.reserved);
     if(shot.settings.blur_gain){
         uint32_t grade=values[1]>=5&&values[1]<=7?(uint32_t)values[1]-4u:0;
         values[1]=(int16_t)(8u+grade*9u+(shot.settings.blur_gain-1u)*3u+shot.settings.blur_range);
@@ -114,7 +116,7 @@ uint32_t m10v_isp_effects_pipeline_settings(uint32_t recipe,uint32_t si,
     ((uint32_t*)params)[0x20/4]=recipe;
     if(pipeline_mask(&shot))pipeline_diagnostic(recipe,1,
         (uint16_t)values[0]|((uint32_t)(uint16_t)values[1]<<16));
-    return pipeline_mask(&shot)!=0;
+    return pipeline_mask(&shot)!=0||m10v_isp_vignette_enabled(shot.settings.reserved);
 }
 uint32_t m10v_isp_effects_pipeline_workspace(const void *params,
     uint32_t *queried_bytes,uint32_t stock_result){

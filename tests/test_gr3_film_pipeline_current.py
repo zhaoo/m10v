@@ -247,7 +247,7 @@ const v=await exportSdFilms({ids:[],customFilms:[{name:'Warm',filename:'warm.cub
     def test_real_task_producer_freezes_global_imprint_from_actual_ui_journal_cache(self):
         if not self.manifest.get('pure_isp_effects',{}).get('imprint'):
             self.skipTest('requires the identifiable imprint delivery candidate')
-        for style in (0,7):
+        for style, vignette in ((0,0),(7,0),(0,0x400),(0,0xc00),(7,0x1400)):
             e,recipe,obj,frame,si,request,data=self.fixture(66)
             # Remove the fixture's color snapshot; the original task producer
             # must construct the real frozen state from the authenticated owner.
@@ -255,8 +255,8 @@ const v=await exportSdFilms({ids:[],customFilms:[{name:'Warm',filename:'warm.cub
             owner=self.publish_owner(e,data)
             manager,slot,filesystem=e.alloc(12),e.alloc(4),e.alloc(0x24)
             e.w32(manager+8,slot);e.w32(slot,filesystem);e.u.mem_write(filesystem+0x20,b'\1')
-            word=0x46580000|(style<<7) if style else 0
-            body=struct.pack('<11I',0x31505349,3 if style else 1,2,0,0,0,0,0,0,0,word)
+            word=0x46580000|(style<<7)|vignette if style or vignette else 0
+            body=struct.pack('<11I',0x31505349,4 if vignette else 3 if style else 1,2,0,0,0,0,0,0,0,word)
             record=body+struct.pack('<I',zlib.crc32(body))
             def storage(u,at,size,unused):
                 if at==0x53828014:result=manager

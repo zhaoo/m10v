@@ -715,7 +715,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             from scripts.build_gr3_hdf_menu import build_hooks as build_hdf_menu
             hook_start=(start+len(provisional)+15)&~15
             hook,hdf_menu_report=build_hdf_menu(hook_start,{**symbols,**entries},settings_report,film_library,live_color=owner_cache,custom_zoom=custom_zoom,pure_isp_effects=pure_isp_effects,companion=companion,extra_owner_bytes=extra_owner_bytes,adj_extra=camera_extensions)
-            if border_enabled:hdf_menu_report.update(border_enabled=True,hdf_enabled=hdf_enabled,border_resource_ids=[1155,1156,1157],effects_children=(['HDF'] if hdf_enabled else [])+['Border']+(['FilmImprint'] if pure_isp_effects else []))
+            if border_enabled:hdf_menu_report.update(border_enabled=True,hdf_enabled=hdf_enabled,border_resource_ids=[1155,1156,1157],effects_children=(['HDF'] if hdf_enabled else [])+['Border']+(['FilmImprint','Vignette'] if pure_isp_effects else []))
             code,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**hdf_menu_report['exports']},'m10v_hdf_menu_')
             image+=bytes(start-base-len(image))+code+bytes(hook_start-start-len(code))+hook;symbols.update(entries)
             # Compose the added ADJ function with the already audited A/B
@@ -866,6 +866,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             texts+=['胶卷印花','小猫吃鱼','樱花纷飞','绚烂彩虹','深海水母','小猫爪爪','呆头大鹅','宝可梦']
         if 786+len(texts)!=(1211 if pure_isp_effects else 1203):raise ValueError('three-film resource allocation differs')
         texts+=['SHD50','Revolog KOLOR','Pegasus']
+        if pure_isp_effects:texts+=['暗角','暗角开关','暗角强度','开']
         last_resource=786+len(texts)-1
         if sd_library:
             from scripts.generate_m10v_card_captions import resource as caption_resource

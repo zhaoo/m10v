@@ -175,5 +175,5 @@ int m10v_isp_effects_camera_imprint_snapshot(uint32_t *out){
     if(!m10v_isp_effects_validate(&local)||c->magic!=M10V_ISP_EFFECT_CACHE_MAGIC||
        !(*(const volatile uint32_t*)0x55063910u&1u)||
        owner!=__atomic_load_n((const uint32_t*)0x55063988u,__ATOMIC_ACQUIRE))return 0;
-    *out=m10v_isp_effects_imprint(&local);return 1;
+    *out=m10v_isp_effects_imprint(&local)|(local.reserved&M10V_ISP_VIGNETTE_MASK);return 1;
 }

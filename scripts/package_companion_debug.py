@@ -11,14 +11,14 @@ def _extension_info(native):
  marker=native.get('companion',{}).get('extensions')
  if marker is None:return None
  need(isinstance(marker,dict) and marker.get('schema')=='m10v.extensions/v1','extension schema differs')
- need(type(marker.get('available'))is int and 0<=marker['available']<(1<<22),'extension availability differs')
+ need(type(marker.get('available'))is int and 0<=marker['available']<(1<<24),'extension availability differs')
  need(isinstance(marker.get('features'),dict) and set(marker['features'])=={'ab','hdf','border','isp','zoom','aspect'} and all(type(v)is bool for v in marker['features'].values()),'extension features differ')
  need(marker.get('powerImages')=='firmwareBuildOnly','extension power images boundary differs')
  contract=(ROOT/'contracts/extensions-v1.json').read_bytes()
  need(native.get('companion',{}).get('sources',{}).get('contracts/extensions-v1.json')==sha(contract),'extension contract source differs')
  value=json.loads(contract);canonical=json.dumps(value,sort_keys=True,separators=(',',':')).encode()
  digest=sha(canonical)
- need(value.get('schema')==marker['schema'] and digest=='8014c8d909a7427519c41c524088912a426bb27a1ec7168e82f4659c5ba113cd','extension contract identity differs')
+ need(value.get('schema')==marker['schema'] and digest=='f1a60c6593fad7d22ffdbd168c9199567799b2153de15ab84064efcd215f93dc','extension contract identity differs')
  return {**marker,'contractHash':digest}
 
 def _extensions_readme(identity,extensions,retained,has_film):
@@ -40,7 +40,8 @@ def _extensions_readme(identity,extensions,retained,has_film):
 7. 安装 GRemote.apk，保留应用数据。'''+pairing+'\n8. '+film+'''
 9. 装回卡并正常开机，手机连接相机 Wi-Fi。在 App「相机 → 扩展」先读取机身状态，再修改一项并等待机身读回确认。
 
-22 项扩展设置（是否可用以本包已安装组件及 App 读取的机身可用项为准）
+24 项扩展设置（是否可用以本包已安装组件及 App 读取的机身可用项为准）
+暗角：独立开关，弱/中/强三挡；关闭保留档位，成片走原厂 ISP Shading。
 功能：快切开关、快切 A、快切 B。
 效果：胶卷印花（关闭或七种样式）、HDF、边框、颗粒模式、颗粒尺寸、漏光强度、漏光位置、漏光范围、模糊强度、模糊范围。
 水印：时间水印、日期格式、水印位置、水印颜色、胶卷名称。
@@ -84,6 +85,9 @@ def package_debug(candidate,service,apk,out,*,prior_pairing=None,film_pack=None)
   names=z.namelist();need(len(names)==len(set(names)),'duplicate APK entries')
   prefix='assets/flutter_assets/assets/films/'
   catalog=json.loads(z.read(prefix+'camera-catalog.json'));contract=z.read(prefix+'camera-contract.json')
+  if catalog['hash']!=identity['catalogHash']:
+   catalog=json.loads(z.read(prefix+'camera-profiles/full-gr3-20261108-catalog.json'))
+   contract=z.read(prefix+'camera-profiles/full-gr3-20261108-contract.json')
   canonical=json.dumps({k:v for k,v in catalog.items()if k!='hash'},sort_keys=True,ensure_ascii=False,separators=(',',':')).encode()
   need(sha(canonical)==catalog['hash']==identity['catalogHash'] and catalog['rendererHash']==identity['rendererHash'],'APK camera catalog differs')
   need(sha(contract)==meta['registrySha256'],'APK camera contract differs')
@@ -114,6 +118,14 @@ exit 0
   'evidence/runtime-manifest.json':(candidate/'M10V-runtime-manifest.json').read_bytes(),
   'evidence/service-receipt.json':(service/'service-receipt.json').read_bytes(),
  }
+ if native.get('debug_mode') is False:
+  files['02_SERVICE/SD_ROOT/SCRIPT/MCW1101/SERVICE.SH']=b'''#!/bin/sh
+base=/media/storage1/SCRIPT/MCW1101
+if mkdir /tmp/m10v-companion-1101.lock 2>/dev/null; then
+ "$base/SERVICE.BIN" </dev/null >/dev/null 2>&1 &
+fi
+exit 0
+'''
  files['手机安装说明.txt']=('''M10V × GRemote 十槽位联调包
 仅用于 GR III 2.10，尚未通过本包真机验收。不得用于其他机型。
 本包包含个人配对密钥，请勿公开分享。

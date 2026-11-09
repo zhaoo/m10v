@@ -125,6 +125,20 @@ class EffectsPipelineTests(unittest.TestCase):
         expected[4:6] = b'\0\0'
         self.assertEqual(bytes(self.u.mem_read(VALUES, 12)), expected)
 
+    def test_vignette_uses_frozen_shading_without_pixel_work_or_extra_workspace(self):
+        for strength in (1, 2, 3):
+            self.setUp()
+            word = 0x46580000 | 0x400 | ((strength - 1) << 11)
+            self.settings = (0,) * 7 + (word,)
+            self.assertEqual(self.call('freeze', RECIPE), 1)
+            self.settings = (0,) * 8
+            self.assertEqual(self.call('settings', RECIPE, SI, PARAMS, 0), 1)
+            self.assertEqual(struct.unpack('<h', self.u.mem_read(VALUES, 2))[0], -strength)
+            self.put(QUERIED, 0)
+            self.assertEqual(self.call('workspace', PARAMS, QUERIED, 1), 1)
+            self.assertEqual(self.word(QUERIED), 0)
+            self.assertEqual(self.render_calls, [])
+
     def test_active_worker_reports_planning_before_native_execution(self):
         self.arm(settings=(1, 0, 0, 1, 0, 0, 0, 0))
         checkpoints = [r for r in self.diagnostics if r[2] == 0x46584800]

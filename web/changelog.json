@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.09.1",
+      "date": "2026-11-09",
+      "title": "新增机内 ISP 暗角与独立三挡调节",
+      "changes": [
+        "GR III 效果菜单新增暗角，提供独立开关及弱、中、强三挡，关闭保留档位。",
+        "暗角接入原厂 ISP Shading，曝光入队冻结本张参数，不增加 CPU 像素处理。",
+        "GRemote 1.2.7 新增暗角远程控制，并保留旧扩展协议兼容。"
+      ],
+      "notice": "用户已确认 GR III R2 候选可用并授权关闭日志、保留完整功能发布；无量化性能或其他机型真机结论。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.08.1",
       "date": "2026-11-08",
       "title": "完善 GRemote 联动与六十款机内胶卷",
@@ -12,9 +26,9 @@
         "GRemote 移除官网手机预设版本造成的装卷误拦截，确认装卷期间暂停页面轮询。"
       ],
       "notice": "用户已确认 GR III 配套候选的连接、胶卷库、扩展设置及 App 体验修复可用并授权发布；其他机型未获得本次设备验收。使用 GRemote 联动仍需配套 SD 服务并启用机身脚本。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "7e45ac2ff5151a4ba57909125598deaa091e7978",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/42495951370"
     },
     {
       "version": "2026.11.07.1",

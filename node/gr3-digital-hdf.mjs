@@ -62,7 +62,7 @@ export function hdfMenuPatches(runtime,m){
  const captions=full?[937,938,1140]:[970],routes=full?[0x0200f100,0x0200f101,0x0200f102]:[0x0200f102];
  if(m.adj_extra){captions.push(1191);routes.push(0x0200f107);}
  need(d.schema==='m10v-gr3-hdf-menu/v1'&&d.film_library===full&&d.owner_offset===offset&&d.owner_bytes===settingsOwnerBytes(m,offset+(pure?0x22c:0x1c0))&&d.controller_bytes===(pure?0x200:0x1c0)&&d.route===0x0200f102&&typeof m.zoom?.enabled==='boolean'&&d.rows.length===captions.length,'independent menu ownership differs');
- if(pure)need(JSON.stringify(d.effects_children)===JSON.stringify(['HDF','Border',...(m.pure_isp_effects.imprint?['FilmImprint']:[])]),'effects menu child inventory differs');
+ if(pure)need(JSON.stringify(d.effects_children)===JSON.stringify(['HDF','Border',...(m.pure_isp_effects.imprint?['FilmImprint','Vignette']:[])]),'effects menu child inventory differs');
  if(pure)need(full&&d.effects_cache_owner_offset===offset+0x200&&d.effects_cache_bytes===44,'effects cache ownership differs');
  const s=m.symbols,base=m.base;
  const words=(at,list)=>{need(Number.isInteger(at)&&at%4===0&&at>=base&&at+list.length*4<=base+runtime.length,'menu code bounds');list.forEach((v,i)=>need(runtime.readUInt32LE(at-base+i*4)===(v>>>0),'menu instruction differs'));};

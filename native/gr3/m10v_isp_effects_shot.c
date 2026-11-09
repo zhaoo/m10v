@@ -107,7 +107,7 @@ int m10v_isp_effects_shot_freeze(uint32_t recipe){
      * authenticated owner cache once at the real producer, never at Make. */
     uint32_t imprint;
     int global_valid=m10v_isp_effects_camera_imprint_snapshot(&imprint);
-    if(global_valid&&imprint)frozen.reserved=M10V_ISP_EFFECT_PREF_TAG|(imprint<<7);
+    if(global_valid&&imprint)frozen.reserved=M10V_ISP_EFFECT_PREF_TAG|((imprint&7u)<<7)|(imprint&M10V_ISP_VIGNETTE_MASK);
     const m10v_isp_recipe_color *color=(const void*)(uintptr_t)(recipe+M10V_SAVE_COLOR_OFFSET);
     int valid=global_valid&&shot_ram(si,0x94c);
     if(valid){

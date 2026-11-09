@@ -471,7 +471,7 @@ function checkRuntime(runtime, manifest) {
   }
   const guideLabels=['黄金分割','黄金螺旋（左上）','黄金螺旋（右上）','黄金螺旋（左下）','黄金螺旋（右下）'];
   const adjLabels=['ADJ','设置 6','设置 7','设置 8','设置 9','构图线','胶卷库','逐卷效果','画幅','HDF 模拟','左右调整 OK 保存'];
-  const resourceCount=420+(manifest.pure_isp_effects?.imprint?8:0); // Marlboro1202, imprint1203..1210, three films1211..1213.
+  const resourceCount=420+(manifest.pure_isp_effects?.imprint?12:0); // Marlboro1202, imprint1203..1210, three films1211..1213.
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   if(manifest.pure_isp_effects?.enabled){
@@ -482,7 +482,9 @@ function checkRuntime(runtime, manifest) {
   need(JSON.stringify(manifest.resources.texts.slice(400,405))===JSON.stringify(['Harman Phoenix 200','Kodak ColorPlus 200','Fujifilm Natura 1600','Lomo Redscale XR','Agfa Vista 200']),'five C41 resource identity differs');
   if(manifest.adj_extra)need(JSON.stringify(manifest.resources.texts.slice(405,416))===JSON.stringify(adjLabels),'ADJ settings captions differ');
   if(manifest.pure_isp_effects?.imprint)need(JSON.stringify(manifest.resources.texts.slice(417,425))===JSON.stringify(['胶卷印花','小猫吃鱼','樱花纷飞','绚烂彩虹','深海水母','小猫爪爪','呆头大鹅','宝可梦']),'imprint captions differ');
-  need(JSON.stringify(manifest.resources.texts.slice(resourceCount-3))===JSON.stringify(['SHD50','Revolog KOLOR','Pegasus']),'three-film captions differ');
+  const threeFilmStart=manifest.pure_isp_effects?.imprint?425:417;
+  need(JSON.stringify(manifest.resources.texts.slice(threeFilmStart,threeFilmStart+3))===JSON.stringify(['SHD50','Revolog KOLOR','Pegasus']),'three-film captions differ');
+  if(manifest.pure_isp_effects?.imprint)need(JSON.stringify(manifest.resources.texts.slice(428,432))===JSON.stringify(['暗角','暗角开关','暗角强度','开']),'vignette captions differ');
   for (let i=0;i<resourceCount;i++) {
     const at = manifest.resources.descriptors[i] - BASE, text = manifest.resources.texts[i];
     need(Number.isInteger(at) && at >= 0 && at + 8 < runtime.length && typeof text === 'string', 'native text pointer invalid');

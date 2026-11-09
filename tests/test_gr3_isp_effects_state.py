@@ -27,6 +27,16 @@ def wire(sequence=0, values=(0,) * 8, magic=0x31505349, version=1):
 
 
 class EffectsStateTests(unittest.TestCase):
+    def test_vignette_record_keeps_switch_strength_and_other_effects(self):
+        # V4: enabled bit10, remembered strength-minus-one in bits11..12.
+        settings = Settings(2,1,2,3,1,2,1,0x46580000 | 0x400 | (2 << 11))
+        record = C.create_string_buffer(48)
+        self.assertEqual(self.lib.m10v_isp_effects_encode(C.byref(settings),7,record,48),1)
+        self.assertEqual(struct.unpack_from('<I',record.raw,4)[0],4)
+        decoded=Settings(); sequence=C.c_uint32()
+        self.assertEqual(self.lib.m10v_isp_effects_decode(record,48,C.byref(decoded),C.byref(sequence)),1)
+        self.assertEqual(bytes(settings),bytes(decoded))
+        self.assertEqual(sequence.value,7)
     @classmethod
     def setUpClass(cls):
         source = ROOT / "native/gr3/m10v_isp_effects_state.c"

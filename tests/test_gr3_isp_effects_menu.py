@@ -78,7 +78,7 @@ class EffectsMenuTests(unittest.TestCase):
  def test_effects_root_shows_hdf_border_and_global_imprint(self):
   self.ready();self.call('m10v_hdf_menu_enter',self.page,0,0)
   for _ in range(4):self.key(0xd1)
-  self.assertEqual(self.get(self.page+0x1a4),2)
+  self.assertEqual(self.get(self.page+0x1a4),3)
   self.assertEqual(self.rows()[:3],[1141,1155,1203])
   self.assertEqual([event for event in self.camera_events if 'isp_effects' in event],['m10v_isp_effects_camera_init'])
  def test_resources_keep_fn_labels_and_direction_choices(self):
@@ -87,6 +87,22 @@ class EffectsMenuTests(unittest.TestCase):
   self.assertEqual(words[:3],['漏光','颗粒','模糊'])
   self.assertEqual(words[4],'漏光位置 左上右下随机')
   self.assertEqual([words[i] for i in (12,7,13,8,14)],['左','上','右','下','随机'])
+ def test_vignette_root_entry_opens_independent_switch_and_strength(self):
+  self.ready();self.call('m10v_hdf_menu_enter',self.page,0,0)
+  self.assertEqual(self.rows()[3],1214)
+  self.child(3)
+  self.assertEqual(self.rows()[:2],[1215,1216])
+  self.key(0xd8) # open switch
+  self.key(0xd1);self.key(0xd8) # enable and save
+  self.assertEqual(self.saved_settings[-1][7]&0x400,0x400)
+  self.child(3);self.key(0xd1);self.key(0xd8) # strength
+  self.key(0xd1);self.key(0xd1);self.key(0xd8) # strong
+  self.assertEqual(self.saved_settings[-1][7]&0x1c00,0x1400)
+  self.child(3);self.key(0xd8) # switch
+  self.key(0xd0);self.key(0xd8) # off, remember strong
+  self.assertEqual(self.saved_settings[-1][7]&0x1c00,0x1000)
+  self.child(3);self.key(0xd1);self.key(0xd8)
+  self.assertEqual(self.get(self.page+0x180),2) # strong restored
  def test_hdf_border_remain_independent_children(self):
   self.ready();self.child(0);self.key(0xd1);self.key(0xd8)
   self.assertEqual(self.hdf_saved,[1]);self.assertEqual(self.get(self.page+0x18c),1)
