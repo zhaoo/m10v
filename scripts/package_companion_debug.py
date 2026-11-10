@@ -11,21 +11,36 @@ def _extension_info(native):
  marker=native.get('companion',{}).get('extensions')
  if marker is None:return None
  need(isinstance(marker,dict) and marker.get('schema')=='m10v.extensions/v1','extension schema differs')
- need(type(marker.get('available'))is int and 0<=marker['available']<(1<<24),'extension availability differs')
- need(isinstance(marker.get('features'),dict) and set(marker['features'])=={'ab','hdf','border','isp','zoom','aspect'} and all(type(v)is bool for v in marker['features'].values()),'extension features differ')
+ need(type(marker.get('available'))is int and 0<=marker['available']<(1<<25),'extension availability differs')
+ features=marker.get('features');required={'ab','hdf','border','isp','zoom','aspect'}
+ need(isinstance(features,dict) and set(features)in(required,required|{'torn'}) and all(type(v)is bool for v in features.values()),'extension features differ')
+ expected=(31<<12)|(7 if features['ab']else 0)|(1<<3 if features['hdf']else 0)|(1<<4 if features['border']else 0)|(((1<<12)-(1<<5))|(7<<21) if features['isp']else 0)|(7<<17 if features['zoom']else 0)|(1<<20 if features['aspect']else 0)|(1<<24 if features.get('torn')else 0)
+ need(marker['available']==expected,'extension availability differs from installed features')
  need(marker.get('powerImages')=='firmwareBuildOnly','extension power images boundary differs')
  contract=(ROOT/'contracts/extensions-v1.json').read_bytes()
  need(native.get('companion',{}).get('sources',{}).get('contracts/extensions-v1.json')==sha(contract),'extension contract source differs')
  value=json.loads(contract);canonical=json.dumps(value,sort_keys=True,separators=(',',':')).encode()
  digest=sha(canonical)
- need(value.get('schema')==marker['schema'] and digest=='f1a60c6593fad7d22ffdbd168c9199567799b2153de15ab84064efcd215f93dc','extension contract identity differs')
+ need(value.get('schema')==marker['schema'] and digest=='c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d','extension contract identity differs')
  return {**marker,'contractHash':digest}
+
+def _extension_service_identity(extensions,elf):
+ if extensions:need(extensions['schema'].encode()in elf and extensions['contractHash'].encode()in elf,'service extension identity differs')
 
 def _extensions_readme(identity,extensions,retained,has_film):
  pairing=('本包已核验沿用旧 v2 的相同配对密钥和相机身份；App 已导入该配对时无需重新导入。'
           if retained else '首次使用时导入 private/pairing.json；沿用旧 v2 相同配对且 App 已导入时无需重新导入。')
  film=('本包附匹配的 M10V/FILMS.M10。先备份旧文件，仅在确认使用本包胶卷库时替换该单个文件；不要删除机身设置、个人配方和照片。'
        if has_film else '本包不覆盖 M10V/FILMS.M10；保留卡上已有胶卷库、个人配方与照片。')
+ torn=bool(extensions['available']&(1<<24))
+ torn_text=('''
+撕纸叠映（实验功能，尚无真机验收）
+在机身「效果 → 撕纸叠映」或 App「相机 → 扩展 → 功能 → 撕纸叠映」开始。
+待拍轮廓：先拍白底暗色撕纸，轮廓原图按普通拍摄保存；待拍素材：再拍实景，候选合成在相机原厂 ISP/IIP 中执行。对焦与快门各自操作，不自动拍摄，手机不合成照片。
+只接纳 YC422；RAW 像素保持不变。选择 Half、非单拍、HDR、Charmera 或像素世界时拒绝开始。取消或重新开始仅控制本次运行会话，不写入持久存档。
+「已完成」仅表示处理阶段完成，不独立证明照片已写入 SD 卡。实机需检查撕纸纤维、暗部素材、白底、彩边、横竖拍、RAW+JPEG、即时回放、相册，以及至少连续三张和取消后恢复。
+断线后先读取阶段并核对回执，不自动重放开始或取消；遇到失败或结果待核对，不要重复提交。性能、混合公式和相机兼容性仍待同条件原厂对照验收。
+''' if torn else '')
  return ('''M10V × GRemote 相机扩展测试包
 仅用于 GR III 2.10，尚未通过本包真机验收。不得用于其他机型。
 本包含个人配对密钥，请勿公开分享。
@@ -40,7 +55,7 @@ def _extensions_readme(identity,extensions,retained,has_film):
 7. 安装 GRemote.apk，保留应用数据。'''+pairing+'\n8. '+film+'''
 9. 装回卡并正常开机，手机连接相机 Wi-Fi。在 App「相机 → 扩展」先读取机身状态，再修改一项并等待机身读回确认。
 
-24 项扩展设置（是否可用以本包已安装组件及 App 读取的机身可用项为准）
+'''+('25 项' if torn else '24 项')+'''扩展设置（是否可用以本包已安装组件及 App 读取的机身可用项为准）
 暗角：独立开关，弱/中/强三挡；关闭保留档位，成片走原厂 ISP Shading。
 功能：快切开关、快切 A、快切 B。
 效果：胶卷印花（关闭或七种样式）、HDF、边框、颗粒模式、颗粒尺寸、漏光强度、漏光位置、漏光范围、模糊强度、模糊范围。
@@ -57,7 +72,7 @@ Half 3:4 使用两次拍摄完成双格合成；离开 Half 会取消尚未完�
 遇到「结果待核对」不要重复提交，也不要自动重放原写入。先核对原请求回执；若断连、重启或回执无法确认，重新读取并手动复核机身实际状态后，再决定后续操作。
 服务失败后需要关机重启，不在同一开机周期热重启服务。撤除服务时先关机，恢复已备份的 STARTUP.TTL，仅撤除本包 SCRIPT/MCW1101；不要删除其他脚本、设置或照片。回退固件使用原备份并按机身更新流程操作。
 本包不会以拍照替代对焦，也不自动触发拍摄。离线测试、构建与 ARM 模拟结果不能替代真机性能、缓存一致性、成片质量或设备兼容性验收。
-'''+ '\n固件标识：'+identity['buildId']+'\n扩展协议：'+extensions['schema']+'\n扩展合同：'+extensions['contractHash']+'\n')
+'''+torn_text+ '\n固件标识：'+identity['buildId']+'\n扩展协议：'+extensions['schema']+'\n扩展合同：'+extensions['contractHash']+'\n')
 
 def package_debug(candidate,service,apk,out,*,prior_pairing=None,film_pack=None):
  candidate,service,apk,out=map(Path,(candidate,service,apk,out))
@@ -68,6 +83,7 @@ def package_debug(candidate,service,apk,out,*,prior_pairing=None,film_pack=None)
  meta=json.loads((service/'service-receipt.json').read_text());elf=(service/'m10v-companion.elf').read_bytes()
  need(meta.get('installable')is True and meta.get('cameraPassed')is False and meta.get('firmwareSha256')==sha(firmware),'service is not matching debug candidate')
  need(meta['buildId']==identity['buildId'] and meta['catalogHash']==identity['catalogHash'] and meta['rendererHash']==identity['rendererHash'] and sha(elf)==meta['serviceSha256'],'service identity differs')
+ _extension_service_identity(extensions,elf)
  pair=(service/'pairing.json').read_bytes();pairing=json.loads(pair)
  need(pairing.get('schema')=='m10v.companion-pairing/v1' and pairing.get('model')=='GR III' and re.fullmatch('[a-f0-9]{64}',pairing.get('keyHex','')) is not None,'invalid private pairing')
  key=bytes.fromhex(pairing['keyHex']);need(sha(key)[:32]==pairing['keyId'] and key in elf and bytes.fromhex(pairing['instanceId']) in elf,'pairing differs from executable')

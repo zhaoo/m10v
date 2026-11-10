@@ -40,6 +40,8 @@ def _compile(base):
   (t/'link.ld').write_text(f'original_setup_continue = 0x5367adb0; original_granulation = 0x5367ad3c; original_rng = 0x5368a92c; original_submit = 0x5376cd10; original_wait = 0x5368a510; original_release = 0x5376c044; SECTIONS {{ . = {base}; .text : {{ *(.text*) }} .rodata : {{ *(.rodata*) }} /DISCARD/ : {{ *(.ARM.exidx*) *(.ARM.extab*) *(.comment*) *(.note*) }} }}')
   subprocess.run([lld,'-T',str(t/'link.ld'),'--entry=m10v_isp_effect_granulation_owned',*objs,'-o',str(t/'out')],check=True,capture_output=True)
   b=(t/'out').read_bytes();sh=struct.unpack_from('<I',b,32)[0];size,count,ni=struct.unpack_from('<HHH',b,46);rows=[struct.unpack_from('<10I',b,sh+n*size) for n in range(count)];names=b[rows[ni][4]:rows[ni][4]+rows[ni][5]];image=bytearray();symbols={}
+  from scripts.gr3_target_relocations import relocations
+  relocations.linked(b)
   for r in rows:
    name=names[r[0]:].split(b'\0',1)[0].decode()
    if r[2]&2 and r[5]:

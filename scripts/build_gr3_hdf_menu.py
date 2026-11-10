@@ -29,7 +29,7 @@ def build_hooks(base,symbols,settings,film_library=True,live_color=False,custom_
         if owner>0x6400:raise ValueError("existing effects overlap companion descriptor")
         owner=0x6440
     if extra_owner_bytes:
-        if not film_library or extra_owner_bytes!=0x6d00 or settings['owner_bytes']!=extra_owner_bytes or owner>0x6500:
+        if not film_library or extra_owner_bytes not in (0x6d00,0x6e00) or settings['owner_bytes']!=extra_owner_bytes or owner>0x6500:
             raise ValueError('extended controls overlap the HDF menu owner')
         owner=extra_owner_bytes
     patches=[]

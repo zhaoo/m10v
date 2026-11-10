@@ -20,7 +20,7 @@ class ProductionOwner(unittest.TestCase):
   for i,p in enumerate(files):
    obj=d/f'{i}.o';subprocess.run(['clang','--target=armv7-none-eabi','-mcpu=cortex-a9','-marm','-mfloat-abi=soft','-Os','-ffreestanding','-fno-builtin','-ffunction-sections','-fdata-sections','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-Wall','-Wextra','-Werror',*cls.feature_flags,'-DM10V_COMPANION_ENABLED=1','-DM10V_APPENDED_SLOTS=1','-DM10V_LIVE_COLOR=1','-include',str(identity),'-c',str(p),'-o',str(obj)],check=True,capture_output=True);objects.append(obj)
   cls.ports={name:0x54010000+i*64 for i,name in enumerate(['m10v_camera_library_read_current','m10v_camera_library_mutation_begin','m10v_camera_library_mutation_end','m10v_camera_library_mutation_busy','m10v_camera_library_commit_snapshot','m10v_sd_camera_custom_record','m10v_camera_library_shooting_count','m10v_settings_controller_remote_busy']+cls.extra_ports)}
-  elf=d/'owner.elf';subprocess.run(['ld.lld','-m','armelf_linux_eabi','--gc-sections','--entry=m10v_companion_ui_init','--undefined=m10v_companion_ui_stop','--undefined=m10v_companion_ui_storage_enter','--undefined=m10v_companion_ui_storage_leave','-Ttext=0x540c0000',*[f'--defsym={k}={v}' for k,v in cls.ports.items()],*[str(p) for p in objects],'-o',str(elf)],check=True,capture_output=True)
+  elf=d/'owner.elf';subprocess.run(['ld.lld','-m','armelf_linux_eabi','--gc-sections','--entry=m10v_companion_ui_init','--undefined=m10v_companion_ui_stop','--undefined=m10v_companion_ui_storage_enter','--undefined=m10v_companion_ui_storage_leave',*[f'--undefined={name}' for name in getattr(cls,'extra_roots',[])],'-Ttext=0x540c0000',*[f'--defsym={k}={v}' for k,v in cls.ports.items()],*[str(p) for p in objects],'-o',str(elf)],check=True,capture_output=True)
   cls.elf=elf.read_bytes();nm=subprocess.check_output(['/opt/homebrew/opt/llvm/bin/llvm-nm','--defined-only',str(elf)],text=True);cls.symbols={line.split()[2]:int(line.split()[0],16) for line in nm.splitlines() if len(line.split())==3}
   path=Path(os.environ.get('M10V_GR3_ORIGINAL_RTOS','/Users/zhaoo/.codex/worktrees/film-companion/diagnostic-20261101/source/builds/gr3-extension-validation/official-rtos.bin'));cls.firmware=path.read_bytes();assert hashlib.sha256(cls.firmware).hexdigest()=='8a4eafcad2716e0b21e9909264e1242e534f0e39e05cba82a53546ceb4070b67'
  def machine(self):
@@ -143,7 +143,7 @@ class ProductionOwner(unittest.TestCase):
   self.assertEqual(self.exchange(m,wire,2,1,bytes([7]*16))[0],0)
   code,read=self.exchange(m,wire,4,5);self.assertEqual(code,0)
   self.assertEqual(struct.unpack_from('<I',read,12)[0],31<<12)
-  before=bytes(m.state);contract=bytes.fromhex('8014c8d909a7427519c41c524088912a426bb27a1ec7168e82f4659c5ba113cd')
+  before=bytes(m.state);contract=bytes.fromhex('c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d')
   def patch(ident,field,value,revision):return bytes([ident]*16)+bytes([7]*16)+contract+revision+struct.pack('<II',field,value)
   p=patch(9,12,2,read[-32:]);code,result=self.exchange(m,wire,6,6,p)
   self.assertEqual(code,0);self.assertEqual(struct.unpack_from('<III',result),(2,0,1));self.assertEqual(m.saves,1);self.assertEqual(m.state[92],2)
@@ -157,7 +157,7 @@ class ProductionOwner(unittest.TestCase):
  def test_extension_uncertainty_blocks_local_film_store_until_poll_readback(self):
   m=self.machine();owner=0x55860000;m.run(self.symbols['m10v_companion_ui_init'],owner);wire=m.word(owner+0x6400+16);m.run(self.symbols['m10v_companion_ui_start'],owner)
   self.exchange(m,wire,2,1,bytes([7]*16));_,read=self.exchange(m,wire,4,5)
-  ident=bytes([22]*16);contract=bytes.fromhex('8014c8d909a7427519c41c524088912a426bb27a1ec7168e82f4659c5ba113cd')
+  ident=bytes([22]*16);contract=bytes.fromhex('c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d')
   payload=ident+bytes([7]*16)+contract+read[-32:]+struct.pack('<II',16,1)
   m.fail_after_commit=True;code,result=self.exchange(m,wire,6,6,payload)
   self.assertEqual(struct.unpack_from('<I',result)[0],4);self.assertEqual(m.saves,1)
@@ -194,7 +194,7 @@ class ProductionHdfDivergence(ProductionOwner):
    u.reg_write(UC_ARM_REG_R0,answer);u.reg_write(UC_ARM_REG_PC,u.reg_read(UC_ARM_REG_LR))
   m.u.hook_add(UC_HOOK_CODE,fs);m.run(self.symbols['m10v_companion_ui_start'],owner)
   self.exchange(m,wire,2,1,bytes([7]*16));code,read=self.exchange(m,wire,4,5);self.assertEqual(code,0)
-  ident=bytes([33]*16);contract=bytes.fromhex('8014c8d909a7427519c41c524088912a426bb27a1ec7168e82f4659c5ba113cd')
+  ident=bytes([33]*16);contract=bytes.fromhex('c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d')
   payload=ident+bytes([7]*16)+contract+read[-32:]+struct.pack('<II',3,3)
   code,result=self.exchange(m,wire,6,6,payload)
   self.assertEqual(struct.unpack_from('<I',result)[0],4);self.assertEqual(len(writes),1)

@@ -22,6 +22,12 @@ class ServiceTargetBuildTests(unittest.TestCase):
    self.assertLessEqual(receipt['reachableStackBoundBytes'],4096)
    self.assertLessEqual(receipt['stagingStaticBytes']+4096,65536)
    self.assertFalse(receipt['cameraPassed'])
+   from scripts.package_companion_debug import _extension_service_identity
+   elf=(Path(d)/'service/m10v-companion.elf').read_bytes();current='c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d'
+   extension={'schema':'m10v.extensions/v1','contractHash':current}
+   _extension_service_identity(extension,elf)
+   previous=elf.replace(current.encode(),b'f1a60c6593fad7d22ffdbd168c9199567799b2153de15ab84064efcd215f93dc')
+   with self.assertRaisesRegex(ValueError,'service extension identity differs'):_extension_service_identity(extension,previous)
 
 @unittest.skipUnless(os.environ.get('M10V_GREMOTE_PACKAGE_NATIVE'),'requires a real audited GR III companion candidate')
 class ServiceEmbeddedIdentityTests(unittest.TestCase):

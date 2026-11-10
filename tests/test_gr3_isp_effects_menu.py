@@ -16,7 +16,7 @@ from tests import test_gr3_hdf_menu as legacy
 ROOT=Path(__file__).resolve().parents[1]
 NAMES=('m10v_hdf_load','m10v_hdf_save','m10v_border_camera_refresh','m10v_border_camera_save',
  'm10v_isp_effects_camera_init','m10v_isp_effects_camera_refresh','m10v_isp_effects_camera_save','m10v_isp_effects_camera_snapshot',
- 'm10v_hdf_menu_parent_ctor','m10v_hdf_menu_parent_dtor','m10v_hdf_menu_parent_factory','m10v_hdf_menu_parent_key_route','m10v_hdf_menu_vtable','m10v_debug_log')
+ 'm10v_hdf_menu_parent_ctor','m10v_hdf_menu_parent_dtor','m10v_hdf_menu_parent_factory','m10v_hdf_menu_parent_key_route','m10v_hdf_menu_vtable','m10v_debug_log','m10v_torn_state','m10v_torn_set','m10v_torn_busy','m10v_companion_ui_storage_enter','m10v_companion_ui_storage_leave')
 STUBS={name:0x53000100+4*i for i,name in enumerate(NAMES)}
 
 class EffectsMenuTests(unittest.TestCase):
@@ -26,6 +26,7 @@ class EffectsMenuTests(unittest.TestCase):
   source=ROOT/'native/gr3/m10v_hdf_menu.c';obj=p/'menu.o';stateobj=p/'state.o';elf=p/'menu.elf';link=p/'link.ld'
   cls.flags=[*FLAGS,'-DM10V_PURE_ISP_EFFECTS=1','-DM10V_BORDER_ENABLED=1','-DM10V_HDF_ENABLED=1','-DM10V_ADJ_EXTRA_CAMERA=1','-DM10V_HDF_OWNER_OFFSET=0x13bc','-DM10V_BORDER_CACHE_OWNER_OFFSET=0x1564','-DM10V_ISP_EFFECT_CACHE_OWNER_OFFSET=0x15bc']
   cls.flags.append('-DM10V_DEBUG_MODE=1')
+  cls.flags.extend(getattr(cls,'EXTRA_FLAGS',[]))
   subprocess.run([shutil.which('clang'),*cls.flags,'-c',str(source),'-o',str(obj)],check=True,capture_output=True)
   subprocess.run([shutil.which('clang'),*FLAGS,'-c',str(ROOT/'native/gr3/m10v_isp_effects_state.c'),'-o',str(stateobj)],check=True,capture_output=True)
   link.write_text('\n'.join(f'{n} = {v};' for n,v in STUBS.items())+'\nSECTIONS { . = 0x54110000; .text : { *(.text*) } .rodata : { *(.rodata*) } /DISCARD/ : { *(.ARM.exidx*) *(.ARM.extab*) *(.comment*) *(.note*) } }')
@@ -49,12 +50,19 @@ class EffectsMenuTests(unittest.TestCase):
  key=legacy.HdfMenuTests.key
  ready=legacy.HdfMenuTests.ready
  def setUp(self):
-  legacy.HdfMenuTests.setUp(self);self.settings=[0]*8;self.saved_settings=[];self.camera_events=[];self.save_error=False;self.hdf_saved=[];self.border_saved=[];self.traces=[];self.refresh_error=False
+  legacy.HdfMenuTests.setUp(self);self.settings=[0]*8;self.saved_settings=[];self.camera_events=[];self.save_error=False;self.hdf_saved=[];self.border_saved=[];self.traces=[];self.refresh_error=False;self.torn_stage=0;self.torn_generation=1;self.torn_busy=False;self.torn_actions=[];self.storage_allowed=True;self.storage_current=True
   def service(u,pc,n,data):
    names={v:k for k,v in STUBS.items()};name=names.get(pc)
    if not name:return
    r=[u.reg_read(getattr(A,f'UC_ARM_REG_R{i}')) for i in range(4)];result=0;self.camera_events.append(name)
    if name=='m10v_debug_log':self.traces.append(r+[self.get(u.reg_read(A.UC_ARM_REG_SP))])
+   elif name=='m10v_torn_state':self.put(r[0],self.torn_stage);self.put(r[1],self.torn_generation);result=1
+   elif name=='m10v_torn_busy':result=int(self.torn_busy)
+   elif name=='m10v_companion_ui_storage_enter':self.assertEqual(r[0],0);result=int(self.storage_allowed)
+   elif name=='m10v_companion_ui_storage_leave':self.assertEqual(r[0],1);result=int(self.storage_current)
+   elif name=='m10v_torn_set':
+    self.torn_actions.append((r[0],r[1]));result=0xffffffff if self.torn_busy else 0
+    if not self.torn_busy:self.torn_stage=r[1];self.torn_generation+=1
    elif name=='m10v_isp_effects_camera_refresh':result=0xfffffffe if self.refresh_error else 0
    elif name=='m10v_isp_effects_camera_snapshot':u.mem_write(r[0],struct.pack('<8I',*self.settings));self.put(r[1],1);result=1
    elif name=='m10v_isp_effects_camera_save':

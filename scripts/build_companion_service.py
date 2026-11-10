@@ -100,9 +100,10 @@ def _embedded_owner_identity(rom,manifest):
  component=manifest['companion'];identity=component['identity']
  flags=identity_flags(identity)
  features=component.get('extensions',{}).get('features',{})
- if set(features)!={'ab','hdf','border','isp','zoom','aspect'} or any(type(v)is not bool for v in features.values()):raise ValueError('runtime owner extension layout differs')
+ required={'ab','hdf','border','isp','zoom','aspect'}
+ if set(features)not in(required,required|{'torn'}) or any(type(v)is not bool for v in features.values()):raise ValueError('runtime owner extension layout differs')
  flags+=[f'-DM10V_COMPANION_EXT_{name.upper()}={int(features[name])}' for name in ['ab','hdf','border','isp','zoom','aspect']]
- flags+=['-DM10V_COMPANION_RTOS_ONLY=1','-DM10V_LIVE_COLOR=1','-DM10V_APPENDED_SLOTS=1']
+ flags+=['-DM10V_COMPANION_RTOS_ONLY=1','-DM10V_LIVE_COLOR=1','-DM10V_APPENDED_SLOTS=1',f'-DM10V_TORN_ENABLED={int(features.get("torn",False))}']
  for name,digest in component.get('sources',{}).items():
   if name.startswith('/') or '..' in Path(name).parts or _hash((ROOT/name).read_bytes())!=digest:raise ValueError('runtime owner source differs: '+name)
  compiler=os.environ.get('M10V_LLVM_CLANG') or shutil.which('clang')

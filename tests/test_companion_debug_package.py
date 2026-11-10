@@ -77,6 +77,16 @@ class DebugPackageTests(unittest.TestCase):
   with self.assertRaisesRegex(ValueError,'APK extension identity differs'):
    module.package_debug(self.native,self.service,apk,self.d/'never')
   self.assertFalse((self.d/'never').exists())
+ def test_service_with_previous_extension_contract_rejected_before_output(self):
+  native=json.loads((self.native/'M10V-runtime-manifest.json').read_text())
+  if not native.get('companion',{}).get('extensions'):self.skipTest('legacy v2 package has no extension component')
+  service=self.d/'old-service';shutil.copytree(self.service,service)
+  path=service/'m10v-companion.elf';data=path.read_bytes();current=b'c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d'
+  self.assertIn(current,data);data=data.replace(current,b'f1a60c6593fad7d22ffdbd168c9199567799b2153de15ab84064efcd215f93dc');path.write_bytes(data)
+  receipt=service/'service-receipt.json';meta=json.loads(receipt.read_text());meta['serviceSha256']=hashlib.sha256(data).hexdigest();receipt.write_text(json.dumps(meta))
+  with self.assertRaisesRegex(ValueError,'service extension identity differs'):
+   module.package_debug(self.native,service,self.apk,self.d/'never')
+  self.assertFalse((self.d/'never').exists())
 
 class ExtensionDeliveryContractTests(unittest.TestCase):
  def native(self):
@@ -88,7 +98,7 @@ class ExtensionDeliveryContractTests(unittest.TestCase):
  def test_extension_marker_binds_exact_independent_contract(self):
   self.assertTrue(hasattr(module,'_extension_info'),'packager must recognize extension marker independently')
   info=module._extension_info(self.native())
-  self.assertEqual(info['contractHash'],'f1a60c6593fad7d22ffdbd168c9199567799b2153de15ab84064efcd215f93dc')
+  self.assertEqual(info['contractHash'],'c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d')
   self.assertEqual(info['available'],(1<<24)-1)
   for change in ['schema','available','source']:
    native=self.native()
@@ -103,3 +113,11 @@ class ExtensionDeliveryContractTests(unittest.TestCase):
   for phrase in ['快切开关','快切 A','快切 B','HDF','边框','颗粒模式','颗粒尺寸','漏光强度','漏光位置','漏光范围','模糊强度','模糊范围','时间水印','日期格式','水印位置','水印颜色','胶卷名称','第一档焦距','第二档焦距','当前焦距档','画幅','只读','重启后默认关闭','两次拍摄','无需重新导入','固件构建','不要重复提交','手动复核','SCRIPT/MCW1101','合并','不要删除整个 SCRIPT','不写入持久模式开关','不能替代真机性能']:
    with self.subTest(phrase=phrase):self.assertIn(phrase,text)
   self.assertNotIn('keyHex',text)
+ def test_torn_feature_mask_and_experimental_instructions_are_bound(self):
+  native=self.native();native['companion']['extensions']['features']['torn']=True;native['companion']['extensions']['available']=(1<<25)-1
+  info=module._extension_info(native);self.assertEqual(info['available'],(1<<25)-1)
+  text=module._extensions_readme({'buildId':'11'*32},info,True,False)
+  for phrase in ['撕纸叠映','白底暗色','待拍轮廓','待拍素材','原厂 ISP/IIP','YC422','RAW','实验','彩边','不自动','25 项']:
+   with self.subTest(phrase=phrase):self.assertIn(phrase,text)
+  native['companion']['extensions']['features']['torn']=False
+  with self.assertRaisesRegex(ValueError,'extension availability'):module._extension_info(native)

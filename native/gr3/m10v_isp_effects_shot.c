@@ -2,6 +2,9 @@
 #include "m10v_isp_effects_shot.h"
 #include "m10v_isp_effects_camera.h"
 #include "m10v_save_trace.h"
+#if M10V_TORN_ENABLED
+#include "m10v_torn_overlay.h"
+#endif
 #if M10V_PURE_ISP_EFFECTS
 #include "m10v_tone.h"
 #include "m10v_isp_recipe_color.h"
@@ -89,6 +92,9 @@ static int shot_valid(uint32_t recipe,const m10v_isp_effects_shot_snapshot *s){
 }
 void m10v_isp_effects_shot_reserve(uint32_t recipe){
     m10v_isp_effects_shot_snapshot *s=shot_storage(recipe);if(!s)return;
+#if M10V_TORN_ENABLED
+    m10v_torn_reserve(recipe);
+#endif
     for(uint32_t i=0;i<sizeof(*s)/4;i++)((volatile uint32_t*)s)[i]=0;
     s->owner=recipe;__atomic_store_n(&s->magic,M10V_ISP_EFFECTS_SHOT_MAGIC,__ATOMIC_RELEASE);
 }
@@ -157,6 +163,9 @@ int m10v_isp_effects_shot_freeze(uint32_t recipe){
     valid=valid&&orientation;
     if(valid){frozen.reserved=m10v_isp_effects_imprint_snapshot_word(frozen.reserved);shot_copy(&s->settings,&frozen,sizeof(frozen));s->sequence=sequence;s->source_si=si;s->saved_orientation=orientation;s->rainbow=rainbow;}
     __atomic_store_n(&s->ready,valid?1u:2u,__ATOMIC_RELEASE);
+#if M10V_TORN_ENABLED
+    (void)m10v_torn_freeze(recipe);
+#endif
     return valid;
 }
 int m10v_isp_effects_shot_read(uint32_t recipe,m10v_isp_effects_shot_snapshot *out){

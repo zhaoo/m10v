@@ -74,7 +74,7 @@ class Server(unittest.TestCase):
  def envelope(self,state,request_id='a'*32):return {'protocol':1,'requestId':request_id,'bootId':self.boot,'baseRevision':state['revision'],'catalogHash':state['catalogHash'],'rendererHash':state['rendererHash'],'patch':[{'slot':0,'grain':2}],'activateSlot':None}
  def test_extensions_independent_discovery_and_verified_commit(self):
   status,caps=self.request('GET','/m10v/v1/extensions/capabilities');self.assertEqual(status,200)
-  self.assertEqual(caps['schema'],'m10v.extensions/v1');self.assertEqual(len(caps['fields']),24)
+  self.assertEqual(caps['schema'],'m10v.extensions/v1');self.assertEqual(len(caps['fields']),25)
   contract=json.loads((ROOT/'contracts/extensions-v1.json').read_text())
   self.assertEqual([{k:v for k,v in f.items() if k!='supported'} for f in caps['fields']],[{k:v for k,v in f.items() if k!='id'} for f in contract['fields']])
   self.assertEqual(caps['powerImages'],{'supported':False,'reason':'firmwareBuildRequired'})

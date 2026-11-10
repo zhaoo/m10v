@@ -2,6 +2,9 @@
 #define M10V_SAVE_TRACE_H
 #include <stdint.h>
 #include "m10v_capture_raw_lifetime.h"
+#ifndef M10V_TORN_ENABLED
+#define M10V_TORN_ENABLED 0
+#endif
 /* No hidden owner. Caller keeps this storage alive through its synchronous
  * bridge call and consumes it only after return. Never put it in appendRX.
  * No pointer in a record is retained for later dereference. */
@@ -17,7 +20,11 @@
 #define M10V_SAVE_CUSTOM_ISP_BYTES 1576u
 #define M10V_SAVE_RECIPE_BASE_EXTENDED_BYTES (M10V_SAVE_CUSTOM_ISP_OFFSET+M10V_SAVE_CUSTOM_ISP_BYTES)
 #if M10V_PURE_ISP_EFFECTS
+#if M10V_TORN_ENABLED
+#define M10V_SAVE_RECIPE_EXTENDED_BYTES (M10V_SAVE_RECIPE_BASE_EXTENDED_BYTES+96u+32u)
+#else
 #define M10V_SAVE_RECIPE_EXTENDED_BYTES (M10V_SAVE_RECIPE_BASE_EXTENDED_BYTES+96u)
+#endif
 #else
 #define M10V_SAVE_RECIPE_EXTENDED_BYTES M10V_SAVE_RECIPE_BASE_EXTENDED_BYTES
 #endif

@@ -2,6 +2,9 @@
  * Linux only exchanges bounded mailbox records. No capture path is changed. */
 #include "m10v_zoom_camera.h"
 #include "m10v_isp_effects_camera.h"
+#if M10V_TORN_ENABLED
+#include "m10v_torn_overlay.h"
+#endif
 extern uint32_t m10v_settings_controller_remote_busy(void);
 extern int m10v_settings_controller_remote_ab_read(uint32_t *,uint32_t *);
 extern int m10v_settings_controller_remote_ab_write(uint32_t,uint32_t);
@@ -21,12 +24,16 @@ extern int m10v_zoom_camera_snapshot(m10v_zoom_state *);
 extern uint32_t m10v_zoom_live_slot(void);
 extern int m10v_zoom_live_apply(uint32_t);
 #endif
-static int extension_busy(void*v){return busy(v)||m10v_settings_controller_remote_busy();}
+static int extension_busy(void*v){return busy(v)||m10v_settings_controller_remote_busy()
+#if M10V_TORN_ENABLED
+ ||m10v_torn_busy()
+#endif
+ ;}
 static int extension_blocked(void*v){return ((ui_context*)v)->transaction.pending.present!=0;}
 static int extension_read(void*v,m10v_extension_snapshot*out){
  ui_context*c=v;if(!current(c)||c->store_depth)return M10V_ERROR_BRIDGE_UNAVAILABLE;
  m10v_companion_snapshot film;int code=snapshot(c,&film);if(code)return code;
- zero(out,sizeof(*out));uint32_t generations[5]={0};
+ zero(out,sizeof(*out));uint32_t generations[6]={0};
  out->available=((1u<<17)-(1u<<12));
  out->values[12]=film.state.stamp;out->values[13]=film.state.format;
  out->values[14]=film.state.corner;out->values[15]=film.state.color;out->values[16]=film.state.reserved&1u;
@@ -62,6 +69,10 @@ static int extension_read(void*v,m10v_extension_snapshot*out){
  if(m10v_settings_controller_remote_aspect_read(&out->values[20]))return M10V_ERROR_BRIDGE_UNAVAILABLE;
  out->available|=1u<<20;
 #endif
+#if M10V_TORN_ENABLED
+ if(!m10v_torn_state(&out->values[24],&generations[5])||out->values[24]>4u)return M10V_ERROR_BRIDGE_UNAVAILABLE;
+ out->available|=1u<<24;
+#endif
  out->busy=(uint32_t)extension_busy(c);
  /* Bind every film byte/hash/sequence and all known extension generations.
   * A local change followed by restoring the value still invalidates CAS. */
@@ -76,6 +87,9 @@ static int extension_read(void*v,m10v_extension_snapshot*out){
 }
 static int extension_write(void*v,uint32_t field,uint32_t value){
  ui_context*c=v;if(!current(c)||!c->locked||extension_busy(c)||extension_blocked(c))return M10V_IO_NOT_WRITTEN;
+#if M10V_TORN_ENABLED
+ if(field==24u)return value<=1u&&!m10v_torn_set(c->ui_owner,value)?M10V_IO_OK:M10V_IO_NOT_WRITTEN;
+#endif
 #if M10V_COMPANION_EXT_AB
  if(field<3)return m10v_settings_controller_remote_ab_write(field,value);
 #endif

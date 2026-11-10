@@ -5,6 +5,18 @@
 #include "m10v_tone.h"
 #include "m10v_debug.h"
 #include "m10v_isp_effect_memory.h"
+#if M10V_TORN_ENABLED
+#include "m10v_torn_overlay.h"
+static int pipeline_torn(uint32_t recipe,uint32_t context,const void *params,
+        const m10v_isp_effects_shot_snapshot *shot){
+    const uint32_t *words=params;
+    const uint32_t *p=(const void*)(uintptr_t)words[shot->stock_workspace_bytes?2u:1u];
+    /* -1 is an explicit untouched-image rejection published as session error.
+     * A submitted graph must never return until actual completion. */
+    (void)m10v_torn_execute(recipe,context,p);
+    return 1;
+}
+#endif
 #ifndef M10V_ISP_EFFECTS_SHOT_OFFSET
 #error "Pipeline requires the matching explicitly allocated shot tail"
 #endif
@@ -178,7 +190,13 @@ int m10v_isp_effects_pipeline_execute(uint32_t recipe,uint32_t native_context,
     }
     /* No own stage touched this image. Preserve the original stage's result
      * and failure policy rather than manufacturing a new effects failure. */
-    if(!pipeline_mask(&shot))return stock_result==1;
+    if(!pipeline_mask(&shot)){
+#if M10V_TORN_ENABLED
+        if(stock_result==1&&shot.stock_query_valid)
+            return pipeline_torn(recipe,native_context,params,&shot);
+#endif
+        return stock_result==1;
+    }
     uint32_t failure=11,failure_detail=stock_result;
     if(stock_result!=1||!shot.stock_query_valid)goto failed;
     failure=12;
@@ -199,7 +217,13 @@ int m10v_isp_effects_pipeline_execute(uint32_t recipe,uint32_t native_context,
         if(clarity<8||clarity>43||((uint32_t)clarity-8u)%9u!=own)goto failed;
     }
     uint32_t mask=pipeline_mask(&shot);
-    if((shot.native_completed&mask)==mask)return 1;
+    if((shot.native_completed&mask)==mask){
+#if M10V_TORN_ENABLED
+        return pipeline_torn(recipe,native_context,params,&shot);
+#else
+        return 1;
+#endif
+    }
     failure=14;
     if(shot.native_completed&mask)goto failed;
     if(mask&(M10V_ISP_EFFECTS_NATIVE_GRAIN|M10V_ISP_EFFECTS_NATIVE_LEAK|
@@ -211,7 +235,11 @@ int m10v_isp_effects_pipeline_execute(uint32_t recipe,uint32_t native_context,
     failure=16;
     if(!m10v_isp_effects_shot_complete(recipe,shot.source_si,mask))goto failed;
     pipeline_diagnostic(recipe,4,mask);
+#if M10V_TORN_ENABLED
+    return pipeline_torn(recipe,native_context,params,&shot);
+#else
     return 1;
+#endif
 failed:
     m10v_isp_effects_shot_fail(recipe,shot.source_si);
     if(pipeline_mask(&shot))pipeline_hold(recipe,failure,failure_detail);
@@ -254,6 +282,9 @@ int m10v_isp_effects_pipeline_encoder_admit(uint32_t recipe,uint32_t si){
         if(m10v_isp_effects_shot_unavailable(recipe,si))return 1;
         pipeline_hold(recipe,22,si);
     }
+#if M10V_TORN_ENABLED
+    if(!m10v_torn_encoder_admit(recipe,si))pipeline_hold(recipe,26,si);
+#endif
     if(!m10v_isp_effects_resolve_snapshot(&shot.settings,grain,&resolved))pipeline_hold(recipe,23,grain);
     uint32_t mask=(resolved.effective_grain_strength?M10V_ISP_EFFECTS_NATIVE_GRAIN:0u)|
         (shot.settings.leak_gain?M10V_ISP_EFFECTS_NATIVE_LEAK:0u)|

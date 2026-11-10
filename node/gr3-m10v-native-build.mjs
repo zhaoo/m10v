@@ -58,6 +58,7 @@ sources.unshift('scripts/build_gr3_three_film_preview.py','native/gr3/three-film
 sources.push('native/gr3/m10v_film_color_candidates.h','native/gr3/isp-film-targets.json','scripts/build_gr3_isp_film_targets.py','native/gr3/m10v_spatial_accel.c','native/gr3/m10v_spatial_accel.h');
 sources.push('native/gr3/m10v_save_trace.c','native/gr3/m10v_save_trace.h','native/gr3/m10v_capture_raw_lifetime.c','native/gr3/m10v_capture_raw_lifetime.h','scripts/build_gr3_save_trace.py','scripts/build_gr3_capture_lifecycle.py','native/gr3/m10v_capture_lifecycle.c');
 sources.push('native/gr3/m10v_file_trace.c','scripts/build_gr3_file_trace.py');
+const tornOverlaySources=['native/gr3/m10v_torn_overlay.c','native/gr3/m10v_torn_overlay.h','native/gr3/m10v_torn_bindings.c','scripts/build_gr3_torn_overlay.py'];
 const halfPairSources=[...halfPairIipSources,'native/gr3/m10v_half_pair.c','native/gr3/m10v_half_pair.h','native/gr3/m10v_half_pair_camera.c','native/gr3/m10v_half_pair_camera.h'];
 sources.push(...hdfSources);
 sources.push('node/gr3-sd-pre-oriented-stamp-contract.json');
@@ -86,7 +87,7 @@ export const pureIspEffectSources=[
  'scripts/build_gr3_isp_effect_render.py','scripts/build_gr3_isp_effect_resize_status.py',
  'scripts/build_gr3_isp_effect_textures.py'];
 export const filmImprintSources=['scripts/build_gr3_film_imprints.py','scripts/render_film_imprint_assets.mjs','web/shared/film-imprints.mjs',...Array.from({length:7},(_,i)=>`native/gr3/film-imprints/${i+1}.png`),...['025','001','004','007'].map(id=>`native/gr3/film-imprints/pokemon/${id}.png`)];
-export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/gr3_target_relocations.py','node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources,...filmImprintSources,...cameraExtensionSources,...rawDevelopmentSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
+export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/gr3_target_relocations.py','node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources,...filmImprintSources,...cameraExtensionSources,...rawDevelopmentSources,...tornOverlaySources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
 export function validateFilmImprintAssets(runtime,m){
  const p=m.pure_isp_effects,imprint=p?.imprint;if(imprint===undefined)return;
  const fail=(v,s)=>need(v,'pure ISP imprint: '+s),a=imprint.assets,manifest=a?.manifest;
@@ -117,7 +118,7 @@ export function pureIspEffectPatches(runtime,m){
  if(!p||p.enabled===false){need(!p?.patches?.length,'pure ISP disabled patches present');return [];}
  const fail=(v,s)=>need(v,'pure ISP: '+s);
  fail(p.enabled===true&&['gr3','gr3x'].includes(m.camera_model)&&m.film_library_enabled!==false&&m.hdf_enabled===true&&m.border?.enabled===true&&typeof m.capture_lifecycle?.snapshot?.live_color==='boolean','native dependencies differ');
- fail(p.scope==='per-film'&&p.recipe_bytes===0x57d8&&JSON.stringify(p.menu_resource_ids)===JSON.stringify(Array.from({length:23},(_,i)=>1163+i)),'recipe/FN identity differs');
+ fail(p.scope==='per-film'&&p.recipe_bytes===(m.torn_overlay?.enabled?0x57f8:0x57d8)&&JSON.stringify(p.menu_resource_ids)===JSON.stringify(Array.from({length:23},(_,i)=>1163+i)),'recipe/FN identity differs');
  fail(m.flags?.includes('-DM10V_PURE_ISP_EFFECTS=1')&&m.flags?.includes('-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778'),'compile ownership differs');
  const b=p.runtime_assets,a=b?.manifest;
  validateFilmImprintAssets(runtime,m);
@@ -228,7 +229,7 @@ function checkRuntime(runtime, manifest) {
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');
   need(manifest.film_count === 110 && manifest.slots === 10 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
-  const expectedSources=[...new Set([...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.raw_development?rawDevelopmentSources:[]),...(manifest.adj_extra?cameraExtensionSources:[]),...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[]),...(manifest.border?.enabled?borderSources:[]),...(manifest.half_pair?.enabled?halfPairSources:[]),...(manifest.pure_isp_effects?.enabled?pureIspEffectSources:[]),...(manifest.pure_isp_effects?.imprint?filmImprintSources:[]),...(manifest.companion?companionNativeSources:[])])];
+  const expectedSources=[...new Set([...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.raw_development?rawDevelopmentSources:[]),...(manifest.adj_extra?cameraExtensionSources:[]),...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[]),...(manifest.border?.enabled?borderSources:[]),...(manifest.half_pair?.enabled?halfPairSources:[]),...(manifest.pure_isp_effects?.enabled?pureIspEffectSources:[]),...(manifest.pure_isp_effects?.imprint?filmImprintSources:[]),...(manifest.companion?companionNativeSources:[]),...(manifest.torn_overlay?.enabled?tornOverlaySources:[])])];
   borderPatches(runtime,manifest);
   halfPairIipPatches(runtime,manifest);
   pureIspEffectPatches(runtime,manifest);
@@ -471,9 +472,11 @@ function checkRuntime(runtime, manifest) {
   }
   const guideLabels=['黄金分割','黄金螺旋（左上）','黄金螺旋（右上）','黄金螺旋（左下）','黄金螺旋（右下）'];
   const adjLabels=['ADJ','设置 6','设置 7','设置 8','设置 9','构图线','胶卷库','逐卷效果','画幅','HDF 模拟','左右调整 OK 保存'];
-  const resourceCount=420+(manifest.pure_isp_effects?.imprint?12:0); // Marlboro1202, imprint1203..1210, three films1211..1213.
+  const resourceCount=420+(manifest.pure_isp_effects?.imprint?12:0)+(manifest.torn_overlay?.enabled?8:0);
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
+  if(manifest.torn_overlay?.enabled)
+   need(JSON.stringify(manifest.resources.texts.slice(432,440))===JSON.stringify(['撕纸叠映','开始 / 重新开始','取消叠映','已关闭','待拍轮廓','待拍素材','已完成','失败']),'torn overlay resources differ');
   if(manifest.pure_isp_effects?.enabled){
    const captions=JSON.parse(readFileSync(new URL('../native/gr3/m10v_isp_effects_resources.json',import.meta.url),'utf8'));
    if(manifest.camera_guides)captions.splice(18,5,...guideLabels);
@@ -597,7 +600,7 @@ function checkIspBase(runtime,manifest) {
 }
 function lifecyclePatches(manifest,runtime){
  const m=manifest.capture_lifecycle;if(!m)return [];
- const extendedRecipeBytes=manifest.pure_isp_effects?.enabled?0x57d8:0x5778;
+ const extendedRecipeBytes=manifest.torn_overlay?.enabled?0x57f8:manifest.pure_isp_effects?.enabled?0x57d8:0x5778;
  const inRuntime=a=>Number.isInteger(a)&&!(a&3)&&a>=manifest.base&&a<manifest.base+manifest.code_bytes;
  need((manifest.debug_mode===true||manifest.experimental_capture?.native_color===true)&&m.owner?.schema===2&&m.owner.storage?.recipe_bytes===0x4778&&m.owner.storage?.extended_recipe_bytes===extendedRecipeBytes&&m.owner.storage?.trace_offset===0x4778&&m.owner.storage?.color_offset===0x4a08&&m.owner.storage?.stamp_offset===0x5140&&m.owner.storage?.stamp_bytes===16&&m.owner.storage?.custom_isp_offset===0x5150&&m.owner.storage?.custom_isp_bytes===1576&&m.buffer_policy_changed===false,'invalid recipe lifetime contract');
  const calls=[[0x53523e0c,0x5351091c,'m10v_save_trace_recipe_alloc'],

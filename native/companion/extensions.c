@@ -5,14 +5,15 @@
 _Static_assert(sizeof(m10v_extension_patch)<=M10V_RESIDENT_PAYLOAD,"extension patch fits resident frame");
 _Static_assert(sizeof(m10v_extension_result)<=M10V_RESIDENT_PAYLOAD,"extension result fits resident frame");
 #if !M10V_COMPANION_RTOS_ONLY
-const char *const m10v_extension_names[M10V_EXTENSION_FIELDS]={"quickSwitch","quickSwitchA","quickSwitchB","hdf","border","grainMode","grainSize","leakGain","leakPosition","leakSpread","blurGain","blurRange","stamp","stampFormat","stampCorner","stampColor","filmNameStamp","focalA","focalB","focalSlot","aspect","imprint","vignetteEnabled","vignetteStrength"};
+const char *const m10v_extension_names[M10V_EXTENSION_FIELDS]={"quickSwitch","quickSwitchA","quickSwitchB","hdf","border","grainMode","grainSize","leakGain","leakPosition","leakSpread","blurGain","blurRange","stamp","stampFormat","stampCorner","stampColor","filmNameStamp","focalA","focalB","focalSlot","aspect","imprint","vignetteEnabled","vignetteStrength","tornSession"};
 #endif
-const uint8_t m10v_extension_min[M10V_EXTENSION_FIELDS]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,28,28,0,0,0,0,1};
-const uint8_t m10v_extension_max[M10V_EXTENSION_FIELDS]={1,21,21,3,2,4,2,3,2,2,3,2,2,3,3,3,1,50,50,2,6,7,1,3};
-const uint8_t m10v_extension_persistent[M10V_EXTENSION_FIELDS]={0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1};
+const uint8_t m10v_extension_min[M10V_EXTENSION_FIELDS]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,28,28,0,0,0,0,1,0};
+const uint8_t m10v_extension_max[M10V_EXTENSION_FIELDS]={1,21,21,3,2,4,2,3,2,2,3,2,2,3,3,3,1,50,50,2,6,7,1,3,4};
+const uint8_t m10v_extension_persistent[M10V_EXTENSION_FIELDS]={0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,0};
 static void zero(void*p,unsigned n){for(unsigned i=0;i<n;i++)((uint8_t*)p)[i]=0;}
 static int equal(const void*a,const void*b,unsigned n){return m10v_constant_equal(a,b,n);}
 int m10v_extensions_valid(const m10v_extension_snapshot*s){if(!s||s->busy>1||(s->available&~M10V_EXTENSION_MASK))return 0;for(unsigned i=0;i<M10V_EXTENSION_FIELDS;i++)if((s->available&(1u<<i))&&(s->values[i]<m10v_extension_min[i]||s->values[i]>m10v_extension_max[i]))return 0;return 1;}
+int m10v_extensions_writable(uint32_t field,uint32_t value){return field<M10V_EXTENSION_FIELDS&&value>=m10v_extension_min[field]&&value<=m10v_extension_max[field]&&(field!=24u||value<=1u);}
 void m10v_extensions_owner_init(m10v_extension_owner*o){if(o)zero(o,sizeof(*o));}
 static int result(m10v_extension_result*r,unsigned status,unsigned code,const m10v_extension_snapshot*s){zero(r,sizeof(*r));r->status=status;r->code=code;if(s){r->has_snapshot=1;r->snapshot=*s;}return (int)code;}
 static int reject(m10v_extension_result*r,unsigned code){return result(r,M10V_OPERATION_REJECTED,code,0);}
@@ -32,10 +33,11 @@ int m10v_extensions_apply(const m10v_extension_patch*p,const m10v_extension_serv
  m10v_extension_snapshot actual;code=fresh(s,&actual);if(code){code=reject(out,(unsigned)code);goto done;}
  if(actual.busy){code=reject(out,M10V_ERROR_BUSY);goto done;}
  if(!equal(actual.revision,p->base_revision,32)){code=reject(out,M10V_ERROR_REVISION_CONFLICT);goto done;}
- if(p->field>=M10V_EXTENSION_FIELDS||!(actual.available&(1u<<p->field))||p->value<m10v_extension_min[p->field]||p->value>m10v_extension_max[p->field]){code=reject(out,M10V_ERROR_INVALID_RECIPE);goto done;}
+ if(!m10v_extensions_writable(p->field,p->value)||!(actual.available&(1u<<p->field))){code=reject(out,M10V_ERROR_INVALID_RECIPE);goto done;}
  if(!s->is_current(s->ctx)||s->is_busy(s->ctx)||s->blocked(s->ctx)){code=reject(out,M10V_ERROR_BUSY);goto done;}
  r=&o->pending;zero(r,sizeof(*r));for(unsigned i=0;i<16;i++)r->id[i]=p->request_id[i];for(unsigned i=0;i<32;i++)r->digest[i]=digest[i];r->present=1;r->expected=actual;r->expected.values[p->field]=p->value;
- if(actual.values[p->field]==p->value){complete(o,r,M10V_OPERATION_COMMITTED,0,&actual);*out=r->result;code=0;goto done;}
+ /* Starting a fresh session at stage1 is an action, not a scalar no-op. */
+ if(p->field!=24u&&actual.values[p->field]==p->value){complete(o,r,M10V_OPERATION_COMMITTED,0,&actual);*out=r->result;code=0;goto done;}
  int written=s->write(s->ctx,p->field,p->value);
  if(written==M10V_IO_NOT_WRITTEN){complete(o,r,M10V_OPERATION_REJECTED,M10V_ERROR_STORE_FAILED,0);*out=r->result;code=M10V_ERROR_STORE_FAILED;goto done;}
  code=fresh(s,&actual);

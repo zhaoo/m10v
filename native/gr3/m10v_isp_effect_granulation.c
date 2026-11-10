@@ -112,3 +112,19 @@ int m10v_isp_effect_granulation_luma(void *ctx,void *mask,const uint32_t photo[8
     (photo[1]<m[1]+mn&&m[1]<photo[1]+n))return -1;
  return run(ctx,mask,mask,1,(void*)(uintptr_t)photo[1],n,curves,pitch*factor);
 }
+static int plane_overlap(uint32_t a,uint32_t an,uint32_t b,uint32_t bn){return a<b+bn&&b<a+an;}
+int m10v_isp_effect_granulation_plane(void *ctx,void *dst,const void *src,void *mask,uint32_t bytes,uint32_t pitch,const int16_t curves[3][256]){
+ if(!ram(U(ctx),0x40)||!ram(U(dst),32)||!ram(U(src),32)||!curves||((U(curves)&1u))||
+    !pitch||pitch>32768u||(pitch&3u)||!m10v_isp_effect_buffer_span(U(mask),bytes))return -1;
+ uint32_t cp=U(curves);if(!((cp>=0x53000000u&&cp<=0x55000000u-1536u)||ram(cp,1536)))return -1;
+ const uint32_t *d=dst,*s=src;uint32_t w=d[4]&65535u,h=d[4]>>16,dp=d[5]&65535u,sp=s[5]&65535u;
+ if(d[0]!=1u||s[0]!=1u||d[2]||s[2]||d[3]||s[3]||d[6]||s[6]||d[7]!=2u||s[7]!=2u||!w||!h||w>6144u||h>4096u||
+    s[4]!=d[4]||dp<w||sp<w||dp>32768u||sp>32768u||((dp|sp)&3u)||(d[5]>>16)<h||(s[5]>>16)<h||pitch<w||pitch*h!=bytes)return -1;
+ uint32_t dn=dp*h,sn=sp*h;
+ if(!m10v_isp_effect_buffer_span(d[1],dn)||!m10v_isp_effect_buffer_span(s[1],sn)||((d[1]|s[1]|U(mask))&3u)||
+    plane_overlap(d[1],dn,U(mask),bytes)||(plane_overlap(s[1],sn,U(mask),bytes)&&(s[1]!=U(mask)||sn!=bytes||sp!=pitch))||
+    (plane_overlap(d[1],dn,s[1],sn)&&(d[1]!=s[1]||dn!=sn||dp!=sp)))return -1;
+ const uint32_t objects[4]={U(ctx),U(dst),U(src),cp},lengths[4]={0x40,32,32,1536};
+ for(uint32_t i=0;i<4;i++)if(plane_overlap(objects[i],lengths[i],d[1],dn)||plane_overlap(objects[i],lengths[i],s[1],sn)||plane_overlap(objects[i],lengths[i],U(mask),bytes))return -1;
+ return run(ctx,dst,src,1,mask,bytes,curves,pitch);
+}

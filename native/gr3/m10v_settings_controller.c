@@ -40,6 +40,9 @@ __attribute__((noinline)) uint32_t m10v_settings_controller_ab_available(void){
 #endif
 #if M10V_HALF_PAIR_ENABLED
 #include "m10v_half_pair_camera.h"
+#if M10V_TORN_ENABLED
+#include "m10v_torn_overlay.h"
+#endif
 #endif
 #ifndef M10V_LIVE_COLOR
 #define M10V_LIVE_COLOR 0
@@ -94,7 +97,11 @@ static m10v_settings_controller *page(uint32_t owner,uint32_t i){
 #include "m10v_ab_camera.inc"
 uint32_t m10v_settings_controller_owner_size(void){
 #if M10V_ADJ_EXTRA_CAMERA || M10V_GUIDES_CAMERA
+#if M10V_TORN_ENABLED
+ return 0x6e00;
+#else
  return 0x6d00;
+#endif
 #elif M10V_COMPANION_ENABLED
  return M10V_COMPANION_DESCRIPTOR_OFFSET+M10V_COMPANION_DESCRIPTOR_BYTES;
 #else
@@ -126,6 +133,9 @@ uint32_t m10v_settings_controller_top_ctor(uint32_t owner){
  #if M10V_HALF_PAIR_ENABLED
  m10v_half_pair_init(owner);
  #endif
+#if M10V_TORN_ENABLED
+ m10v_torn_init(owner);
+#endif
  return owner;
 }
 uint32_t m10v_settings_controller_destroy(m10v_settings_controller *p){
@@ -135,6 +145,9 @@ uint32_t m10v_settings_controller_destroy(m10v_settings_controller *p){
  return (uint32_t)(uintptr_t)p;
 }
 uint32_t m10v_settings_controller_top_dtor(uint32_t owner){
+#if M10V_TORN_ENABLED
+ m10v_torn_destroy(owner);
+#endif
 #if M10V_ADJ_EXTRA_CAMERA
  m10v_adj_extra_camera_dispose(owner);
 #endif

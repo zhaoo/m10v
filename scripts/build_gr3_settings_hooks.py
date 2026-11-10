@@ -13,7 +13,7 @@ def build_settings_hooks(base,symbols,live_color=False,appended_slots=False,cust
  if type(companion)is not bool or (companion and not live_color):raise ValueError("companion requires live owner cache")
  owner_bytes=0x6440 if companion else 0x613c if live_color else 0x213c
  if extra_owner_bytes:
-  if extra_owner_bytes!=0x6d00 or not live_color:raise ValueError('extended controls require the shared TopMenu owner')
+  if extra_owner_bytes not in (0x6d00,0x6e00) or not live_color:raise ValueError('extended controls require the shared TopMenu owner')
   owner_bytes=extra_owner_bytes
  image=bytearray();exports={};patches=[];rows=[]
  def data(raw):

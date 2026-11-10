@@ -9,5 +9,5 @@ int m10v_extensions_parse(const uint8_t*b,uint32_t n,m10v_json_token*t,m10v_exte
  if(seen!=63)return M10V_ERROR_INVALID_RECIPE;for(unsigned i=0;i<sizeof(*out);i++)((uint8_t*)out)[i]=0;
  if(!hex(b,&t[indices[0]],16,out->request_id)||!hex(b,&t[indices[1]],16,out->boot_id)||!hex(b,&t[indices[2]],32,out->contract_hash)||!hex(b,&t[indices[3]],32,out->base_revision))return M10V_ERROR_INVALID_RECIPE;
  for(out->field=0;out->field<M10V_EXTENSION_FIELDS;out->field++)if(name(b,&t[indices[4]],m10v_extension_names[out->field]))break;
- if(out->field==M10V_EXTENSION_FIELDS||!m10v_json_uint(b,&t[indices[5]],&out->value)||out->value<m10v_extension_min[out->field]||out->value>m10v_extension_max[out->field])return M10V_ERROR_INVALID_RECIPE;return 0;
+ if(out->field==M10V_EXTENSION_FIELDS||!m10v_json_uint(b,&t[indices[5]],&out->value)||!m10v_extensions_writable(out->field,out->value))return M10V_ERROR_INVALID_RECIPE;return 0;
 }
