@@ -161,11 +161,21 @@ int m10v_torn_execute(uint32_t recipe,uint32_t context,const uint32_t photo[8]){
  d[0]=1;d[7]=2;
  uint32_t view[8];for(uint32_t i=0;i<8;i++)view[i]=d[i];
  view[2]=0;
+ uint32_t edge[8];for(uint32_t i=0;i<8;i++)edge[i]=view[i];
+ edge[1]=s->plane;edge[5]=alpha_pitch|(h<<16);
+ /* Equal endpoint curves sharpen the resized distance field independently
+  * of the weight input. The unchanged photo Y supplies a disjoint weight
+  * plane, so sharpening needs no additional full-frame allocation. */
+ cache(d[1],n);
+ if(m10v_isp_effect_granulation_plane((void*)(uintptr_t)context,edge,edge,
+     (void*)(uintptr_t)d[1],n,pitch,torn_curves[0])!=1){
+  int r=reject(s,p,12,0);leave(s);return r;
+ }
  for(uint32_t c=0;c<2;c++){
   view[1]=d[1u+c];
   cache(view[1],n);
   if(m10v_isp_effect_granulation_plane((void*)(uintptr_t)context,view,view,
-      (void*)(uintptr_t)s->plane,an,alpha_pitch,torn_curves[c])!=1){
+      (void*)(uintptr_t)s->plane,an,alpha_pitch,torn_curves[1u+c])!=1){
    for(;;)((void(*)(uint32_t))0x536b0a74u)(1);
   }
  }

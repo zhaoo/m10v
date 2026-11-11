@@ -67,13 +67,13 @@ class TornTests(unittest.TestCase):
  def test_every_shutter_composites_and_consecutive_masks_differ(self):
   self.assertEqual(self.call('m10v_torn_set',self.owner,1),0);self.freeze()
   self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),1);self.assertEqual(self.stage()[0],1)
-  self.assertEqual(len(self.graphs()),2);self.assertEqual(self.call('m10v_torn_encoder_admit',self.r,self.si),1)
+  self.assertEqual(len(self.graphs()),3);self.assertEqual(self.call('m10v_torn_encoder_admit',self.r,self.si),1)
   self.freeze();self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),1)
-  self.assertEqual(self.stage()[0],1);self.assertEqual(len(self.graphs()),4)
+  self.assertEqual(self.stage()[0],1);self.assertEqual(len(self.graphs()),6)
   self.assertNotEqual(self.masks[0][0],self.masks[1][0])
   self.assertEqual(self.call('m10v_torn_set',self.owner,0),0)
   self.assertEqual(len([c for c in self.calls if c[0]=='free']),1)
-  self.assertEqual(self.descriptors[1][0][1],0x74000000)
+  self.assertEqual(self.descriptors[2][0][1],0x74000000)
   self.assertTrue(all(not s[2] and not d[2] for d,s in self.descriptors))
  def test_resize_error_preserves_original_and_reports_failure(self):
   self.call('m10v_torn_set',self.owner,1);self.freeze();self.resize_ok=False
@@ -107,10 +107,10 @@ class TornTests(unittest.TestCase):
   for _ in range(2):
    self.freeze();self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),1)
    self.assertEqual(self.stage()[0],1)
-  self.assertEqual(len(self.graphs()),4)
+  self.assertEqual(len(self.graphs()),6)
   self.assertEqual(len([c for c in self.calls if c[0]=='alloc']),allocations)
-  self.assertEqual(self.descriptors[0][0][5],6016|(4000<<16))
-  self.assertEqual(self.leases,[(1,0)]*4)
+  self.assertEqual(self.descriptors[0][0][5],6000|(4000<<16))
+  self.assertEqual(self.leases,[(1,0)]*6)
   self.assertEqual(len([c for c in self.calls if c[0]=='alloc']),1)
  def test_pending_capture_busy_and_second_queue_fails_preserving_pixels(self):
   self.call('m10v_torn_set',self.owner,1);self.freeze();self.assertEqual(self.call('m10v_torn_busy'),1)
@@ -118,15 +118,15 @@ class TornTests(unittest.TestCase):
   other=self.r+0x10000;self.put(other,0x53d0fc90);self.put(other+0x44c8,self.si);self.freeze(other)
   self.assertEqual(self.stage()[0],1);self.assertEqual(self.call('m10v_torn_encoder_admit',other,self.si),1)
   self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),1)
-  self.assertEqual(len(self.graphs()),2)
+  self.assertEqual(len(self.graphs()),3)
  def test_allocation_failure_and_ineligible_do_not_start(self):
   self.alloc_ok=False;self.assertEqual(self.call('m10v_torn_set',self.owner,1),0xffffffff);self.assertEqual(self.stage()[0],0)
   self.alloc_ok=True;self.eligible=False;self.assertEqual(self.call('m10v_torn_set',self.owner,1),0xffffffff);self.assertFalse(self.graphs())
  def test_wrong_si_encoder_duplicate_and_geometry_rejection(self):
   self.call('m10v_torn_set',self.owner,1);self.freeze();self.assertEqual(self.call('m10v_torn_encoder_admit',self.r,self.si+4),0)
   self.assertEqual(self.call('m10v_torn_encoder_admit',self.r,self.si),0)
-  self.call('m10v_torn_execute',self.r,0x55072000,self.photo);self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),1);self.assertEqual(len(self.graphs()),2)
-  self.freeze();self.put(self.photo+16,319|(480<<16));self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),0xffffffff);self.assertEqual(len(self.graphs()),2)
+  self.call('m10v_torn_execute',self.r,0x55072000,self.photo);self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),1);self.assertEqual(len(self.graphs()),3)
+  self.freeze();self.put(self.photo+16,319|(480<<16));self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),0xffffffff);self.assertEqual(len(self.graphs()),3)
  def test_cancel_queued_via_destroy_releases_once(self):
   self.call('m10v_torn_set',self.owner,1);self.freeze();self.call('m10v_torn_destroy',self.owner)
   self.assertEqual(len([c for c in self.calls if c[0]=='free']),1);self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),0xffffffff)
@@ -139,7 +139,7 @@ class TornTests(unittest.TestCase):
   self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),0xffffffff);self.assertFalse(self.graphs())
  def test_unaligned_uv_second_phase_rejects_before_either_channel(self):
   self.call('m10v_torn_set',self.owner,1);self.freeze();self.call('m10v_torn_execute',self.r,0x55072000,self.photo);self.freeze()
-  self.put(self.photo+8,0x74000001);self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),0xffffffff);self.assertEqual(len(self.graphs()),2)
+  self.put(self.photo+8,0x74000001);self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),0xffffffff);self.assertEqual(len(self.graphs()),3)
  def test_native_pitch_rounding_rejects_before_first_pass(self):
   self.call('m10v_torn_set',self.owner,1);self.freeze();self.put(self.photo+16,642|(480<<16));self.put(self.photo+20,644|(480<<16))
   self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),0xffffffff);self.assertFalse(self.graphs())
@@ -149,7 +149,7 @@ class TornTests(unittest.TestCase):
  def test_second_channel_alias_of_native_request_is_preflight_rejected(self):
   self.call('m10v_torn_set',self.owner,1);self.freeze();self.call('m10v_torn_execute',self.r,0x55072000,self.photo);self.freeze()
   self.put(self.r+0x5c,0x74000000)
-  self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),0xffffffff);self.assertEqual(len(self.graphs()),2)
+  self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),0xffffffff);self.assertEqual(len(self.graphs()),3)
  def test_generic_plane_export_validates_roi_stride_and_nonalias_before_native(self):
   from scripts import build_gr3_isp_effect_granulation as g
   code,m=g.build(0x54b00000,self.rom,enabled=True);self.assertIn('m10v_isp_effect_granulation_plane',m['symbols'])

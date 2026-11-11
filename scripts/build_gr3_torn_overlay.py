@@ -1,5 +1,6 @@
 """Exact GR III2.10 experimental ISP-only session component; no hooks."""
-import hashlib,shutil,struct,subprocess,tempfile
+import hashlib,math,shutil,struct,subprocess,tempfile
+from functools import lru_cache
 from pathlib import Path
 from scripts import build_gr3_border_wait_guard as guard
 ROOT=Path(__file__).resolve().parents[1]
@@ -9,8 +10,9 @@ TRACE_EXTERNAL='m10v_save_trace_recipe_mark'
 SOURCES=('native/gr3/m10v_torn_overlay.c','native/gr3/m10v_torn_overlay.h','scripts/build_gr3_torn_overlay.py','native/gr3/m10v_isp_effect_granulation.h','native/gr3/m10v_isp_effect_memory.h')
 def _curves():
  identity=list(range(256))
- profiles=(([255]*256,identity,identity),([128]*256,identity,identity))
- return 'static const int16_t torn_curves[2][3][256]={'+','.join('{'+','.join('{'+','.join(map(str,row))+'}' for row in profile)+'}' for profile in profiles)+'};\n'
+ edge=[max(0,min(255,((luma-124)*255+4)//8)) for luma in identity]
+ profiles=((edge,edge,identity),([255]*256,identity,identity),([128]*256,identity,identity))
+ return 'static const int16_t torn_curves[3][3][256]={'+','.join('{'+','.join('{'+','.join(map(str,row))+'}' for row in profile)+'}' for profile in profiles)+'};\n'
 
 MASK_WIDTH,MASK_HEIGHT=64,80
 # Jagged paper fragments in normalized frame coordinates. Gaps are painted
@@ -27,17 +29,27 @@ MASK_SHAPES=(
   ((42,37),(50,35),(55,39),(56,46),(53,51),(57,56),(53,61),(49,60),(44,67),(39,65),(34,71),(28,68),(31,63),(38,60),(42,53),(38,47))),
 )
 
+@lru_cache(maxsize=1)
 def _mask_blob():
- def inside(x,y,polygon):
+ def distance_to_polygon(x,y,edges):
   crossings=0
-  for (ax,ay),(bx,by) in zip(polygon,polygon[1:]+polygon[:1]):
+  distance_squared=math.inf
+  for (ax,ay),(bx,by) in edges:
    if (ay>y)!=(by>y) and x<ax+(bx-ax)*(y-ay)/(by-ay):
     crossings+=1
-  return crossings%2
+   dx,dy=bx-ax,by-ay
+   t=max(0,min(1,((x-ax)*dx+(y-ay)*dy)/(dx*dx+dy*dy)))
+   distance_squared=min(distance_squared,(x-ax-t*dx)**2+(y-ay-t*dy)**2)
+  return math.sqrt(distance_squared)*(-1 if crossings%2 else 1)
+ def rasterize(shape):
+  fragments=[tuple(zip(polygon,polygon[1:]+polygon[:1])) for polygon in shape]
+  # Preserve subpixel geometry during native interpolation. The zero crossing
+  # at 127.5 is restored to a narrow alpha edge after the upscale.
+  return bytes(max(0,min(255,round(127.5+102*min(
+      distance_to_polygon(x+.5,y+.5,edges) for edges in fragments))))
+      for y in range(MASK_HEIGHT) for x in range(MASK_WIDTH))
  return b''.join(
-  bytes(0 if any(inside(x+.5,y+.5,poly) for poly in shape) else 255
-        for y in range(MASK_HEIGHT) for x in range(MASK_WIDTH))+
-  bytes([128])*(MASK_WIDTH*MASK_HEIGHT//2)
+  rasterize(shape)+bytes([128])*(MASK_WIDTH*MASK_HEIGHT//2)
   for shape in MASK_SHAPES)
 def build(base=0x54d00000,rtos=None,externals=None,*,enabled=False,camera_model='gr3',debug=False):
  m=dict(schema='m10v-torn-overlay/v1',enabled=False,experimental=True,code_bytes=0,symbols={},patches=[],camera_tested=False,pixel_math_proven=False,firmware_emitted=False)
@@ -80,7 +92,7 @@ def build(base=0x54d00000,rtos=None,externals=None,*,enabled=False,camera_model=
  mask_offset=image.find(masks)
  if mask_offset<0 or (base+mask_offset)&63:
   raise ValueError('torn mask asset readback differs')
- m.update(capture_mode='single',native_passes=[1,2],
+ m.update(capture_mode='single',native_passes=[1,3],
           masks=dict(base=base+mask_offset,bytes=len(masks),count=len(MASK_SHAPES),
                      width=MASK_WIDTH,height=MASK_HEIGHT,sha256=hashlib.sha256(masks).hexdigest()),
           allocation='enable only; NV12 workspace plus alignment slack')

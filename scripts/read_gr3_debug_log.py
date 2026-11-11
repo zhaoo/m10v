@@ -80,7 +80,7 @@ EVENTS.update(EFFECTS_MENU_EVENTS)
 EVENTS[225]='torn.outcome'
 TORN_EXEC_REASONS=('isp-complete','no-shot','owner-or-lease','session-changed','invalid-context-or-descriptor',
                    'ineligible','format-or-layout','overlap-or-span','raw-bank','pair-geometry',
-                   'invalid-mask-selection','mask-resize')
+                   'invalid-mask-selection','mask-resize','mask-edge')
 TORN_LAYOUT_FAULTS=('format','dimensions','alignment','stride-or-rows','third-plane-or-roi','address-mode','orientation','mask-capacity')
 TORN_PROTECTED_OBJECTS=('recipe','shooting-info','menu-owner','context','descriptor','request','raw-dimensions')
 
