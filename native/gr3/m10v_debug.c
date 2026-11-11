@@ -3,6 +3,9 @@
  * persistent handles or retries; concurrent logger invocations are skipped.
  * Stock filesystem calls may still wait on other camera tasks. */
 #include "m10v_debug.h"
+#if M10V_TORN_ENABLED
+#include "m10v_torn_overlay.h"
+#endif
 #ifndef M10V_DEBUG_BUILD_ID
 #define M10V_DEBUG_BUILD_ID 0u
 #endif
@@ -12,8 +15,19 @@ typedef void (*free_fn)(void *);
 typedef int (*open_fn)(uint32_t,const char *,uint32_t,uint32_t *,uint32_t *);
 typedef int (*io_fn)(uint32_t,uint32_t,void *,uint32_t,uint32_t *);
 typedef int (*close_fn)(uint32_t,uint32_t,uint32_t *);
-static const char paths[8][16]={"C:\\M10VMN0.BIN","C:\\M10VMN1.BIN","C:\\M10VCP0.BIN","C:\\M10VCP1.BIN","C:\\M10VIO0.BIN","C:\\M10VIO1.BIN","C:\\M10VAK0.BIN","C:\\M10VAK1.BIN"};
-static uint32_t event_channel(uint32_t event){return (event>=230&&event<=315)||(event>=85&&event<=99)?4u:event>=180&&event<=209?3u:event>=100?2u:1u;}
+static const char paths[][16]={
+    "C:\\M10VMN0.BIN","C:\\M10VMN1.BIN","C:\\M10VCP0.BIN","C:\\M10VCP1.BIN",
+    "C:\\M10VIO0.BIN","C:\\M10VIO1.BIN","C:\\M10VAK0.BIN","C:\\M10VAK1.BIN",
+#if M10V_TORN_ENABLED
+    "C:\\M10VTO0.BIN","C:\\M10VTO1.BIN",
+#endif
+};
+static uint32_t event_channel(uint32_t event){
+#if M10V_TORN_ENABLED
+    if(event==M10V_TORN_OUTCOME_EVENT)return 5u;
+#endif
+    return (event>=230&&event<=315)||(event>=85&&event<=99)?4u:event>=180&&event<=209?3u:event>=100?2u:1u;
+}
 static int ram(uint32_t p,uint32_t n){return !(p&3)&&p>=0x55000000u&&p<0x80000000u&&n<=0x80000000u-p;}
 static int code(uint32_t p,uint32_t n){return !(p&3)&&p>=0x53000000u&&p<0x540b6000u&&n<=0x540b6000u-p;}
 static uint32_t crc(const uint32_t *words){

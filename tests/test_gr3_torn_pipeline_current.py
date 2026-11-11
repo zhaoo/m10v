@@ -10,6 +10,7 @@ from pathlib import Path
 from unicorn import UC_HOOK_CODE
 from unicorn import arm_const as A
 from tests import test_gr3_film_pipeline_current as existing
+from tests.test_gr3_debug import DebugLogArmTests
 from tests.test_gr3_isp_base import StockISP,ROOT
 
 class TornPipelineCurrentTests(unittest.TestCase):
@@ -41,7 +42,7 @@ class TornPipelineCurrentTests(unittest.TestCase):
   e.u.emu_start(site,site+4,count=5000000)
   self.assertEqual(e.u.reg_read(A.UC_ARM_REG_PC),site+4)
   return e.u.reg_read(A.UC_ARM_REG_R0)
- def session_start(self,e,owner):
+ def session_start(self,e,owner,debug_batches=None):
   self.call(e,'m10v_torn_init',owner)
   e.w32(0x55064398,1);e.w32(0x55063ecc,1);e.u.mem_write(0x55067958+0x880,b'\3');e.u.mem_write(0x55063e03,b'\0');e.w32(0x55063dcc,1)
   e.w32(0x55067958+0x2c,0)
@@ -53,7 +54,12 @@ class TornPipelineCurrentTests(unittest.TestCase):
    elif pc in (0x5320b31c,0x5320ba9c):result=0x55062000
    elif pc in (0x53245190,0x53245260,0x532bd6d4):result=0
    elif pc==0x532bd6b4:result=11
-   elif pc==self.manifest['symbols'].get('m10v_debug_batch'):result=0
+   elif pc==0x53050b7c:result=0
+   elif pc==self.manifest['symbols'].get('m10v_debug_batch'):
+    if debug_batches is not None:
+     ptr=u.reg_read(A.UC_ARM_REG_R0);count=u.reg_read(A.UC_ARM_REG_R1)
+     debug_batches.extend(struct.iter_unpack('<5I',u.mem_read(ptr,count*20)))
+    result=0
    else:return
    u.reg_write(A.UC_ARM_REG_R0,result);u.reg_write(A.UC_ARM_REG_PC,u.reg_read(A.UC_ARM_REG_LR))
   e.u.hook_add(UC_HOOK_CODE,camera)
@@ -108,6 +114,26 @@ class TornPipelineCurrentTests(unittest.TestCase):
    else:return
    record['leaf_calls'].append(pc);u.reg_write(A.UC_ARM_REG_R0,result);u.reg_write(A.UC_ARM_REG_PC,u.reg_read(A.UC_ARM_REG_LR))
   e.u.hook_add(UC_HOOK_CODE,leaf);return record
+ def test_rejected_shot_keeps_its_exact_reason_after_the_shared_trace_fills(self):
+  if not self.manifest.get('debug_mode'):self.skipTest('requires a debug delivery')
+  e,recipe,obj,frame,si,request,data=self.fixture(66,stage=0)
+  batches=[]
+  self.session_start(e,self.publish_owner(e,data),batches)
+  self.enqueue(e,recipe,19)
+  self.make(e,recipe,obj,frame)
+  photo=e.alloc(32)
+  # An incompatible layout should leave the original unmodified and must
+  # still explain its rejection when no more shared records fit.
+  e.u.mem_write(photo,struct.pack('<8I',2,0x70000000,0x74000000,0,
+                                640|(480<<16),640|(480<<16),0,1))
+  for _ in range(32):
+   self.call(e,'m10v_save_trace_recipe_mark',recipe,198,0,0,0)
+  self.assertEqual(self.call(e,'m10v_torn_execute',recipe,e.alloc(0x40),photo),0xffffffff)
+  self.assertEqual(self.call(e,'m10v_torn_encoder_admit',recipe,si),1)
+  self.call(e,'m10v_lifecycle_phase',recipe+0x9b8,190,0)
+  self.assertEqual([r for r in batches if r[0]==225],
+                   [(225,recipe,2,1<<8,(-(6|((1|32)<<8)))&0xffffffff)])
+  self.assertTrue(any(r[0]==199 for r in batches))
  def test_real_producer_freezes_exact_recipe_then_original_graph_and_encoder(self):
   e,recipe,obj,frame,si,request,data=self.fixture(66,stage=0)
   owner=self.publish_owner(e,data);self.session_start(e,owner)
@@ -168,6 +194,31 @@ class TornPipelineCurrentTests(unittest.TestCase):
   self.assertEqual(record['curves'],[(threshold,threshold,identity),((255,)*256,identity,identity),((128,)*256,identity,identity)])
   self.assertEqual(self.call(e,'m10v_torn_state',query,query+4),1);self.assertEqual(self.word(e,query),3)
   self.assertEqual(e.assertions,[])
+
+class TornDedicatedLogTests(unittest.TestCase):
+ setUp=DebugLogArmTests.setUp
+ services=DebugLogArmTests.services
+ log=DebugLogArmTests.log
+ decoded=DebugLogArmTests.decoded
+ @classmethod
+ def setUpClass(cls):
+  folder=os.environ.get('M10V_CURRENT_PIPELINE_CANDIDATE')
+  if not folder:raise unittest.SkipTest('set M10V_CURRENT_PIPELINE_CANDIDATE')
+  folder=Path(folder)
+  cls.manifest=json.loads((folder/'M10V-runtime-manifest.json').read_text())
+  if 'M10VTO0.BIN' not in (cls.manifest.get('debug_log') or {}).get('files',[]):
+   raise unittest.SkipTest('requires dedicated torn logging')
+  cls.code=(folder/'M10V-runtime-arm.bin').read_bytes()
+ def test_outcome_writes_independent_pages_and_decodes_after_restart(self):
+  self.assertEqual(self.log(225,0x55005000,2,0x100,(-0x2106)&0xffffffff),1)
+  self.assertEqual(self.log(198,0x55005000,0,0,0),1)
+  self.assertEqual(self.log(225,0x55005000,3,0x201,1),1)
+  self.assertTrue(all('C:\\'+name in self.files for name in ('M10VTO0.BIN','M10VTO1.BIN')))
+  outcomes=[row['torn'] for row in self.decoded()['records'] if row['channel']=='torn']
+  self.assertEqual(len(outcomes),2)
+  self.assertEqual(outcomes[0]['layout_faults'],['format','address-mode'])
+  self.assertEqual(outcomes[1]['phase'],2)
+  self.assertTrue(outcomes[1]['complete'])
 
 class NativePlaneGraphControlTests(unittest.TestCase):
  word,graph_leaves=TornPipelineCurrentTests.word,TornPipelineCurrentTests.graph_leaves

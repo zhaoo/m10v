@@ -17,7 +17,8 @@ class DebugLogArmTests(unittest.TestCase):
 
     def setUp(self):
         self.u = Uc(UC_ARCH_ARM, UC_MODE_ARM)
-        self.u.mem_map(0x53000000, 0x1200000)
+        end=self.manifest['base']+len(self.code)
+        self.u.mem_map(0x53000000, max(0x1200000,(end-0x53000000+4095)&~4095))
         self.u.mem_write(self.manifest['base'], self.code)
         self.u.mem_map(0x55000000, 0x100000)
         self.files = {}; self.handles = {}; self.calls = []; self.available = True
@@ -41,7 +42,8 @@ class DebugLogArmTests(unittest.TestCase):
         elif address==0x536af2e4: result=0
         elif address==0x53900100:
             name=bytes(u.mem_read(args[1],16)).split(b'\0')[0].decode()
-            self.assertIn(name,('C:\\M10VMN0.BIN','C:\\M10VMN1.BIN','C:\\M10VCP0.BIN','C:\\M10VCP1.BIN','C:\\M10VIO0.BIN','C:\\M10VIO1.BIN','C:\\M10VAK0.BIN','C:\\M10VAK1.BIN'))
+            expected=self.manifest.get('debug_log',{}).get('files',[])
+            self.assertIn(name,['C:\\'+file for file in expected])
             self.assertIn(args[2],(0,1)); self.calls.append(('open',name,args[2]))
             result=int(args[2]==0 or name in self.files)
             if result:

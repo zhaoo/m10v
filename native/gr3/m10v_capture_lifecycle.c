@@ -77,16 +77,17 @@ void m10v_lifecycle_phase(uint32_t context,uint32_t event,uint32_t result){
  }
 #endif
 #if M10V_TORN_ENABLED && M10V_DEBUG_MODE
- if(event==193&&recipe<=0x80000000u-M10V_TORN_RECIPE_BYTES&&
+ /* Pre-submit runs after encoder admission, so the outcome is final even
+  * when an earlier owner-entry checkpoint had no terminal state yet. */
+ if(event==190&&recipe<=0x80000000u-M10V_TORN_RECIPE_BYTES&&
     *(const uint32_t*)(uintptr_t)(recipe+M10V_SAVE_RECIPE_BYTES)==M10V_SAVE_TRACE_MAGIC){
   const m10v_torn_snapshot *s=(const void*)(uintptr_t)(recipe+M10V_TORN_SHOT_OFFSET);
-  uint32_t packed=0xffffffffu,generation=0;
   if(__atomic_load_n(&s->magic,__ATOMIC_ACQUIRE)==M10V_TORN_SHOT_MAGIC&&s->recipe==recipe&&
-     s->si==*(const uint32_t*)(uintptr_t)(recipe+0x44c8u)){
-   packed=(s->phase<<24)|((s->result&255u)<<16)|(s->completion<<8);generation=s->generation;
+     s->si==*(const uint32_t*)(uintptr_t)(recipe+0x44c8u)&&(s->phase||s->result<0)){
+   const uint32_t row[5]={M10V_TORN_OUTCOME_EVENT,recipe,s->generation,
+                         (s->phase<<8)|s->completion,(uint32_t)s->result};
+   m10v_debug_batch(row,1);
   }
-  const uint32_t row[5]={198,recipe,M10V_TORN_JPEG,packed,generation};
-  m10v_debug_batch(row,1);
  }
 #endif
 #if M10V_BORDER_ENABLED && M10V_DEBUG_MODE

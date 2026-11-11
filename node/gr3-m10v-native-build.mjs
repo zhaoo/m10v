@@ -320,7 +320,8 @@ function checkRuntime(runtime, manifest) {
   need(typeof manifest.debug_mode==='boolean' && (manifest.debug_mode?
     manifest.debug_log?.schema==='m10v-gr3-sd-debug/v1'&&manifest.debug_log?.guard_address===0x5506821f&&
     /^[0-9a-f]{8}$/.test(manifest.debug_log.build_id)&&manifest.debug_log.page_bytes===4096&&manifest.debug_log.records_per_channel===63&&
-    JSON.stringify(manifest.debug_log.files)===JSON.stringify(['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN','M10VAK0.BIN','M10VAK1.BIN'])&&
+    JSON.stringify(manifest.debug_log.files)===JSON.stringify(['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN','M10VAK0.BIN','M10VAK1.BIN',
+      ...(manifest.torn_overlay?.enabled?['M10VTO0.BIN','M10VTO1.BIN']:[])])&&
     manifest.debug_log.files.every(name=>runtime.includes(Buffer.from('C:\\'+name))):
     !manifest.debug_log&&((!manifest.symbols?.m10v_debug_log&&!manifest.symbols?.m10v_debug_batch)||quietDebugSinks)&&!runtime.includes(Buffer.from('C:\\M10VMN'))&&!runtime.includes(Buffer.from('C:\\M10VCP'))),'native debug contract differs');
   for (const name of [...hooks.map(row=>row[2]), 'm10v_capture_library',...(manifest.debug_mode?['m10v_debug_log','m10v_debug_batch']:[])]) {

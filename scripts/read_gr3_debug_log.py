@@ -77,17 +77,22 @@ GUARDS={1:'context',2:'recipe',3:'topology',4:'sequence-mode',5:'objects',6:'jpe
         15:'preview-planes',16:'settings',17:'scratch-allocation',18:'scratch-overlap'}
 
 EVENTS.update(EFFECTS_MENU_EVENTS)
+EVENTS[225]='torn.outcome'
+TORN_EXEC_REASONS=('isp-complete','no-shot','owner-or-lease','session-changed','invalid-context-or-descriptor',
+                   'ineligible','format-or-layout','overlap-or-span','raw-bank','pair-geometry')
+TORN_LAYOUT_FAULTS=('format','dimensions','alignment','stride-or-rows','third-plane-or-roi','address-mode','orientation','mask-capacity')
+TORN_PROTECTED_OBJECTS=('recipe','shooting-info','menu-owner','context','descriptor','request','raw-dimensions')
 
 def page_records(data):
     if len(data)!=4096:return None
     h=struct.unpack_from('<16I',data)
-    if h[0]!=0x4744564d or h[1]!=1 or h[3]>63 or h[4]>=63 or not 0<h[5]<0xffffff00 or h[5]<h[3] or h[6] not in (1,2,3,4) or h[15]!=zlib.crc32(data[:60]) or (h[3]<63 and h[4]!=h[3]):return None
+    if h[0]!=0x4744564d or h[1]!=1 or h[3]>63 or h[4]>=63 or not 0<h[5]<0xffffff00 or h[5]<h[3] or h[6] not in (1,2,3,4,5) or h[15]!=zlib.crc32(data[:60]) or (h[3]<63 and h[4]!=h[3]):return None
     records=[]
     for index in range(h[3]):
         raw=data[64+index*64:128+index*64];r=struct.unpack('<16I',raw)
         if r[0]!=0x474c564d or r[1]!=1 or not 0<r[2]<=h[5] or r[8]!=h[2] or r[9]!=h[6] or r[15]!=zlib.crc32(raw[:60]):return None
         records.append({'sequence':r[2],'event':r[3],'stage':EVENTS.get(r[3],f'unknown.{r[3]}'),
-                        'arguments':list(r[4:8]),'build_id':f'{r[8]:08x}','channel':{1:'menu',2:'capture',3:'io',4:'ab'}[r[9]]})
+                        'arguments':list(r[4:8]),'build_id':f'{r[8]:08x}','channel':{1:'menu',2:'capture',3:'io',4:'ab',5:'torn'}[r[9]]})
     for record in records:
         if record['event']==198:
             recipe,tag,a,b=record['arguments']
@@ -175,6 +180,31 @@ def page_records(data):
         if record['event']==125:
             context,tone,mode,raw=record['arguments']
             record['request_identity']={'context':hex(context),'stock_tone':tone,'sequence_mode':mode,'raw_source':hex(raw)}
+        if record['event']==225 and record['channel']=='torn':
+            recipe,generation,packed,result=record['arguments']
+            result=struct.unpack('<i',struct.pack('<I',result))[0]
+            diagnostic={'kind':'jpeg-outcome','recipe':hex(recipe),'generation':generation,
+                        'phase':packed>>8,'complete':bool(packed&1),'result':result}
+            if result<0:
+                reason=(-result)&255
+                diagnostic['reason']=TORN_EXEC_REASONS[reason] if reason<len(TORN_EXEC_REASONS) else reason
+                if reason==6:
+                    diagnostic['layout_faults']=[name for bit,name in enumerate(TORN_LAYOUT_FAULTS) if (-result)>>8 & (1<<bit)]
+                elif reason==7:
+                    faults=('luma-span','chroma-span','luma/chroma-overlap','image/mask-overlap')
+                    faults+=tuple(f'image/{name}-overlap' for name in TORN_PROTECTED_OBJECTS)
+                    faults+=tuple(f'mask/{name}-overlap' for name in TORN_PROTECTED_OBJECTS)
+                    diagnostic['buffer_faults']=[name for bit,name in enumerate(faults) if (-result)>>8 & (1<<bit)]
+                elif reason==8:
+                    detail=(-result)>>8
+                    diagnostic['raw_fault']={1:'dimensions-pointer',2:'dimensions',3:'span',4:'image-overlap',5:'mask-overlap'}.get(detail,detail)
+                elif 16<=reason<=31:
+                    diagnostic.update(reason='unverified-raw-release',raw_status=reason-16)
+                elif 32<=reason<64:
+                    diagnostic.update(reason='freeze-rejection',freeze_code=reason-32)
+                elif reason==64:
+                    diagnostic['reason']='cancelled'
+            record['torn']=diagnostic
         if record['event']==38:
             action,stage,generation,result=record['arguments']
             record['torn']={'kind':'toggle','action':{0:'off',1:'on',2:'busy-or-unavailable',3:'storage-busy'}.get(action,action),
@@ -194,11 +224,9 @@ def page_records(data):
                 elif kind==3:
                     diagnostic.update(kind='layout',width=value&65535,height=value>>16,stride=detail&65535,rows=detail>>16)
                 elif kind==4:
-                    reasons=('isp-complete','no-shot','owner-or-lease','session-changed','invalid-context-or-descriptor',
-                             'ineligible','format-or-layout','overlap-or-span','raw-bank','pair-geometry')
                     reason=value&255
                     diagnostic.update(kind='execute',phase=value>>8,generation=detail,
-                                      reason=reasons[reason] if reason<len(reasons) else reason)
+                                      reason=TORN_EXEC_REASONS[reason] if reason<len(TORN_EXEC_REASONS) else reason)
                     if reason>=16:diagnostic['raw_status']=reason-16
                 elif kind in (5,8):
                     diagnostic.update(kind='encoder-admit' if kind==5 else 'jpeg-handoff',generation=detail)

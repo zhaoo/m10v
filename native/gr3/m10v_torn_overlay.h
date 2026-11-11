@@ -15,6 +15,9 @@
 #define M10V_TORN_SPATIAL 0x544f5206u
 #define M10V_TORN_FORMAT 0x544f5207u
 #define M10V_TORN_JPEG 0x544f5208u
+#define M10V_TORN_OUTCOME_EVENT 225u
+#define M10V_TORN_FREEZE_REJECTION 32u
+#define M10V_TORN_CANCELLED 64u
 #if M10V_DEBUG_MODE
 extern uint32_t m10v_save_trace_recipe_mark(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t);
 #define M10V_TORN_MARK(recipe,tag,a,b) ((void)m10v_save_trace_recipe_mark(recipe,198u,tag,a,b))

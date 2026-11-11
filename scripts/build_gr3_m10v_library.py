@@ -1485,7 +1485,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['debug_mode']=debug_mode
     manifest['capture_profile']={'schema':'m10v-capture-profile/v1','counter_service':0x53050b7c,'units':'milliseconds','flush':'once after render and cache writeback','max_batch':32} if profile_mode else None
     manifest['debug_log']={'schema':'m10v-gr3-sd-debug/v1','build_id':f'{debug_build_id:08x}',
-        'files':['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN','M10VAK0.BIN','M10VAK1.BIN'],
+        'files':['M10VMN0.BIN','M10VMN1.BIN','M10VCP0.BIN','M10VCP1.BIN','M10VIO0.BIN','M10VIO1.BIN','M10VAK0.BIN','M10VAK1.BIN']+
+                (['M10VTO0.BIN','M10VTO1.BIN'] if torn_overlay else []),
         'page_bytes':4096,'records_per_channel':63,'guard_address':0x5506821f,'adj_exit_trace':adj_exit_trace} if debug_mode else None
     initial_offset = bytes(image).find(initial)
     if initial_offset < 0 or bytes(image).find(initial, initial_offset+1) >= 0: raise ValueError('initial state not uniquely embedded')
