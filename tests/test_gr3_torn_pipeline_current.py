@@ -194,8 +194,15 @@ class TornPipelineCurrentTests(unittest.TestCase):
   self.assertEqual(record['bindings'],[(0x70000000,640),(0x76000000,640),(0x70000000,640),(0x70000000,640),(0x74000000,640),(0x74000000,640)])
   self.assertEqual(len(record['submit']),3);self.assertEqual(record['releases'],3);self.assertEqual(len(record['wait_events']),3)
   self.assertEqual(record['weights'],[(0x70000000,640),(0x76000000,640),(0x76000000,640)])
-  identity=tuple(range(256));threshold=tuple(0 if i<=48 else 255 if i>=208 else ((i-48)*255+80)//160 for i in range(256))
-  self.assertEqual(record['curves'],[(threshold,threshold,identity),((255,)*256,identity,identity),((128,)*256,identity,identity)])
+  identity=tuple(range(256))
+  mask_a,mask_b,mask_output=record['curves'][0]
+  self.assertEqual(mask_a,mask_b)
+  self.assertEqual(mask_output,identity)
+  self.assertEqual(mask_a[:113],(0,)*113)
+  self.assertEqual(mask_a[136:],(255,)*120)
+  self.assertEqual(mask_a[124],128)
+  self.assertTrue(all(a<=b for a,b in zip(mask_a,mask_a[1:])))
+  self.assertEqual(record['curves'][1:],[((255,)*256,identity,identity),((128,)*256,identity,identity)])
   self.assertEqual(self.call(e,'m10v_torn_state',query,query+4),1);self.assertEqual(self.word(e,query),3)
   self.assertEqual(e.assertions,[])
 

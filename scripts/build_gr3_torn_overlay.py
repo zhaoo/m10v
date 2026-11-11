@@ -7,8 +7,18 @@ EXTERNALS=('m10v_isp_effect_granulation_plane','m10v_torn_eligible','m10v_torn_c
 TRACE_EXTERNAL='m10v_save_trace_recipe_mark'
 SOURCES=('native/gr3/m10v_torn_overlay.c','native/gr3/m10v_torn_overlay.h','scripts/build_gr3_torn_overlay.py','native/gr3/m10v_isp_effect_granulation.h','native/gr3/m10v_isp_effect_memory.h')
 def _curves():
- identity=list(range(256));threshold=[0 if i<=48 else 255 if i>=208 else ((i-48)*255+80)//160 for i in identity]
- profiles=((threshold,threshold,identity),([255]*256,identity,identity),([128]*256,identity,identity))
+ identity=list(range(256))
+ # Keep dark paper fully open and light backing fully opaque. A short
+ # smoothstep softens edge pixels without turning either region translucent.
+ dark_paper,white_backing=112,136
+ width=white_backing-dark_paper
+ denominator=width**3
+ mask=[]
+ for luma in identity:
+  offset=max(0,min(width,luma-dark_paper))
+  numerator=255*offset**2*(3*width-2*offset)
+  mask.append((numerator+denominator//2)//denominator)
+ profiles=((mask,mask,identity),([255]*256,identity,identity),([128]*256,identity,identity))
  return 'static const int16_t torn_curves[3][3][256]={'+','.join('{'+','.join('{'+','.join(map(str,row))+'}' for row in profile)+'}' for profile in profiles)+'};\n'
 def build(base=0x54d00000,rtos=None,externals=None,*,enabled=False,camera_model='gr3',debug=False):
  m=dict(schema='m10v-torn-overlay/v1',enabled=False,experimental=True,code_bytes=0,symbols={},patches=[],camera_tested=False,pixel_math_proven=False,firmware_emitted=False)
