@@ -1,5 +1,8 @@
 #include "m10v_save_trace.h"
 #include "m10v_debug.h"
+#if M10V_TORN_ENABLED
+#include "m10v_torn_overlay.h"
+#endif
 #if M10V_PURE_ISP_EFFECTS
 #include "m10v_isp_effects_shot.h"
 #endif
@@ -71,6 +74,19 @@ void m10v_lifecycle_phase(uint32_t context,uint32_t event,uint32_t result){
    {198,recipe,0x46583036u,s->effective_grain_strength,s->settings.grain_mode},
    {198,recipe,0x46583037u,si,native}};
   m10v_debug_batch(&facts[0][0],8);
+ }
+#endif
+#if M10V_TORN_ENABLED && M10V_DEBUG_MODE
+ if(event==193&&recipe<=0x80000000u-M10V_TORN_RECIPE_BYTES&&
+    *(const uint32_t*)(uintptr_t)(recipe+M10V_SAVE_RECIPE_BYTES)==M10V_SAVE_TRACE_MAGIC){
+  const m10v_torn_snapshot *s=(const void*)(uintptr_t)(recipe+M10V_TORN_SHOT_OFFSET);
+  uint32_t packed=0xffffffffu,generation=0;
+  if(__atomic_load_n(&s->magic,__ATOMIC_ACQUIRE)==M10V_TORN_SHOT_MAGIC&&s->recipe==recipe&&
+     s->si==*(const uint32_t*)(uintptr_t)(recipe+0x44c8u)){
+   packed=(s->phase<<24)|((s->result&255u)<<16)|(s->completion<<8);generation=s->generation;
+  }
+  const uint32_t row[5]={198,recipe,M10V_TORN_JPEG,packed,generation};
+  m10v_debug_batch(row,1);
  }
 #endif
 #if M10V_BORDER_ENABLED && M10V_DEBUG_MODE

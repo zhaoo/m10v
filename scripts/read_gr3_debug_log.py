@@ -4,7 +4,7 @@ import json
 import struct
 import zlib
 EFFECTS_MENU_EVENTS={32:'effects.lifecycle',33:'effects.ready.before',34:'effects.ready.stage',
-                     35:'effects.enter',36:'effects.key.before',37:'effects.route',39:'effects.key.after'}
+                     35:'effects.enter',36:'effects.key.before',37:'effects.route',38:'torn.toggle',39:'effects.key.after'}
 from pathlib import Path
 
 EVENTS={10:'menu.enter.before',11:'menu.enter.after',20:'menu.key.before',21:'menu.key.after',
@@ -175,6 +175,45 @@ def page_records(data):
         if record['event']==125:
             context,tone,mode,raw=record['arguments']
             record['request_identity']={'context':hex(context),'stock_tone':tone,'sequence_mode':mode,'raw_source':hex(raw)}
+        if record['event']==38:
+            action,stage,generation,result=record['arguments']
+            record['torn']={'kind':'toggle','action':{0:'off',1:'on',2:'busy-or-unavailable',3:'storage-busy'}.get(action,action),
+                            'previous_stage':stage,'generation':generation,'result':result}
+        if record['event']==198:
+            recipe,tag,value,detail=record['arguments']
+            if 0x544f5201<=tag<=0x544f5208:
+                diagnostic={'recipe':hex(recipe)}
+                kind=tag&255
+                if kind==1:
+                    reasons=('armed','no-owner','lease-busy','inactive','pending-recipe','no-plane','saved-shot-ineligible')
+                    reason=value&255
+                    diagnostic.update(kind='freeze',stage=value>>8,reason=reasons[reason] if reason<len(reasons) else reason,generation=detail)
+                elif kind==2:
+                    diagnostic.update(kind='saved-si',requested_drive=value>>24,normalized_drive=(value>>16)&255,
+                                      aspect=(value>>8)&255,tone=value&255,orientation=detail)
+                elif kind==3:
+                    diagnostic.update(kind='layout',width=value&65535,height=value>>16,stride=detail&65535,rows=detail>>16)
+                elif kind==4:
+                    reasons=('isp-complete','no-shot','owner-or-lease','session-changed','invalid-context-or-descriptor',
+                             'ineligible','format-or-layout','overlap-or-span','raw-bank','pair-geometry')
+                    reason=value&255
+                    diagnostic.update(kind='execute',phase=value>>8,generation=detail,
+                                      reason=reasons[reason] if reason<len(reasons) else reason)
+                    if reason>=16:diagnostic['raw_status']=reason-16
+                elif kind in (5,8):
+                    diagnostic.update(kind='encoder-admit' if kind==5 else 'jpeg-handoff',generation=detail)
+                    if value==0xffffffff:diagnostic['snapshot']='missing-or-mismatched'
+                    else:
+                        result=(value>>16)&255
+                        diagnostic.update(phase=value>>24,result=result-256 if result>=128 else result,complete=(value>>8)&255)
+                        if kind==5:diagnostic['admitted']=bool(value&1)
+                elif kind==6:
+                    diagnostic.update(kind='spatial',plan={0:'invalid',1:'no-stock-query',2:'stock-query-verified'}.get(value,value),
+                                      stock_result=detail)
+                else:
+                    diagnostic.update(kind='format',format=value&255,layout_flags=(value>>8)&255,
+                                      roi=bool(value&0x30000),orientation=detail)
+                record['torn']=diagnostic
         if record['event']==197:
             recipe,tag,value,detail=record['arguments']
             if tag&0xff000000==0x4a000000:

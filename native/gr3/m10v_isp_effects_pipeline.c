@@ -185,9 +185,15 @@ int m10v_isp_effects_pipeline_execute(uint32_t recipe,uint32_t native_context,
     void *params,uint32_t stock_result){
     m10v_isp_effects_shot_snapshot shot;
     if(!pipeline_params(recipe,params,&shot)){
+#if M10V_TORN_ENABLED
+        M10V_TORN_MARK(recipe,M10V_TORN_SPATIAL,0,stock_result);
+#endif
         if(pipeline_ram((uint32_t)(uintptr_t)params,0x34)&&pipeline_word(params,0x20)==recipe)pipeline_hold(recipe,10,stock_result);
         return 0;
     }
+#if M10V_TORN_ENABLED
+    M10V_TORN_MARK(recipe,M10V_TORN_SPATIAL,shot.stock_query_valid?2u:1u,stock_result);
+#endif
     /* No own stage touched this image. Preserve the original stage's result
      * and failure policy rather than manufacturing a new effects failure. */
     if(!pipeline_mask(&shot)){

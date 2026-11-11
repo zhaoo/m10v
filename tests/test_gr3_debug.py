@@ -196,6 +196,14 @@ class DebugLogArmTests(unittest.TestCase):
         self.assertEqual(records[1]['isp_effects']['imprint_style'],7)
         self.assertEqual(records[1]['isp_effects']['rainbow'],0)
 
+    def test_torn_checkpoint_identifies_rejected_second_shot_and_jpeg_handoff(self):
+        recipe=0x55005000
+        self.assertEqual(self.log(198,recipe,0x544f5204,0x210,2),1)
+        self.assertEqual(self.log(198,recipe,0x544f5208,0x02ff0000,2),1)
+        rejected,jpeg=[r['torn'] for r in self.decoded()['records']]
+        self.assertEqual((rejected['phase'],rejected['raw_status'],rejected['generation']),(2,0,2))
+        self.assertEqual((jpeg['kind'],jpeg['phase'],jpeg['result'],jpeg['complete']),('jpeg-handoff',2,-1,0))
+
     def test_arm_writes_history_with_payload_build_identity_and_balanced_close(self):
         self.assertEqual(self.log(),1);self.assertEqual(self.log(31),1)
         result=self.decoded();records=result['records']

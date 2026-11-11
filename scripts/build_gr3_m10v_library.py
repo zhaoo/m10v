@@ -425,7 +425,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         (out / 'm10v-library-camera-arm.o').write_bytes(camera_obj.read_bytes())
         torn_report=None
         if torn_overlay:
-            from scripts.build_gr3_torn_overlay import build as build_torn, EXTERNALS as TORN_EXTERNALS
+            from scripts.build_gr3_torn_overlay import build as build_torn, EXTERNALS as TORN_EXTERNALS, TRACE_EXTERNAL
+            torn_externals=TORN_EXTERNALS+((TRACE_EXTERNAL,) if debug_mode else ())
             torn_binding_obj=folder/"torn-bindings.o"
             subprocess.run([compiler,*compile_flags,"-c",str(ROOT/"native/gr3/m10v_torn_bindings.c"),"-o",str(torn_binding_obj)],check=True,capture_output=True)
             torn_binding_object=torn_binding_obj.read_bytes()
@@ -433,7 +434,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             torn_binding_code,torn_binding_symbols=link_object(torn_binding_object,torn_binding_base,{**symbols,"m10v_isp_frame_recipe_state":0x54fe0000,"m10v_isp_effects_shot_read":0x54fe0000},"m10v_torn_binding_",additional_exports=("m10v_torn_eligible","m10v_torn_camera_busy"))
             image+=bytes(torn_binding_base-base-len(image))+torn_binding_code;symbols.update(torn_binding_symbols)
             torn_base=(base+len(image)+15)&~15
-            torn_code,torn_report=build_torn(torn_base,capture_stock_rtos(camera_model),{k:symbols.get(k,0x54fe0000) for k in TORN_EXTERNALS},enabled=True,camera_model=camera_model)
+            torn_code,torn_report=build_torn(torn_base,capture_stock_rtos(camera_model),{k:symbols.get(k,0x54fe0000) for k in torn_externals},enabled=True,camera_model=camera_model,debug=debug_mode)
             image+=bytes(torn_base-base-len(image))+torn_code;symbols.update(torn_report["symbols"])
         pure_pipeline_object=None
         pure_pipeline_base=None
@@ -454,6 +455,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                     pure_pipeline_object=obj_path.read_bytes();pure_pipeline_base=module_base
                     externals['m10v_isp_effects_render']=module_base
                     externals['m10v_debug_batch']=module_base
+                    externals['m10v_save_trace_recipe_mark']=module_base
                 code,entries=link_object(obj_path.read_bytes(),module_base,externals,prefix,
                     additional_exports=('m10v_isp_effects_camera_read_legacy',) if source=='m10v_isp_effects_camera.c' else ())
                 image+=bytes(module_base-base-len(image))+code;symbols.update(entries)
@@ -882,7 +884,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         if 786+len(texts)!=(1211 if pure_isp_effects else 1203):raise ValueError('three-film resource allocation differs')
         texts+=['SHD50','Revolog KOLOR','Pegasus']
         if pure_isp_effects:texts+=['暗角','暗角开关','暗角强度','开']
-        if torn_overlay:texts+=['撕纸叠映','开始 / 重新开始','取消叠映','已关闭','待拍轮廓','待拍素材','已完成','失败']
+        if torn_overlay:texts+=['撕纸叠映','开','关','撕纸叠映：关','撕纸叠映：1/2 轮廓','撕纸叠映：2/2 素材','撕纸叠映：已完成','撕纸叠映：失败']
         last_resource=786+len(texts)-1
         if sd_library:
             from scripts.generate_m10v_card_captions import resource as caption_resource
@@ -1331,7 +1333,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             bindings_final,bindings_entries=link_object(torn_binding_object,torn_binding_base,symbols,'m10v_torn_binding_',additional_exports=('m10v_torn_eligible','m10v_torn_camera_busy'))
             if len(bindings_final)!=len(torn_binding_code) or bindings_entries!=torn_binding_symbols:raise ValueError('torn bindings forward-link changed layout')
             image[torn_binding_base-base:torn_binding_base-base+len(bindings_final)]=bindings_final;torn_binding_code=bindings_final
-            torn_final,torn_final_report=build_torn(torn_base,capture_stock_rtos(camera_model),{k:symbols[k] for k in TORN_EXTERNALS},enabled=True,camera_model=camera_model)
+            torn_final,torn_final_report=build_torn(torn_base,capture_stock_rtos(camera_model),{k:symbols[k] for k in torn_externals},enabled=True,camera_model=camera_model,debug=debug_mode)
             if len(torn_final)!=len(torn_code) or torn_final_report['symbols']!=torn_report['symbols']:raise ValueError('torn forward-link layout changed')
             image[torn_base-base:torn_base-base+len(torn_final)]=torn_final;torn_report=torn_final_report
         final_pipeline,final_entries=link_object(pure_pipeline_object,pure_pipeline_base,symbols,'m10v_isp_effects_pipeline_')

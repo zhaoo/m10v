@@ -31,6 +31,16 @@ class TornPipelineCurrentTests(unittest.TestCase):
   off=cls.manifest['base']-0x53000000
   assert hashlib.sha256(cls.image[off:off+cls.manifest['code_bytes']]).hexdigest()==cls.manifest['code_sha256']
  def word(self,e,p):return struct.unpack('<I',e.u.mem_read(p,4))[0]
+ def spatial_hook(self,e,site,ctx,params,arg,recipe):
+  carrier=recipe+0x4320
+  e.w32(carrier+0x30,recipe+0x1a8)
+  for n,v in enumerate((ctx,params,arg,0,carrier)):
+   e.u.reg_write(getattr(A,'UC_ARM_REG_R'+str(n)),v)
+  e.u.reg_write(A.UC_ARM_REG_SP,0x5effff00)
+  e.u.reg_write(A.UC_ARM_REG_CPSR,0x13)
+  e.u.emu_start(site,site+4,count=5000000)
+  self.assertEqual(e.u.reg_read(A.UC_ARM_REG_PC),site+4)
+  return e.u.reg_read(A.UC_ARM_REG_R0)
  def session_start(self,e,owner):
   self.call(e,'m10v_torn_init',owner)
   e.w32(0x55064398,1);e.w32(0x55063ecc,1);e.u.mem_write(0x55067958+0x880,b'\3');e.u.mem_write(0x55063e03,b'\0');e.w32(0x55063dcc,1)
@@ -123,9 +133,9 @@ class TornPipelineCurrentTests(unittest.TestCase):
   e.u.mem_write(params,struct.pack('<13I',0,photo,other,0,values,0,0,0,0,0,0,0,0))
   self.call(e,'m10v_isp_effects_pipeline_settings',recipe,si,params,0)
   self.assertEqual(self.word(e,params+0x20),recipe)
-  self.assertEqual(self.call(e,'m10v_isp_effects_pipeline_workspace',params,query,1),1)
+  self.assertEqual(self.spatial_hook(e,0x535033e8,ctx,params,query,recipe),1)
   self.assertEqual(self.call(e,'m10v_torn_encoder_admit',recipe,si),0)
-  self.assertEqual(self.call(e,'m10v_isp_effects_pipeline_execute',recipe,ctx,params,1),1)
+  self.assertEqual(self.spatial_hook(e,0x53503ab4,ctx,params,0,recipe),1)
   self.assertEqual(self.call(e,'m10v_torn_encoder_admit',recipe,si),1)
   self.assertEqual(self.call(e,'m10v_isp_effects_pipeline_encoder_admit',recipe,si),1)
   self.assertEqual(self.word(e,p+28),1);self.assertEqual(record['rng'],0)
@@ -146,9 +156,9 @@ class TornPipelineCurrentTests(unittest.TestCase):
   self.make(e,second,obj,frame)
   e.w32(second+0x60,0x78000000);e.w32(second+0x230,dims)
   self.call(e,'m10v_isp_effects_pipeline_settings',second,second_si,params,0)
-  self.assertEqual(self.call(e,'m10v_isp_effects_pipeline_workspace',params,query,1),1)
+  self.assertEqual(self.spatial_hook(e,0x535033e8,ctx,params,query,second),1)
   self.assertEqual(self.call(e,'m10v_torn_encoder_admit',second,second_si),0)
-  self.assertEqual(self.call(e,'m10v_isp_effects_pipeline_execute',second,ctx,params,1),1)
+  self.assertEqual(self.spatial_hook(e,0x53503ab4,ctx,params,0,second),1)
   self.assertEqual(self.call(e,'m10v_isp_effects_pipeline_encoder_admit',second,second_si),1)
   self.assertEqual(self.word(e,second+0x57d8+28),1)
   self.assertEqual(record['bindings'],[(0x70000000,640),(0x76000000,640),(0x70000000,640),(0x70000000,640),(0x74000000,640),(0x74000000,640)])

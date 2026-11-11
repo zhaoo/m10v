@@ -6,6 +6,21 @@
 #define M10V_TORN_SHOT_OFFSET 0x57d8u
 #define M10V_TORN_RECIPE_BYTES 0x57f8u
 #define M10V_TORN_SHOT_MAGIC 0x31524f54u
+/* Scalar recipe observations, drained by the existing JPEG worker. */
+#define M10V_TORN_FREEZE 0x544f5201u
+#define M10V_TORN_SI 0x544f5202u
+#define M10V_TORN_LAYOUT 0x544f5203u
+#define M10V_TORN_EXEC 0x544f5204u
+#define M10V_TORN_ENCODER 0x544f5205u
+#define M10V_TORN_SPATIAL 0x544f5206u
+#define M10V_TORN_FORMAT 0x544f5207u
+#define M10V_TORN_JPEG 0x544f5208u
+#if M10V_DEBUG_MODE
+extern uint32_t m10v_save_trace_recipe_mark(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t);
+#define M10V_TORN_MARK(recipe,tag,a,b) ((void)m10v_save_trace_recipe_mark(recipe,198u,tag,a,b))
+#else
+#define M10V_TORN_MARK(recipe,tag,a,b) ((void)(sizeof(a)+sizeof(b)))
+#endif
 typedef struct {uint32_t magic,recipe,si,generation,phase,owner;int32_t result;uint32_t completion;} m10v_torn_snapshot;
 void m10v_torn_init(uint32_t owner);
 void m10v_torn_destroy(uint32_t owner);

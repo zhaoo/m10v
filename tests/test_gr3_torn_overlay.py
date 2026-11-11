@@ -10,11 +10,13 @@ class TornTests(unittest.TestCase):
  def setUp(self):
   if not (ROOT/'scripts/build_gr3_torn_overlay.py').exists():return
   from scripts import build_gr3_torn_overlay as b
-  self.b=b;self.ext={n:0x54f00000+4*i for i,n in enumerate(b.EXTERNALS)}
+  debug=self._testMethodName=='test_debug_trace_distinguishes_raw_rejection_from_stock_passthrough'
+  names=b.EXTERNALS+((b.TRACE_EXTERNAL,) if debug else ())
+  self.b=b;self.ext={n:0x54f00000+4*i for i,n in enumerate(names)}
   fixture=Path(os.environ.get('M10V_GR3_RTOS',str(ROOT/'builds/gr3-extension-validation/official-rtos.bin')))
   if not fixture.exists():fixture=Path.home()/'Desktop/code/zhaoo/m10v/builds/gr3-extension-validation/official-rtos.bin'
   self.rom=fixture.read_bytes()
-  code,m=b.build(0x54d00000,self.rom,self.ext,enabled=True);self.sym=m['symbols']
+  code,m=b.build(0x54d00000,self.rom,self.ext,enabled=True,debug=debug);self.sym=m['symbols']
   self.u=Uc(UC_ARCH_ARM,UC_MODE_ARM);self.u.mem_map(0x53000000,0x2000000);self.u.mem_write(0x54d00000,code)
   self.u.mem_map(0x55000000,0x1000000);self.u.reg_write(A.UC_ARM_REG_SP,0x55fe0000)
   self.owner=0x55080000;self.r=0x55100000;self.si=0x55200000;self.photo=0x55070000
@@ -66,6 +68,26 @@ class TornTests(unittest.TestCase):
   self.assertEqual(self.stage()[0],3);self.assertEqual(len(self.graphs()),3);self.assertEqual(len([c for c in self.calls if c[0]=='free']),1)
   self.assertEqual(self.descriptors[2][0][1],0x74000000)
   self.assertTrue(all(not s[2] and not d[2] for d,s in self.descriptors))
+ def test_busy_freeze_cannot_cancel_the_lease_holders_first_shot(self):
+  self.call('m10v_torn_set',self.owner,1);self.freeze()
+  # Model a second producer hitting the first shot's execution lease.
+  self.put(self.owner+0x6d04,1)
+  other=self.r+0x10000;self.put(other,0x53d0fc90);self.put(other+0x44c8,self.si);self.freeze(other)
+  self.assertEqual(self.stage()[0],1)
+  self.assertEqual(self.call('m10v_torn_encoder_admit',other,self.si),1)
+  self.put(self.owner+0x6d04,0)
+  self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),1)
+  self.assertEqual(self.stage()[0],2)
+ def test_debug_trace_distinguishes_raw_rejection_from_stock_passthrough(self):
+  self.call('m10v_torn_set',self.owner,1);self.freeze();self.raw_status=0
+  self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),0xffffffff)
+  self.assertEqual(self.call('m10v_torn_encoder_admit',self.r,self.si),1)
+  tags={regs[2]:(regs[3],stack[0]) for name,regs,stack in self.calls if name==self.b.TRACE_EXTERNAL}
+  self.assertEqual(tags[0x544f5201],(0x100,2))
+  self.assertEqual(tags[0x544f5203],(640|(480<<16),640|(480<<16)))
+  self.assertEqual(tags[0x544f5204],(0x110,2))
+  self.assertEqual(tags[0x544f5205],(0x01ff0001,2))
+  self.assertFalse(self.graphs())
  def test_24mp_planes_stay_unmapped_and_worker_never_allocates(self):
   self.put(self.photo+16,6000|(4000<<16),6016|(4000<<16))
   self.assertEqual(self.call('m10v_torn_set',self.owner,1),0)
