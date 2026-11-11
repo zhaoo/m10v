@@ -42,7 +42,7 @@ class TornPipelineCurrentTests(unittest.TestCase):
   e.u.emu_start(site,site+4,count=5000000)
   self.assertEqual(e.u.reg_read(A.UC_ARM_REG_PC),site+4)
   return e.u.reg_read(A.UC_ARM_REG_R0)
- def session_start(self,e,owner,debug_batches=None):
+ def session_start(self,e,owner,debug_batches=None,resize_requests=None):
   self.call(e,'m10v_torn_init',owner)
   e.w32(0x55064398,1);e.w32(0x55063ecc,1);e.u.mem_write(0x55067958+0x880,b'\3');e.u.mem_write(0x55063e03,b'\0');e.w32(0x55063dcc,1)
   e.w32(0x55067958+0x2c,0)
@@ -55,6 +55,10 @@ class TornPipelineCurrentTests(unittest.TestCase):
    elif pc in (0x53245190,0x53245260,0x532bd6d4):result=0
    elif pc==0x532bd6b4:result=11
    elif pc==0x53050b7c:result=0
+   elif pc==self.manifest['symbols'].get('m10v_isp_effect_transfer_execute'):
+    ptr=u.reg_read(A.UC_ARM_REG_R0)
+    if resize_requests is not None:resize_requests.append(struct.unpack('<17I',u.mem_read(ptr,68)))
+    result=1
    elif pc==self.manifest['symbols'].get('m10v_debug_batch'):
     if debug_batches is not None:
      ptr=u.reg_read(A.UC_ARM_REG_R0);count=u.reg_read(A.UC_ARM_REG_R1)
@@ -136,7 +140,8 @@ class TornPipelineCurrentTests(unittest.TestCase):
   self.assertTrue(any(r[0]==199 for r in batches))
  def test_real_producer_freezes_exact_recipe_then_original_graph_and_encoder(self):
   e,recipe,obj,frame,si,request,data=self.fixture(66,stage=0)
-  owner=self.publish_owner(e,data);self.session_start(e,owner)
+  resizes=[]
+  owner=self.publish_owner(e,data);self.session_start(e,owner,resize_requests=resizes)
   self.call(e,'m10v_torn_reserve',recipe)
   e.u.mem_write(recipe+0x4a08,bytes(1796))
   self.enqueue(e,recipe,19)
@@ -152,7 +157,7 @@ class TornPipelineCurrentTests(unittest.TestCase):
   e.u.mem_write(photo,struct.pack('<8I',1,0x70000000,0x74000000,0,640|(480<<16),640|(480<<16),0,2))
   # Native RAW still belongs to a separate allocation. No borrowed pixel is
   # mapped and no photo copy/threshold/blend can execute on the CPU.
-  e.w32(recipe+0x60,0x78000000);dims=e.alloc(4);e.w32(dims,640|(480<<16));e.w32(recipe+0x230,dims)
+  e.w32(recipe+0x60,0x7c000000);dims=e.alloc(4);e.w32(dims,640|(480<<16));e.w32(recipe+0x230,dims)
   record=self.graph_leaves(e,ctx)
   params,other,values,query=[e.alloc(n) for n in (0x34,32,12,4)]
   e.u.mem_write(other,struct.pack('<8I',1,0x71000000,0x75000000,0,640|(480<<16),640|(480<<16),0,2))
@@ -168,8 +173,9 @@ class TornPipelineCurrentTests(unittest.TestCase):
   self.assertEqual(self.call(e,'m10v_torn_encoder_admit',recipe,si),1)
   self.assertEqual(self.call(e,'m10v_isp_effects_pipeline_encoder_admit',recipe,si),1)
   self.assertEqual(self.word(e,p+28),1);self.assertEqual(record['rng'],0)
-  self.assertEqual(record['bindings'],[(0x70000000,640),(0x76000000,640)])
-  self.assertEqual(len(record['submit']),1);self.assertEqual(record['releases'],1);self.assertEqual(len(record['wait_events']),1)
+  bindings=[(0x70000000,640),(0x70000000,640),(0x74000000,640),(0x74000000,640)]
+  self.assertEqual(record['bindings'],bindings)
+  self.assertEqual(len(record['submit']),2);self.assertEqual(record['releases'],2);self.assertEqual(len(record['wait_events']),2)
   e.u.mem_write(si+0x799,b'\x00')
   # The second exposure is independently allocated and enters through the
   # SAME original producer. Reserve initializes an empty tail; it does not
@@ -182,28 +188,27 @@ class TornPipelineCurrentTests(unittest.TestCase):
   e.u.reg_write(A.UC_ARM_REG_R0,second);e.u.reg_write(A.UC_ARM_REG_R4,second);e.u.emu_start(0x5350eb10,0x5350eb38,count=100)
   self.call(e,'m10v_isp_effects_shot_reserve',second);self.enqueue(e,second,19)
   second_frozen=struct.unpack('<8I',e.u.mem_read(second+0x57d8,32))
-  self.assertEqual(second_frozen[:3],(0x31524f54,second,second_si));self.assertEqual(second_frozen[4],2)
+  self.assertEqual(second_frozen[:3],(0x31524f54,second,second_si));self.assertEqual(second_frozen[4],1)
   self.make(e,second,obj,frame)
-  e.w32(second+0x60,0x78000000);e.w32(second+0x230,dims)
+  e.w32(second+0x60,0x7c000000);e.w32(second+0x230,dims)
   self.call(e,'m10v_isp_effects_pipeline_settings',second,second_si,params,0)
   self.assertEqual(self.spatial_hook(e,0x535033e8,ctx,params,query,second),1)
   self.assertEqual(self.call(e,'m10v_torn_encoder_admit',second,second_si),0)
   self.assertEqual(self.spatial_hook(e,0x53503ab4,ctx,params,0,second),1)
   self.assertEqual(self.call(e,'m10v_isp_effects_pipeline_encoder_admit',second,second_si),1)
   self.assertEqual(self.word(e,second+0x57d8+28),1)
-  self.assertEqual(record['bindings'],[(0x70000000,640),(0x76000000,640),(0x70000000,640),(0x70000000,640),(0x74000000,640),(0x74000000,640)])
-  self.assertEqual(len(record['submit']),3);self.assertEqual(record['releases'],3);self.assertEqual(len(record['wait_events']),3)
-  self.assertEqual(record['weights'],[(0x70000000,640),(0x76000000,640),(0x76000000,640)])
+  self.assertEqual(record['bindings'],bindings*2)
+  self.assertEqual(len(record['submit']),4);self.assertEqual(record['releases'],4);self.assertEqual(len(record['wait_events']),4)
+  self.assertEqual(record['weights'],[(0x76000000,640)]*4)
+  self.assertEqual(len(resizes),2)
+  self.assertNotEqual(resizes[0][1],resizes[1][1])
+  masks=self.manifest['torn_overlay']['core']['masks']
+  stride=masks['bytes']//masks['count']
+  self.assertTrue(all(r[1] in [masks['base']+n*stride for n in range(masks['count'])] for r in resizes))
+  self.assertTrue(all(r[8:13]==(2,0x76000000,0x76000000+640*480,0,640|(480<<16)) for r in resizes))
   identity=tuple(range(256))
-  mask_a,mask_b,mask_output=record['curves'][0]
-  self.assertEqual(mask_a,mask_b)
-  self.assertEqual(mask_output,identity)
-  self.assertEqual(mask_a[:113],(0,)*113)
-  self.assertEqual(mask_a[136:],(255,)*120)
-  self.assertEqual(mask_a[124],128)
-  self.assertTrue(all(a<=b for a,b in zip(mask_a,mask_a[1:])))
-  self.assertEqual(record['curves'][1:],[((255,)*256,identity,identity),((128,)*256,identity,identity)])
-  self.assertEqual(self.call(e,'m10v_torn_state',query,query+4),1);self.assertEqual(self.word(e,query),3)
+  self.assertEqual(record['curves'],[((255,)*256,identity,identity),((128,)*256,identity,identity)]*2)
+  self.assertEqual(self.call(e,'m10v_torn_state',query,query+4),1);self.assertEqual(self.word(e,query),1)
   self.assertEqual(e.assertions,[])
 
 class TornDedicatedLogTests(unittest.TestCase):
@@ -242,6 +247,19 @@ class NativePlaneGraphControlTests(unittest.TestCase):
   image=bytearray(rom);off=0x1190000;image.extend(bytes(max(0,off+len(code)-len(image))));image[off:off+len(code)]=code
   for p in cls.manifest['patches']:struct.pack_into('<I',image,p['address']-0x53000000,p['replacement'])
   cls.image=bytes(image)
+ def test_original_resize_plans_full_resolution_mask_without_reading_pixels(self):
+  from scripts.border_resize_contract import probe
+  from scripts.build_gr3_torn_overlay import MASK_WIDTH,MASK_HEIGHT
+  rom=(ROOT/'builds/gr3-extension-validation/official-rtos.bin').read_bytes()
+  result=probe(rom,6000,4000,fmt=2,source_format=2,
+               source_size=(MASK_WIDTH,MASK_HEIGHT),source_stride=MASK_WIDTH,
+               source_plane=0x54218000,destination_stride=6000,texture_research=True)
+  self.assertEqual(result['assertions'],[])
+  self.assertFalse(result['pixels_mapped'])
+  self.assertTrue(result['scaler_configuration_executed'])
+  luma,chroma=result['scaler_requests']
+  self.assertEqual(luma['destination']['size'],[6000,4000])
+  self.assertEqual(chroma['destination']['size'],[3000,2000])
  def test_original_graph_independent_mask_destination_then_inplace_y_uv(self):
   e=StockISP(self.image);ctx=e.alloc(0x40);src=e.alloc(32);dst=e.alloc(32);curves=e.alloc(1536)
   # Coefficients are bounded metadata; photo addresses stay unmapped.

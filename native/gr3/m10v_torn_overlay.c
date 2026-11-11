@@ -1,14 +1,18 @@
 #include "m10v_torn_overlay.h"
 #include "m10v_isp_effect_granulation.h"
 #include "m10v_isp_effect_memory.h"
+#include "m10v_isp_effect_transfer_runtime.h"
 #include "m10v_torn_curves.h"
 #define U(p) ((uint32_t)(uintptr_t)(p))
 #define MAGIC 0x31534f54u
-#define CAPACITY (6144u*4096u)
+#define CAPACITY (6144u*4096u*3u/2u)
+#define MASK_BYTES (TORN_MASK_WIDTH*TORN_MASK_HEIGHT*3u/2u)
 #define LEASE 1u
 #define CLOSING 2u
 extern uint32_t m10v_save_trace_recipe_raw_status(uint32_t,uint32_t,uint32_t,uint32_t);
-typedef struct {uint32_t magic,control,stage,generation,pending,token,manager,plane,capacity,width,height,pitch,orientation,pending_orientation;} session;
+extern const uint8_t torn_masks[];
+typedef struct {uint32_t magic,control,stage,generation,pending,token,manager,plane,capacity;
+                uint32_t random_state,last_mask,pending_mask,pending_orientation;} session;
 _Static_assert(sizeof(session)<=0x100,"torn owner tail");
 _Static_assert(sizeof(m10v_torn_snapshot)==32,"torn recipe tail");
 static uint32_t word(uint32_t p){return *(const uint32_t*)(uintptr_t)p;}
@@ -23,6 +27,13 @@ static void release(session *s){if(s->token){((void(*)(uint32_t,uint32_t))0x536a
 static m10v_torn_snapshot *shot(uint32_t r){return ram(r,M10V_TORN_RECIPE_BYTES)&&word(r)==0x53d0fc90u?(void*)(uintptr_t)(r+M10V_TORN_SHOT_OFFSET):0;}
 static int owned(m10v_torn_snapshot *p,uint32_t r){return p&&p->magic==M10V_TORN_SHOT_MAGIC&&p->recipe==r&&ram(p->si,0x74270u)&&word(r+0x44c8u)==p->si;}
 static uint32_t orientation(uint32_t si){const uint8_t *p=(void*)(uintptr_t)si;uint32_t v=p[p[0x71e03]?0x71e04:0xc8];return v<=3u?v:0xffffffffu;}
+static uint32_t choose_mask(session *s){
+ uint32_t x=s->random_state;
+ x^=x<<13;x^=x>>17;x^=x<<5;s->random_state=x;
+ if(s->last_mask>=TORN_MASK_COUNT)return x%TORN_MASK_COUNT;
+ uint32_t index=x%(TORN_MASK_COUNT-1u);
+ return index>=s->last_mask?index+1u:index;
+}
 void m10v_torn_init(uint32_t owner){session *s=storage(owner);if(!s)return;zero(s,sizeof(*s));s->generation=1;__atomic_store_n(&s->magic,MAGIC,__ATOMIC_RELEASE);}
 void m10v_torn_destroy(uint32_t owner){session *s=storage(owner);if(!s||__atomic_load_n(&s->magic,__ATOMIC_ACQUIRE)!=MAGIC)return;__atomic_fetch_or(&s->control,CLOSING,__ATOMIC_ACQ_REL);while(__atomic_load_n(&s->control,__ATOMIC_ACQUIRE)&LEASE)((void(*)(uint32_t))0x536b0a74u)(1);if(s->pending){m10v_torn_snapshot *p=shot(s->pending);if(owned(p,s->pending)&&p->owner==owner&&p->generation==s->generation&&!p->completion){p->result=-(int32_t)M10V_TORN_CANCELLED;p->completion=0;}}s->pending=0;release(s);s->generation++;s->stage=0;__atomic_store_n(&s->magic,0,__ATOMIC_RELEASE);}
 int m10v_torn_state(uint32_t *stage,uint32_t *generation){session *s=storage(current());if(!s||!stage||!generation)return 0;*stage=__atomic_load_n(&s->stage,__ATOMIC_ACQUIRE);*generation=__atomic_load_n(&s->generation,__ATOMIC_ACQUIRE);return 1;}
@@ -36,7 +47,11 @@ int m10v_torn_set(uint32_t owner,uint32_t action){
    if(!m10v_isp_effect_buffer_span(token,CAPACITY+63u)||overlap(token,CAPACITY+63u,owner,M10V_TORN_OWNER_BYTES)){((void(*)(uint32_t,uint32_t))0x536a248cu)(manager,token);leave(s);return -1;}
    s->manager=manager;s->token=token;s->plane=(token+63u)&~63u;s->capacity=CAPACITY;
   }
-  s->width=s->height=s->pitch=s->orientation=0;s->stage=1;
+  uint32_t time[2]={0,0};
+  (void)((int(*)(uint32_t *))0x53050b7cu)(time);
+  s->random_state=(owner^s->generation^time[0]^time[1])|1u;
+  s->last_mask=TORN_MASK_COUNT;
+  s->stage=1;
  }else{release(s);s->stage=0;}
  s->generation++;leave(s);return 0;
 }
@@ -50,10 +65,11 @@ int m10v_torn_freeze(uint32_t recipe){
   if(!enter(s)){reason=2;p->result=-(int32_t)(M10V_TORN_FREEZE_REJECTION+reason);p->completion=0;}
   else{
    p->owner=owner;p->generation=s->generation;stage=s->stage;reason=3;
-   if(stage==1u||stage==2u){
+   if(stage==1u){
     reason=s->pending?4u:!s->token?5u:!m10v_torn_eligible(recipe,si)?6u:0u;
-    if(reason){s->stage=4;p->result=-(int32_t)(M10V_TORN_FREEZE_REJECTION+reason);p->completion=0;}
-    else{p->phase=stage;p->completion=0;s->pending=recipe;s->pending_orientation=orientation(si);}
+    if(reason){p->result=-(int32_t)(M10V_TORN_FREEZE_REJECTION+reason);p->completion=0;}
+    else{p->phase=stage;p->completion=0;s->pending=recipe;s->pending_orientation=orientation(si);
+         s->pending_mask=choose_mask(s);}
    }
    leave(s);
   }
@@ -87,7 +103,7 @@ int m10v_torn_execute(uint32_t recipe,uint32_t context,const uint32_t photo[8]){
  uint32_t reason=p->generation!=s->generation||s->pending!=recipe||s->stage!=p->phase||!s->token?3u:
                  !ram(context,0x40)||!ram(U(photo),32)?4u:0u;
  if(reason){int r=reject(s,p,reason,0);leave(s);return r;}
- uint32_t d[8];for(uint32_t i=0;i<8;i++)d[i]=photo[i];uint32_t w=d[4]&65535u,h=d[4]>>16,pitch=d[5]&65535u,rows=d[5]>>16,alpha_pitch=(w+63u)&~63u,n=pitch*h,an=alpha_pitch*h,dir=orientation(p->si);
+ uint32_t d[8];for(uint32_t i=0;i<8;i++)d[i]=photo[i];uint32_t w=d[4]&65535u,h=d[4]>>16,pitch=d[5]&65535u,rows=d[5]>>16,alpha_pitch=(w+15u)&~15u,n=pitch*h,an=alpha_pitch*h,dir=orientation(p->si);
  uint32_t layout_faults=0;
  if((d[0]&255u)!=1u)layout_faults|=1u;
  if(w<2u||w>6144u||h<2u||h>4096u||((w|h)&1u))layout_faults|=2u;
@@ -96,7 +112,7 @@ int m10v_torn_execute(uint32_t recipe,uint32_t context,const uint32_t photo[8]){
  if(d[3]||d[6])layout_faults|=16u;
  if((d[7]&255u)!=2u)layout_faults|=32u;
  if(dir>3u||dir!=s->pending_orientation)layout_faults|=64u;
- if(an>s->capacity)layout_faults|=128u;
+ if(an+an/2u>s->capacity)layout_faults|=128u;
  M10V_TORN_MARK(recipe,M10V_TORN_LAYOUT,d[4],d[5]);
  M10V_TORN_MARK(recipe,M10V_TORN_FORMAT,(d[0]&255u)|((d[7]&255u)<<8)|((d[3]!=0)<<16)|((d[6]!=0)<<17),dir);
  if(layout_faults){int r=reject(s,p,6,layout_faults);leave(s);return r;}
@@ -132,26 +148,30 @@ int m10v_torn_execute(uint32_t recipe,uint32_t context,const uint32_t photo[8]){
   if(status!=2u){int r=reject(s,p,0x10u+(status&15u),0);leave(s);return r;}
  }
  if(raw_fault){int r=reject(s,p,8,raw_fault);leave(s);return r;}
- if(p->phase==2u&&(s->width!=w||s->height!=h||s->orientation!=dir||s->pitch!=alpha_pitch)){
-  int r=reject(s,p,9,0);leave(s);return r;
+ uint32_t mask=s->pending_mask;
+ if(mask>=TORN_MASK_COUNT){int r=reject(s,p,10,0);leave(s);return r;}
+ const m10v_isp_effect_texture texture={U(torn_masks)+mask*MASK_BYTES,MASK_BYTES,
+     TORN_MASK_WIDTH,TORN_MASK_HEIGHT,TORN_MASK_WIDTH};
+ m10v_isp_effect_transfer transfer;
+ if(m10v_isp_effect_transfer_plan_format(&texture,s->plane,s->capacity,w,h,
+        TORN_MASK_WIDTH,TORN_MASK_HEIGHT,0,2,&transfer)!=1||
+    m10v_isp_effect_transfer_execute(&transfer,p->si)!=1){
+  int r=reject(s,p,11,0);leave(s);return r;
  }
- d[0]=1;d[7]=2;uint32_t view[8],source[8];for(uint32_t i=0;i<8;i++){view[i]=d[i];source[i]=d[i];}view[2]=0;source[2]=0;
- if(p->phase==1u){
-  view[1]=s->plane;view[5]=alpha_pitch|(h<<16);
-  cache(s->plane,an);cache(d[1],n);
-  if(m10v_isp_effect_granulation_plane((void*)(uintptr_t)context,view,source,(void*)(uintptr_t)d[1],n,pitch,torn_curves[0])!=1){for(;;)((void(*)(uint32_t))0x536b0a74u)(1);}
-  s->width=w;s->height=h;s->pitch=alpha_pitch;s->orientation=dir;uint32_t expected=1u;__atomic_compare_exchange_n(&s->stage,&expected,2u,0,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE);
- }else{
-  cache(s->plane,an);
-  for(uint32_t c=0;c<2;c++){
-   view[1]=d[1u+c];
-   cache(view[1],n);
-   if(m10v_isp_effect_granulation_plane((void*)(uintptr_t)context,view,view,(void*)(uintptr_t)s->plane,an,alpha_pitch,torn_curves[1u+c])!=1){for(;;)((void(*)(uint32_t))0x536b0a74u)(1);}
+ d[0]=1;d[7]=2;
+ uint32_t view[8];for(uint32_t i=0;i<8;i++)view[i]=d[i];
+ view[2]=0;
+ for(uint32_t c=0;c<2;c++){
+  view[1]=d[1u+c];
+  cache(view[1],n);
+  if(m10v_isp_effect_granulation_plane((void*)(uintptr_t)context,view,view,
+      (void*)(uintptr_t)s->plane,an,alpha_pitch,torn_curves[c])!=1){
+   for(;;)((void(*)(uint32_t))0x536b0a74u)(1);
   }
-  uint32_t expected=2u;__atomic_compare_exchange_n(&s->stage,&expected,3u,0,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE);release(s);
  }
+ s->last_mask=mask;
  p->result=1;p->completion=1;s->pending=0;leave(s);
- M10V_TORN_MARK(recipe,M10V_TORN_EXEC,p->phase<<8,p->generation);
+ M10V_TORN_MARK(recipe,M10V_TORN_EXEC,(p->phase<<8)|((mask+1u)<<16),p->generation);
  return 1;
 }
 int m10v_torn_encoder_admit(uint32_t recipe,uint32_t si){

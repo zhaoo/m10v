@@ -79,7 +79,8 @@ GUARDS={1:'context',2:'recipe',3:'topology',4:'sequence-mode',5:'objects',6:'jpe
 EVENTS.update(EFFECTS_MENU_EVENTS)
 EVENTS[225]='torn.outcome'
 TORN_EXEC_REASONS=('isp-complete','no-shot','owner-or-lease','session-changed','invalid-context-or-descriptor',
-                   'ineligible','format-or-layout','overlap-or-span','raw-bank','pair-geometry')
+                   'ineligible','format-or-layout','overlap-or-span','raw-bank','pair-geometry',
+                   'invalid-mask-selection','mask-resize')
 TORN_LAYOUT_FAULTS=('format','dimensions','alignment','stride-or-rows','third-plane-or-roi','address-mode','orientation','mask-capacity')
 TORN_PROTECTED_OBJECTS=('recipe','shooting-info','menu-owner','context','descriptor','request','raw-dimensions')
 
@@ -225,8 +226,9 @@ def page_records(data):
                     diagnostic.update(kind='layout',width=value&65535,height=value>>16,stride=detail&65535,rows=detail>>16)
                 elif kind==4:
                     reason=value&255
-                    diagnostic.update(kind='execute',phase=value>>8,generation=detail,
+                    diagnostic.update(kind='execute',phase=(value>>8)&255,generation=detail,
                                       reason=TORN_EXEC_REASONS[reason] if reason<len(TORN_EXEC_REASONS) else reason)
+                    if value>>16:diagnostic['mask']=value>>16
                     if reason>=16:diagnostic['raw_status']=reason-16
                 elif kind in (5,8):
                     diagnostic.update(kind='encoder-admit' if kind==5 else 'jpeg-handoff',generation=detail)

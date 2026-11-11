@@ -884,7 +884,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         if 786+len(texts)!=(1211 if pure_isp_effects else 1203):raise ValueError('three-film resource allocation differs')
         texts+=['SHD50','Revolog KOLOR','Pegasus']
         if pure_isp_effects:texts+=['暗角','暗角开关','暗角强度','开']
-        if torn_overlay:texts+=['撕纸叠映','开','关','撕纸叠映：关','撕纸叠映：1/2 轮廓','撕纸叠映：2/2 素材','撕纸叠映：已完成','撕纸叠映：失败']
+        if torn_overlay:texts+=['撕纸叠映','开','关','撕纸叠映：关','撕纸叠映：开','撕纸叠映：处理中','撕纸叠映：已完成','撕纸叠映：失败']
         last_resource=786+len(texts)-1
         if sd_library:
             from scripts.generate_m10v_card_captions import resource as caption_resource

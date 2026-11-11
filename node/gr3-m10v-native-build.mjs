@@ -477,7 +477,7 @@ function checkRuntime(runtime, manifest) {
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   if(manifest.torn_overlay?.enabled)
-   need(JSON.stringify(manifest.resources.texts.slice(432,440))===JSON.stringify(['撕纸叠映','开','关','撕纸叠映：关','撕纸叠映：1/2 轮廓','撕纸叠映：2/2 素材','撕纸叠映：已完成','撕纸叠映：失败']),'torn overlay resources differ');
+   need(JSON.stringify(manifest.resources.texts.slice(432,440))===JSON.stringify(['撕纸叠映','开','关','撕纸叠映：关','撕纸叠映：开','撕纸叠映：处理中','撕纸叠映：已完成','撕纸叠映：失败']),'torn overlay resources differ');
   if(manifest.pure_isp_effects?.enabled){
    const captions=JSON.parse(readFileSync(new URL('../native/gr3/m10v_isp_effects_resources.json',import.meta.url),'utf8'));
    if(manifest.camera_guides)captions.splice(18,5,...guideLabels);
