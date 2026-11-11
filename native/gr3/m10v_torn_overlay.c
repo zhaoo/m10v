@@ -80,8 +80,12 @@ int m10v_torn_execute(uint32_t recipe,uint32_t context,const uint32_t photo[8]){
  if(p->result<0)return -1;if(!p->phase||p->completion)return 1;
  session *s=storage(p->owner);
  if(p->owner!=current()||!enter(s)){M10V_TORN_MARK(recipe,M10V_TORN_EXEC,(p->phase<<8)|2u,p->generation);return -1;}
+ /* Freeze assigns a phase only after validating the copied shooting info
+  * and film selection. Native workers can update that info in place.
+  * Use the admitted phase for this recipe and validate the actual buffers
+  * and orientation below before submitting any IIP work. */
  uint32_t reason=p->generation!=s->generation||s->pending!=recipe||s->stage!=p->phase||!s->token?3u:
-                 !ram(context,0x40)||!ram(U(photo),32)?4u:!m10v_torn_eligible(recipe,p->si)?5u:0u;
+                 !ram(context,0x40)||!ram(U(photo),32)?4u:0u;
  if(reason){int r=reject(s,p,reason,0);leave(s);return r;}
  uint32_t d[8];for(uint32_t i=0;i<8;i++)d[i]=photo[i];uint32_t w=d[4]&65535u,h=d[4]>>16,pitch=d[5]&65535u,rows=d[5]>>16,alpha_pitch=(w+63u)&~63u,n=pitch*h,an=alpha_pitch*h,dir=orientation(p->si);
  uint32_t layout_faults=0;

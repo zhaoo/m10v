@@ -161,12 +161,16 @@ class TornPipelineCurrentTests(unittest.TestCase):
   self.assertEqual(self.word(e,params+0x20),recipe)
   self.assertEqual(self.spatial_hook(e,0x535033e8,ctx,params,query,recipe),1)
   self.assertEqual(self.call(e,'m10v_torn_encoder_admit',recipe,si),0)
+  # Model an original worker rewriting normalized drive after the owning
+  # producer has already admitted this single exposure.
+  e.u.mem_write(si+0x799,b'\x02')
   self.assertEqual(self.spatial_hook(e,0x53503ab4,ctx,params,0,recipe),1)
   self.assertEqual(self.call(e,'m10v_torn_encoder_admit',recipe,si),1)
   self.assertEqual(self.call(e,'m10v_isp_effects_pipeline_encoder_admit',recipe,si),1)
   self.assertEqual(self.word(e,p+28),1);self.assertEqual(record['rng'],0)
   self.assertEqual(record['bindings'],[(0x70000000,640),(0x76000000,640)])
   self.assertEqual(len(record['submit']),1);self.assertEqual(record['releases'],1);self.assertEqual(len(record['wait_events']),1)
+  e.u.mem_write(si+0x799,b'\x00')
   # The second exposure is independently allocated and enters through the
   # SAME original producer. Reserve initializes an empty tail; it does not
   # create a frozen snapshot or report completion.
