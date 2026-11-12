@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
-from scipy.ndimage import binary_fill_holes, distance_transform_edt, label, shift
+from scipy.ndimage import binary_fill_holes, distance_transform_edt, gaussian_filter, label, shift
 
 from scripts.build_gr3_torn_overlay import MASK_HEIGHT, MASK_SHAPES, MASK_WIDTH
 
@@ -101,16 +101,58 @@ def render_cutout(photo):
     solid = np.logical_or.reduce(pieces)
     inside = distance_transform_edt(solid)
     distance = inside - distance_transform_edt(~solid)
+    # Cut a few deep, tapered tears into each piece. Keep their placement
+    # irregular and their axes oblique to the original outline.
+    tears = Image.new("L", size)
+    cuts = ImageDraw.Draw(tears)
+    gy, gx = np.gradient(gaussian_filter(distance, 2))
+    for piece in pieces:
+        edge_y, edge_x = np.where(piece & (inside < 1.5))
+        centers = []
+        for index in rng.permutation(len(edge_x)):
+            y0, x0 = edge_y[index], edge_x[index]
+            center = np.array([x0, y0], dtype=float)
+            if any(np.linalg.norm(center - other) < 130 for other in centers):
+                continue
+            normal = np.array([gx[y0, x0], gy[y0, x0]])
+            length = np.linalg.norm(normal)
+            if length < .5:
+                continue
+            normal /= length
+            tangent = np.array([-normal[1], normal[0]])
+            depth = rng.uniform(29, 66)
+            drift = rng.uniform(-24, 24)
+            tip = center + normal * depth + tangent * drift
+            tx, ty = np.round(tip).astype(int)
+            if not (0 <= tx < width and 0 <= ty < height and piece[ty, tx]):
+                continue
+            left, right = rng.uniform(9, 25, 2)
+            vertices = [
+                center - 24*normal - left*tangent,
+                center + .24*depth*normal - .65*left*tangent,
+                center + .53*depth*normal + (.40*drift - 5)*tangent,
+                tip,
+                center + .60*depth*normal + (.61*drift + 6)*tangent,
+                center + .18*depth*normal + .60*right*tangent,
+                center - 24*normal + right*tangent,
+            ]
+            cuts.polygon(list(map(tuple, vertices)), fill=255)
+            centers.append(center)
+            if len(centers) == 4:
+                break
+    torn = np.asarray(tears) > 127
+    distance = np.minimum(distance, distance_transform_edt(~torn) - distance_transform_edt(torn))
+    long_tear = texture(size, rng, 100)
     coarse = texture(size, rng, 43)
     pulp = texture(size, rng, 9)
     fine = texture(size, rng, 3)
     grain = texture(size, rng, 1)
     # A rough physical edge may extend beyond the original cutout. Only
     # exposed paper does so; printed pixels always come from inside R8.
-    tear = distance + 9 * coarse + 8 * pulp + 3.5 * fine + grain
+    tear = distance + 29 * long_tear + 28 * coarse + 15 * pulp + 6 * fine + 1.8 * grain
     paper = np.clip((tear + 2.8) / 1.6, 0, 1)
-    print_inset = 4.7 + 5.5 * pulp + 3.5 * coarse + 1.2 * fine
-    printed = np.clip((tear - print_inset) / 1.35, 0, 1) * np.clip((inside - 2) / 1.5, 0, 1)
+    print_inset = np.clip(10 + 18 * pulp + 19 * coarse + 9 * long_tear + 2.5 * fine, 3, 29)
+    printed = np.clip((tear - print_inset) / 1.35, 0, 1) * np.clip((inside - 3) / 1.5, 0, 1)
 
     y, x = np.ogrid[:height, :width]
     light = ((x - width * .34) / width)**2 + ((y - height * .28) / height)**2
@@ -120,13 +162,13 @@ def render_cutout(photo):
     # Keep one direction of light, but vary the lift of the individual pieces.
     shadow = np.zeros_like(tear)
     for index, piece in enumerate(pieces):
-        piece_alpha = paper * (distance_transform_edt(~piece) < 10)
-        offset = (4 + 1.8 * index, 2 + index)
+        piece_alpha = paper * (distance_transform_edt(~piece) < 40)
+        offset = (7 + 2.3 * index, 3.5 + 1.3 * index)
         shifted = shift(piece_alpha, offset, order=1, prefilter=False)
         shadow_image = Image.fromarray(np.uint8(np.clip(shifted * 255, 0, 255)))
         contact = np.asarray(shadow_image.filter(ImageFilter.GaussianBlur(2.4)), dtype=float) / 255
         cast = np.asarray(shadow_image.filter(ImageFilter.GaussianBlur(11)), dtype=float) / 255
-        np.maximum(shadow, .20 * contact + .13 * cast, out=shadow)
+        np.maximum(shadow, .23 * contact + .13 * cast, out=shadow)
     backing = blend(backing, np.array([78., 66., 53.]), shadow)
 
     # Individual light pulp fibers, biased along the local edge normal.
@@ -134,7 +176,7 @@ def render_cutout(photo):
     draw = ImageDraw.Draw(threads)
     gy, gx = np.gradient(distance)
     edge_y, edge_x = np.where((tear > -3.5) & (tear < -1.5))
-    for index in rng.choice(len(edge_x), min(len(edge_x), 3600), replace=False):
+    for index in rng.choice(len(edge_x), min(len(edge_x), 6300), replace=False):
         py, px = edge_y[index], edge_x[index]
         normal = np.array([gx[py, px], gy[py, px]])
         length = np.linalg.norm(normal)
@@ -143,11 +185,13 @@ def render_cutout(photo):
         normal /= length
         tangent = np.array([-normal[1], normal[0]])
         base = np.array([px, py], dtype=float)
-        tip = base - rng.uniform(1.8, 6.0) * normal + rng.uniform(-2.2, 2.2) * tangent
+        tip = base - rng.uniform(2.5, 11.0) * normal + rng.uniform(-4.0, 4.0) * tangent
         draw.line([tuple(base + normal * 2), tuple(tip)], fill=int(rng.integers(55, 185)))
     fiber = np.asarray(threads.filter(ImageFilter.GaussianBlur(.35)), dtype=float) / 255
     backing = blend(backing, np.array([255., 253., 245.]), fiber)
-    core = np.array([252., 249., 239.]) + (8 * coarse + 14 * pulp + 16 * grain)[..., None]
+    core = np.array([251., 247., 233.]) + (
+        7 * long_tear + 10 * coarse + 23 * pulp + 14 * fine + 19 * grain
+    )[..., None]
     result = blend(backing, core, paper)
     result = blend(result, pixels, printed)
     return Image.fromarray(np.round(result).astype(np.uint8))
