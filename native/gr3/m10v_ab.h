@@ -36,6 +36,7 @@ static inline uint32_t m10v_ab_caption(uint32_t choice,uint32_t film){
  if(film==M10V_SHD50_ID)return M10V_SHD50_NAME;
  if(film==M10V_KOLOR_ID)return M10V_KOLOR_NAME;
  if(film==M10V_PEGASUS_ID)return M10V_PEGASUS_NAME;
+ if(M10V_LEICA(film))return M10V_LEICA_NAME(film);
  if(M10V_FOUR_LOOKS(film))return M10V_FOUR_LOOKS_NAME(film);
  if(M10V_EXTRA_FILM(film))return M10V_EXTRA_FILM_NAME(film);
  if(M10V_C41(film))return M10V_C41_NAME(film);

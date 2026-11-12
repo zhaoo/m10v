@@ -56,7 +56,8 @@ static uint32_t fetch(uint32_t page,uint32_t row,uint8_t *memory,int full){
    for(uint32_t i=0;i<count;i++)if(M10V_CUSTOM(m10v_sd_u32(memory+64+i*12)))id++;
   }else if(count&&index<count){
    id=m10v_sd_u32(memory+64+index*12);
-   if(full){uint32_t expected=m10v_sd_u32(memory+68+index*12);uint8_t *record=memory+4096;
+   if(!M10V_LEICA_NATIVE&&M10V_LEICA(id))id=0;
+   if(full&&id){uint32_t expected=m10v_sd_u32(memory+68+index*12);uint8_t *record=memory+4096;
     if(!exact(fs,v,handle,4096+index*M10V_SD_RECORD_BYTES,record,M10V_SD_RECORD_BYTES)||
        m10v_sd_u32(record+M10V_SD_RECORD_BYTES-4)!=expected||!m10v_sd_record(record,M10V_SD_RECORD_BYTES,id))id=0;
    }
@@ -109,6 +110,7 @@ static int persist(const uint8_t *record,uint32_t id){
  char name[]="M10VS00.bin",primary[]="F:\\M10VS00.bin";
  if(id==M10V_MARLBORO_ID)id=84;
  if(M10V_THREE_FILM(id))id=id-M10V_SHD50_ID+85;
+ if(M10V_LEICA(id))id=id-M10V_LEICA_FIRST+88;
  if(M10V_FOUR_LOOKS(id))id=id-318+29;
  if(M10V_EXTRA_FILM(id))id=id-314+25;
  if(M10V_C41(id))id=id>=322?id-322+79:id-312+23;
@@ -182,7 +184,7 @@ int m10v_sd_camera_catalog_name(uint32_t index,uint32_t expected_id,char *out,ui
  ((free_fn)0x536af2e4u)(memory);return ok;
 }
 static int install(uint32_t page,uint32_t row,uint32_t expected_id,uint32_t slot){
- if((page==32?row>=M10V_SD_DIRECTORY_LIMIT:page>=32||row>=8)||expected_id<33||M10V_ANIME(expected_id)||(expected_id>M10V_CUSTOM_MAX_ID&&!M10V_BUILTIN(expected_id))||slot>=M10V_SLOT_COUNT)return -1;
+ if((page==32?row>=M10V_SD_DIRECTORY_LIMIT:page>=32||row>=8)||expected_id<33||(!M10V_LEICA_NATIVE&&M10V_LEICA(expected_id))||M10V_ANIME(expected_id)||(expected_id>M10V_CUSTOM_MAX_ID&&!M10V_BUILTIN(expected_id))||slot>=M10V_SLOT_COUNT)return -1;
  uint8_t *memory=allocate();if(!memory)return -1;
  int result=-1;uint32_t id=fetch(page,row,memory,1);
  if(id==expected_id){

@@ -352,6 +352,10 @@ const v=await exportSdFilms({ids:[],customFilms:[{name:'Warm',filename:'warm.cub
             for slot in (0, 4, 9):
                 with self.subTest(film=film, slot=slot):
                     e, recipe, obj, frame, si, request, data = self.fixture(film, slot)
+                    if self.manifest.get('pure_isp_effects',{}).get('enabled'):
+                        self.publish_owner(e,data)
+                        e.u.mem_write(recipe+0x4a08,bytes(1796))
+                        self.enqueue(e,recipe,19)
                     self.make(e, recipe, obj, frame)
                     self.assertEqual(self.call(e, 'm10v_isp_frame_recipe_completed', recipe, si, 25 + slot, data), 1)
                     self.assertEqual(self.capture(e, recipe, si, request), 0)
@@ -398,8 +402,8 @@ const v=await exportSdFilms({ids:[],customFilms:[{name:'Warm',filename:'warm.cub
                     self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),1)
                     self.assertEqual(self.capture(e,recipe,si,request),0)
 
-    def test_four_looks_real_producer_freezes_queued_identity_and_zero_pixel_encoder(self):
-        for film in range(318,322):
+    def test_native_image_looks_real_producer_freezes_queued_identity_and_zero_pixel_encoder(self):
+        for film in (*range(318,322), *range(331,335)):
             for stage in (0,1):
                 with self.subTest(film=film,stage=stage):
                     e,recipe,obj,frame,si,request,data=self.fixture(film,slot=9,stage=stage)
@@ -419,8 +423,8 @@ const v=await exportSdFilms({ids:[],customFilms:[{name:'Warm',filename:'warm.cub
                     self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,34,data),1)
                     self.assertEqual(self.capture(e,recipe,si,request),0)
 
-    def test_four_looks_missing_native_completion_rejects_before_pixel_work(self):
-        for film in range(318,322):
+    def test_native_image_looks_missing_native_completion_rejects_before_pixel_work(self):
+        for film in (*range(318,322), *range(331,335)):
             with self.subTest(film=film):
                 e,recipe,obj,frame,si,request,data=self.fixture(film)
                 e.u.mem_write(recipe+0x4a08,bytes(1796))
@@ -429,6 +433,107 @@ const v=await exportSdFilms({ids:[],customFilms:[{name:'Warm',filename:'warm.cub
                 # and admission must reject before any CPU image work.
                 self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),0)
                 self.assertEqual(self.capture(e,recipe,si,request),0xfffffffb)
+
+    def test_leica_looks_share_isp_coefficients_between_live_and_still(self):
+        for film in range(331,335):
+            with self.subTest(film=film):
+                e,recipe,obj,frame,si,request,data=self.fixture(film)
+                self.publish_owner(e,data)
+                e.u.mem_write(recipe+0x4a08,bytes(1796))
+                self.enqueue(e,recipe,19)
+                self.make(e,recipe,obj,frame)
+                live_obj=e.cursor
+                e.make(25,stage=1,live=True,actual_live=True)
+                live_frame=live_obj+0x1400
+                callback=int.from_bytes(e.u.mem_read(0x53dbd954,4),'little')
+                e.call(callback,live_obj,live_frame)
+                for offset,length in ((0x140,18),(0x12a0,18),(0x4888,2048)):
+                    self.assertEqual(e.u.mem_read(live_frame+offset,length),e.u.mem_read(frame+offset,length))
+                self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),1)
+
+    def test_leica_adj_returns_each_film_artwork(self):
+        icons=self.manifest['icons']
+        artwork=(ROOT/'native/gr3/m10v_leica_adj.bin').read_bytes()
+        seen=set()
+        for film in range(331,335):
+            with self.subTest(film=film):
+                e,_,_,_,_,_,data=self.fixture(film)
+                self.publish_owner(e,data)
+                icon=self.call(e,'m10v_menu_value_icon',0,25)
+                self.assertEqual(icon,891+film-331)
+                desc=int.from_bytes(e.u.mem_read(icons['table']+icon*4,4),'little')
+                self.assertEqual(struct.unpack('<HHI',e.u.mem_read(desc,8)),(40,40,0))
+                palette_and_indices=artwork[(film-331)*416:(film-330)*416]
+                palette=struct.unpack_from('<4I',palette_and_indices)
+                expected=struct.pack('<1600I',*(palette[(index>>shift)&3]
+                    for index in palette_and_indices[16:] for shift in (0,2,4,6)))
+                owner,descriptor=e.alloc(256),e.alloc(40)
+                pixels=e.cursor
+                e.u.reg_write(A.UC_ARM_REG_R5,descriptor)
+                e.u.reg_write(A.UC_ARM_REG_R11,owner+128)
+                e.u.reg_write(A.UC_ARM_REG_SP,0x5effff00)
+                e.u.reg_write(A.UC_ARM_REG_R0,icon)
+                e.u.mem_write(descriptor+0x24,struct.pack('<H',icon))
+                e.u.emu_start(self.manifest['symbols']['m10v_icon_pixels'],0x5320a838,count=100000)
+                self.assertEqual(e.cursor,pixels+6400)
+                self.assertEqual(e.u.reg_read(A.UC_ARM_REG_PC),0x5320a838)
+                self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R0),icon)
+                self.assertEqual(e.u.reg_read(A.UC_ARM_REG_R12),pixels)
+                self.assertEqual(int.from_bytes(e.u.mem_read(owner,4),'little'),pixels)
+                self.assertEqual(bytes(e.u.mem_read(pixels,6400)),expected)
+                freed=[]
+                e.u.hook_add(UC_HOOK_CODE,lambda u,at,_size,_:freed.append(at),
+                    begin=0x536af2e4,end=0x536af2e4)
+                e.u.emu_start(self.manifest['symbols']['m10v_zoom_icon_draw_done'],0x5320a9b8,count=200)
+                self.assertEqual(e.u.reg_read(A.UC_ARM_REG_PC),0x5320a9b8)
+                self.assertEqual(freed,[0x536af2e4])
+                card=e.alloc(128*128*4)
+                self.assertEqual(self.call(e,'m10v_film_card_render',card,film,0,0),0)
+                self.assertEqual(bytes(e.u.mem_read(card+(28*128+104)*4,4)),bytes.fromhex('c92020ff'))
+                self.assertEqual(bytes(e.u.mem_read(card+(111*128+60)*4,4)),bytes.fromhex('f4f1eaff'))
+                seen.add(expected)
+        self.assertEqual(len(seen),4)
+        for film,expected in ((33,703),(318,878),(328,888)):
+            with self.subTest(film=film):
+                e,_,_,_,_,_,data=self.fixture(film)
+                self.publish_owner(e,data)
+                self.assertEqual(self.call(e,'m10v_menu_value_icon',0,25),expected)
+                desc=int.from_bytes(e.u.mem_read(icons['table']+expected*4,4),'little')
+                width,height,pixels=struct.unpack('<HHI',e.u.mem_read(desc,8))
+                self.assertEqual((width,height),(40,40))
+                self.assertGreater(pixels,0)
+
+    def test_leica_packed_native_coefficients_match_original_fit(self):
+        reference=json.loads((ROOT/'native/gr3/leica-reference.json').read_text())
+        e=StockISP(self.image)
+        native=e.alloc(1600)
+        for profile in reference['native_profiles_full']:
+            film=profile['film_id']
+            with self.subTest(film=film):
+                self.assertEqual(self.call(e,'m10v_isp_native_look_prepare',native,film,0,42),1)
+                expected=tuple(v for key in ('matrix_q13','post_q9','curves') for row in profile[key] for v in row)
+                self.assertEqual(struct.unpack('<18h768H',e.u.mem_read(native+28,1572)),expected)
+
+    def test_leica_and_previous_sd_records_validate_in_arm(self):
+        js="""import {sdFilmRecord,sdCrc} from './node/gr3-sd-film-pack.mjs';
+import {readFileSync} from 'node:fs';
+const old=JSON.parse(readFileSync('./node/gr3-sd-pre-leica-contract.json'));
+const rc1=JSON.parse(readFileSync('./node/gr3-sd-leica-rc1-contract.json'));
+for(const [id,prior] of [[331],[332],[333],[334],[330,old],[33,rc1],[334,rc1]]){
+  const record=sdFilmRecord(id);
+  if(prior){
+    Buffer.from(prior.renderer,'hex').copy(record,8448);
+    record.writeUInt32LE(sdCrc(record.subarray(0,-4)),12284);
+  }
+  process.stdout.write(record);
+}"""
+        pack=subprocess.check_output(['node','--input-type=module','-e',js],cwd=ROOT)
+        e=StockISP(self.image)
+        record=e.alloc(12288)
+        for index,film in enumerate((331,332,333,334,330,33,334)):
+            with self.subTest(film=film):
+                e.u.mem_write(record,pack[index*12288:(index+1)*12288])
+                self.assertEqual(self.call(e,'m10v_sd_record',record,12288,film),film)
 
     def test_marlboro_real_producer_freezes_queued_identity_and_zero_pixel_encoder(self):
         for stage in (0,1):
@@ -618,7 +723,7 @@ writeFileSync(process.argv[1]+'/manifest.json',JSON.stringify(r.manifest));
             self.assertFalse(self.manifest['capture_lifecycle']['snapshot']['live_color'])
             self.assertEqual(self.manifest['settings_menu']['owner_bytes'], 0x613c)
             self.test_durable_ui_load_publishes_owner_used_by_actual_task_submission()
-            self.test_four_looks_real_producer_freezes_queued_identity_and_zero_pixel_encoder()
+            self.test_native_image_looks_real_producer_freezes_queued_identity_and_zero_pixel_encoder()
             self.test_marlboro_real_producer_freezes_queued_identity_and_zero_pixel_encoder()
 
     def test_ordinary_builtin_profiles_complete_under_native_parameter_changes(self):

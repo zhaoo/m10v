@@ -1260,8 +1260,8 @@
     "code": "ISO 50",
     "color": "#eceae2",
     "icon_url": "/gr3/film-icons/328-large.png?v=5623dd9afb2f",
-    "icon_compact_url": "/gr3/film-icons/328.png?v=21792998b883",
     "sha256": "21792998b88392eab6b8054e112049d90272e0f1b5b25b7264b218dc995b869d",
+    "icon_compact_url": "/gr3/film-icons/328.png?v=21792998b883",
     "artwork_revision": "classic-square-v1"
   },
   {
@@ -1271,8 +1271,8 @@
     "code": "200",
     "color": "#e9d75d",
     "icon_url": "/gr3/film-icons/329-large.png?v=522549971278",
-    "icon_compact_url": "/gr3/film-icons/329.png?v=6c733e0dc4e4",
     "sha256": "6c733e0dc4e4fe6b2b95f6b65a05b8a0266acb2d72c14912bcb7e946407b3101",
+    "icon_compact_url": "/gr3/film-icons/329.png?v=6c733e0dc4e4",
     "artwork_revision": "classic-square-v1"
   },
   {
@@ -1282,8 +1282,52 @@
     "code": "400",
     "color": "#202338",
     "icon_url": "/gr3/film-icons/330-large.png?v=e3935f0c1bf0",
-    "icon_compact_url": "/gr3/film-icons/330.png?v=b4539acedb3e",
     "sha256": "b4539acedb3e63d8e50aaaa77f6f173586c16775c064f6039bae391bf3906142",
+    "icon_compact_url": "/gr3/film-icons/330.png?v=b4539acedb3e",
+    "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 331,
+    "name": "Leica Chrome",
+    "title": "CHROME",
+    "code": "CHR",
+    "color": "#58666c",
+    "icon_url": "/gr3/film-icons/331-large.png?v=a0a90bbe8005",
+    "sha256": "23cc3d59d218cf0ed4fc69bcd96553fa7782414f03f3d64c11e8d0a707dad347",
+    "icon_compact_url": "/gr3/film-icons/331.png?v=23cc3d59d218",
+    "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 332,
+    "name": "Leica Brass",
+    "title": "BRASS",
+    "code": "BRS",
+    "color": "#ae7945",
+    "icon_url": "/gr3/film-icons/332-large.png?v=9952607c55cc",
+    "sha256": "4e62cab63e2c22768afc7aca34fedd9060ccfea9db94d0d6300b60f60a663dca",
+    "icon_compact_url": "/gr3/film-icons/332.png?v=4e62cab63e2c",
+    "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 333,
+    "name": "Leica Teal",
+    "title": "TEAL",
+    "code": "TEL",
+    "color": "#367173",
+    "icon_url": "/gr3/film-icons/333-large.png?v=09924c32f73e",
+    "sha256": "9a13c715a7a11bb4b43c157db8da0b56244f4d9fe29c23309b38f638a7cf7295",
+    "icon_compact_url": "/gr3/film-icons/333.png?v=9a13c715a7a1",
+    "artwork_revision": "classic-square-v1"
+  },
+  {
+    "id": 334,
+    "name": "Leica Classic",
+    "title": "CLASSIC",
+    "code": "CLS",
+    "color": "#92634c",
+    "icon_url": "/gr3/film-icons/334-large.png?v=7e8681218e28",
+    "sha256": "79135acc7a4c8b4a79943c15be8d67f0dc585b419dd91b5e6ae68545f1f9bd8a",
+    "icon_compact_url": "/gr3/film-icons/334.png?v=79135acc7a4c",
     "artwork_revision": "classic-square-v1"
   }
 ]

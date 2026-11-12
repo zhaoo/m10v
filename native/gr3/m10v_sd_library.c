@@ -62,6 +62,8 @@ static uint32_t custom_record(const uint8_t *p,uint32_t id){
  if(p[6655])return 0;
  if(!m10v_custom_isp_valid(p))return 0;
  if(!renderer_matches(p+8448,m10v_sd_renderer_hash)&&
+    !renderer_matches(p+8448,m10v_sd_leica_rc1_renderer)&&
+    !renderer_matches(p+8448,m10v_sd_pre_leica_renderer)&&
     !renderer_matches(p+8448,m10v_sd_pre_directory_count_renderer)&&
     !renderer_matches(p+8448,m10v_sd_pre_three_films_renderer)&&
     !renderer_matches(p+8448,m10v_sd_pre_marlboro_renderer)&&
@@ -107,6 +109,7 @@ uint32_t m10v_sd_record(const uint8_t *p,uint32_t n,uint32_t id){
  uint32_t bits=n*8;for(uint32_t i=0;i<4;++i)tail[63-i]=(uint8_t)(bits>>(8*i));block(h,tail);
  uint32_t pre_directory_count=1,pre_three_films=1,pre_marlboro=1,current=1,legacy=1,prior=1,previous=1,recent=1,pre_styles=1,texture_prior=1,pre_multiselect=1,pre_directory=1,pre_aerocolor=1,pre_d76=1,pre_isp=1,pre_halo=1,pre_anime_e6=1,pre_mono=1,pre_c41=1,pre_instax=1,pre_orientation=1,pre_retired_anime=1,pre_square_art=1,pre_four_looks=1,pre_five_c41=1,pre_per_film=1,per_film_rc1=1,pre_adj_defaults=1;
  for(uint32_t i=0;i<32;++i){uint8_t v=(uint8_t)(h[i>>2]>>(24-8*(i&3)));
+
   if(id>327||v!=m10v_sd_pre_three_films_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])pre_three_films=0;
   if(id>326||v!=m10v_sd_pre_marlboro_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])pre_marlboro=0;
   if(id>321||v!=m10v_sd_pre_five_c41_hashes[id>=M10V_CHAR_ID?id-243:id-33][i])pre_five_c41=0;

@@ -22,8 +22,8 @@ test('GRemote opt-in binds current App metadata and deterministic source/configu
  const source=await readNativeOfficial(),input={gremote_enabled:true,configuration:defaultConfiguration()},before=structuredClone(input);
  const options=resolveIspEffectOptions(source,input,'GR III'),identity=options.companion_identity;
  assert.ok(identity,'GRemote opt-in must include the resident owner');
- assert.equal(identity.catalogHash,'1b1b34c3da9b80de854eae3ad9fc3e85ffee5687f0e28fead0504129ff6294e8');
- assert.equal(identity.rendererHash,'bcef872c4ff5789a34b47f4c1becc31303a55b95f381c032d9b73bc7cc4c1ae7');
+ assert.equal(identity.catalogHash,'641428c8f8461c4ece0e87e98647b4424cbf2ee7cbe6e9162c51d208730bf921');
+ assert.equal(identity.rendererHash,'d949f6917beb8261ab4ffe888e86aad1677c62d96a81cd2c3562a1d01d9aa851');
  assert.match(identity.buildId,/^[a-f0-9]{64}$/);
  assert.deepEqual(resolveIspEffectOptions(source,structuredClone(input),'GR III'),options);
  assert.deepEqual(input,before);

@@ -6,7 +6,7 @@ def directory():return json.loads((ROOT/'web/gr3/film-directory.json').read_text
 def names():return {f['id']:f['name'] for g in directory() for f in g['films']}
 def generate():
  groups=directory();films=[(i,f) for i,g in enumerate(groups) for f in g['films']]
- if len(groups)!=6 or len(films)!=60 or len({f['id'] for _,f in films})!=60:raise ValueError('directory identity inventory differs')
+ if len(groups)!=6 or len(films)!=64 or len({f['id'] for _,f in films})!=64:raise ValueError('directory identity inventory differs')
  text='/* Generated from web/gr3/film-directory.json. Display order is not identity. */\n#ifndef M10V_FILM_DIRECTORY_H\n#define M10V_FILM_DIRECTORY_H\n#include <stdint.h>\n#define M10V_DIRECTORY_COUNT '+str(len(films))+'u\n#define M10V_DIRECTORY_GROUPS '+str(len(groups))+'u\n#define M10V_DIRECTORY_GROUP_RESOURCE 1129u\n'
  text+='static const struct {uint16_t id;uint8_t group;char name[24];} m10v_directory[]={\n'
  text+=''.join('{%d,%d,%s},\n'%(f['id'],i,json.dumps(f['name'])) for i,f in films)+'};\n'

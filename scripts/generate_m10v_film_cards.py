@@ -3,7 +3,7 @@ import json,re,sys,base64,hashlib,struct
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from scripts.generate_m10v_icons import artwork,FONT,THREE_FILM_SPECS
+from scripts.generate_m10v_icons import artwork,FONT,THREE_FILM_SPECS,LEICA_CARD_PAPER,LEICA_CARD_INK,LEICA_CARD_RED
 
 def canonical_raster():
  """Pinned coverage avoids FreeType/RAQM differences across build hosts."""
@@ -31,9 +31,12 @@ def generate():
  specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/c41-luts.json').read_text())['stocks'] if v['id']>=322]
  specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/marlboro-luts.json').read_text())['stocks']]
  specs += [(v['id'],v['name'],v) for v in THREE_FILM_SPECS]
+ specs += [(v['id'],v['name'],v) for v in json.loads((ROOT/'web/gr3/leica-luts.json').read_text())['stocks']]
  rows=['static const struct { uint8_t brand,main,sub,header,color,ink,accent,motif; } box_cards[]={'];palette=[];words=[]
  for i,name,spec in specs:
   brand,title,code,paper,ink,accent,motif=artwork(name,i,spec)
+  if 331<=i<=334:
+   brand,code,paper,ink,accent,motif='LEICA','',LEICA_CARD_PAPER,LEICA_CARD_INK,LEICA_CARD_RED,12
   header=paper
   for c in (header,paper,ink,accent):
    if c not in palette:palette.append(c)

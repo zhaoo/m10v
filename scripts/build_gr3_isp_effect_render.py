@@ -54,7 +54,7 @@ def _validated(base,bindings,externals):
  all_t=[g]+[t for p in pairs+vertical for t in p]+[t for b in rainbows for v in b for c in v for t in c]
  for i,t in enumerate(all_t):
   for q in all_t[:i]:
-   if t['base']<q['base']+q['bytes'] and q['base']<t['base']+t['bytes']:raise ValueError('overlapping immutable texture bindings')
+   if t!=q and t['base']<q['base']+q['bytes'] and q['base']<t['base']+t['bytes']:raise ValueError('overlapping immutable texture bindings')
  if not isinstance(externals,dict) or set(externals)!=set(EXTERNALS) or any(type(v)is not int or v&3 or not 0x540b6000<=v<0x55000000 for v in externals.values()) or len(set(externals.values()))!=4:raise ValueError('four distinct bound native exports required')
  if any(t['base']<=a<t['base']+t['bytes'] for a in externals.values() for t in all_t):raise ValueError('native export points into immutable texture bytes')
  return {'grain':g,'leaks':pairs,'leaks_vertical':vertical,'rainbows':rainbows},dict(externals)

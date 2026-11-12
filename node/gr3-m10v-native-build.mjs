@@ -51,6 +51,7 @@ const ispHooks = [
  [0x536dd3e0,0xe5d7177c,1,0xe51401e0,'curve'],
  [0x535131c0,0xe5d1377c,3,0xe1a0000e,'local_process'],
 ];
+const leicaSources=['native/gr3/leica-reference.json','native/gr3/m10v_leica_native_data.c','native/gr3/m10v_leica_native_profiles.h','native/gr3/m10v_leica.rgba','web/gr3/leica-luts.json','scripts/fit_gr3_leica_native.py','node/gr3-sd-pre-leica-contract.json','native/gr3/m10v_leica_adj_icon.c','native/gr3/m10v_leica_adj.bin','node/gr3-sd-leica-rc1-contract.json'];
 const sources = ['scripts/build_gr3_marlboro_reference.py','scripts/preview_gr3_marlboro.py','native/gr3/marlboro-reference.json','native/gr3/m10v_marlboro_native_profile.h','native/gr3/m10v_marlboro.rgba','web/gr3/marlboro-luts.json','node/gr3-sd-pre-marlboro-contract.json','native/gr3/four-looks-reference.json','native/gr3/m10v_four_looks_native_profiles.h','native/gr3/m10v_four_looks.rgba','web/gr3/four-looks-luts.json','scripts/build_gr3_four_looks_reference.py','scripts/fit_gr3_four_looks_native.py','scripts/verify_gr3_four_looks_reference.py','node/gr3-sd-pre-four-looks-contract.json','native/gr3/m10v_aspect_config.h','native/gr3/m10v_half_frame_icon.rgba','native/gr3/half-frame-icon.json','scripts/generate_gr3_half_frame_icon.py','native/gr3/extra-films-reference.json','native/gr3/m10v_extra_films_native_profiles.h','native/gr3/m10v_extra_films.rgba','web/gr3/extra-films-luts.json','scripts/build_gr3_extra_films_reference.py','scripts/fit_gr3_extra_films_native.py','scripts/verify_gr3_extra_films_reference.py','native/gr3/m10v_c41_native_data.c','scripts/fit_gr3_c41_solver.py','node/gr3-sd-pre-five-c41-contract.json','node/gr3-sd-pre-per-film-effects-contract.json','node/gr3-sd-per-film-rc1-contract.json','node/gr3-sd-pre-adj-defaults-contract.json','native/gr3/c41-reference.json','native/gr3/m10v_c41_native_profiles.h','native/gr3/m10v_c41.rgba','web/gr3/c41-luts.json','scripts/build_gr3_c41_reference.py','scripts/fit_gr3_c41_native.py','scripts/verify_gr3_c41_reference.py','node/gr3-sd-pre-instax-contract.json','node/gr3-sd-pre-retired-anime-contract.json','node/gr3-sd-pre-c41-contract.json','native/gr3/m10v_anime.h','native/gr3/anime-e6-reference.json','native/gr3/m10v_anime_e6_native_profiles.h','native/gr3/m10v_anime_e6.rgba','native/gr3/m10v_anime_ui.rgba','native/gr3/anime-ui.json','native/gr3/anime-ui-raster.json','third_party/anime-ui-font/OFL.txt','web/gr3/anime-e6-luts.json','scripts/build_gr3_anime_e6_reference.py','scripts/fit_gr3_anime_e6_native.py','scripts/verify_gr3_anime_e6_reference.py','scripts/generate_m10v_anime_ui.py','node/gr3-sd-pre-anime-e6-contract.json','node/gr3-sd-pre-d76-mono-contract.json','native/gr3/m10v_aspect_icons.rgba','native/gr3/aspect-icons.json','scripts/generate_gr3_aspect_icons.py','native/gr3/film_d76_0.c','native/gr3/film_d76_1.c','native/gr3/film_d76_0_data.h','native/gr3/film_d76_1_data.h','native/gr3/m10v_d76.rgba','native/gr3/d76-reference.json','web/gr3/d76-luts.json','scripts/build_gr3_d76_reference.py','scripts/fit_gr3_d76_native.py','scripts/verify_gr3_d76_reference.py','native/gr3/m10v_d76_native_profiles.h','node/gr3-sd-pre-universal-halation-contract.json','node/gr3-sd-pre-d76-contract.json','native/gr3/m10v_spectral_native_profiles.h','native/gr3/m10v_film_directory.h','web/gr3/film-directory.json','node/gr3-film-directory.mjs','scripts/generate_m10v_directory.py','native/gr3/film_spectral_data.h','native/gr3/spectral-reference.json','web/gr3/spectral-luts.json','scripts/build_gr3_spectral_reference.py','scripts/fit_gr3_spectral_native.py','scripts/verify_gr3_spectral_reference.py','native/gr3/m10v_5213.rgba','docs/research/aerocolor-2460/official-medium-curves.json','node/gr3-sd-pre-aerocolor-contract.json','node/gr3-sd-pre-directory-contract.json','native/gr3/m10v_tone.h','native/gr3/m10v_pixel_world.h','native/gr3/m10v_pixel_world.rgba','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/m10v_charmera_ui.rgba','scripts/generate_m10v_charmera_ui.py','native/gr3/film_style_filters_0.c','native/gr3/film_style_filters_1.c','native/gr3/film_style_filters_0_data.h','native/gr3/film_style_filters_1_data.h','native/gr3/m10v_style_filters.rgba','native/gr3/style-filters-reference.json','web/gr3/style-filters-luts.json','scripts/build_gr3_style_filters_reference.py','scripts/fit_gr3_style_filters_native.py','scripts/verify_gr3_style_filters_reference.py','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','scripts/generate_m10v_icons.py','native/gr3/m10v_icons.rgba','native/gr3/m10v_stock_icon_directory.bin','native/gr3/m10v_legacy_data.h','web/gr3/film-catalog.json','scripts/generate_m10v_catalog.py','native/gr3/m10v_universal_halation.h','native/gr3/halation_core.c','native/gr3/halation_core.h','native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py','native/gr3/m10v_library.c','native/gr3/m10v_library.h',
   'native/gr3/m10v_library_camera.c','native/gr3/m10v_library_menu.c',
   'native/gr3/m10v_library_capture.c','native/gr3/m10v_debug.c','native/gr3/m10v_debug.h','native/gr3/m10v_capture_profile.h','scripts/build_gr3_m10v_library.py'];
@@ -87,7 +88,7 @@ export const pureIspEffectSources=[
  'scripts/build_gr3_isp_effect_render.py','scripts/build_gr3_isp_effect_resize_status.py',
  'scripts/build_gr3_isp_effect_textures.py'];
 export const filmImprintSources=['scripts/build_gr3_film_imprints.py','scripts/render_film_imprint_assets.mjs','web/shared/film-imprints.mjs',...Array.from({length:7},(_,i)=>`native/gr3/film-imprints/${i+1}.png`),...['025','001','004','007'].map(id=>`native/gr3/film-imprints/pokemon/${id}.png`)];
-export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/gr3_target_relocations.py','node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources,...filmImprintSources,...cameraExtensionSources,...rawDevelopmentSources,...tornOverlaySources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
+export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/gr3_target_relocations.py','node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...leicaSources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources,...filmImprintSources,...cameraExtensionSources,...rawDevelopmentSources,...tornOverlaySources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
 export function validateFilmImprintAssets(runtime,m){
  const p=m.pure_isp_effects,imprint=p?.imprint;if(imprint===undefined)return;
  const fail=(v,s)=>need(v,'pure ISP imprint: '+s),a=imprint.assets,manifest=a?.manifest;
@@ -122,22 +123,32 @@ export function pureIspEffectPatches(runtime,m){
  fail(m.flags?.includes('-DM10V_PURE_ISP_EFFECTS=1')&&m.flags?.includes('-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778'),'compile ownership differs');
  const b=p.runtime_assets,a=b?.manifest;
  validateFilmImprintAssets(runtime,m);
- fail(Buffer.isBuffer(runtime)&&Number.isInteger(m.base)&&b?.base===(p.imprint?0x54220000:0x54400000)&&b.bytes===11280384&&b.sha256==='fd542db7b7ec99fceb8e6bbc2f15578ca5076a0a3ddbed2463ecc8fbead23d23','asset identity differs');
+ const compact=m.leica_native===true;
+ const canonicalHash='fd542db7b7ec99fceb8e6bbc2f15578ca5076a0a3ddbed2463ecc8fbead23d23';
+ const compactHash='4fdb5debedc498e683ec219293a645c58bd74fbfb73987c600898cbbf70e78ec';
+ fail(Buffer.isBuffer(runtime)&&Number.isInteger(m.base)&&b?.base===(compact?0x54222a00:p.imprint?0x54220000:0x54400000)&&b.bytes===(compact?11269632:11280384)&&b.sha256===(compact?compactHash:canonicalHash),'asset identity differs');
  fail(a?.resource_set==='runtime_modulation'&&a.blob_length===b.bytes&&a.blob_sha256===b.sha256&&a.source_sha256===sha(readFileSync(new URL('../scripts/build_gr3_isp_effect_textures.py',import.meta.url)))&&a.parameters?.height===2048&&a.parameters?.leak_height===128&&a.parameters?.leak_width===256&&a.parameters?.rainbow_height===16&&a.parameters?.rainbow_width===32&&a.parameters?.seed===20261031&&a.parameters?.width===3072,'asset generator parameters differ');
  const offset=b.base-m.base;
  fail(offset>=0&&offset+b.bytes<=runtime.length&&sha(runtime.subarray(offset,offset+b.bytes))===b.sha256,'asset payload hash differs');
  const names=['grain_nv12',...['','_vertical'].flatMap(orientation=>['left','right','both'].flatMap(position=>['narrow','medium','wide'].flatMap(spread=>['cb','cr'].map(channel=>`leak_${position}_${spread}_${channel}_field${orientation}_nv12`)))),...['kolor','pegasus'].flatMap(kind=>[0,1,2,3].flatMap(variant=>['y','cb','cr'].flatMap(component=>['pos','neg'].map(sign=>`rainbow_${kind}_${variant}_${component}_${sign}_nv12`))))];
  fail(Array.isArray(a.assets)&&a.assets.length===names.length,'asset inventory differs');
- let next=0;
+ let next=0,zeroOffset;
+ const canonical=createHash('sha256');
  for(let i=0;i<names.length;i++){
   const asset=a.assets[i],grain=i===0,rainbow=i>=37,vertical=!rainbow&&i>18,w=grain?3072:rainbow?32:vertical?128:256,h=grain?2048:rainbow?16:vertical?256:128,stride=rainbow?64:w,n=stride*h;
   const format=grain?'NV12':rainbow&&asset?.name.includes('_cr_')?'NV12_MODULATION_Y_CR':!rainbow&&i%2===0?'NV12_MODULATION_Y_CR':'NV12_MODULATION_Y_CB';
-  fail(asset?.name===names[i]&&asset.format===format&&asset.width===w&&asset.height===h&&asset.stride===stride&&asset.offset===next&&asset.length===n*3/2,'asset layout differs');
+  const zero=compact&&rainbow&&names[i].endsWith('_y_neg_nv12');
+  const alias=zero&&zeroOffset!==undefined;
+  const expectedOffset=alias?zeroOffset:next;
+  fail(asset?.name===names[i]&&asset.format===format&&asset.width===w&&asset.height===h&&asset.stride===stride&&asset.offset===expectedOffset&&asset.length===n*3/2,'asset layout differs');
   fail(asset.planes?.length===2&&asset.planes[0].length===n&&asset.planes[0].offset===0&&asset.planes[0].stride===stride&&asset.planes[1].length===n/2&&asset.planes[1].offset===n&&asset.planes[1].stride===stride,'asset plane layout differs');
-  fail(asset.sha256===sha(runtime.subarray(offset+next,offset+next+asset.length)),'asset hash differs');
-  next+=asset.length;
+  const bytes=runtime.subarray(offset+expectedOffset,offset+expectedOffset+asset.length);
+  fail(asset.sha256===sha(bytes)&&(!zero||!bytes.some(value=>value!==0)),'asset hash differs');
+  canonical.update(bytes);
+  if(zero&&!alias)zeroOffset=next;
+  if(!alias)next+=asset.length;
  }
- fail(next===b.bytes,'asset extent differs');
+ fail(next===b.bytes&&canonical.digest('hex')===canonicalHash,'asset extent or canonical content differs');
  const r=p.render;
  fail(r?.enabled===true&&r.cpu_pixel_access===false&&r.cpu_rng===false&&r.curve_profiles===12&&r.curve_coefficients===9216&&r.bindings?.rainbows?.length===2&&Number.isInteger(r.symbols?.m10v_render_rainbows),'rainbow renderer identity differs');
  const rainbowAssets=a.assets.slice(37),rainbowBindings=r.bindings.rainbows.flat(3);
@@ -227,9 +238,11 @@ function checkRuntime(runtime, manifest) {
     'native runtime size invalid');
   need(manifest?.schema === 'm10v-gr3-native-film-runtime/v2' && manifest.base === BASE &&
     manifest.code_bytes === runtime.length && manifest.code_sha256 === sha(runtime), 'native runtime hash mismatch');
-  need(manifest.film_count === 110 && manifest.slots === 10 && Array.isArray(manifest.dependencies) &&
+  const leica=manifest.camera_model==='gr3'&&manifest.sd_library&&manifest.film_library_enabled!==false&&manifest.experimental_capture?.native_color===true&&manifest.experimental_capture?.native_grain===true&&!!manifest.capture_lifecycle?.snapshot;
+  need(manifest.leica_native===leica,'native Leica ISP ownership differs');
+  need(manifest.film_count === (leica?114:110) && manifest.slots === 10 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
-  const expectedSources=[...new Set([...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...(manifest.raw_development?rawDevelopmentSources:[]),...(manifest.adj_extra?cameraExtensionSources:[]),...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[]),...(manifest.border?.enabled?borderSources:[]),...(manifest.half_pair?.enabled?halfPairSources:[]),...(manifest.pure_isp_effects?.enabled?pureIspEffectSources:[]),...(manifest.pure_isp_effects?.imprint?filmImprintSources:[]),...(manifest.companion?companionNativeSources:[]),...(manifest.torn_overlay?.enabled?tornOverlaySources:[])])];
+  const expectedSources=[...new Set([...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...leicaSources,...(manifest.raw_development?rawDevelopmentSources:[]),...(manifest.adj_extra?cameraExtensionSources:[]),...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[]),...(manifest.border?.enabled?borderSources:[]),...(manifest.half_pair?.enabled?halfPairSources:[]),...(manifest.pure_isp_effects?.enabled?pureIspEffectSources:[]),...(manifest.pure_isp_effects?.imprint?filmImprintSources:[]),...(manifest.companion?companionNativeSources:[]),...(manifest.torn_overlay?.enabled?tornOverlaySources:[])])];
   borderPatches(runtime,manifest);
   halfPairIipPatches(runtime,manifest);
   pureIspEffectPatches(runtime,manifest);
@@ -331,7 +344,9 @@ function checkRuntime(runtime, manifest) {
   }
   const focalIcons=manifest.zoom?.enabled===true&&manifest.sd_library;
   const halfFrame=manifest.camera_model==='gr3'&&manifest.base>=0x540be000;
-  const aspectFirst=focalIcons?855:782,iconCount=891,descriptorCount=136+(focalIcons?1:0)+Number(!!manifest.hdf_adj)+Number(halfFrame);
+  const aspectFirst=focalIcons?855:782,iconCount=891+4*Number(leica),baseDescriptorCount=136+(focalIcons?1:0)+Number(!!manifest.hdf_adj)+Number(halfFrame);
+  const descriptorCount=baseDescriptorCount+4*Number(leica);
+
   const icons=manifest.icons, stock=readFileSync(new URL('../native/gr3/m10v_stock_icon_directory.bin',import.meta.url)), artwork=readFileSync(new URL('../native/gr3/m10v_icons.rgba',import.meta.url));
   need(icons?.first_id===671&&icons.last_id===748&&icons.width===40&&icons.height===40&&artwork.length===78*6400&&icons.sha256===sha(artwork),'native icon inventory differs');
   const retired=manifest.sd_library?32:0, packedArt=artwork.subarray(retired*6400), packedCount=78-retired;
@@ -372,7 +387,7 @@ function checkRuntime(runtime, manifest) {
   }
   {
     const art=readFileSync(new URL('../native/gr3/m10v_marlboro.rgba',import.meta.url));
-    const d=icons.descriptors+(descriptorCount-4)*8,at=d-BASE,pixels=runtime.readUInt32LE(at+4)*4;
+    const d=icons.descriptors+(baseDescriptorCount-4)*8,at=d-BASE,pixels=runtime.readUInt32LE(at+4)*4;
     need(art.length===6400&&runtime.readUInt32LE(icons.table-BASE+887*4)===d&&
       runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&pixels>=BASE&&pixels+6400<=BASE+runtime.length&&
       runtime.subarray(pixels-BASE,pixels-BASE+6400).equals(art),'Marlboro icon readback differs');
@@ -383,7 +398,7 @@ function checkRuntime(runtime, manifest) {
     const names=['SHD50','Revolog KOLOR','Pegasus'];
     need(art.length===3*6400,'three-film artwork extent differs');
     for(let i=0;i<3;i++){
-      const d=icons.descriptors+(descriptorCount-3+i)*8,at=d-BASE,pixels=runtime.readUInt32LE(at+4)*4;
+      const d=icons.descriptors+(baseDescriptorCount-3+i)*8,at=d-BASE,pixels=runtime.readUInt32LE(at+4)*4;
       need(runtime.readUInt32LE(icons.table-BASE+(888+i)*4)===d&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&
         pixels>=BASE&&pixels+6400<=BASE+runtime.length&&runtime.subarray(pixels-BASE,pixels-BASE+6400).equals(art.subarray(i*6400,(i+1)*6400)),
         'three-film icon readback differs');
@@ -460,20 +475,30 @@ function checkRuntime(runtime, manifest) {
       need(runtime.subarray(pixel-BASE,pixel-BASE+6400).equals(art),'native film artwork differs');
     }
   }
-  const unknownDescriptor=icons.descriptors+(descriptorCount-14-Number(halfFrame))*8,unknownAt=unknownDescriptor-BASE;
+  const unknownDescriptor=icons.descriptors+(baseDescriptorCount-14-Number(halfFrame))*8,unknownAt=unknownDescriptor-BASE;
   const unknownPixels=runtime.readUInt32LE(unknownAt+4)*4;
   need(runtime.readUInt32LE(icons.table-BASE+876*4)===unknownDescriptor&&runtime.readUInt16LE(unknownAt)===40&&runtime.readUInt16LE(unknownAt+2)===40&&runtime.subarray(unknownPixels-BASE,unknownPixels-BASE+6400).equals(readFileSync(new URL('../native/gr3/m10v_unknown_film.rgba',import.meta.url))),'unknown recorded film artwork differs');
   {
     const art=readFileSync(new URL('../native/gr3/m10v_four_looks.rgba',import.meta.url));
     need(art.length===4*6400,'four ISP looks artwork extent differs');
     for(let i=0;i<4;i++){
-      const d=icons.descriptors+(descriptorCount-13+i)*8,at=d-BASE,pixel=runtime.readUInt32LE(at+4)*4;
+      const d=icons.descriptors+(baseDescriptorCount-13+i)*8,at=d-BASE,pixel=runtime.readUInt32LE(at+4)*4;
       need(runtime.readUInt32LE(icons.table-BASE+(878+i)*4)===d&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&pixel>=BASE&&pixel+6400<=BASE+runtime.length&&runtime.subarray(pixel-BASE,pixel-BASE+6400).equals(art.subarray(i*6400,(i+1)*6400)),'four ISP looks artwork differs');
+    }
+  }
+  if(leica){
+    const art=readFileSync(new URL('../native/gr3/m10v_leica_adj.bin',import.meta.url));
+    const artOffset=icons.leica_data-BASE,decode=manifest.symbols.m10v_leica_adj_icon_decode;
+    need(art.length===4*416&&artOffset>=0&&artOffset+art.length<=runtime.length&&runtime.subarray(artOffset,artOffset+art.length).equals(art),'Leica ADJ artwork readback differs');
+    need(Number.isInteger(decode)&&decode>=icons.leica_data+art.length&&decode<manifest.symbols.m10v_icon_pixels,'Leica ADJ decoder outside icon module');
+    for(let i=0;i<4;i++){
+      const d=icons.descriptors+(baseDescriptorCount+i)*8,at=d-BASE;
+      need(runtime.readUInt32LE(icons.table-BASE+(891+i)*4)===d&&runtime.readUInt16LE(at)===40&&runtime.readUInt16LE(at+2)===40&&runtime.readUInt32LE(at+4)===0,'Leica ADJ draw-owned descriptor differs');
     }
   }
   const guideLabels=['黄金分割','黄金螺旋（左上）','黄金螺旋（右上）','黄金螺旋（左下）','黄金螺旋（右下）'];
   const adjLabels=['ADJ','设置 6','设置 7','设置 8','设置 9','构图线','胶卷库','逐卷效果','画幅','HDF 模拟','左右调整 OK 保存'];
-  const resourceCount=420+(manifest.pure_isp_effects?.imprint?12:0)+(manifest.torn_overlay?.enabled?8:0);
+  const resourceCount=leica?444:420+(manifest.pure_isp_effects?.imprint?12:0)+(manifest.torn_overlay?.enabled?8:0);
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   if(manifest.torn_overlay?.enabled)
@@ -489,6 +514,7 @@ function checkRuntime(runtime, manifest) {
   const threeFilmStart=manifest.pure_isp_effects?.imprint?425:417;
   need(JSON.stringify(manifest.resources.texts.slice(threeFilmStart,threeFilmStart+3))===JSON.stringify(['SHD50','Revolog KOLOR','Pegasus']),'three-film captions differ');
   if(manifest.pure_isp_effects?.imprint)need(JSON.stringify(manifest.resources.texts.slice(428,432))===JSON.stringify(['暗角','暗角开关','暗角强度','开']),'vignette captions differ');
+  if(leica)need(JSON.stringify(manifest.resources.texts.slice(440))===JSON.stringify(['Leica Chrome','Leica Brass','Leica Teal','Leica Classic']),'Leica captions differ');
   for (let i=0;i<resourceCount;i++) {
     const at = manifest.resources.descriptors[i] - BASE, text = manifest.resources.texts[i];
     need(Number.isInteger(at) && at >= 0 && at + 8 < runtime.length && typeof text === 'string', 'native text pointer invalid');
@@ -902,6 +928,10 @@ function patchList(manifest,runtime) {
     }
   }
   for(const [address,expected,reg] of [[0x53209fb8,0xe300329e,3],[0x53209fec,0xe300329e,3],[0x5320a7cc,0xe300129e,1]])iconPatches.push({address,expected,replacement:movw(reg,manifest.icons.catalog_count-1),name:'M10V icon maximum '+address.toString(16)});
+  if(manifest.leica_native&&!manifest.zoom?.enabled){
+    for(const [address,expected,name] of [[0x5320a7b8,0xe24dd06c,'m10v_zoom_icon_draw_frame'],[0x5320a9b4,0xe51b2030,'m10v_zoom_icon_draw_done']])
+      iconPatches.push({address,expected,replacement:branch(address,manifest.symbols[name]),name});
+  }
   const detailPatches=detailHooks.map(([address,expected,name,link])=>({address,expected,replacement:branch(address,manifest.detail.entries[name],link),name:'native detail '+name}));
   detailPatches.push({address:0x531b0248,expected:0xe3043bd8,replacement:movw(3,manifest.detail.captions&65535),name:'detail captions low'},{address:0x531b024c,expected:0xe34533b3,replacement:movt(3,manifest.detail.captions>>>16),name:'detail captions high'});
   if(manifest.film_library_enabled===false){

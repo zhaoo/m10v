@@ -32,7 +32,7 @@ def stamp_orientation_contract(rom):
         live_direction_reads=0,stamp_offset=0x5140,stamp_bytes=16,extended_recipe_bytes=0x5778,
         guard_words={hex(k):hex(v) for k,v in words.items()},exif_table=0x53d30190)
 
-def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,producer_snapshot=False,native_color=False,native_grain=False,external_noise=False,live_color=False,shared_hdf=False,appended_slots=False,border_snapshot=False,pure_isp_effects=False,four_looks_native=False,raw_development=False,torn_overlay=False):
+def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,producer_snapshot=False,native_color=False,native_grain=False,external_noise=False,live_color=False,shared_hdf=False,appended_slots=False,border_snapshot=False,pure_isp_effects=False,four_looks_native=False,raw_development=False,torn_overlay=False,leica_native=False):
     rom=bytes(rom)
     if hashlib.sha256(rom).hexdigest()!=SHA:raise ValueError('wrong official RTOS')
     stamp_contract=stamp_orientation_contract(rom)
@@ -52,6 +52,7 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
         raise ValueError('RAW development requires owned native ISP and recorded identity')
     required=(('m10v_hdf_reserve','m10v_hdf_task_snapshot','m10v_hdf_settings','m10v_hdf_done') if shared_hdf else ())+ (('m10v_camera_library_preview','m10v_camera_library_custom_profile') if live_color or producer_snapshot else ())+('m10v_library_valid',)+(('m10v_library_tables',) if not observer else ())+(('m10v_camera_library_mutation_busy',) if producer_snapshot else ())+(('m10v_border_shot_freeze',) if border_snapshot else ())
     if native_color:required+=('m10v_c41_native_data',)
+    if leica_native:required+=('m10v_leica_native_data',)
     if pure_isp_effects:
         required+=('m10v_isp_effects_shot_freeze','m10v_isp_effects_shot_reserve','m10v_isp_effects_shot_read','m10v_isp_effects_pipeline_settings')
     if any(type(library_exports.get(k))!=int or library_exports[k]&3 for k in required):raise ValueError('real library decoder/validator ARM exports required')
@@ -64,7 +65,7 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
         recipe_flags=['-Oz' if flag=='-Os' else flag for flag in FLAGS] if pure_isp_effects else FLAGS
         raw_flags=['-DM10V_RAW_DEVELOPMENT=1'] if raw_development else []
         raw_exports=('m10v_isp_frame_raw_supported','m10v_isp_frame_raw_snapshot') if raw_development else ()
-        subprocess.run([compiler,*recipe_flags,*pure_flags,*raw_flags,'-DM10V_C41_EXTERNAL_DATA=1','-DM10V_MARLBORO_NATIVE='+str(int(native_color and producer_snapshot)),'-DM10V_FOUR_LOOKS_NATIVE='+str(int(four_looks_native)),'-DM10V_BORDER_SHOT='+str(int(border_snapshot)),'-DM10V_APPENDED_SLOTS='+str(int(appended_slots)),'-DM10V_ISP_SHARED_HDF='+str(int(shared_hdf)),'-DM10V_ISP_LIVE_COLOR='+str(int(live_color)),'-DM10V_ISP_RECIPE_COLOR_OBSERVER='+str(int(observer)),'-DM10V_ISP_RECIPE_COLOR_PRODUCER='+str(int(producer_snapshot)),'-DM10V_ISP_NATIVE_LOOK='+str(int(native_color)),'-DM10V_ISP_NATIVE_GRAIN_MODE='+str(int(native_grain)),'-c',str(src),'-o',str(obj)],check=True,capture_output=True)
+        subprocess.run([compiler,*recipe_flags,*pure_flags,*raw_flags,'-DM10V_C41_EXTERNAL_DATA=1','-DM10V_LEICA_EXTERNAL_DATA=1','-DM10V_LEICA_NATIVE='+str(int(leica_native)),'-DM10V_MARLBORO_NATIVE='+str(int(native_color and producer_snapshot)),'-DM10V_FOUR_LOOKS_NATIVE='+str(int(four_looks_native)),'-DM10V_BORDER_SHOT='+str(int(border_snapshot)),'-DM10V_APPENDED_SLOTS='+str(int(appended_slots)),'-DM10V_ISP_SHARED_HDF='+str(int(shared_hdf)),'-DM10V_ISP_LIVE_COLOR='+str(int(live_color)),'-DM10V_ISP_RECIPE_COLOR_OBSERVER='+str(int(observer)),'-DM10V_ISP_RECIPE_COLOR_PRODUCER='+str(int(producer_snapshot)),'-DM10V_ISP_NATIVE_LOOK='+str(int(native_color)),'-DM10V_ISP_NATIVE_GRAIN_MODE='+str(int(native_grain)),'-c',str(src),'-o',str(obj)],check=True,capture_output=True)
         code,exports=link_object(obj.read_bytes(),base,externals={k:library_exports[k] for k in required},prefix='m10v_isp_frame_',additional_exports=('m10v_isp_frame_identity_code','m10v_isp_frame_identity_clear','m10v_isp_frame_live_prepare','m10v_isp_frame_live_color','m10v_isp_frame_recipe_snapshot','m10v_isp_frame_recipe_state','m10v_isp_frame_recipe_begin','m10v_isp_frame_recipe_finish','m10v_isp_frame_recipe_producer','m10v_isp_frame_recipe_direction','m10v_isp_frame_recipe_completed','m10v_isp_frame_recipe_grain_settings','m10v_isp_frame_recipe_grain_done')+(('m10v_isp_multiaxis_apply','m10v_isp_native_look_prepare','m10v_isp_native_look_apply','m10v_isp_native_look_matches') if native_color else ())+raw_exports)
     entry=base+len(code)
     # Both preparation and finish preserve all original result/caller registers.

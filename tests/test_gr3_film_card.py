@@ -10,6 +10,9 @@ class FilmCardTests(unittest.TestCase):
  def test_checked_in_artwork_matches_the_generator(self):
   from scripts.generate_m10v_film_cards import generate
   self.assertEqual((ROOT/'native/gr3/m10v_film_card_data.h').read_text(),generate())
+  from scripts.generate_m10v_icons import pack_leica_adj_icons
+  stocks=json.loads((ROOT/'web/gr3/leica-luts.json').read_text())['stocks']
+  self.assertEqual((ROOT/'native/gr3/m10v_leica_adj.bin').read_bytes(),pack_leica_adj_icons(stocks))
  @classmethod
  def setUpClass(cls):
   cls.tmp=tempfile.TemporaryDirectory();cls.addClassCleanup(cls.tmp.cleanup)
@@ -19,7 +22,7 @@ class FilmCardTests(unittest.TestCase):
   cls.draw.argtypes=[C.POINTER(C.c_uint32),C.c_uint32,C.c_uint32,C.c_uint32];cls.draw.restype=C.c_int
  def test_all_films_fit_the_owned_buffer_and_emit_rgba(self):
   count=128*128;buffer=(C.c_uint32*(count+2))();pixels=C.cast(C.byref(buffer,4),C.POINTER(C.c_uint32))
-  for film in list(range(1,79))+list(range(289,331)):
+  for film in list(range(1,79))+list(range(289,335)):
    for slot in range(10):
     buffer[0]=buffer[-1]=0x12345678
     self.assertEqual(self.draw(pixels,film,slot,slot==2),0)
@@ -48,7 +51,16 @@ class FilmCardTests(unittest.TestCase):
    digest=hashlib.sha256(bytes(pixels)).hexdigest()
    self.assertNotIn(digest,images,(film,images.get(digest)))
    images[digest]=film
-  self.assertEqual(len(images),60)
+  self.assertEqual(len(images),64)
+
+ def test_leica_camera_cards_have_high_contrast_type_and_red_accent(self):
+  pixels=(C.c_uint32*(128*128))()
+  for film in range(331,335):
+   with self.subTest(film=film):
+    self.assertEqual(self.draw(pixels,film,0,0),0)
+    self.assertEqual(pixels[28*128+104],0xff2020c9)
+    self.assertEqual(pixels[111*128+60],0xffeaf1f4)
+    self.assertTrue(any(pixel==0xff191919 for pixel in pixels[57*128:97*128]))
 
  def test_custom_names_produce_distinct_bounded_art_without_builtin_alias(self):
   draw=self.lib.m10v_film_card_custom

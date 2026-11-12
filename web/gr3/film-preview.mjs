@@ -71,11 +71,15 @@ function previewRgbLutPixels(source,lut,table){
   }
   return output;
 }
-let marlboroTablesPromise;
+let marlboroTablesPromise,leicaTablesPromise;
 let animeE6TablesPromise,c41TablesPromise,extraFilmsTablesPromise,fourLooksTablesPromise;
 let harmanTablesPromise,curatedTablesPromise,newstocksTablesPromise,styleFiltersTablesPromise,spectralTablesPromise,d76TablesPromise;
 export async function renderPreviewPixels(source, look, width, height) {
   const film=look.film??look.id;
+  if(Number.isInteger(film)&&film>=331&&film<=334){
+    leicaTablesPromise??=fetch(new URL('./leica-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('Film LUT unavailable');return r.json();}).catch(e=>{leicaTablesPromise=undefined;throw e;});
+    const lut=await leicaTablesPromise;return previewRgbLutPixels(source,lut,lut.stocks.find(s=>s.id===film)?.native_values);
+  }
   if(film===327){
     marlboroTablesPromise??=fetch(new URL('./marlboro-luts.json',import.meta.url)).then(r=>{if(!r.ok)throw Error('Film LUT unavailable');return r.json();}).catch(e=>{marlboroTablesPromise=undefined;throw e;});
     const lut=await marlboroTablesPromise;return previewRgbLutPixels(source,lut,lut.stocks[0].native_values);

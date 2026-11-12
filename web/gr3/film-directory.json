@@ -268,6 +268,22 @@
         {
           "id": 320,
           "name": "Classic Chrome"
+        },
+        {
+          "id": 331,
+          "name": "Leica Chrome"
+        },
+        {
+          "id": 332,
+          "name": "Leica Brass"
+        },
+        {
+          "id": 333,
+          "name": "Leica Teal"
+        },
+        {
+          "id": 334,
+          "name": "Leica Classic"
         }
       ]
     }

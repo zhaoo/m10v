@@ -250,10 +250,41 @@ THREE_FILM_SPECS=(
  {'id':329,'name':'Revolog KOLOR','title':'KOLOR','code':'200','color':'#e9d75d'},
  {'id':330,'name':'Pegasus','title':'PEGASUS','code':'400','color':'#202338'},
 )
+LEICA_CARD_PAPER='#f4f1ea'
+LEICA_CARD_INK='#191919'
+LEICA_CARD_RED='#c92020'
 
 def three_film_artifacts():
  """Original sparse artwork; independent of the official firmware fixture."""
  return [(dict(spec),box_icon(spec['name'],spec['id']),box_icon(spec['name'],spec['id'],160)) for spec in THREE_FILM_SPECS]
+
+def pack_leica_adj_icons(specs):
+ """Pack high-contrast labels for the camera's 40×40 ADJ icons."""
+ packed=bytearray()
+ for spec in specs:
+  packed.extend(bytes(4))
+  for color in (LEICA_CARD_PAPER,LEICA_CARD_INK,LEICA_CARD_RED):
+   packed.extend(bytes.fromhex(color[1:])+b'\xff')
+  indexed=Image.new('L',(40,40))
+  draw=ImageDraw.Draw(indexed)
+  draw.rounded_rectangle((0,1,39,38),radius=3,fill=1,outline=2)
+  draw.ellipse((5,7,12,14),fill=3)
+  draw.line((5,18,34,18),fill=2)
+  mask=Image.new('L',(40,40))
+  text=ImageDraw.Draw(mask)
+  text.text((16,7),'LEICA',font=ImageFont.truetype(str(FONT),8),fill=255,anchor='lt')
+  title=spec['title']
+  size=12
+  while True:
+   font=ImageFont.truetype(str(FONT),size)
+   left,top,right,bottom=font.getbbox(title,anchor='lt')
+   if right-left<=36:break
+   size-=1
+  text.text(((40-right+left)//2-left,22),title,font=font,fill=255,anchor='lt')
+  indexed.paste(2,mask=mask.point(lambda value:255 if value>=112 else 0))
+  indices=indexed.tobytes()
+  packed.extend(a|(b<<2)|(c<<4)|(d<<6) for a,b,c,d in zip(indices[::4],indices[1::4],indices[2::4],indices[3::4]))
+ return bytes(packed)
 
 def generate():
  names=re.findall(r'\{"([^"\n]+)",[-0-9]',(ROOT/'native/gr3/m10v_library.c').read_text())
@@ -341,6 +372,14 @@ def generate():
   im.save(out/f"{spec['id']}.png",optimize=True);large.save(out/f"{spec['id']}-large.png",optimize=True)
   meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
  (ROOT/'native/gr3/m10v_three_films.rgba').write_bytes(three_pixels)
+ leica_pixels=bytearray()
+ leica_specs=json.loads((ROOT/'web/gr3/leica-luts.json').read_text())['stocks']
+ for spec in leica_specs:
+  im=box_icon(spec['name'],spec['id'],spec=spec);raw=im.tobytes();leica_pixels+=raw
+  im.save(out/f"{spec['id']}.png",optimize=True);box_icon(spec['name'],spec['id'],160,spec).save(out/f"{spec['id']}-large.png",optimize=True)
+  meta.append(dict(id=spec['id'],name=spec['name'],title=spec['title'],code=spec['code'],color=spec['color'],icon_url=f"/gr3/film-icons/{spec['id']}-large.png",sha256=hashlib.sha256(raw).hexdigest()))
+ (ROOT/'native/gr3/m10v_leica.rgba').write_bytes(leica_pixels)
+ (ROOT/'native/gr3/m10v_leica_adj.bin').write_bytes(pack_leica_adj_icons(leica_specs))
  for row in meta:
   large=out/f"{row['id']:02d}-large.png"
   revision=hashlib.sha256(large.read_bytes()).hexdigest()[:12]

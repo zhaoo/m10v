@@ -20,6 +20,7 @@ static uint32_t ab_host_film(m10v_native_ab_host *h,uint32_t choice){uint32_t sl
 static uint32_t ab_host_icon(m10v_native_ab_host *h,uint32_t choice){
  uint32_t id=ab_host_film(h,choice);
  if(M10V_THREE_FILM(id))return M10V_THREE_FILM_ICON(id);
+ if(M10V_LEICA(id))return M10V_LEICA_ICON(id);
  if(M10V_FOUR_LOOKS(id))return M10V_FOUR_LOOKS_ICON(id);
  if(M10V_EXTRA_FILM(id))return M10V_EXTRA_FILM_ICON(id);
  if(M10V_C41(id))return M10V_C41_ICON_FIRST+id-312;

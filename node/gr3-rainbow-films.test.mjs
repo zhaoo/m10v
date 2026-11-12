@@ -17,9 +17,9 @@ const additions=[
 
 test('three ISP films append to their processing groups without rebinding existing identities',async()=>{
   const catalog=await nativeCatalog();
-  assert.equal(FILM_DIRECTORY.length,60);
-  assert.equal(catalog.film_count,60);
-  assert.equal(new Set(catalog.films.map(f=>f.id)).size,60);
+  assert.equal(FILM_DIRECTORY.length,64);
+  assert.equal(catalog.film_count,64);
+  assert.equal(new Set(catalog.films.map(f=>f.id)).size,64);
   assert.deepEqual(FILM_GROUPS.find(g=>g.name==='C41').films.slice(-2).map(f=>f.id),[329,330]);
   assert.equal(FILM_GROUPS.find(g=>g.name==='D76').films.at(-1).id,328);
   for(const [id,name,group] of additions){

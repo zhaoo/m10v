@@ -1,5 +1,5 @@
 import {unwrapFirmwareDownload} from './firmware-download.mjs';
-import {isGr3Family,modelCapabilities,supportsNativeFilm} from './model-capabilities.mjs';
+import {isGr3Family,isLeicaFilm,modelCapabilities,supportsNativeFilm} from './model-capabilities.mjs';
 import {renderZoomControls,validateZoomControls} from './zoom-controls.mjs';
 import {normalizeVersionUnlock,assertVersionUnlockReceipt} from './version-unlock-state.mjs';
 import {createFilmPreview} from './preview-controller.mjs';
@@ -90,7 +90,7 @@ function renderFilms(){const q=$('#search').value.toLowerCase().trim(),selected=
   const prefix=[];if(f.group!==lastGroup){const title=document.createElement('h3');title.className='film-directory-group';title.style.cssText='grid-column:1/-1;margin:20px 0 0';title.textContent=f.group;prefix.push(title);lastGroup=f.group;}
   count++;const label=document.createElement('label');label.className='film';label.dataset.selected=String(selected.has(f.id));
   const check=document.createElement('input');check.type='checkbox';check.value=String(f.id);check.checked=selected.has(f.id);check.disabled=busy||!supportsNativeFilm(sourceModel,f.id);check.dataset.focus='film-'+f.id;check.setAttribute('aria-label',`选择 ${f.name}`);
-  const strong=document.createElement('strong');strong.textContent=`${f.number??films.indexOf(f)+1}. ${f.name}`;const preview=document.createElement('button');preview.type='button';preview.className='film-peek';preview.setAttribute('aria-label',`查看 ${f.name}，不改变已选胶卷`);preview.append(filmIcon(f),strong);preview.onclick=event=>{event.preventDefault();event.stopPropagation();const selectedIndex=configuration.slots.findIndex(s=>s.film===f.id);if(selectedIndex>=0){active=selectedIndex;render();}else onInspect(f,false);};label.append(check,preview);if((f.id>=299&&f.id<=305)||(f.id>=318&&f.id<=321)){const badge=document.createElement('small');badge.textContent=f.id>=318?'ISP 近似 · 仅 GR III':f.infrared_style?'\u7ea2\u5916\u6ee4\u955c\u98ce\u683c\u8fd1\u4f3c':'\u98ce\u683c\u8fd1\u4f3c';badge.style.cssText='display:block;font-size:12px;font-weight:400;opacity:.7;margin-top:4px';strong.append(badge);}
+  const strong=document.createElement('strong');strong.textContent=`${f.number??films.indexOf(f)+1}. ${f.name}`;const preview=document.createElement('button');preview.type='button';preview.className='film-peek';preview.setAttribute('aria-label',`查看 ${f.name}，不改变已选胶卷`);preview.append(filmIcon(f),strong);preview.onclick=event=>{event.preventDefault();event.stopPropagation();const selectedIndex=configuration.slots.findIndex(s=>s.film===f.id);if(selectedIndex>=0){active=selectedIndex;render();}else onInspect(f,false);};label.append(check,preview);if((f.id>=299&&f.id<=305)||(f.id>=318&&f.id<=321)||isLeicaFilm(f.id)){const badge=document.createElement('small');badge.textContent=f.id>=318?'ISP 近似 · 仅 GR III':f.infrared_style?'\u7ea2\u5916\u6ee4\u955c\u98ce\u683c\u8fd1\u4f3c':'\u98ce\u683c\u8fd1\u4f3c';badge.style.cssText='display:block;font-size:12px;font-weight:400;opacity:.7;margin-top:4px';strong.append(badge);}
   check.onchange=()=>toggleFilm(f.id);
   return [...prefix,label];
  }));$('#empty').hidden=count!==0;

@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.12.2",
+      "date": "2026-11-12",
+      "title": "GR III 新增四款莱卡风格胶卷",
+      "changes": [
+        "GR III 2.10 的胶卷配置和胶卷库在「影像」中新增 Leica Chrome、Brass、Teal、Classic。",
+        "四款胶卷的取景和 JPG 调色使用相机原生 ISP。ADJ 和机内胶卷库采用 LEICA 字样及高对比度的完整滤镜名。",
+        "GRemote 1.2.12 支持新胶卷目录，并兼容此前的莱卡测试候选。相机装卷需配套固件与 SD 连接服务。"
+      ],
+      "notice": "四款效果依据公开样片拟合，已完成离线构建和 ARM 回归。真机色彩、LCD 显示和保存速度仍待验证。适用机型为 GR III 2.10。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.12.1",
       "date": "2026-11-12",
       "title": "GR III 新增单张 JPG 撕纸效果",
@@ -11,9 +25,9 @@
         "GRemote 1.2.11 将撕纸和暗角放在相机扩展的效果组。"
       ],
       "notice": "用户已确认 GR III R9 实拍效果可用。正式包关闭诊断日志。网页入口和 App 控制通过离线回归。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "824d68fdf74eac6bfa6d869c0110efcbd314a6d0",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/43223481978"
     },
     {
       "version": "2026.11.09.1",

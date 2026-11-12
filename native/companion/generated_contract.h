@@ -3,10 +3,10 @@
 #define M10V_COMPANION_GENERATED_CONTRACT_H
 #include <stdint.h>
 #define M10V_FIELD_COUNT 13u
-#define M10V_CONTRACT_SHA256 "c80fa133b13c589daa10cad5d46e0629cbcc3d18b0af1e32369dbfae4bf58aa1"
+#define M10V_CONTRACT_SHA256 "cf4feadfbbea7764d851dac5ce0eded875040b9d2322876a48db175664bf6094"
 enum {M10V_FIELD_FILMID,M10V_FIELD_GRAIN,M10V_FIELD_GRAINSIZE,M10V_FIELD_HALOGAIN,M10V_FIELD_HALOSPREAD,M10V_FIELD_HALOTHRESHOLD,M10V_FIELD_HALOPROFILE,M10V_FIELD_LEAKGAIN,M10V_FIELD_LEAKPOSITION,M10V_FIELD_LEAKSPREAD,M10V_FIELD_LEAKVARIATION,M10V_FIELD_FILMEXPOSURE,M10V_FIELD_CHARMERACOLOR};
 static const char *const m10v_field_names[M10V_FIELD_COUNT]={"filmId","grain","grainSize","haloGain","haloSpread","haloThreshold","haloProfile","leakGain","leakPosition","leakSpread","leakVariation","filmExposure","charmeraColor"};
-static inline unsigned m10v_field_max(unsigned field,unsigned film){switch(field){case M10V_FIELD_FILMID:return 330;
+static inline unsigned m10v_field_max(unsigned field,unsigned film){switch(field){case M10V_FIELD_FILMID:return 334;
 case M10V_FIELD_GRAIN:return 3;
 case M10V_FIELD_GRAINSIZE:return 2;
 case M10V_FIELD_HALOGAIN:return 8;
@@ -20,7 +20,7 @@ case M10V_FIELD_LEAKVARIATION:return 1;
 case M10V_FIELD_FILMEXPOSURE:if(film==67)return 1;return 2;
 case M10V_FIELD_CHARMERACOLOR:return 3;
 default:return 0;}}
-static inline int m10v_field_supported(unsigned field,unsigned film){if(!film||film>330||field>=M10V_FIELD_COUNT)return 0;switch(field){
+static inline int m10v_field_supported(unsigned field,unsigned film){if(!film||film>334||field>=M10V_FIELD_COUNT)return 0;switch(field){
 case M10V_FIELD_GRAIN:return film!=289;
 case M10V_FIELD_GRAINSIZE:return film!=289;
 case M10V_FIELD_LEAKGAIN:return film!=289;

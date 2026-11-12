@@ -137,6 +137,8 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
             struct.pack_into('<I', image, out_at, word)
     required = {
         'm10v_c41_': {'m10v_c41_native_data'},
+        'm10v_leica_': {'m10v_leica_native_data'},
+        'm10v_leica_adj_': {'m10v_leica_adj_icon_decode'},
         '__aeabi_': {'__aeabi_'+n for n in ['memcpy','memcpy4','memcpy8','memset','memset4','memclr','memclr4','memclr8']},
         'm10v_auth_': {'m10v_auth_init','m10v_auth_accept','m10v_auth_sign_response'},
         'm10v_json_': {'m10v_json_parse','m10v_json_get','m10v_json_string','m10v_json_uint'},
@@ -239,7 +241,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     half_pair_enabled=bool(camera_model=='gr3' and base>=0x540be000 and film_library and sd_library and recipe_snapshot and lifecycle_trace)
     pair_flags=[f'-DM10V_HALF_PAIR_ENABLED={int(half_pair_enabled)}']
     native_owned=bool(native_color and native_grain and recipe_snapshot and lifecycle_trace)
-    compile_flags += [f'-DM10V_FOUR_LOOKS_NATIVE={int(camera_model=="gr3" and native_owned)}',f'-DM10V_MARLBORO_NATIVE={int(native_owned)}',f'-DM10V_THREE_FILM_NATIVE={int(native_owned)}']
+    leica_native=camera_model=='gr3' and native_owned and film_library and sd_library
+    compile_flags += [f'-DM10V_LEICA_NATIVE={int(leica_native)}',f'-DM10V_FOUR_LOOKS_NATIVE={int(camera_model=="gr3" and native_owned)}',f'-DM10V_MARLBORO_NATIVE={int(native_owned)}',f'-DM10V_THREE_FILM_NATIVE={int(native_owned)}']
     if type(border_hardware)is not bool or (border_hardware and not(border_enabled and native_owned and save_chain_trace and view_deferred)):
         raise ValueError('border hardware requires explicit opt-in, owned native pipeline, RAW lifetime and view recovery')
     if live_color and (not native_color or not sd_library):raise ValueError('live color requires native color and owned settings')
@@ -284,8 +287,9 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 empty=True
                 if any(initial[12+i*8:20+i*8]) or any(initial[96+i*8:104+i*8]):raise ValueError('disabled film must be empty')
                 continue
-            if empty or film in seen or not (1<=film<=78 or 289<=film<=305 or 309<=film<=330) or grain>3 or soft>3 or gain>8 or spread>8 or threshold>8 or profile>(6 if universal_halation else 3):raise ValueError('invalid enabled film')
+            if empty or film in seen or not (1<=film<=78 or 289<=film<=305 or 309<=film<=334) or grain>3 or soft>3 or gain>8 or spread>8 or threshold>8 or profile>(6 if universal_halation else 3):raise ValueError('invalid enabled film')
             if 318<=film<=321 and camera_model!='gr3':raise ValueError('Four looks require the verified GR III native pipeline')
+            if 331<=film<=334 and not leica_native:raise ValueError('Leica looks require the verified GR III ISP pipeline')
             if (film==294 or 309<=film<=330) and not native_owned:raise ValueError('New looks require ISP still ownership')
             if film in (329,330) and not pure_isp_effects:raise ValueError('KOLOR/Pegasus require pure ISP rainbow rendering')
             seen.add(film)
@@ -325,6 +329,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     verify_extra_films(ROOT)
     from scripts.verify_gr3_four_looks_reference import verify as verify_four_looks
     verify_four_looks(ROOT)
+    from scripts.fit_gr3_leica_native import verify as verify_leica
+    verify_leica(ROOT)
     from scripts.build_gr3_marlboro_reference import verify as verify_marlboro
     verify_marlboro(ROOT)
     if base & 4095: raise ValueError('runtime base must be page aligned')
@@ -555,8 +561,15 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 lifecycle_report['patches']+=module_report['patches']+pool_report['patches']
             if recipe_snapshot:
                 from scripts.build_gr3_isp_recipe_color import build as build_recipe_color
+                if leica_native:
+                    leica_obj=folder/'leica-native-data.o'
+                    subprocess.run([compiler,*render_flags,'-c',str(ROOT/'native/gr3/m10v_leica_native_data.c'),'-o',str(leica_obj)],check=True,capture_output=True)
+                    leica_base=(base+len(image)+15)&~15
+                    leica_code,leica_symbols=link_object(leica_obj.read_bytes(),leica_base,symbols,'m10v_leica_')
+                    image+=bytes(leica_base-base-len(image))+leica_code
+                    symbols.update(leica_symbols)
                 snapshot_base=(base+len(image)+15)&~15
-                snapshot_code,snapshot_report=build_recipe_color(out/'recipe-snapshot',stock,symbols,owner_report,snapshot_base,observer=not native_color,producer_snapshot=True,native_color=native_color,native_grain=native_grain,external_noise=False,live_color=live_color,shared_hdf=hdf_enabled,appended_slots=appended_slots,border_snapshot=border_enabled,pure_isp_effects=pure_isp_effects,four_looks_native=camera_model=='gr3' and native_owned,raw_development=raw_development,torn_overlay=torn_overlay)
+                snapshot_code,snapshot_report=build_recipe_color(out/'recipe-snapshot',stock,symbols,owner_report,snapshot_base,observer=not native_color,producer_snapshot=True,native_color=native_color,native_grain=native_grain,external_noise=False,live_color=live_color,shared_hdf=hdf_enabled,appended_slots=appended_slots,border_snapshot=border_enabled,pure_isp_effects=pure_isp_effects,four_looks_native=camera_model=='gr3' and native_owned,raw_development=raw_development,torn_overlay=torn_overlay,leica_native=leica_native)
                 image+=bytes(snapshot_base-base-len(image))+snapshot_code;symbols.update(snapshot_report['exports'])
                 lifecycle_report['snapshot']=snapshot_report
                 lifecycle_report['patches']+=snapshot_report['patches']
@@ -885,6 +898,10 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         texts+=['SHD50','Revolog KOLOR','Pegasus']
         if pure_isp_effects:texts+=['暗角','暗角开关','暗角强度','开']
         if torn_overlay:texts+=['撕纸效果','开','关','撕纸叠映：关','撕纸叠映：开','撕纸叠映：处理中','撕纸叠映：已完成','撕纸叠映：失败']
+        if leica_native:
+            texts+=['']*(1226-786-len(texts))
+            if 786+len(texts)!=1226:raise ValueError('Leica resource allocation differs')
+            texts += [s['name'] for s in json.loads((ROOT/'web/gr3/leica-luts.json').read_text())['stocks']]
         last_resource=786+len(texts)-1
         if sd_library:
             from scripts.generate_m10v_card_captions import resource as caption_resource
@@ -1036,8 +1053,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         half_frame=bool(camera_model=='gr3' and base>=0x540be000)
         half_pixels=(ROOT/'native/gr3/m10v_half_frame_icon.rgba').read_bytes() if half_frame else b''
         if half_frame and len(half_pixels)!=9600:raise ValueError('half-frame icon extent differs')
-        icon_count = 891
-        descriptor_count=old_descriptor_count+23+int(hdf_adj_report is not None)+int(half_frame)
+        icon_count = 891+4*int(leica_native)
+        descriptor_count=old_descriptor_count+23+4*int(leica_native)+int(hdf_adj_report is not None)+int(half_frame)
         icon_descriptors = icon_table + icon_count*4
         icon_data = icon_descriptors + descriptor_count*8
         relocations.data(icon_table,stock_directory)
@@ -1059,6 +1076,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         image += b''.join(struct.pack('<I',icon_descriptors+(old_descriptor_count+14+int(hdf_adj_report is not None)+int(half_frame)+i)*8) for i in range(5))
         image += struct.pack('<I',icon_descriptors+(old_descriptor_count+19+int(hdf_adj_report is not None)+int(half_frame))*8)
         image += b''.join(struct.pack('<I',icon_descriptors+(old_descriptor_count+20+int(hdf_adj_report is not None)+int(half_frame)+i)*8) for i in range(3))
+        if leica_native:
+            image += b''.join(struct.pack('<I',icon_descriptors+(descriptor_count-4+i)*8) for i in range(4))
         image += b''.join(struct.pack('<HHI',40,40,(icon_data+(len(icon_pixels) if i<retired_icon_count else (i-retired_icon_count)*6400))//4) for i in range(78))
         if sd_library:
             image += bytes(5*8) # Reserved ROM padding; dynamic metadata is in owned RAM.
@@ -1129,6 +1148,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         if len(three_film_pixels)!=3*6400:raise ValueError('three-film artwork extent differs')
         three_film_data=four_data+len(four_pixels)+len(marlboro_pixels)
         image += b''.join(struct.pack('<HHI',40,40,(three_film_data+i*6400)//4) for i in range(3))
+        if leica_native:image+=struct.pack('<HHI',40,40,0)*4
         image += icon_pixels
         if sd_library:
             from scripts.generate_m10v_film_cards import custom_icon
@@ -1137,6 +1157,18 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             image += custom_pixels
         image += (ROOT/'native/gr3/m10v_charmera.rgba').read_bytes()
         image += color_pixels+pixel_pixels+style_pixels+spectral_icon+d76_icon_pixels+aspect_pixels+anime_pixels+c41_pixels+extra_pixels+hdf_adj_pixels+unknown_pixels+half_pixels+four_pixels+marlboro_pixels+three_film_pixels
+        leica_icon_data=None
+        if leica_native:
+            packed_icons=(ROOT/'native/gr3/m10v_leica_adj.bin').read_bytes()
+            if len(packed_icons)!=4*416:raise ValueError('Leica icon data extent differs')
+            leica_icon_data=base+len(image)
+            image+=packed_icons
+            leica_icon_obj=folder/'leica-adj-icon.o'
+            subprocess.run([compiler,*render_flags,'-c',str(ROOT/'native/gr3/m10v_leica_adj_icon.c'),'-o',str(leica_icon_obj)],check=True,capture_output=True)
+            leica_icon_base=(base+len(image)+15)&~15
+            leica_icon_code,leica_icon_symbols=link_object(leica_icon_obj.read_bytes(),leica_icon_base,symbols,'m10v_leica_adj_')
+            image+=bytes(leica_icon_base-base-len(image))+leica_icon_code
+            symbols.update(leica_icon_symbols)
         icon_asm=folder/'icons.S';icon_obj=folder/'icons.o'
         icon_asm.write_text("""
             .syntax unified
@@ -1149,6 +1181,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             mrs r0,cpsr
             ldrh r1,[r5,#0x24]
             FOCAL_ICON_DISPATCH
+            LEICA_ICON_DISPATCH
             movw ip,#671
             cmp r1,ip
             blo 1f
@@ -1162,7 +1195,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             pop {r0,r1}
             ldr pc,=0x5320a838
             .ltorg
-        """.replace('ICON_LAST',str(icon_count-1)).replace('FOCAL_ICON_DISPATCH','movw ip,#855\n            cmp r1,ip\n            bhs 4f\n            movw ip,#782\n            cmp r1,ip\n            bhs .Lfocal_pixels\n        4:' if focal_icons else ''))
+        """.replace('ICON_LAST',str(icon_count-1)).replace('LEICA_ICON_DISPATCH','movw ip,#891\n            cmp r1,ip\n            bhs .Lleica_pixels' if leica_native else '').replace('FOCAL_ICON_DISPATCH','movw ip,#855\n            cmp r1,ip\n            bhs 4f\n            movw ip,#782\n            cmp r1,ip\n            bhs .Lfocal_pixels\n        4:' if focal_icons else ''))
         if focal_icons:
             icon_asm.write_text(icon_asm.read_text()+'''
         .Lfocal_pixels:
@@ -1173,6 +1206,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             push {ip,lr}
             ldrh r0,[r5,#0x24]
             bl m10v_zoom_icon_decode
+            b .Ldecoded_pixels
+        .Ldecoded_pixels:
             cmp r0,#0
             beq 3f
             str r0,[fp,#-0x80]
@@ -1187,6 +1222,39 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             ldr pc,=0x5320a9b4
             .ltorg
         ''')
+        if leica_native:
+            text=icon_asm.read_text()
+            if not focal_icons:
+                text+='''
+            .Ldecoded_pixels:
+                cmp r0,#0
+                beq 3f
+                str r0,[fp,#-0x80]
+                str r0,[sp,#56]
+                pop {ip,lr}
+                msr cpsr_fs,ip
+                pop {r0-r12,lr}
+                ldr pc,=0x5320a838
+            3:  pop {ip,lr}
+                msr cpsr_fs,ip
+                pop {r0-r12,lr}
+                ldr pc,=0x5320a9b4
+                .ltorg
+                '''
+            text+=f'''
+            .Lleica_pixels:
+                msr cpsr_fs,r0
+                pop {{r0,r1}}
+                push {{r0-r12,lr}}
+                mrs ip,cpsr
+                push {{ip,lr}}
+                ldrh r0,[r5,#0x24]
+                ldr r1,={leica_icon_data}
+                bl m10v_leica_adj_icon_decode
+                b .Ldecoded_pixels
+                .ltorg
+            '''
+            icon_asm.write_text(text)
         if sd_library:
             # Private resources fall back to immutable 40px icons unless their
             # live view owner has published a valid RAM descriptor directory.
@@ -1294,6 +1362,29 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         asset_bytes=packed_blob.read_bytes();asset_base=0x54220000
         if len(asset_bytes)!=11280384 or sha(asset_bytes)!='fd542db7b7ec99fceb8e6bbc2f15578ca5076a0a3ddbed2463ecc8fbead23d23':
             raise ValueError('pure ISP build-time texture identity differs; use the pinned NumPy build environment')
+        if leica_native:
+            # All eight negative luma rainbow fields contain the same zero
+            # bytes. Share that immutable surface and leave the imprint base
+            # and upper RTOS bound at their established addresses.
+            compact=bytearray()
+            zero_offset=None
+            for asset in packed['assets']:
+                offset=asset['offset']
+                raw=asset_bytes[offset:offset+asset['length']]
+                if asset['name'].startswith('rainbow_') and asset['name'].endswith('_y_neg_nv12'):
+                    if len(raw)!=1536 or any(raw):raise ValueError('rainbow zero surface differs')
+                    if zero_offset is not None:
+                        asset['offset']=zero_offset
+                        continue
+                    zero_offset=len(compact)
+                asset['offset']=len(compact)
+                compact.extend(raw)
+            saved=len(asset_bytes)-len(compact)
+            if saved!=10752 or sha(compact)!='4fdb5debedc498e683ec219293a645c58bd74fbfb73987c600898cbbf70e78ec':
+                raise ValueError('compact texture identity differs')
+            asset_base+=saved
+            asset_bytes=bytes(compact)
+            packed.update(blob_length=len(compact),blob_sha256=sha(compact))
         from scripts.build_gr3_film_imprints import build as build_imprints
         imprint_manifest,imprint_bytes=build_imprints(texture_dir/'imprints')
         imprint_base=asset_base+len(asset_bytes)
@@ -1361,7 +1452,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             'code_end_exclusive':code_end,'cpu_pixel_processing':False,'cpu_rng':False,
             'camera_tested':False,'performance_measured':False}
     manifest = {'camera_model':camera_model,'schema': 'm10v-gr3-native-film-runtime/v2', 'base': base, 'symbols': symbols,
-                'code_bytes': len(image), 'code_sha256': sha(image), 'film_count': 110, 'slots': 10,
+                'code_bytes': len(image), 'code_sha256': sha(image), 'film_count': 114 if leica_native else 110, 'leica_native': leica_native, 'slots': 10,
                 'sources': {p: sha((ROOT / p).read_bytes()) for p in
                             ('native/gr3/extra-films-reference.json','native/gr3/m10v_extra_films_native_profiles.h','native/gr3/m10v_extra_films.rgba','web/gr3/extra-films-luts.json','scripts/build_gr3_extra_films_reference.py','scripts/fit_gr3_extra_films_native.py','scripts/verify_gr3_extra_films_reference.py','native/gr3/m10v_c41_native_data.c','scripts/fit_gr3_c41_solver.py','node/gr3-sd-pre-five-c41-contract.json','node/gr3-sd-pre-per-film-effects-contract.json','node/gr3-sd-per-film-rc1-contract.json','node/gr3-sd-pre-adj-defaults-contract.json','native/gr3/c41-reference.json','native/gr3/m10v_c41_native_profiles.h','native/gr3/m10v_c41.rgba','web/gr3/c41-luts.json','scripts/build_gr3_c41_reference.py','scripts/fit_gr3_c41_native.py','scripts/verify_gr3_c41_reference.py','node/gr3-sd-pre-instax-contract.json','node/gr3-sd-pre-retired-anime-contract.json','node/gr3-sd-pre-c41-contract.json','native/gr3/m10v_anime.h','native/gr3/anime-e6-reference.json','native/gr3/m10v_anime_e6_native_profiles.h','native/gr3/m10v_anime_e6.rgba','native/gr3/m10v_anime_ui.rgba','native/gr3/anime-ui.json','native/gr3/anime-ui-raster.json','third_party/anime-ui-font/OFL.txt','web/gr3/anime-e6-luts.json','scripts/build_gr3_anime_e6_reference.py','scripts/fit_gr3_anime_e6_native.py','scripts/verify_gr3_anime_e6_reference.py','scripts/generate_m10v_anime_ui.py','node/gr3-sd-pre-anime-e6-contract.json','node/gr3-sd-pre-d76-mono-contract.json','native/gr3/film_d76_0.c','native/gr3/film_d76_1.c','native/gr3/film_d76_0_data.h','native/gr3/film_d76_1_data.h','native/gr3/m10v_d76.rgba','native/gr3/d76-reference.json','web/gr3/d76-luts.json','scripts/build_gr3_d76_reference.py','scripts/fit_gr3_d76_native.py','scripts/verify_gr3_d76_reference.py','native/gr3/m10v_d76_native_profiles.h','node/gr3-sd-pre-universal-halation-contract.json','node/gr3-sd-pre-d76-contract.json','native/gr3/m10v_spectral_native_profiles.h','native/gr3/m10v_film_directory.h','web/gr3/film-directory.json','node/gr3-film-directory.mjs','scripts/generate_m10v_directory.py','native/gr3/film_spectral_data.h','native/gr3/spectral-reference.json','web/gr3/spectral-luts.json','scripts/build_gr3_spectral_reference.py','scripts/fit_gr3_spectral_native.py','scripts/verify_gr3_spectral_reference.py','native/gr3/m10v_5213.rgba','docs/research/aerocolor-2460/official-medium-curves.json','node/gr3-sd-pre-aerocolor-contract.json','node/gr3-sd-pre-directory-contract.json','native/gr3/film_style_filters_0.c','native/gr3/film_style_filters_1.c','native/gr3/film_style_filters_0_data.h','native/gr3/film_style_filters_1_data.h','native/gr3/m10v_style_filters.rgba','native/gr3/style-filters-reference.json','web/gr3/style-filters-luts.json','scripts/build_gr3_style_filters_reference.py','scripts/fit_gr3_style_filters_native.py','scripts/verify_gr3_style_filters_reference.py','native/gr3/film_newstocks.c','native/gr3/film_newstocks_data.h','native/gr3/newstocks-reference.json','web/gr3/newstocks-luts.json','scripts/build_gr3_newstocks_reference.py','scripts/fit_gr3_newstocks_native.py','scripts/verify_gr3_newstocks_reference.py','native/gr3/film_curated.c','native/gr3/film_curated_data.h','native/gr3/curated-reference.json','web/gr3/curated-luts.json','scripts/verify_gr3_curated_reference.py','scripts/build_gr3_curated_reference.py','scripts/fit_gr3_curated_native.py','scripts/build_gr3_harman_reference.py','scripts/verify_gr3_harman_reference.py','native/gr3/film_harman.c','native/gr3/film_harman.h','native/gr3/film_harman_data.h','native/gr3/harman-reference.json','web/gr3/harman-luts.json','scripts/verify_gr3_5207_reference.py','scripts/build_gr3_5207_reference.py','web/gr3/5207-lut.json','native/gr3/film_5207.c','native/gr3/film_5207.h','native/gr3/m10v_color_cache.h','native/gr3/film_5207_data.h','native/gr3/5207-reference.json','native/gr3/m10v_pixel_world.h','native/gr3/m10v_pixel_world.rgba','native/gr3/m10v_charmera.h','native/gr3/m10v_charmera.rgba','native/gr3/m10v_charmera_ui.rgba','scripts/generate_m10v_charmera_ui.py','native/gr3/m10v_library.c', 'native/gr3/m10v_library.h',
                              'native/gr3/m10v_universal_halation.h','native/gr3/halation_core.c', 'native/gr3/halation_core.h', 'native/gr3/halation_energy.h','native/gr3/m10v_detail.c','scripts/build_gr3_native_detail.py','scripts/build_gr3_menu_patches.py','scripts/build_gr3_isp_base.py',
@@ -1395,7 +1486,10 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         'native/gr3/m10v_marlboro_native_profile.h','native/gr3/m10v_marlboro.rgba','web/gr3/marlboro-luts.json','node/gr3-sd-pre-marlboro-contract.json',
         'scripts/build_gr3_three_film_preview.py','native/gr3/three-film-reference.json',
         'native/gr3/m10v_three_films_native_profile.h','native/gr3/m10v_three_films.rgba',
-        'node/gr3-sd-pre-three-films-contract.json','node/gr3-sd-pre-directory-count-contract.json']})
+        'node/gr3-sd-pre-three-films-contract.json','node/gr3-sd-pre-directory-count-contract.json',
+        'native/gr3/leica-reference.json','native/gr3/m10v_leica_native_data.c','native/gr3/m10v_leica_native_profiles.h','native/gr3/m10v_leica.rgba',
+        'web/gr3/leica-luts.json','scripts/fit_gr3_leica_native.py','node/gr3-sd-pre-leica-contract.json',
+        'native/gr3/m10v_leica_adj_icon.c','native/gr3/m10v_leica_adj.bin','node/gr3-sd-leica-rc1-contract.json']})
     if sd_library:manifest['sources']['native/gr3/m10v_sd_previous_hash.c']=sha((ROOT/'native/gr3/m10v_sd_previous_hash.c').read_bytes())
     if sd_library:
         manifest['custom_isp']={'schema':'m10v-custom-isp/v1','record_offset':6688,'payload_bytes':1572,
@@ -1538,6 +1632,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['aspect_icons']={'first_id':aspect_icon_first,'last_id':aspect_icon_first+1,'width':60,'height':40,'pixels':aspect_icon_data,'sha256':sha(aspect_pixels)}
     manifest['half_frame_icon']={'id':877,'width':60,'height':40,'pixels':half_icon_data,'descriptor':icon_descriptors+(old_descriptor_count+10+int(hdf_adj_report is not None))*8,'sha256':sha(half_pixels)} if half_frame else None
     manifest['icons']={'catalog_count':icon_count,'descriptor_count':descriptor_count,'focal':{'first_id':782,'last_id':854,'width':60,'height':20,'descriptor':icon_descriptors+111*8,'storage':'draw-owned-heap','heap_bytes':4800,'owner_fp_offset':-0x80} if focal_icons else None,'first_id':671,'last_id':748,'width':40,'height':40,'table':icon_table,'descriptors':icon_descriptors,'pixels':icon_data,'sha256':icon_artwork_sha,'payload_bytes':len(icon_pixels),'retired_generic_count':retired_icon_count}
+    if leica_native:manifest['icons']['leica_data']=leica_icon_data
     if sd_library:manifest['custom_film_display']={'name_resources':[1007,1011],'appended_name_resources':[1111,1115],'name_storage':'getter-stack-80-bytes','icon_id':754,'icon_sha256':sha(custom_icon()),'card_art':'name-fitted-inside-square-box-and-stable-palette','legacy_sd_compatible':True,'camera_tested':False}
     # Linked diagnostic modules retain ARM mapping symbols. Recording the
     # trace never changes runtime bytes; the manifest binds its exact inputs.

@@ -68,6 +68,13 @@ static inline uint32_t m10v_halo_workspace_planes(uint32_t film,uint32_t profile
 #define M10V_ANIME_LAST 308u
 #define M10V_ANIME(id) ((id)>=306u && (id)<=308u)
 #define M10V_E6(id) ((id)>=309u && (id)<=311u)
+#define M10V_LEICA_FIRST 331u
+#define M10V_LEICA(id) ((id)>=M10V_LEICA_FIRST && (id)<=334u)
+#define M10V_LEICA_NAME(id) (1226u+(id)-M10V_LEICA_FIRST)
+#ifndef M10V_LEICA_NATIVE
+#define M10V_LEICA_NATIVE M10V_FOUR_LOOKS_NATIVE
+#endif
+#define M10V_LEICA_ICON(id) (M10V_LEICA_NATIVE?891u+(id)-M10V_LEICA_FIRST:876u)
 #define M10V_FOUR_LOOKS(id) ((id)>=318u && (id)<=321u)
 #ifndef M10V_FOUR_LOOKS_NATIVE
 #define M10V_FOUR_LOOKS_NATIVE 0
@@ -90,7 +97,7 @@ static inline uint32_t m10v_halo_workspace_planes(uint32_t film,uint32_t profile
 #define M10V_ANIME_VALUE_FIRST 864u
 #define M10V_ANIME_SCALE_ICON 868u
 #define M10V_ANIME_CAPTION 1148u
-#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_MARLBORO_ID || M10V_THREE_FILM(id) || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID || (id)==M10V_5213_ID || M10V_STYLE(id) || M10V_D76(id) || M10V_ANIME_E6(id)||M10V_C41(id)||M10V_EXTRA_FILM(id)||M10V_FOUR_LOOKS(id)))
+#define M10V_BUILTIN(id) ((id)>0 && ((id)<=M10V_FILM_COUNT || (id)==M10V_MARLBORO_ID || M10V_THREE_FILM(id) || (id)==M10V_CHAR_ID || (id)==M10V_PIXEL_ID || (id)==M10V_5213_ID || M10V_STYLE(id) || M10V_D76(id) || M10V_ANIME_E6(id)||M10V_C41(id)||M10V_EXTRA_FILM(id)||M10V_FOUR_LOOKS(id)||M10V_LEICA(id)))
 #define M10V_CUSTOM(id) ((id)>M10V_FILM_COUNT && (id)<=M10V_CUSTOM_MAX_ID)
 #define M10V_SLOT_COUNT 10u
 #define M10V_CUSTOM_IMMUTABLE_FIRST 21u
