@@ -178,9 +178,6 @@ static void draw(page *p){
 #if M10V_TORN_ENABLED
  uint32_t torn=!p->root&&p->child==TORN_SWITCH;
  if(torn)border=0;
- uint32_t stage=0,generation=0;
- if(p->root&&root_first+4u>=root_rows()&&
-    (!m10v_torn_state(&stage,&generation)||stage>4u))stage=4;
 #endif
 #endif
  caption(p->widgets[2],p->root?1140:border?1155:970);caption(p->widgets[3],p->root?941:971);
@@ -206,7 +203,7 @@ static void draw(page *p){
   if(p->root&&row==(M10V_HDF_ENABLED?2u:1u))id=M10V_ISP_TEXT_IMPRINT;
   if(p->root&&row==(M10V_HDF_ENABLED?3u:2u))id=1214;
 #if M10V_TORN_ENABLED
-  if(p->root&&row==root_rows()-1u)id=1221u+stage;
+  if(p->root&&row==root_rows()-1u)id=1218;
   if(torn)id=i?1219u:1220u;
 #endif
   if(!p->root&&p->child==VIGNETTE_CHILD)id=1215+i;
