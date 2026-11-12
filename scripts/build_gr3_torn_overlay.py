@@ -10,9 +10,13 @@ TRACE_EXTERNAL='m10v_save_trace_recipe_mark'
 SOURCES=('native/gr3/m10v_torn_overlay.c','native/gr3/m10v_torn_overlay.h','scripts/build_gr3_torn_overlay.py','native/gr3/m10v_isp_effect_granulation.h','native/gr3/m10v_isp_effect_memory.h')
 def _curves():
  identity=list(range(256))
- edge=[max(0,min(255,((luma-124)*255+4)//8)) for luma in identity]
- profiles=((edge,edge,identity),([255]*256,identity,identity),([128]*256,identity,identity))
- return 'static const int16_t torn_curves[3][3][256]={'+','.join('{'+','.join('{'+','.join(map(str,row))+'}' for row in profile)+'}' for profile in profiles)+'};\n'
+ # Leave a narrow, opaque white paper lip inside the geometric edge.
+ edge=[max(0,min(255,((luma-116)*255+4)//8)) for luma in identity]
+ # The shadow begins outside the lip and disappears into the white backing.
+ shadow=[max(0,min(128,(luma-131)*16,(161-luma)*8)) for luma in identity]
+ profiles=((edge,edge,identity),([255]*256,identity,identity),([128]*256,identity,identity),
+           (shadow,shadow,identity),([224]*256,identity,identity))
+ return 'static const int16_t torn_curves[5][3][256]={'+','.join('{'+','.join('{'+','.join(map(str,row))+'}' for row in profile)+'}' for profile in profiles)+'};\n'
 
 MASK_WIDTH,MASK_HEIGHT=64,80
 # Jagged paper fragments in normalized frame coordinates. Gaps are painted
@@ -107,7 +111,7 @@ def build(base=0x54d00000,rtos=None,externals=None,*,enabled=False,camera_model=
  mask_offset=image.find(masks)
  if mask_offset<0 or (base+mask_offset)&63:
   raise ValueError('torn mask asset readback differs')
- m.update(capture_mode='single',native_passes=[1,3],
+ m.update(capture_mode='single',native_passes=[2,5],
           masks=dict(base=base+mask_offset,bytes=len(masks),count=len(MASK_SHAPES),
                      width=MASK_WIDTH,height=MASK_HEIGHT,sha256=hashlib.sha256(masks).hexdigest()),
           allocation='enable only; NV12 workspace plus alignment slack')

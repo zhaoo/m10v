@@ -212,7 +212,7 @@ def page_records(data):
                             'previous_stage':stage,'generation':generation,'result':result}
         if record['event']==198:
             recipe,tag,value,detail=record['arguments']
-            if 0x544f5201<=tag<=0x544f5208:
+            if 0x544f5201<=tag<=0x544f5209:
                 diagnostic={'recipe':hex(recipe)}
                 kind=tag&255
                 if kind==1:
@@ -230,6 +230,9 @@ def page_records(data):
                                       reason=TORN_EXEC_REASONS[reason] if reason<len(TORN_EXEC_REASONS) else reason)
                     if value>>16:diagnostic['mask']=value>>16
                     if reason>=16:diagnostic['raw_status']=reason-16
+                elif kind==9:
+                    diagnostic.update(kind='paper-shadow',generation=detail,
+                                      status={1:'complete',2:'resize-rejected',3:'mask-rejected'}.get(value,value))
                 elif kind in (5,8):
                     diagnostic.update(kind='encoder-admit' if kind==5 else 'jpeg-handoff',generation=detail)
                     if value==0xffffffff:diagnostic['snapshot']='missing-or-mismatched'

@@ -174,9 +174,10 @@ class TornPipelineCurrentTests(unittest.TestCase):
   self.assertEqual(self.call(e,'m10v_isp_effects_pipeline_encoder_admit',recipe,si),1)
   self.assertEqual(self.word(e,p+28),1);self.assertEqual(record['rng'],0)
   bindings=[(0x76000000,640),(0x76000000,640),
-            (0x70000000,640),(0x70000000,640),(0x74000000,640),(0x74000000,640)]
+            (0x70000000,640),(0x70000000,640),(0x74000000,640),(0x74000000,640),
+            (0x76000000,640),(0x76000000,640),(0x70000000,640),(0x70000000,640)]
   self.assertEqual(record['bindings'],bindings)
-  self.assertEqual(len(record['submit']),3);self.assertEqual(record['releases'],3);self.assertEqual(len(record['wait_events']),3)
+  self.assertEqual(len(record['submit']),5);self.assertEqual(record['releases'],5);self.assertEqual(len(record['wait_events']),5)
   e.u.mem_write(si+0x799,b'\x00')
   # The second exposure is independently allocated and enters through the
   # SAME original producer. Reserve initializes an empty tail; it does not
@@ -199,10 +200,12 @@ class TornPipelineCurrentTests(unittest.TestCase):
   self.assertEqual(self.call(e,'m10v_isp_effects_pipeline_encoder_admit',second,second_si),1)
   self.assertEqual(self.word(e,second+0x57d8+28),1)
   self.assertEqual(record['bindings'],bindings*2)
-  self.assertEqual(len(record['submit']),6);self.assertEqual(record['releases'],6);self.assertEqual(len(record['wait_events']),6)
-  self.assertEqual(record['weights'],[(0x70000000,640),(0x76000000,640),(0x76000000,640)]*2)
-  self.assertEqual(len(resizes),2)
-  self.assertNotEqual(resizes[0][1],resizes[1][1])
+  self.assertEqual(len(record['submit']),10);self.assertEqual(record['releases'],10);self.assertEqual(len(record['wait_events']),10)
+  self.assertEqual(record['weights'],[(0x70000000,640),(0x76000000,640),
+      (0x76000000,640),(0x70000000,640),(0x76000000,640)]*2)
+  self.assertEqual(len(resizes),4)
+  self.assertEqual(resizes[0],resizes[1]);self.assertEqual(resizes[2],resizes[3])
+  self.assertNotEqual(resizes[0][1],resizes[2][1])
   masks=self.manifest['torn_overlay']['core']['masks']
   stride=masks['bytes']//masks['count']
   self.assertTrue(all(r[1] in [masks['base']+n*stride for n in range(masks['count'])] for r in resizes))
@@ -214,11 +217,16 @@ class TornPipelineCurrentTests(unittest.TestCase):
   identity=tuple(range(256))
   edge_a,edge_b,edge_out=record['curves'][0]
   self.assertEqual(edge_a,edge_b);self.assertEqual(edge_out,identity)
-  self.assertEqual(edge_a[:125],(0,)*125)
-  self.assertEqual(edge_a[132:],(255,)*124)
-  self.assertEqual(edge_a[128],128)
+  self.assertEqual(edge_a[:117],(0,)*117)
+  self.assertEqual(edge_a[124:],(255,)*132)
+  self.assertEqual(edge_a[120],128)
+  shadow_a,shadow_b,shadow_out=record['curves'][3]
+  self.assertEqual(shadow_a,shadow_b);self.assertEqual(shadow_out,identity)
+  self.assertFalse(any(shadow_a[:132]));self.assertFalse(any(shadow_a[161:]))
+  self.assertEqual(max(shadow_a),128)
   self.assertEqual(record['curves'],[(edge_a,edge_b,identity),
-      ((255,)*256,identity,identity),((128,)*256,identity,identity)]*2)
+      ((255,)*256,identity,identity),((128,)*256,identity,identity),
+      (shadow_a,shadow_b,identity),((224,)*256,identity,identity)]*2)
   self.assertEqual(self.call(e,'m10v_torn_state',query,query+4),1);self.assertEqual(self.word(e,query),1)
   self.assertEqual(e.assertions,[])
 

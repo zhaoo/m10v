@@ -179,6 +179,24 @@ int m10v_torn_execute(uint32_t recipe,uint32_t context,const uint32_t photo[8]){
    for(;;)((void(*)(uint32_t))0x536b0a74u)(1);
   }
  }
+ /* Reuse the same workspace for the optional exterior shadow. If resizing
+  * or shaping fails, the finished cutout is still valid. Once a job can
+  * modify the JPEG luma plane, its completion remains mandatory. */
+ uint32_t shadow=1u;
+ if(m10v_isp_effect_transfer_execute(&transfer,p->si)!=1)shadow=2u;
+ else{
+  cache(d[1],n);
+  if(m10v_isp_effect_granulation_plane((void*)(uintptr_t)context,edge,edge,
+      (void*)(uintptr_t)d[1],n,pitch,torn_curves[3])!=1)shadow=3u;
+  else{
+   view[1]=d[1];
+   if(m10v_isp_effect_granulation_plane((void*)(uintptr_t)context,view,view,
+       (void*)(uintptr_t)s->plane,an,alpha_pitch,torn_curves[4])!=1){
+    for(;;)((void(*)(uint32_t))0x536b0a74u)(1);
+   }
+  }
+ }
+ M10V_TORN_MARK(recipe,M10V_TORN_SHADOW,shadow,p->generation);
  s->last_mask=mask;
  p->result=1;p->completion=1;s->pending=0;leave(s);
  M10V_TORN_MARK(recipe,M10V_TORN_EXEC,(p->phase<<8)|((mask+1u)<<16),p->generation);
