@@ -1,9 +1,13 @@
 import {defaultConfiguration,normalizeConfiguration,migrateSimulationSelection,normalizeRawNr,migrateRetiredFilms} from './native-library-state.mjs';
 import {modelCapabilities} from './model-capabilities.mjs';
-export const extensionFeatures=['halation','digitalHdf','border','ispEffects','timestamp','aspect','level','negativeGrain','rawNr','abCompare','powerImages','gremote'];
+export const extensionFeatures=['halation','digitalHdf','border','ispEffects','tornOverlay','timestamp','aspect','level','negativeGrain','rawNr','abCompare','powerImages','gremote'];
 export function updateWorkbenchFeature(selected,id,enabled,model='gr3'){
  const next=new Set(selected);
  if(enabled&&id==='gremote'&&(!modelCapabilities(model).gremote||!next.has('film')))throw Error('GRemote 连接需要 GR III 2.10 胶卷库');
+ if(enabled&&id==='tornOverlay'){
+  if(!modelCapabilities(model).gremote||!next.has('film'))throw Error('撕纸效果需要 GR III 2.10 胶卷库');
+  for(const feature of ['gremote','ispEffects','digitalHdf','border'])next.add(feature);
+ }
  if(enabled&&id==='ispEffects'){
   if(!modelCapabilities(model).ispEffects||!next.has('film'))throw Error('胶片效果菜单需要 GR III / IIIx 胶卷库');
   next.add('digitalHdf');next.add('border');
@@ -11,6 +15,7 @@ export function updateWorkbenchFeature(selected,id,enabled,model='gr3'){
  enabled?next.add(id):next.delete(id);
  if(!enabled&&['film','digitalHdf','border'].includes(id))next.delete('ispEffects');
  if(!enabled&&id==='film')next.delete('gremote');
+ if(!next.has('ispEffects')||!next.has('gremote'))next.delete('tornOverlay');
  return next;
 }
 // Old custom selections remain recoverable in a separate local-storage backup.
@@ -27,6 +32,7 @@ export function normalizeWorkbenchDraft(draft={},catalog=[],current=defaultConfi
  const hdfOnly=draft.profile==='native'&&selected.has('digitalHdf')&&!selected.has('film');
  if(draft.halationMenuSchema!==1&&!hdfOnly&&model!=='gr4')selected.add('halation');
  if(!selected.has('film')||!selected.has('digitalHdf')||!selected.has('border')||!modelCapabilities(model).ispEffects)selected.delete('ispEffects');
+ if(!selected.has('ispEffects')||!selected.has('gremote'))selected.delete('tornOverlay');
  if(draft.imagingSchema!==1&&Object.keys(draft.powerImages||{}).length)selected.add('powerImages');
  const features=[...(hdfOnly?[]:['film']),...extensionFeatures.filter(id=>selected.has(id)&&!(hdfOnly&&['halation','border','timestamp','abCompare'].includes(id)))];
  configuration.stamp=features.includes('timestamp')?(configuration.stamp||1):0;

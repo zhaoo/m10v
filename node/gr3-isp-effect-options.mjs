@@ -11,6 +11,9 @@ const exactSources=new Map([
 export function resolveIspEffectOptions(source,input={},sourceModel){
  if(input.pure_isp_effects!==undefined&&typeof input.pure_isp_effects!=='boolean')throw Error('纯 ISP 效果开关必须为布尔值');
  for(const name of ['hdf_enabled','border_enabled'])if(input[name]!==undefined&&typeof input[name]!=='boolean')throw Error('HDF 和边框开关必须为布尔值');
+ if(input.torn_overlay!==undefined&&typeof input.torn_overlay!=='boolean')throw Error('撕纸效果开关必须为布尔值');
+ const torn_overlay=input.torn_overlay===true;
+ if(torn_overlay&&(input.gremote_enabled!==true||input.pure_isp_effects!==true||sourceModel!=='GR III'))throw Error('撕纸效果需要 GR III 2.10、纯 ISP 与 GRemote 连接');
  const film_library=input.film_library??true;
  const eligible=film_library!==false&&exactSources.get(createHash('sha256').update(source).digest('hex'))===sourceModel&&['GR III','GR IIIx'].includes(sourceModel);
  const pure_isp_effects=input.pure_isp_effects??false;
@@ -23,7 +26,7 @@ export function resolveIspEffectOptions(source,input={},sourceModel){
   film_library,hdf_enabled:input.hdf_enabled,
   halation_enabled:input.halation_enabled??(film_library!==false&&input.live_color!==false),border_enabled:input.border_enabled??false,
   ab_enabled:input.ab_enabled??false,appended_slots:input.appended_slots,
-  live_color:input.live_color,pure_isp_effects,
+  live_color:input.live_color,pure_isp_effects,...(torn_overlay?{torn_overlay:true}:{}),
  };
  return {...options,...resolveGRemoteOptions(source,{...input,...options},sourceModel)};
 }

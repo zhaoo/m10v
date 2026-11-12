@@ -32,6 +32,6 @@ export function resolveGRemoteOptions(source,input={},sourceModel){
  const preserve_existing=input.gremote_preserve_settings??true;
  const gremoteCameraMetadata=readCameraMetadata();
  const buildId=sha256({schema:'m10v-public-companion-build/v2',configurationSha256:base.configuration_sha256,
-  preserveExisting:preserve_existing,companionSourceSha256:companionSourceFingerprint(),...gremoteCameraMetadata,powerImages:input.power_images??{}});
+  preserveExisting:preserve_existing,...(input.torn_overlay===true?{tornOverlay:true}:{}),companionSourceSha256:companionSourceFingerprint(),...gremoteCameraMetadata,powerImages:input.power_images??{}});
  return {companion_identity:{buildId,...gremoteCameraMetadata},...(preserve_existing?{preserve_existing:true}:{})};
 }

@@ -165,3 +165,23 @@ test('active GRemote card exposes preservation checked by default and applies an
  assert.ok(elements.some(element=>element.tag==='label'&&element.children.includes(' 保留机内设置')));
  control.checked=false;control.listeners.change();assert.equal(state.gremotePreserveSettings,false);
 });
+
+test('the GR III workbench exposes the reviewed tear in the public companion plan',async()=>{
+ const selected=updateWorkbenchFeature(new Set(['film']),'tornOverlay',true);
+ for(const feature of ['film','tornOverlay','gremote','ispEffects','digitalHdf','border'])
+  assert.ok(selected.has(feature),feature);
+ for(const dependency of ['gremote','ispEffects','border','digitalHdf','film'])
+  assert.equal(updateWorkbenchFeature(selected,dependency,false).has('tornOverlay'),false);
+ assert.equal(normalizeWorkbenchDraft({profile:'native',features:[...selected]},[],defaultConfiguration(),'gr3x').features.includes('tornOverlay'),false);
+ const source=await readNativeOfficial(),input={
+  configuration:defaultConfiguration(),gremote_enabled:true,pure_isp_effects:true,
+  hdf_enabled:true,border_enabled:true,torn_overlay:true,
+ };
+ const options=resolveIspEffectOptions(source,input,'GR III');
+ const plan=prepareNative(source,input.configuration,options);
+ assert.ok(plan.torn_overlay&&plan.features.includes('tornOverlay'));
+ assert.notEqual(options.companion_identity.buildId,
+  resolveIspEffectOptions(source,{...input,torn_overlay:false},'GR III').companion_identity.buildId);
+ for(const invalid of [{gremote_enabled:false},{pure_isp_effects:false},{torn_overlay:'true'}])
+  assert.throws(()=>resolveIspEffectOptions(source,{...input,...invalid},'GR III'),/撕纸/);
+});

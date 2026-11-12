@@ -207,11 +207,16 @@ class TornPipelineCurrentTests(unittest.TestCase):
   self.assertEqual(resizes[0],resizes[1]);self.assertEqual(resizes[2],resizes[3])
   self.assertNotEqual(resizes[0][1],resizes[2][1])
   masks=self.manifest['torn_overlay']['core']['masks']
+  from scripts.build_gr3_torn_overlay import _mask_blob
+  self.assertEqual(self.manifest['torn_overlay']['core']['layout'],'center-tear')
+  offset=masks['base']-0x53000000
+  self.assertEqual(self.image[offset:offset+masks['bytes']],_mask_blob())
   stride=masks['bytes']//masks['count']
   self.assertTrue(all(r[1] in [masks['base']+n*stride for n in range(masks['count'])] for r in resizes))
   for r in resizes:
    luma=bytes(e.u.mem_read(r[1],masks['width']*masks['height']))
-   self.assertIn(0,luma);self.assertIn(255,luma)
+   self.assertEqual(min(luma),0)
+   self.assertGreaterEqual(max(luma),214) # backing shade above the opaque lip
    self.assertGreater(len(set(luma)),16)
   self.assertTrue(all(r[8:13]==(2,0x76000000,0x76000000+640*480,0,640|(480<<16)) for r in resizes))
   identity=tuple(range(256))
@@ -222,11 +227,12 @@ class TornPipelineCurrentTests(unittest.TestCase):
   self.assertEqual(edge_a[120],128)
   shadow_a,shadow_b,shadow_out=record['curves'][3]
   self.assertEqual(shadow_a,shadow_b);self.assertEqual(shadow_out,identity)
-  self.assertFalse(any(shadow_a[:132]));self.assertFalse(any(shadow_a[161:]))
-  self.assertEqual(max(shadow_a),128)
+  self.assertFalse(any(shadow_a[:132]))
+  self.assertGreater(max(shadow_a),shadow_a[255])
+  self.assertGreater(shadow_a[255],shadow_a[214])
   self.assertEqual(record['curves'],[(edge_a,edge_b,identity),
       ((255,)*256,identity,identity),((128,)*256,identity,identity),
-      (shadow_a,shadow_b,identity),((224,)*256,identity,identity)]*2)
+      (shadow_a,shadow_b,identity),((205,)*256,identity,identity)]*2)
   self.assertEqual(self.call(e,'m10v_torn_state',query,query+4),1);self.assertEqual(self.word(e,query),1)
   self.assertEqual(e.assertions,[])
 

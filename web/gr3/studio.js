@@ -60,7 +60,8 @@ const definitions = [
   ['halation', '光晕', '让亮部产生溢出或横向拉丝。开启后，在机内图像控制中选胶卷，按 FN 调整模式和强度；不显示在取景中，可能增加保存等待。', 'GR III / IIIx · 静态 JPEG'],
   ['digitalHdf', 'HDF 模拟', '为照片增加数字柔焦。开启后在下方选初始档位，机内 MENU → 设置 → HDF 模拟也可调整；可单独使用。', 'GR III / IIIx · 静态 JPEG'],
   ['border', '边框', '为照片添加拍立得或 135 胶卷边框。开启后到机内 MENU → 设置 → 效果 → 边框选择样式；向外扩展画布，保留完整构图。', 'GR III / IIIx · 静态 JPEG'],
-  ['ispEffects', '胶片印花', '在胶卷 FN 页面独立调整颗粒、漏光和模糊。MENU → 设置 → 效果中可选择胶卷印花、HDF 模拟和边框。', 'GR III 2.10 / IIIx 1.60 · 静态 JPEG'],
+  ['ispEffects', '胶片印花与暗角', '加入胶片印花和暗角。机内效果菜单可独立开关暗角并选择弱、中、强。', 'GR III 2.10 / IIIx 1.60 · 静态 JPEG'],
+  ['tornOverlay', '撕纸效果', '拍一张 JPG，在画面中间生成撕口。加入此功能会同时启用 GRemote 连接和原生胶片效果组件。', 'GR III 2.10 · 静态 JPEG'],
   ['timestamp', '时间与胶卷名称水印', '将拍摄日期、时间或胶卷名称印在 JPEG 上。开启后在下方选样式，也可到机内 MENU → 设置 → 时间水印调整。', '相机时钟 · 四角位置'],
   ['aspect', '画幅比例', '增加 4:3、16:9、6x7、XPan 画幅及取景蒙版。开启后在机内拍摄菜单的裁切设置中选择比例。', '4:3 / 16:9 / 6x7 / XPan'],
   ['negativeGrain', '原厂负片颗粒', '为原厂负片风格开放颗粒调节。开启后选负片风格，进入图像控制详细设置调整颗粒档位。', '原厂负片 · 机内调整'],
@@ -278,9 +279,11 @@ function renderFeatures() {
   if(!zoomControls){zoomControls=document.createElement('section');zoomControls.id='studio-zoom-controls';zoomControls.className='feature-row';target.prepend(zoomControls);}
   renderZoomControls(zoomControls,state.nativeConfig,chosenModel,value=>nativeEditor.setConfiguration(value,{globalZoom:true}),!state.features.has('film'),{feature:true,number:'01'});
   if(!modelCapabilities(chosenModel).ispEffects)target.querySelector('[data-feature="ispEffects"]')?.remove();
-  for (const [index, [id, name, description, tag]] of definitions.filter(([id])=>id!=='ispEffects'||modelCapabilities(chosenModel).ispEffects).entries()) {
+  if(!modelCapabilities(chosenModel).gremote)target.querySelector('[data-feature="tornOverlay"]')?.remove();
+  for (const [index, [id, name, description, tag]] of definitions.filter(([id])=>
+    id==='ispEffects'?modelCapabilities(chosenModel).ispEffects:id==='tornOverlay'?modelCapabilities(chosenModel).gremote:true).entries()) {
     const active = state.features.has(id);
-    const signature=JSON.stringify([chosenModel,active,state.features.has('film'),id==='ispEffects'?ispEffectsAvailable():id==='gremote'?[gremoteAvailable(),state.gremotePreserveSettings]:null,id==='film'?[state.nativeConfig,state.nativeCatalog.length,state.unresolvedSlots]:id==='recipes'?[...state.recipes]:id==='presets'?[state.stockPresets,state.stockCapabilities.length]:id==='rawNr'?state.rawNr:id==='digitalHdf'?state.nativeConfig.hdf:id==='timestamp'?[state.nativeConfig.stamp,state.nativeConfig.format,state.nativeConfig.corner,state.nativeConfig.color,state.nativeConfig.filmNameStamp]:null]);
+    const signature=JSON.stringify([chosenModel,active,state.features.has('film'),id==='ispEffects'?ispEffectsAvailable():id==='tornOverlay'?gremoteAvailable():id==='gremote'?[gremoteAvailable(),state.gremotePreserveSettings]:null,id==='film'?[state.nativeConfig,state.nativeCatalog.length,state.unresolvedSlots]:id==='recipes'?[...state.recipes]:id==='presets'?[state.stockPresets,state.stockCapabilities.length]:id==='rawNr'?state.rawNr:id==='digitalHdf'?state.nativeConfig.hdf:id==='timestamp'?[state.nativeConfig.stamp,state.nativeConfig.format,state.nativeConfig.corner,state.nativeConfig.color,state.nativeConfig.filmNameStamp]:null]);
     const existing=target.querySelector(`[data-feature="${id}"]`);
     if(existing?.dataset.signature===signature)continue;
     const row = document.createElement('article');row.dataset.feature=id;row.dataset.signature=signature;
@@ -294,8 +297,9 @@ function renderFeatures() {
     button.type = 'button';
     button.setAttribute('aria-pressed',String(active));
     if(gr4Workbench&&id==='timestamp'&&state.profile!=='native'&&!active){button.disabled=true;button.textContent='在胶卷库设置';}
-    if(['timestamp','halation','border','abCompare','ispEffects','gremote'].includes(id)&&!state.features.has('film')&&!active){button.disabled=true;button.textContent='需启用胶卷库';}
+    if(['timestamp','halation','border','abCompare','ispEffects','gremote','tornOverlay'].includes(id)&&!state.features.has('film')&&!active){button.disabled=true;button.textContent='需启用胶卷库';}
     if(id==='ispEffects'&&!ispEffectsAvailable()){button.disabled=true;button.textContent='需 GR III 2.10 / IIIx 1.60';}
+    if(id==='tornOverlay'&&!gremoteAvailable()){button.disabled=true;button.textContent='需 GR III 2.10';}
     if(id==='gremote'&&(!gremoteAvailable()||!state.features.has('film'))){
       const reason=gremoteAvailable()?'先启用胶卷库，再开启 GRemote 连接。':'GRemote 连接仅支持 GR III 2.10。';
       button.disabled=true;button.textContent=reason;
@@ -323,9 +327,10 @@ function renderFeatures() {
       } else if (id === 'digitalHdf') {
         const levels=document.createElement('div');levels.className='hdf-levels';levels.setAttribute('role','group');levels.setAttribute('aria-label','HDF 模拟默认档位');
         ['关闭','弱','中','强'].forEach((label,value)=>{const b=textNode('button',label);b.type='button';b.dataset.imagingField='hdf-level-'+value;b.setAttribute('aria-pressed',String(state.nativeConfig.hdf===value));b.onclick=()=>nativeEditor.setHdf(value);levels.append(b);});
-        const filmToggle=textNode('button',state.features.has('film')?'关闭胶卷库，仅使用 HDF':'同时启用胶卷库','outline');filmToggle.type='button';filmToggle.onclick=()=>{if(state.features.has('film')){for(const id of ['film','halation','border','timestamp','abCompare','ispEffects','gremote'])state.features.delete(id);nativeEditor.setConfiguration({...state.nativeConfig,stamp:0,filmNameStamp:false,zoom:{...state.nativeConfig.zoom,write:false}},{globalHdf:true});}else{state.features.add('film');invalidate();}renderFeatures();};
+        const filmToggle=textNode('button',state.features.has('film')?'关闭胶卷库，仅使用 HDF':'同时启用胶卷库','outline');filmToggle.type='button';filmToggle.onclick=()=>{if(state.features.has('film')){for(const id of ['film','halation','border','timestamp','abCompare','ispEffects','gremote','tornOverlay'])state.features.delete(id);nativeEditor.setConfiguration({...state.nativeConfig,stamp:0,filmNameStamp:false,zoom:{...state.nativeConfig.zoom,write:false}},{globalHdf:true});}else{state.features.add('film');invalidate();}renderFeatures();};
         detail.append(levels,filmToggle,textNode('p','这是固件初始档位。机内 HDF 菜单独立保存设置，换卷与重置胶卷不会改变它。'));
-      } else if (id === 'ispEffects') detail.append(textNode('p','ADJ → 滤镜 → FN：按卷保存颗粒、漏光和模糊。MENU → 设置 → 效果 → 胶卷印花：关闭、小猫吃鱼、樱花纷飞、绚烂彩虹、深海水母、小猫爪爪、呆头大鹅、宝可梦。印花默认为关闭。'));
+      } else if (id === 'ispEffects') detail.append(textNode('p','ADJ → 滤镜 → FN：按卷保存颗粒、漏光和模糊。MENU → 设置 → 效果 → 胶卷印花：关闭、小猫吃鱼、樱花纷飞、绚烂彩虹、深海水母、小猫爪爪、呆头大鹅、宝可梦。印花默认为关闭。效果 → 暗角可独立切换开关和强度。'));
+      else if (id === 'tornOverlay') detail.append(textNode('p','机身效果 → 撕纸效果 → 开。单张拍摄时仅 JPG 应用撕纸。'));
       else if (id === 'gremote') {
         const label=document.createElement('label'),preserve=document.createElement('input');
         preserve.type='checkbox';preserve.checked=state.gremotePreserveSettings!==false;preserve.disabled=!gremoteAvailable();preserve.dataset.imagingField='gremote-preserve-settings';
@@ -602,7 +607,7 @@ async function importSource(file,local=false) {
     $('build-model').textContent=`${report.model} · 输出基线 ${report.build_source?.public_version||report.public_version}`;
     document.title=`m10v · GR固件工作台 · ${report.model}`;
     document.querySelector('.hero .kicker').textContent=`${report.model} · ${report.public_version}`;
-    state.projectId = report.sha256; state.source = report;if(chosenModel==='gr4'||report.proof?.identity===false)state.features.delete('ispEffects');if(chosenModel!=='gr3'){state.features.delete('gremote');state.gremotePreserveSettings=true;}invalidate();
+    state.projectId = report.sha256; state.source = report;if(chosenModel==='gr4'||report.proof?.identity===false)state.features.delete('ispEffects');if(!gremoteAvailable())state.features.delete('tornOverlay');if(chosenModel!=='gr3'){state.features.delete('gremote');state.gremotePreserveSettings=true;}invalidate();
     // Legacy recipe resources are not needed by the film-library workbench.
     renderFeatures();
 
@@ -632,7 +637,7 @@ async function download(response, filename, verification, isCurrent=()=>true) {
 }
 async function prepare() {
   if (!state.projectId) return;
-  let request;try{validateZoomControls($('studio-zoom-controls'));validateZoomControls($('native-editor'));if(state.profile==='native'){if(state.nativeConfig.zoom?.write&&!state.features.has('film'))throw Error('写入裁切焦距需要启用胶卷库');const configuration=prepareZoomConfigurationForBuild(state.nativeConfig,chosenModel);if(configuration.zoom.write){state.nativeConfig=configuration;nativeEditor?.setConfiguration(configuration);}}request=state.profile==='native'?{configuration:configurationForEffects(state.nativeConfig,{halation:state.features.has('halation'),perFilmEffects:state.features.has('ispEffects')}),film_library:state.features.has('film'),hdf_enabled:state.features.has('digitalHdf'),halation_enabled:state.features.has('halation'),border_enabled:state.features.has('border'),...(chosenModel!=='gr4'?{pure_isp_effects:state.features.has('ispEffects'),gremote_enabled:state.features.has('gremote'),...(state.features.has('gremote')?{gremote_preserve_settings:state.gremotePreserveSettings!==false}:{})}:{}),ab_enabled:state.features.has('abCompare'),extensions:nativeExtensions(),debug_mode:debugEnabled(),version_unlock:versionUnlockSnapshot(),...(chosenModel!=='gr4'?{power_images:selectedPowerImages()}:{})}:{selection:selection()};}catch(e){$('preflight-result').textContent=e.message;return;}
+  let request;try{validateZoomControls($('studio-zoom-controls'));validateZoomControls($('native-editor'));if(state.profile==='native'){if(state.nativeConfig.zoom?.write&&!state.features.has('film'))throw Error('写入裁切焦距需要启用胶卷库');const configuration=prepareZoomConfigurationForBuild(state.nativeConfig,chosenModel);if(configuration.zoom.write){state.nativeConfig=configuration;nativeEditor?.setConfiguration(configuration);}}request=state.profile==='native'?{configuration:configurationForEffects(state.nativeConfig,{halation:state.features.has('halation'),perFilmEffects:state.features.has('ispEffects')}),film_library:state.features.has('film'),hdf_enabled:state.features.has('digitalHdf'),halation_enabled:state.features.has('halation'),border_enabled:state.features.has('border'),...(chosenModel!=='gr4'?{pure_isp_effects:state.features.has('ispEffects'),torn_overlay:state.features.has('tornOverlay'),gremote_enabled:state.features.has('gremote'),...(state.features.has('gremote')?{gremote_preserve_settings:state.gremotePreserveSettings!==false}:{})}:{}),ab_enabled:state.features.has('abCompare'),extensions:nativeExtensions(),debug_mode:debugEnabled(),version_unlock:versionUnlockSnapshot(),...(chosenModel!=='gr4'?{power_images:selectedPowerImages()}:{})}:{selection:selection()};}catch(e){$('preflight-result').textContent=e.message;return;}
   if(request.version_unlock?.enabled){state.preparation=null;state.preparationRequest=null;$('preflight-result').textContent='网页已禁止版本适配，请保持官方基线版本。';return;}
   activeBuildController?.abort();const controller=new AbortController();activeBuildController=controller;
   const revision=state.revision;state.preparation=null;renderLedger();

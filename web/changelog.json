@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.12.1",
+      "date": "2026-11-12",
+      "title": "GR III 新增单张 JPG 撕纸效果",
+      "changes": [
+        "GR III 2.10 工作台新增撕纸效果开关，拍一张即可通过原厂 ISP 在 JPG 上生成中缝、纸芯和浅影。",
+        "影像工具显示暗角入口，机身效果菜单支持独立开关和三挡强度。",
+        "GRemote 1.2.11 将撕纸和暗角放在相机扩展的效果组。"
+      ],
+      "notice": "用户已确认 GR III R9 实拍效果可用。正式包关闭诊断日志。网页入口和 App 控制通过离线回归。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.09.1",
       "date": "2026-11-09",
       "title": "新增机内 ISP 暗角与独立三挡调节",
@@ -11,9 +25,9 @@
         "GRemote 1.2.7 新增暗角远程控制，并保留旧扩展协议兼容。"
       ],
       "notice": "用户已确认 GR III R2 候选可用并授权关闭日志、保留完整功能发布；无量化性能或其他机型真机结论。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "9796cc688342abb7bccd6e8ab3daa6af97e753eb",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/42632915857"
     },
     {
       "version": "2026.11.08.1",

@@ -6,12 +6,40 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 from scipy.ndimage import binary_fill_holes, distance_transform_edt, gaussian_filter, label, shift
 
-from scripts.build_gr3_torn_overlay import MASK_HEIGHT, MASK_SHAPES, MASK_WIDTH
+R8_MASK_WIDTH,R8_MASK_HEIGHT=64,80
+# Jagged paper fragments in normalized frame coordinates. Gaps are painted
+# white by the blend; the polygons preserve the underlying scene.
+R8_MASK_SHAPES=(
+ (((7,23),(11,18),(24,15),(33,12),(41,13),(40,21),(43,26),(36,30),(33,35),
+   (24,34),(19,38),(14,34),(10,32)),
+  ((45,13),(50,15),(56,20),(58,28),(55,35),(51,38),(44,36),(38,35),(40,32),
+   (47,27),(43,21)),
+  ((9,36),(14,38),(18,43),(25,40),(32,40),(36,47),(35,53),(29,55),(29,64),
+   (25,68),(18,64),(14,64),(12,57),(9,54),(10,47),(7,44)),
+  ((35,39),(43,39),(49,42),(57,38),(58,46),(54,52),(55,58),(48,63),(44,68),
+   (36,69),(29,67),(33,61),(33,57),(39,54),(40,47))),
+ (((9,19),(16,15),(23,16),(30,13),(37,17),(34,22),(38,27),(32,32),(24,30),
+   (20,34),(13,31),(11,25)),
+  ((41,17),(51,17),(56,22),(54,27),(58,33),(56,39),(50,43),(44,42),(39,38),
+   (33,36),(41,30),(42,26),(39,23)),
+  ((12,35),(20,39),(24,35),(30,37),(34,42),(35,48),(31,53),(25,54),(24,61),
+   (19,66),(14,61),(12,57),(8,51),(10,44)),
+  ((40,43),(46,46),(52,46),(54,50),(51,56),(53,61),(46,65),(42,69),(33,66),
+   (28,63),(29,57),(36,55),(39,50))),
+ (((12,18),(20,14),(28,15),(32,20),(39,21),(41,28),(37,33),(32,33),(25,31),
+   (20,37),(13,35),(10,30),(11,25),(8,23)),
+  ((34,14),(42,12),(48,15),(54,15),(57,22),(55,29),(58,34),(55,39),(47,39),
+   (40,37),(45,28),(42,20),(35,18)),
+  ((10,38),(18,41),(23,40),(26,35),(34,37),(37,44),(36,50),(30,53),(27,58),
+   (28,64),(23,67),(18,64),(15,58),(10,56),(8,50)),
+  ((40,40),(47,43),(54,42),(57,47),(55,53),(57,58),(50,62),(47,67),(40,66),
+   (32,69),(31,62),(32,56),(39,52),(42,47))),
+)
 
 
 def ragged_path(polygon, size, rng):
     """Displace each authored edge along its normal at three spatial scales."""
-    scale = np.array([size[0] / MASK_WIDTH, size[1] / MASK_HEIGHT])
+    scale = np.array([size[0] / R8_MASK_WIDTH, size[1] / R8_MASK_HEIGHT])
     vertices = np.asarray(polygon, dtype=float) * scale
     result = []
     for start, end in zip(vertices, np.roll(vertices, -1, axis=0)):
@@ -47,7 +75,7 @@ def render(photo, variant):
     mask = Image.new("L", size)
     fibers = Image.new("L", size)
     draw, threads = ImageDraw.Draw(mask), ImageDraw.Draw(fibers)
-    for polygon in MASK_SHAPES[variant]:
+    for polygon in R8_MASK_SHAPES[variant]:
         path = ragged_path(polygon, size, rng)
         draw.polygon(path, fill=255)
         center = np.mean(path, axis=0)
@@ -197,21 +225,88 @@ def render_cutout(photo):
     return Image.fromarray(np.round(result).astype(np.uint8))
 
 
+def render_center_tear(photo):
+    """Split one print along a shared tear and pull the two halves apart."""
+    rng = np.random.default_rng(801)
+    w, h = photo.size
+    rows = np.arange(h)
+    # One fracture shared by both pieces, with a few larger changes of
+    # direction and shorter irregular fibers along the same contour.
+    turns = [0, -17, 14, -11, -26, 27, 44, 18, -31, -44, 7, 31, 11, -18, 0]
+    seam = w * .49 + np.interp(rows, np.linspace(0, h-1, len(turns)), turns)
+    for step, amplitude in ((34, 7.0), (9, 3.1), (2, 1.25)):
+        knots = np.arange(0, h + step, step)
+        seam += np.interp(rows, knots, rng.normal(0, amplitude, len(knots)))
+    distance = seam[:, None] - np.arange(w)[None, :]
+    fibers = texture(photo.size, rng, 3)
+    pulp = texture(photo.size, rng, 10)
+    grain = texture(photo.size, rng, 1)
+    surface = np.array([247., 242., 226.]) + (22*pulp + 14*fibers + 10*grain)[..., None]
+    pixels = np.asarray(photo)
+    frame = (w+300, h+238)
+    layers = []
+    for side, offset, angle in ((1, (-30, -5), .65), (-1, (30, 10), -.9)):
+        inside = side * distance
+        coverage = np.clip((inside + .55) / 1.1, 0, 1)
+        lip = np.clip(7 + 13*pulp + 6*fibers + 2.5*side*np.sin(rows[:, None]/26), 2.5, 16)
+        print_alpha = np.clip((inside - lip) / 1.2, 0, 1)
+        paper = Image.fromarray(np.uint8(np.round(blend(surface, pixels, print_alpha))))
+        alpha = Image.fromarray(np.uint8(np.round(coverage*255)))
+        # A few broken fibers protrude from each side of the same tear.
+        thread = Image.new("L", photo.size)
+        draw = ImageDraw.Draw(thread)
+        for y in rng.choice(rows[5:-5], size=h//2, replace=False):
+            x = seam[y]
+            draw.line([(x+side*2, y),
+                       (x-side*rng.uniform(1, 5.6), y+rng.uniform(-3, 3))],
+                      fill=int(rng.integers(65, 192)))
+        fiber_layer = Image.new("RGBA", photo.size, (249, 244, 228, 0))
+        fiber_layer.putalpha(thread)
+        paper.putalpha(alpha)
+        piece = Image.new("RGBA", frame)
+        xy = (150+offset[0], 110+offset[1])
+        piece.alpha_composite(fiber_layer, xy)
+        piece.alpha_composite(paper, xy)
+        layers.append(piece.rotate(angle, resample=Image.Resampling.BICUBIC))
+    bg = np.array([239., 235., 224.]) + (
+        4 * texture(frame, rng, 49) + 3 * texture(frame, rng, 1)
+    )[..., None]
+    for piece in layers:
+        lifted = Image.new("L", frame)
+        lifted.paste(piece.getchannel("A"), (4, 10))
+        contact = np.asarray(lifted.filter(ImageFilter.GaussianBlur(2.7)), dtype=float) / 255
+        cast = np.asarray(lifted.filter(ImageFilter.GaussianBlur(11)), dtype=float) / 255
+        bg = blend(bg, np.array([70., 58., 46.]), .22*contact + .15*cast)
+    output = Image.fromarray(np.uint8(np.round(bg))).convert("RGBA")
+    for piece in layers:
+        output.alpha_composite(piece)
+    return output.convert("RGB")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("photo", type=Path)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--variant", type=int, choices=range(1, len(MASK_SHAPES)+1), default=1)
-    parser.add_argument("--from-cutout", action="store_true", help="use an existing R8 JPEG")
+    parser.add_argument("--variant", type=int, choices=range(1, len(R8_MASK_SHAPES)+1), default=1)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--from-cutout", action="store_true", help="use an existing R8 JPEG")
+    mode.add_argument("--center-tear", action="store_true", help="split a complete photo into two pieces")
     args = parser.parse_args()
     with Image.open(args.photo) as image:
         source = ImageOps.exif_transpose(image).convert("RGB")
         if args.from_cutout:
             source.thumbnail((2400, 2400), Image.Resampling.LANCZOS)
             photo = source
+        elif args.center_tear:
+            photo = ImageOps.fit(source, (1560, 1040))
         else:
             photo = ImageOps.fit(source, (1800, 1200))
-    result = render_cutout(photo) if args.from_cutout else render(photo, args.variant-1)
+    if args.center_tear:
+        result = render_center_tear(photo)
+    elif args.from_cutout:
+        result = render_cutout(photo)
+    else:
+        result = render(photo, args.variant-1)
     result.save(args.output, quality=96, subsampling=0)
 
 
