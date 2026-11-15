@@ -13,7 +13,7 @@ class CameraZoom(unittest.TestCase):
     obj=pathlib.Path(tmp)/'a.o';subprocess.run(['clang',*FLAGS,*getattr(cls,'seed_flags',[]),*getattr(cls,'companion_flags',[]),'-c',str(ROOT/'native/gr3'/name),'-o',str(obj)],check=True,capture_output=True)
     exports=['m10v_zoom_'+n for n in (['load','open','adjust','save','replace'] if name=='m10v_zoom.c' else ['camera_load','camera_save','camera_bits','camera_slot','camera_select'])]
     if name=='m10v_zoom_camera.c' and getattr(cls,'companion_flags',[]):exports+=['m10v_zoom_camera_snapshot','m10v_zoom_camera_prime']
-    b,s=link_object(obj.read_bytes(),addr,cls.symbols,prefix='m10v_settings_',omitted_exports=('m10v_settings_open','m10v_settings_key'),additional_exports=exports);cls.symbols.update(s);cls.blobs.append((addr,b))
+    b,s=link_object(obj.read_bytes(),addr,cls.symbols,prefix='m10v_settings_',omitted_exports=('m10v_settings_open','m10v_settings_key','m10v_settings_catalog_tap'),additional_exports=exports);cls.symbols.update(s);cls.blobs.append((addr,b))
  def setUp(self):
   self.u=Uc(UC_ARCH_ARM,UC_MODE_ARM);u=self.u
   for a,n in [(0x53000000,0x2000000),(0x55000000,0x1000000),(RAM,0x100000)]:u.mem_map(a,n)

@@ -12,7 +12,7 @@ class PureImprintShotTests(unittest.TestCase):
   src.write_text('\n'.join('#include "'+str(shot.ROOT/'native/gr3'/f)+'"' for f in ('m10v_isp_effects_state.c','m10v_isp_effects_shot.c')))
   subprocess.run(['clang',*FLAGS,'-DM10V_PURE_ISP_EFFECTS=1','-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778','-c',str(src),'-o',str(obj)],check=True,capture_output=True)
   exports=tuple('m10v_isp_effects_shot_'+n for n in ('reserve','freeze','read','plan','complete','fail','stock_query','unavailable'))
-  cls.code,cls.symbols=link_object(obj.read_bytes(),shot.BASE,{'m10v_isp_effects_camera_imprint_snapshot':0x53000100,'m10v_library_valid':0x53000104},'m10v_settings_',omitted_exports=('m10v_settings_open','m10v_settings_key'),additional_exports=exports)
+  cls.code,cls.symbols=link_object(obj.read_bytes(),shot.BASE,{'m10v_isp_effects_camera_imprint_snapshot':0x53000100,'m10v_library_valid':0x53000104},'m10v_settings_',omitted_exports=('m10v_settings_open','m10v_settings_key','m10v_settings_catalog_tap'),additional_exports=exports)
  put=shot.EffectsShotTests.put
  word=shot.EffectsShotTests.word
  call=shot.EffectsShotTests.call

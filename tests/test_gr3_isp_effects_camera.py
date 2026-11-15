@@ -38,7 +38,8 @@ class EffectsCameraTests(unittest.TestCase):
             check=True, capture_output=True)
         exports = tuple('m10v_isp_effects_camera_' + name for name in ('init', 'refresh', 'save', 'snapshot','imprint_snapshot'))
         cls.code, cls.symbols = link_object(obj.read_bytes(), BASE, prefix='m10v_settings_',
-            omitted_exports=('m10v_settings_open', 'm10v_settings_key'), additional_exports=exports)
+            omitted_exports=('m10v_settings_open', 'm10v_settings_key', 'm10v_settings_catalog_tap'),
+            additional_exports=exports)
 
     @classmethod
     def tearDownClass(cls):

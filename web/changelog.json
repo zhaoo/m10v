@@ -2,17 +2,29 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
-      "version": "2026.11.15.2",
+      "version": "2026.11.15.3",
       "date": "2026-11-15",
       "title": "优化 GR III 机身胶卷库与触屏操作",
       "changes": [
         "机身胶卷库在封面下显示卷名，修正英文字形的基线和裁切。右上角显示已选数量，已启用的胶卷用黄底黑勾圆标标记。",
         "GR III 2.10 支持左右滑动翻页，点按封面可以启用或停用胶卷。点按后隐藏黄色焦点框，按方向键时恢复。"
       ],
-      "notice": "GR III 2.10 的 R3 胶卷库已通过用户真机验证。",
+      "notice": "GR III 2.10 的 R3 胶卷库已通过用户真机验证。本次同步修正 GR IV 构建时的符号校验。",
       "commit": null,
       "evidence": "current",
       "evidence_url": null
+    },
+    {
+      "version": "2026.11.15.2",
+      "date": "2026-11-15",
+      "title": "GR III 机身胶卷库发布候选",
+      "changes": [
+        "完成机身胶卷库的卷名、启用标记和触屏操作更新。"
+      ],
+      "notice": "本次部署未通过 GR IV 构建校验，官网回滚到上一版。",
+      "commit": "e0c7a9c110242b2ef54f519971406a94a9fae2c4",
+      "evidence": "documented",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/43723472837"
     },
     {
       "version": "2026.11.15.1",
