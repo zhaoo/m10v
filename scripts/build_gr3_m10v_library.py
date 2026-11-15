@@ -648,7 +648,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         if sd_library:
             from scripts.build_gr3_zoom import build as build_zoom
             zoom_base=(base+len(image)+15)&~15
-            zoom_code,zoom_report=build_zoom(zoom_base,capture_stock_rtos(),aspect=base>=0x540be000,seed=zoom_seed,debug_log=symbols['m10v_debug_log'] if debug_mode else None,camera_model=camera_model,companion=companion)
+            zoom_code,zoom_report=build_zoom(zoom_base,capture_stock_rtos(),aspect=base>=0x540be000,seed=zoom_seed,debug_log=symbols['m10v_debug_log'] if debug_mode else None,camera_model=camera_model,companion=companion,menu_snapshot=menu_hub)
             zoom_report['enabled']=custom_zoom
             image+=bytes(zoom_base-base-len(image))+zoom_code
             symbols.update(zoom_report['symbols'])
@@ -735,6 +735,17 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                          replacement=(symbols['m10v_adj_extra_camera_'+name] if link is None else
                                       branch(site,symbols['m10v_adj_extra_camera_'+name],link)),name='ADJ extra '+name)
                     for site,expected,name,link in adj_hooks])
+            if menu_hub and not companion:
+                # Size-optimized menu builds can emit EABI struct clears on
+                # Linux clang. Companion builds already provide these leaves.
+                menu_runtime_obj=folder/'menu-runtime.o'
+                subprocess.run([compiler,*menu_compile_flags,'-c',str(ROOT/'native/companion/runtime.c'),
+                                '-o',str(menu_runtime_obj)],check=True,capture_output=True)
+                menu_runtime_base=(base+len(image)+15)&~15
+                menu_runtime,menu_runtime_symbols=link_object(menu_runtime_obj.read_bytes(),
+                    menu_runtime_base,symbols,'__aeabi_',additional_exports=('memcpy','memset'))
+                image+=bytes(menu_runtime_base-base-len(image))+menu_runtime
+                symbols.update(menu_runtime_symbols)
             controller_obj=folder/'settings-controller.o'
             subprocess.run([compiler,*menu_compile_flags,*debug_flags,*border_flags,*pair_flags,*control_flags,f'-DM10V_AB_ENABLED={int(ab_enabled)}',f'-DM10V_PHOTO_RECIPE={int(photo_recipe)}','-DM10V_LIVE_COLOR='+str(int(owner_cache)),'-c',str(ROOT/'native/gr3/m10v_settings_controller.c'),'-o',str(controller_obj)],check=True,capture_output=True)
             start=(base+len(image)+15)&~15
@@ -1598,6 +1609,9 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     if menu_hub:
         manifest['menu_hub']={'route':0x0200f10a,'owner_offset':0x6e00,'owner_bytes':0x74c0,'caption':1244}
         for name in ('native/gr3/m10v_menu_hub_view.inc','native/gr3/m10v_menu_detail_style.h'):
+            manifest['sources'][name]=sha((ROOT/name).read_bytes())
+        if not companion:
+            name='native/companion/runtime.c'
             manifest['sources'][name]=sha((ROOT/name).read_bytes())
     manifest['zoom']=zoom_report
     if zoom_report:manifest['sources'].update(zoom_report['sources'])

@@ -89,7 +89,7 @@ export const pureIspEffectSources=[
  'scripts/build_gr3_isp_effect_textures.py'];
 export const filmImprintSources=['scripts/build_gr3_film_imprints.py','scripts/render_film_imprint_assets.mjs','web/shared/film-imprints.mjs',...Array.from({length:7},(_,i)=>`native/gr3/film-imprints/${i+1}.png`),...['025','001','004','007'].map(id=>`native/gr3/film-imprints/pokemon/${id}.png`)];
 const menuHubSources=['native/gr3/m10v_menu_hub_view.inc','native/gr3/m10v_menu_detail_style.h'];
-export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/gr3_target_relocations.py','node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...leicaSources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources,...filmImprintSources,...cameraExtensionSources,...rawDevelopmentSources,...tornOverlaySources,...menuHubSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
+export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/gr3_target_relocations.py','node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...leicaSources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources,...filmImprintSources,...cameraExtensionSources,...rawDevelopmentSources,...tornOverlaySources,...menuHubSources,'native/companion/runtime.c'].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
 export function validateFilmImprintAssets(runtime,m){
  const p=m.pure_isp_effects,imprint=p?.imprint;if(imprint===undefined)return;
  const fail=(v,s)=>need(v,'pure ISP imprint: '+s),a=imprint.assets,manifest=a?.manifest;
@@ -264,7 +264,10 @@ function checkRuntime(runtime, manifest) {
     need(c.reader_veneers?.[name]===BASE+off&&runtime.readUInt32LE(off)===branch(BASE+off,manifest.symbols[symbol]),'custom ISP reader veneer differs');
    }
   }
-  if(manifest.menu_hub)expectedSources.push(...menuHubSources);
+  if(manifest.menu_hub){
+   expectedSources.push(...menuHubSources);
+   if(!manifest.companion)expectedSources.push('native/companion/runtime.c');
+  }
   need(Object.keys(manifest.sources || {}).sort().join('|') === [...expectedSources].sort().join('|'), 'native source inventory differs');
   for (const name of expectedSources) need(manifest.sources[name] === sha(readFileSync(new URL('../'+name,import.meta.url))),
     'native source changed since compilation: '+name);

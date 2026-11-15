@@ -106,7 +106,7 @@ int m10v_zoom_camera_save(m10v_zoom_state *s,const m10v_zoom_editor *e){
  if(!applied&&p)p->zoom_flags=MAGIC|current;
  return applied;
 }
-#if M10V_COMPANION_ENABLED
+#if M10V_COMPANION_ENABLED || M10V_ZOOM_MENU_SNAPSHOT
 static int native_crop_matches(const m10v_zoom_state *durable){
  uint32_t root=((uint32_t(*)(void))0x53525d5cu)();
  if(!ram(root,4)||!ram(*(uint32_t*)(uintptr_t)root,4))return 0;
@@ -118,6 +118,7 @@ static int native_crop_matches(const m10v_zoom_state *durable){
  if(!ram(front,4)||m10v_zoom_native_front_bits(front)!=expected)return 0;
  return 1;
 }
+#if M10V_COMPANION_ENABLED
 int m10v_zoom_camera_prime(void){
  m10v_settings_controller *p=cache();
  if(!p)return -1;
@@ -134,6 +135,7 @@ int m10v_zoom_camera_prime(void){
  publish(p,&durable);
  return 0;
 }
+#endif
 int m10v_zoom_camera_snapshot(m10v_zoom_state *s){
  uint32_t fs=filesystem();if(!s||!fs)return -1;
  m10v_settings_controller *p=cache();
