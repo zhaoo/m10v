@@ -182,12 +182,12 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_resource_': {'m10v_resource_primary', 'm10v_resource_secondary'},
         'm10v_chain_': {'m10v_chain_capture'},
         'm10v_icon_': {'m10v_icon_pixels'},
-        'm10v_film_card_': {'m10v_film_card_render','m10v_film_card_custom'},
+        'm10v_film_card_': {'m10v_film_card_render','m10v_film_card_custom','m10v_film_card_label','m10v_film_card_dots'},
         'm10v_sd_': {'m10v_sd_u32','m10v_sd_crc','m10v_sd_header','m10v_sd_record'},
         'm10v_sd_previous_hash': {'m10v_sd_previous_hash'},
         'm10v_sd_camera_': {'m10v_sd_camera_directory_extent','m10v_sd_camera_directory_item','m10v_sd_camera_directory_install','m10v_sd_camera_item','m10v_sd_camera_install','m10v_sd_camera_custom_record','m10v_sd_camera_custom_name','m10v_sd_camera_catalog_name'},
         'm10v_debug_': {'m10v_debug_log','m10v_debug_batch'},
-        'm10v_settings_': {'m10v_settings_open','m10v_settings_key'},
+        'm10v_settings_': {'m10v_settings_open','m10v_settings_key','m10v_settings_catalog_tap'},
         'm10v_settings_view_': {'m10v_settings_view_create','m10v_settings_view_draw','m10v_settings_view_destroy'},
         'm10v_settings_controller_': {'m10v_settings_controller_card_directory','m10v_settings_controller_owner_size','m10v_settings_controller_top_ctor','m10v_settings_controller_top_dtor','m10v_settings_controller_destroy','m10v_settings_controller_factory','m10v_settings_controller_ready','m10v_settings_controller_enter','m10v_settings_controller_key','m10v_settings_controller_key_route'},
         'm10v_detail_': {'m10v_detail_table','m10v_detail_control'},
@@ -636,8 +636,8 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         control_flags = ['-DM10V_GUIDES_CAMERA=1','-DM10V_ADJ_EXTRA_CAMERA=1',
             '-DM10V_GUIDES_OWNER_OFFSET=0x6600','-DM10V_ADJ_EXTRA_OWNER_OFFSET=0x6500',
             '-DM10V_ADJ_EXTRA_HDF='+str(int(bool(hdf_enabled))),
-            '-DM10V_GUIDES_ASPECT='+str(int(base>=0x540be000)),
-            '-DM10V_CAMERA_GR3X='+str(int(camera_model=='gr3x'))] if camera_extensions else []
+            '-DM10V_GUIDES_ASPECT='+str(int(base>=0x540be000))] if camera_extensions else []
+        control_flags += ['-DM10V_CAMERA_GR3X='+str(int(camera_model=='gr3x'))]
         if sd_library:
             from scripts.build_gr3_zoom import build as build_zoom
             zoom_base=(base+len(image)+15)&~15
@@ -859,7 +859,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         texts+=[s['name'] for s in json.loads((ROOT/'web/gr3/style-filters-luts.json').read_text())['stocks']]
         if sd_library:
             if 786+len(texts)!=1111:raise ValueError('multiselect text base differs')
-            texts+=['Custom LUT']*5+[f'胶卷库  已启用 {n}/10' for n in range(11)]+['已达启用上限，请先停用一卷']
+            texts+=['Custom LUT']*5+[f'已选：{n}/{10 if appended_slots else 5}' for n in range(11)]+['已达启用上限，请先停用一卷']
         from scripts.generate_m10v_directory import directory as display_directory
         from scripts.generate_m10v_card_captions import resource as film_resource_id
         if sd_library:
@@ -1276,7 +1276,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 text+=f"\n.global m10v_icon_directory_{name}\n.type m10v_icon_directory_{name},%function\nm10v_icon_directory_{name}:\n"
                 text+="push {r0-r12,lr}\nmrs ip,cpsr\npush {ip,lr}\n"
                 text+=f"movw r0,#{icon_table&65535}\nmovt r0,#{icon_table>>16}\nstr r0,[sp,#{8+reg*4}]\nldr r1,[sp,#{8+idreg*4}]\n"
-                text+=f"movw ip,#749\ncmp r1,ip\nblo .L{name}_done\nmovw ip,#753\ncmp r1,ip\nbls .L{name}_dynamic\nmovw ip,#769\ncmp r1,ip\nblo .L{name}_done\nmovw ip,#773\ncmp r1,ip\nbhi .L{name}_done\n.L{name}_dynamic:\n"
+                text+=f"movw ip,#857\ncmp r1,ip\nbeq .L{name}_dynamic\nmovw ip,#749\ncmp r1,ip\nblo .L{name}_done\nmovw ip,#753\ncmp r1,ip\nbls .L{name}_dynamic\nmovw ip,#769\ncmp r1,ip\nblo .L{name}_done\nmovw ip,#773\ncmp r1,ip\nbhi .L{name}_done\n.L{name}_dynamic:\n"
                 text+=f"bl m10v_settings_controller_card_directory\ncmp r0,#0\nstrne r0,[sp,#{8+reg*4}]\n.L{name}_done:\npop {{ip,lr}}\nmsr cpsr_fs,ip\npop {{r0-r12,lr}}\nldr pc,={hex(ret)}\n.ltorg\n"
             icon_asm.write_text(text)
 
@@ -1608,7 +1608,11 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
     manifest['film_5207']={'offset':film_offset,'bytes':len(film_payload),'sha256':sha(film_payload),'camera_calibrated':False,'film_calibrated':False}
     manifest['resources'] = {'first_id': 786, 'last_id': last_resource, 'table': resource_base,
                               'descriptors': descriptors, 'texts': texts}
-    manifest['film_cards']={'first_id':749,'last_id':773,'ids':[749,750,751,752,753,769,770,771,772,773],'width':128,'height':128,'artwork_height':128,'caption_height':0,'descriptor_storage':'view-owned-heap','descriptor_offset':655360,'directory_offset':655440,'directory_provider':symbols['m10v_settings_controller_card_directory'],'directory_hooks':{n:symbols['m10v_icon_directory_'+n] for n in ('width','height','draw')},'heap_bytes':655540} if sd_library else None
+    manifest['film_cards']={'first_id':749,'last_id':773,'ids':[749,750,751,752,753,769,770,771,772,773],
+        'width':128,'height':172,'artwork_height':128,'caption_height':44,'page_dots':{'id':857,'width':448,'height':8,'max_pages':28},
+        'descriptor_storage':'view-owned-heap','descriptor_offset':894976,'directory_offset':895064,'heap_bytes':895500,
+        'directory_provider':symbols['m10v_settings_controller_card_directory'],
+        'directory_hooks':{n:symbols['m10v_icon_directory_'+n] for n in ('width','height','draw')}} if sd_library else None
     manifest['film_curated']=[]
     for i,payload in enumerate(curated_payloads):
         offset=bytes(image).find(payload)

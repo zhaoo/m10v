@@ -22,19 +22,57 @@ static void rect(uint32_t *p,uint32_t x,uint32_t y,uint32_t w,uint32_t h,uint32_
 }
 /* Freestanding ARMv6 has no division service in the resource renderer. */
 static uint32_t divide(uint32_t n,uint32_t d){uint32_t q=0,r=0;for(uint32_t b=32;b;b--){r=(r<<1)|((n>>(b-1))&1u);if(r>=d){r-=d;q|=1u<<(b-1);}}return q;}
+/* The pinned artwork atlas crops every glyph to its top ink row. Restore
+ * the ASCII caption origin measured with NotoSans-Bold.ttf at 14px,
+ * anchor ls, baseline y=14 in each 16x20 cell. Keep box artwork origins. */
+static const uint8_t caption_top[95]={
+ 0,4,4,4,3,4,4,4,4,4,3,5,12,9,11,4,
+ 4,4,4,4,4,4,4,4,4,4,6,6,5,7,5,4,
+ 4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,
+ 4,4,4,4,4,4,4,4,4,4,4,4,4,4,3,14,
+ 2,6,3,6,3,6,3,6,3,3,3,3,3,6,6,6,
+ 6,6,6,6,4,6,6,6,6,6,6,4,3,4,7
+};
+static uint32_t advance(uint32_t c,uint32_t centered){
+ /* These six ink boxes extend one pixel beyond the artwork advance. */
+ return smooth_width[c-32]+(centered&&(c=='K'||c=='R'||c=='V'||c=='X'||c=='f'||c=='r'));
+}
 /* Explicit line boxes keep the largest possible name clear of the speed. */
-static void text(uint32_t *p,const char *s,uint32_t y,uint32_t height,uint32_t color){
- uint32_t width=0;for(uint32_t k=0;s[k];k++){uint32_t c=(uint8_t)s[k];if(c<32||c>126)return;width+=smooth_width[c-32];}
+static void text_line(uint32_t *p,const char *s,uint32_t y,uint32_t height,uint32_t color,uint32_t centered){
+ uint32_t width=0;for(uint32_t k=0;s[k];k++){uint32_t c=(uint8_t)s[k];if(c<32||c>126)return;width+=advance(c,centered);}
  if(!width)return;
- uint32_t w=width*height/20,h=height;if(w>112){w=112;h=divide(20*112,width);}if(!h)h=1;
- uint32_t x=8,offset=0,k=0,loaded=~0u,source=0,fraction=0;uint8_t pixels[320],row[40];
+ uint32_t limit=centered?120:112;
+ uint32_t w=width*height/20,h=height;if(w>limit){w=limit;h=divide(20*limit,width);}if(!h)h=1;
+ uint32_t x=centered?(128-w)/2:8,offset=0,k=0,loaded=~0u,source=0,fraction=0;uint8_t pixels[320],row[40];
  for(uint32_t j=0,r=0,f=0;j<h;j++){row[j]=(uint8_t)r;f+=20;while(f>=h){f-=h;r++;}}
  for(uint32_t i=0;i<w;i++){
-  while(s[k]&&source>=offset+smooth_width[(uint8_t)s[k]-32])offset+=smooth_width[(uint8_t)s[k++]-32];
+  while(s[k]&&source>=offset+advance((uint8_t)s[k],centered))offset+=advance((uint8_t)s[k++],centered);
   if(!s[k]||source-offset>=16)continue;
-  if(loaded!=k){glyph(pixels,(uint8_t)s[k]-32);loaded=k;}
-  for(uint32_t j=0;j<h&&y+j<M10V_CARD_HEIGHT;j++)blend(p,(y+j)*M10V_CARD_WIDTH+x+i,pixels[row[j]*16+source-offset],color);
+  uint32_t ch=(uint8_t)s[k]-32,top=centered?caption_top[ch]:0;
+  if(loaded!=k){glyph(pixels,ch);loaded=k;}
+  for(uint32_t j=0;j<h;j++){
+   if(row[j]<top)continue;
+   uint32_t at=(y+j)*M10V_CARD_WIDTH+x+i,a=pixels[(row[j]-top)*16+source-offset];
+   /* Catalog labels overlay the native canvas. Keep their bitmap strictly
+    * transparent or opaque so the firmware's blend cannot thicken edges. */
+   if(centered){if(a>=144)p[at]=rgba(color);}
+   else blend(p,at,a,color);
+  }
   fraction+=width;while(fraction>=w){fraction-=w;source++;}
+ }
+}
+static void text(uint32_t *p,const char *s,uint32_t y,uint32_t height,uint32_t color){
+ text_line(p,s,y,height,color,0);
+}
+static void enabled_badge(uint32_t *pixels){
+ const uint32_t dark=rgba(0xff12151cu),yellow=rgba(0xffffdc46u);
+ for(int y=-12;y<=12;y++)for(int x=-12;x<=12;x++){
+  int distance=x*x+y*y;
+  if(distance>144)continue;
+  int down=y-x-4,up=y+x-2;
+  int check=(x>=-6&&x<=-1&&down>=-1&&down<=1)||
+            (x>=-2&&x<=6&&up>=-1&&up<=1);
+  pixels[(17+y)*M10V_CARD_WIDTH+111+x]=(distance>100||check)?dark:yellow;
  }
 }
 static int render(uint32_t *p,const char *main,const char *sub,uint32_t c,uint32_t ink,const char *brand,uint32_t accent,uint32_t motif,uint32_t slot,uint32_t selected){
@@ -65,7 +103,7 @@ static int render(uint32_t *p,const char *main,const char *sub,uint32_t c,uint32
   text(p,brand,7,15,motif==3?accent:ink);
   text(p,main,29,40,ink);text(p,sub,73,32,ink);
  }
- if(selected)for(uint32_t y=0;y<12;y++)rect(p,116+y,y,12-y,1,0xffe9dc45u);
+ if(selected)enabled_badge(p);
  return 0;
 }
 int m10v_film_card_render(uint32_t *p,uint32_t film,uint32_t slot,uint32_t selected){
@@ -79,4 +117,36 @@ int m10v_film_card_custom(uint32_t *p,const char *name,uint32_t slot,uint32_t se
  if(!length||length==24)return -1;
  static const uint32_t colors[]={0xff508b9du,0xffa484adu,0xffc78d48u,0xff669c7au,0xffc94c47u,0xff667fa7u,0xffb47787u,0xff917b61u};
  return render(p,name,"LUT",0xffeee9d9u,0xff25363bu,"M10V",colors[hash&7],8,slot,selected);
+}
+void m10v_film_card_label(uint32_t *pixels,const char *name,uint32_t focused){
+ uint32_t *label=pixels+M10V_CARD_PIXELS;
+ for(uint32_t i=0;i<M10V_CARD_TILE_PIXELS-M10V_CARD_PIXELS;i++)label[i]=0;
+ if(!name)return;
+ char line[24];
+ uint32_t width=0,split=0,n=0;
+ for(;n+1<sizeof(line)&&name[n];n++){
+  uint32_t c=(uint8_t)name[n];
+  if(c<32||c>126)return;
+  if(c==' '&&n&&width<=120)split=n;
+  width+=advance(c,1);
+  line[n]=(char)c;
+ }
+ line[n]=0;
+ uint32_t ink=focused?0xffffef00u:0xfff3f5f6u;
+ if(width>120&&split){
+  line[split]=0;
+  text_line(label,line,5,20,ink,1);
+  text_line(label,line+split+1,23,20,ink,1);
+ }else text_line(label,line,5,20,ink,1);
+}
+void m10v_film_card_dots(uint32_t *pixels,uint32_t current,uint32_t total){
+ for(uint32_t i=0;i<M10V_CARD_DOTS_WIDTH*M10V_CARD_DOTS_HEIGHT;i++)pixels[i]=0;
+ if(!total||total>M10V_CARD_MAX_PAGES||current>=total)return;
+ uint32_t center=M10V_CARD_DOTS_WIDTH/2-(total-1)*8;
+ for(uint32_t i=0;i<total;i++,center+=16){
+  uint32_t ink=rgba(i==current?0xffffef00u:0xff656c73u);
+  for(int32_t y=-3;y<=3;y++)for(int32_t x=-3;x<=3;x++){
+   if(x*x+y*y<=10)pixels[(y+3)*M10V_CARD_DOTS_WIDTH+center+x]=ink;
+  }
+ }
 }

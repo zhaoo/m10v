@@ -10,6 +10,16 @@ static uint32_t item(const m10v_settings_ops *o,uint32_t i){
 static uint32_t value(const m10v_library_state *s,uint32_t field){
  return field==0?s->stamp:field==1?s->format:field==2?s->corner:field==3?s->color:s->reserved&1u;
 }
+int m10v_settings_catalog_tap(m10v_settings *p,const m10v_settings_ops *o,uint32_t index){
+ if(!p||!ready(o)||p->screen!=M10V_SETTINGS_CATALOG||index>=p->group||index/10!=p->index/10)return 0;
+ uint32_t id=item(o,index);
+ if(!id)return 0;
+ p->index=index;
+ p->expected=id;
+ m10v_settings_key(p,o,M10V_KEY_OK);
+ p->focus=M10V_CATALOG_TOUCH_FOCUS_HIDDEN;
+ return 1;
+}
 int m10v_settings_open(m10v_settings *p,const m10v_settings_ops *o,uint32_t screen){
  if(!p||!ready(o))return -1;
  p->screen=M10V_SETTINGS_CLOSED;

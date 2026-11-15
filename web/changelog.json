@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.15.2",
+      "date": "2026-11-15",
+      "title": "优化 GR III 机身胶卷库与触屏操作",
+      "changes": [
+        "机身胶卷库在封面下显示卷名，修正英文字形的基线和裁切。右上角显示已选数量，已启用的胶卷用黄底黑勾圆标标记。",
+        "GR III 2.10 支持左右滑动翻页，点按封面可以启用或停用胶卷。点按后隐藏黄色焦点框，按方向键时恢复。"
+      ],
+      "notice": "GR III 2.10 的 R3 胶卷库已通过用户真机验证。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.15.1",
       "date": "2026-11-15",
       "title": "GR III 新增机内关机图与拍摄配方联动",
@@ -11,9 +24,9 @@
         "在配套固件上可用机身原有「保存设置」为 U1、U2、U3 保存配方。ADJ 影像控制支持取景试色，确认后切换胶卷，取消后恢复。机内 RAW 显影走原厂 ISP。"
       ],
       "notice": "适用机型为 GR III 2.10。关机图菜单修正版已通过用户真机验证。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "c6d776ba247035aea7746db6fef5b75c49cfaf6a",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/43696891454"
     },
     {
       "version": "2026.11.12.2",

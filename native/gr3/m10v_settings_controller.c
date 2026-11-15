@@ -265,6 +265,7 @@ uint32_t m10v_settings_controller_factory(uint32_t factory,uint32_t route){
 uint32_t m10v_settings_controller_ready(m10v_settings_controller *p,uint32_t route){
  p->display_trace=0;
  p->pending_source=0;
+ p->film_touch_start=p->film_touch_last=0;
  p->page=route==M10V_SETTINGS_ZOOM_ROUTE?M10V_SETTINGS_ZOOM:route==M10V_SETTINGS_AB_ROUTE?M10V_SETTINGS_AB:route==M10V_SETTINGS_NAME_ROUTE?M10V_SETTINGS_NAME:route==M10V_SETTINGS_STAMP_ROUTE?M10V_SETTINGS_WATERMARK:M10V_SETTINGS_FILMS;m10v_settings_ops o;ops(&o);
  /* AB is a shooting ImageControl child, not a generic Setup controller.
   * Match stock 531ab0f8 / 531ab160(route02000012): mode0 waits for the
@@ -359,8 +360,86 @@ void m10v_settings_controller_ab_render(m10v_settings_controller *p){
  if(trace)M10V_LOG(98,(uint32_t)(uintptr_t)p,root,root?((uint8_t *)(uintptr_t)root)[0xa0]|((uint32_t)((uint8_t *)(uintptr_t)root)[0xa2]<<8):0,p->base[0x14e]);
 #endif
 }
+#if !M10V_CAMERA_GR3X
+static uint32_t catalog_tile(uint32_t x,uint32_t y){
+ if(x<M10V_FILM_GRID_X||y<M10V_FILM_GRID_Y)return 10;
+ x-=M10V_FILM_GRID_X;y-=M10V_FILM_GRID_Y;
+ uint32_t column=x/M10V_FILM_GRID_DX,row=y/M10V_FILM_GRID_DY;
+ if(column>=5||row>=2||x%M10V_FILM_GRID_DX>=M10V_CARD_WIDTH||
+    y%M10V_FILM_GRID_DY>=M10V_CARD_TILE_HEIGHT)return 10;
+ return row*5+column;
+}
+static uint32_t catalog_touch(m10v_settings_controller *p,uint32_t payload){
+ if(p->page!=M10V_SETTINGS_FILMS||p->state.screen!=M10V_SETTINGS_CATALOG)return 0;
+ /* Stock GR III 2.10 TouchModel (5323e768) publishes a 0x58-byte packet.
+  * Its current point is at +8/+12 and the gesture kind at +0x50.
+  * A single finger produces down (1), drag (5), optional fling (7),
+  * and release (10). The prior sample copied to +0x28 retains the
+  * last contact coordinates when the release sample clears them. */
+ if(!ab_ram(payload,0x58)){
+  p->film_touch_start=p->film_touch_last=0;
+  return 0;
+ }
+ const uint8_t *packet=(const uint8_t *)(uintptr_t)payload;
+ uint32_t kind=packet[0x50],fingers=packet[0];
+ if((kind==1||kind==5)&&fingers==1){
+  uint32_t x=*(const uint32_t *)(packet+8),y=*(const uint32_t *)(packet+12);
+  if(x>720||y>480){p->film_touch_start=p->film_touch_last=0;return 0;}
+  uint32_t point=(y<<16)|(x+1);
+  if(kind==1){
+   p->film_touch_start=p->film_touch_last=point;
+   p->film_touch_dragged=0;
+   M10V_LOG(76,x,y,p->state.index,0);
+  }else if(p->film_touch_start){
+   p->film_touch_last=point;
+   p->film_touch_dragged=1;
+  }
+  return 0;
+ }
+ /* The stock touch model may queue a tap or double tap notification
+  * before release. Commit exclusively on release to avoid a double toggle. */
+ if((kind==2||kind==4||kind==7)&&fingers==0){
+  if(kind==7)p->film_touch_dragged=1;
+  return 0;
+ }
+ uint32_t start=p->film_touch_start,last=p->film_touch_last;
+ p->film_touch_start=p->film_touch_last=0;
+ if(!start)return 0;
+ if(kind!=10||fingers){
+  M10V_LOG(78,kind,fingers,p->state.index,0);
+  return 0;
+ }
+ int32_t dx=(int32_t)(last&0xffffu)-(int32_t)(start&0xffffu);
+ int32_t dy=(int32_t)(last>>16)-(int32_t)(start>>16);
+ uint32_t width=(uint32_t)(dx<0?-dx:dx),height=(uint32_t)(dy<0?-dy:dy);
+ uint32_t before=p->state.index,end=p->state.group;
+ if(!p->film_touch_dragged&&packet[0x28]==1){
+  uint32_t x=(start&0xffffu)-1,y=start>>16,tile=catalog_tile(x,y);
+  uint32_t end_x=*(const uint32_t *)(packet+0x30),end_y=*(const uint32_t *)(packet+0x34);
+  if(tile<10&&catalog_tile(end_x,end_y)==tile&&end_x+12>=x&&x+12>=end_x&&end_y+12>=y&&y+12>=end_y){
+   m10v_settings_ops o;ops(&o);
+   uint32_t index=(before/10)*10+tile;
+   if(m10v_settings_catalog_tap(&p->state,&o,index)){
+    M10V_LOG(79,x,y,index,(m10v_library_count(&p->state.saved)<<16)|p->state.error);
+    m10v_settings_view_draw(&p->view,&p->state,&o);
+    return 1;
+   }
+  }
+ }else if(width>=60&&width>=2*height&&
+    ((dx>0&&before>=10)||(dx<0&&before/10+1<(end+9)/10))){
+  m10v_settings_ops o;ops(&o);
+  m10v_settings_key(&p->state,&o,dx>0?M10V_KEY_PREVIOUS:M10V_KEY_NEXT);
+  m10v_settings_view_draw(&p->view,&p->state,&o);
+ }
+ M10V_LOG(77,(uint32_t)dx,(uint32_t)dy,before,p->state.index);
+ return p->state.index!=before;
+}
+#endif
 uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event){
  uint32_t raw=*(const uint16_t *)(uintptr_t)event,key;
+#if !M10V_CAMERA_GR3X
+ if(raw==0x30)return catalog_touch(p,*(const uint32_t *)(uintptr_t)(event+4));
+#endif
  M10V_LOG(82,raw,p->state.screen,p->state.focus,p->state.value);
  /* Physical MENU/DISP can be filtered before this virtual handler. The
   * dispatch adapter retries only an unhandled first press on this owned page. */
@@ -438,7 +517,9 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
   else m10v_settings_view_zoom(&p->view,&p->zoom);
   return 1;
  }
+ p->film_touch_start=p->film_touch_last=0;
  m10v_settings_ops o;ops(&o);uint32_t before=p->state.screen;
+ if(before==M10V_SETTINGS_CATALOG&&key<=M10V_KEY_OK)p->state.focus=0;
  m10v_settings_key(&p->state,&o,key);
  if(before==M10V_SETTINGS_CATALOG&&p->state.screen==M10V_SETTINGS_FILMS&&key==M10V_KEY_OK){p->ab.enabled=0;ab_clear(&p->ab);}
  if(p->state.screen==M10V_SETTINGS_AB&&p->state.value){

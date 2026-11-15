@@ -18,6 +18,7 @@ HALF_PAIR_STAGES={0:'entry',1:'first-ready',2:'pair-composed',3:'pending-cancell
 EVENTS.update({210:'zoom.set.before',211:'zoom.set.after',212:'firmware.assert'})
 EVENTS.update({208:'ab.dispatch.physical-down',209:'ab.dispatch.fallback'})
 EVENTS.update({97:'ab.display.snapshot',98:'ab.display.return'})
+EVENTS.update({76:'film.touch.down',77:'film.swipe.release',78:'film.touch.cancel',79:'film.tap.toggle'})
 EVENTS.update(dict(enumerate([
     'adj.event.before','adj.event.after','adj.restore.before',
     'adj.restore.refresh.before','adj.restore.refresh.after',

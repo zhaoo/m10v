@@ -9,6 +9,11 @@ class FlatControllerTests(unittest.TestCase):
  native_host=True
  debug=False
  appended_slots=True
+ companion=False
+ half_pair=False
+ ab_enabled=True
+ exit_trace=False
+ owner_cache=False
  setUpClass=classmethod(adapter.ControllerLifetimeTests.setUpClass.__func__)
  machine=adapter.ControllerLifetimeTests.machine
  call=adapter.ControllerLifetimeTests.call
@@ -19,7 +24,7 @@ class FlatControllerTests(unittest.TestCase):
  def begin(self,virtual=True,enabled=0):
   u=host.NativeHostTests.begin(self);self.controller=self.page;self.route=0x0200f100
   self.call(u,'ready',self.page,self.route)
-  u.mem_write(self.page+0x238,struct.pack('<I',53))
+  u.mem_write(self.page+0x238,struct.pack('<I',54))
   u.mem_write(self.page+0x150,struct.pack('<I',0x0200004a))
   self.stock_input_gate(u,enabled)
   from scripts.build_gr3_settings_hooks import BASE_VTABLE
@@ -77,4 +82,93 @@ class FlatControllerTests(unittest.TestCase):
  def test_synthetic_back_alias_still_exits_without_physical_payload(self):
   u=self.begin();self.call(u,'key',self.page,self.event(u,0xda))
   self.assertEqual([e[1:4] for e in self.events if e[0]=='dispatch'],[(self.page,0x0200004a,0x10000000)])
+
+ def swipe_sample(self,u,kind,fingers,x,y,previous=None):
+  event=self.event(u,0x30)
+  packet=bytearray(0x58)
+  packet[0]=fingers
+  struct.pack_into('<ii',packet,8,x,y)
+  packet[0x50]=kind
+  if previous:
+   packet[0x28]=1
+   struct.pack_into('<ii',packet,0x30,*previous)
+  u.mem_write(event+4,struct.pack('<I',0x55000120))
+  u.mem_write(0x55000120,bytes(packet))
+  return self.call(u,'ab_dispatch',self.page,event)
+
+ def test_tap_on_selected_cover_removes_once_after_native_release(self):
+  u=self.begin()
+  state=self.page+0x2f4
+  u.mem_write(state,struct.pack('<8I',2,0,0,0,33,0,0,64))
+  target=self.externals['m10v_sd_camera_directory_item']
+  def read_item(m,a,n,_):
+   if a==target:
+    index=next(e[1] for e in reversed(self.events) if e[0]=='m10v_sd_camera_directory_item')
+    m.reg_write(UC_ARM_REG_R0,33 if index==0 else 0)
+   elif a==0x532bd6d4:
+    m.reg_write(UC_ARM_REG_R0,0)
+    m.reg_write(UC_ARM_REG_PC,m.reg_read(UC_ARM_REG_LR))
+  u.hook_add(UC_HOOK_CODE,read_item)
+  self.swipe_sample(u,1,1,80,110)
+  self.swipe_sample(u,2,0,0,0)
+  self.assertFalse(self.count('m10v_camera_library_remove'))
+  self.swipe_sample(u,10,0,0,0,previous=(80,110))
+  self.swipe_sample(u,10,0,0,0,previous=(80,110))
+  self.assertEqual(self.count('m10v_camera_library_remove'),1)
+  self.assertEqual(self.word(u,state+4),1)
+  self.call(u,'key',self.page,self.event(u,0xce))
+  self.assertEqual(self.word(u,state+4),0)
+
+ def test_tap_selects_hit_card_but_not_gutter_or_vertical_drag(self):
+  u=self.begin()
+  state=self.page+0x2f4
+  u.mem_write(state,struct.pack('<8I',2,0,0,0,33,0,0,64))
+  target=self.externals['m10v_sd_camera_directory_item']
+  def read_item(m,a,n,_):
+   if a==target:
+    index=next(e[1] for e in reversed(self.events) if e[0]=='m10v_sd_camera_directory_item')
+    m.reg_write(UC_ARM_REG_R0,{0:33,1:66}.get(index,0))
+  u.hook_add(UC_HOOK_CODE,read_item)
+  for x,y in ((155,110),(40,445),(350,110)):
+   self.swipe_sample(u,1,1,x,y)
+   self.swipe_sample(u,10,0,0,0,previous=(x,y))
+  self.swipe_sample(u,1,1,180,110)
+  self.swipe_sample(u,5,1,180,200)
+  self.swipe_sample(u,10,0,0,0,previous=(180,200))
+  self.assertFalse(self.count('m10v_sd_camera_directory_install'))
+  self.swipe_sample(u,1,1,180,110)
+  self.swipe_sample(u,10,0,0,0,previous=(183,110))
+  self.assertEqual(self.word(u,state+12),1)
+  self.assertEqual([e[1:3] for e in self.events if e[0]=='m10v_sd_camera_directory_install'],[(1,66)])
+
+ def test_native_touch_dispatch_pages_once_without_mutating_films(self):
+  import json
+  films=[f['id'] for g in json.loads((adapter.ROOT/'web/gr3/film-directory.json').read_text())['groups'] for f in g['films']]
+  u=self.begin()
+  state=self.page+0x2f4
+  u.mem_write(state,struct.pack('<8I',2,0,0,0,films[0],0,0,len(films)))
+  item=self.externals['m10v_sd_camera_directory_item']
+  def read_item(m,a,n,_):
+   if a==item:
+    # The provider's only argument is the catalog index.
+    index=next(e[1] for e in reversed(self.events) if e[0]=='m10v_sd_camera_directory_item')
+    m.reg_write(UC_ARM_REG_R0,films[index])
+  u.hook_add(UC_HOOK_CODE,read_item)
+  def gesture(start,end):
+   self.swipe_sample(u,1,1,*start)
+   self.swipe_sample(u,5,1,*end)
+   self.swipe_sample(u,7,0,*end)
+   self.swipe_sample(u,10,0,*end)
+   self.swipe_sample(u,10,0,*end)
+  gesture((520,180),(210,190))
+  self.assertEqual(self.word(u,state+12),10)
+  gesture((200,210),(220,410))
+  self.assertEqual(self.word(u,state+12),10)
+  gesture((210,180),(520,185))
+  self.assertEqual(self.word(u,state+12),0)
+  gesture((210,180),(520,185))
+  self.assertEqual(self.word(u,state+12),0)
+  self.assertEqual(self.count('m10v_settings_view_draw'),2)
+  for operation in ('m10v_sd_camera_directory_install','m10v_camera_library_remove','activate_tone','dispatch'):
+   self.assertFalse(self.count(operation))
 if __name__=='__main__':unittest.main()

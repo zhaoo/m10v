@@ -38,6 +38,39 @@ class FilmCardTests(unittest.TestCase):
    self.assertEqual(self.draw(pixels,film,slot,0),-1);self.assertEqual(bytes(pixels),before)
   self.assertEqual(self.draw(None,1,0,0),-1)
 
+ def test_catalog_label_wraps_and_keeps_existing_cover_pixels(self):
+  caption=self.lib.m10v_film_card_label
+  caption.argtypes=[C.POINTER(C.c_uint32),C.c_char_p,C.c_uint32]
+  cover=128*128
+  end=128*172
+  buf=(C.c_uint32*(end+1))()
+  buf[end]=0x12345678
+  self.assertEqual(self.draw(buf,70,9,0),0)
+  before=bytes(buf)[:cover*4]
+  caption(buf,b'Fuji Industrial 100',1)
+  self.assertEqual(bytes(buf)[:cover*4],before)
+  self.assertTrue(any(buf[128*137:128*155]))
+  self.assertTrue(any(buf[128*155:end]))
+  self.assertLessEqual(set(buf[cover:end]),{0,0xff00efff})
+  self.assertEqual(buf[end],0x12345678)
+
+ def test_catalog_label_uses_baseline_for_cap_height_and_descenders(self):
+  buf=(C.c_uint32*(128*172))()
+  self.lib.m10v_film_card_label(buf,b'Ag',0)
+  def vertical_ink(first,last):
+   return [y for y in range(128,172) if any(buf[y*128+first:y*128+last])]
+  upper=vertical_ink(54,64)
+  lower=vertical_ink(64,73)
+  self.assertGreater(min(lower),min(upper))
+  self.assertGreater(max(lower),max(upper))
+
+ def test_enabled_badge_has_dark_outline_and_check_on_yellow(self):
+  buf=(C.c_uint32*(128*128))()
+  self.assertEqual(self.draw(buf,33,0,1),0)
+  self.assertEqual(buf[17*128+123],0xff1c1512)
+  self.assertEqual(buf[13*128+111],0xff46dcff)
+  self.assertEqual(buf[19*128+111],0xff1c1512)
+
  def test_directory_cards_are_distinct_and_replace_reused_phoenix_pixels(self):
   directory=json.loads((ROOT/'web/gr3/film-directory.json').read_text())
   films=[film['id'] for group in directory['groups'] for film in group['films']]

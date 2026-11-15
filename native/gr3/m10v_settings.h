@@ -10,6 +10,9 @@ enum { M10V_KEY_LEFT, M10V_KEY_RIGHT, M10V_KEY_UP, M10V_KEY_DOWN,
        M10V_KEY_OK, M10V_KEY_BACK, M10V_KEY_PREVIOUS, M10V_KEY_NEXT, M10V_KEY_DISP, M10V_KEY_CLEAN };
 enum { M10V_SETTINGS_NO_ERROR, M10V_SETTINGS_EMPTY, M10V_SETTINGS_CHANGED,
        M10V_SETTINGS_SAVE_FAILED, M10V_SETTINGS_FULL };
+/* The catalog uses focus only to distinguish touch from the hardware cursor.
+ * The selected directory index remains available for the next key press. */
+enum { M10V_CATALOG_TOUCH_FOCUS_HIDDEN=1 };
 typedef struct {
  void *context;
  int (*load)(void *, m10v_library_state *);
@@ -27,4 +30,5 @@ typedef struct {
 } m10v_settings;
 int m10v_settings_open(m10v_settings *,const m10v_settings_ops *,uint32_t screen);
 void m10v_settings_key(m10v_settings *,const m10v_settings_ops *,uint32_t key);
+int m10v_settings_catalog_tap(m10v_settings *,const m10v_settings_ops *,uint32_t index);
 #endif

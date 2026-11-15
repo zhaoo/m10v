@@ -15,15 +15,16 @@
 #ifndef M10V_NATIVE_BASE
 #define M10V_NATIVE_BASE 0x540b6000u
 #endif
-/* Ten live bitmaps own portrait artwork; timestamp views allocate none.
- * The reserved heap word is outside the child-widget entries. */
+/* The catalog owns ten tiles and the page indicator. Other settings do
+ * not allocate bitmap storage. The heap word is outside the widget entries. */
+_Static_assert((M10V_SD_DIRECTORY_LIMIT+9)/10<=M10V_CARD_MAX_PAGES,"catalog indicator extent");
 static uint32_t *card_descriptors(const m10v_settings_view *v){return (uint32_t *)(uintptr_t)(v->widgets[M10V_VIEW_HEAP]+M10V_CARD_DESCRIPTOR_OFFSET);}
 typedef uint32_t (*fn1)(uint32_t);
 typedef uint32_t (*fn2)(uint32_t,uint32_t);
 typedef uint32_t (*fn3)(uint32_t,uint32_t,uint32_t);
 typedef uint32_t (*ctor)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t);
 enum { ROOT, BACKGROUND, TITLE, NAME, FOOTER, ERROR_TEXT,
- FRAME=6, INNER=16, ICON=26, ROW_FRAME=36, ROW_INNER=40, ROW=44, VALUE=48, PAGE=52, COUNT=M10V_VIEW_COUNT };
+ FRAME=6, INNER=16, ICON=26, ROW_FRAME=36, ROW_INNER=40, ROW=44, VALUE=48, PAGE=52, SELECTED_COUNT=53, COUNT=M10V_VIEW_COUNT };
 static uint32_t ptr(const void *p){return (uint32_t)(uintptr_t)p;}
 static void visible(uint32_t w,uint32_t yes){((fn2)0x533ad3c0u)(w,yes);}
 static void color(uint32_t w,uint32_t c){((fn2)0x53393e00u)(w,c);}
@@ -53,15 +54,16 @@ int m10v_settings_view_create(m10v_settings_view *v){
  if(make(v,1,0,0,720,480)||make(v,11,0,0,720,480)||
     make(v,17,20,12,580,42)||make(v,0,24,58,672,38)||
     make(v,17,20,432,680,40)||make(v,17,20,378,680,40))goto fail;
- for(uint32_t i=0;i<10;i++)if(make(v,11,20+(i%5)*136,98+(i/5)*140,136,136))goto fail;
- for(uint32_t i=0;i<10;i++)if(make(v,11,22+(i%5)*136,100+(i/5)*140,132,132))goto fail;
- for(uint32_t i=0;i<10;i++)if(make(v,10,24+(i%5)*136,102+(i/5)*140,M10V_CARD_WIDTH,M10V_CARD_HEIGHT))goto fail;
+ for(uint32_t i=0;i<10;i++)if(make(v,11,M10V_FILM_GRID_X-4+(i%5)*M10V_FILM_GRID_DX,M10V_FILM_GRID_Y-4+(i/5)*M10V_FILM_GRID_DY,136,136))goto fail;
+ for(uint32_t i=0;i<10;i++)if(make(v,11,M10V_FILM_GRID_X-2+(i%5)*M10V_FILM_GRID_DX,M10V_FILM_GRID_Y-2+(i/5)*M10V_FILM_GRID_DY,132,132))goto fail;
+ for(uint32_t i=0;i<10;i++)if(make(v,10,M10V_FILM_GRID_X+(i%5)*M10V_FILM_GRID_DX,M10V_FILM_GRID_Y+(i/5)*M10V_FILM_GRID_DY,M10V_CARD_WIDTH,M10V_CARD_TILE_HEIGHT))goto fail;
  /* Selection rectangles precede text in the child draw order. */
  for(uint32_t i=0;i<4;i++)if(make(v,11,0,84+i*72,720,64))goto fail;
  for(uint32_t i=0;i<4;i++)if(make(v,11,0,147+i*72,720,1))goto fail;
  for(uint32_t i=0;i<4;i++)if(make(v,17,36,90+i*72,300,52))goto fail;
  for(uint32_t i=0;i<4;i++)if(make(v,17,350,90+i*72,330,52))goto fail;
- if(make(v,0,610,18,86,32))goto fail;
+ if(make(v,10,(720-M10V_CARD_DOTS_WIDTH)/2,428,M10V_CARD_DOTS_WIDTH,M10V_CARD_DOTS_HEIGHT)||
+    make(v,17,494,10,202,38))goto fail;
  color(v->widgets[BACKGROUND],1);
  for(uint32_t i=0;i<10;i++){
   color(v->widgets[INNER+i],1);
@@ -89,27 +91,33 @@ static uint32_t valueres(uint32_t row,uint32_t value){
  static const uint16_t first[4]={M10V_VIEW_OFF,M10V_VIEW_YMD,M10V_VIEW_TOP_LEFT,M10V_VIEW_WHITE};
  return row<4&&value<(row?4u:3u)?first[row]+value:M10V_VIEW_OFF;
 }
+static void bitmap(const m10v_settings_view *v,uint32_t slot,uint32_t id,uint32_t *pixels,uint32_t width,uint32_t height){
+ uint32_t *d=card_descriptors(v)+slot*2;
+ uint32_t *directory=(uint32_t *)(uintptr_t)(v->widgets[M10V_VIEW_HEAP]+M10V_CARD_DIRECTORY_OFFSET);
+ d[0]=width|(height<<16);d[1]=ptr(pixels)/4;
+ directory[id-M10V_CARD_FIRST]=ptr(d);
+}
 void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const m10v_settings_ops *o){
  if(!v||!s||v->count!=COUNT)return;
  uint32_t name_page=s->screen==M10V_SETTINGS_NAME;
  uint32_t ab_page=s->screen==M10V_SETTINGS_AB;
- uint32_t films=s->screen==M10V_SETTINGS_FILMS||s->screen==M10V_SETTINGS_CATALOG;
- uint32_t first=0;
- uint32_t focus=s->screen==M10V_SETTINGS_CATALOG?(s->index-first)%10:s->focus;
- caption(v->widgets[TITLE],films?(M10V_APPENDED_SLOTS?1116+m10v_library_count(&s->saved):M10V_VIEW_FILMS):M10V_VIEW_STAMP);
- caption(v->widgets[FOOTER],s->screen==M10V_SETTINGS_CATALOG?M10V_VIEW_CATALOG_HELP:
-   s->screen==M10V_SETTINGS_FILMS?M10V_VIEW_FILM_HELP:
-   s->screen==M10V_SETTINGS_VALUE||name_page?M10V_VIEW_VALUE_HELP:M10V_VIEW_STAMP_HELP);
- visible(v->widgets[NAME],0);
+ uint32_t catalog=s->screen==M10V_SETTINGS_CATALOG;
+ uint32_t films=s->screen==M10V_SETTINGS_FILMS||catalog;
+ uint32_t focus=catalog?(s->focus==M10V_CATALOG_TOUCH_FOCUS_HIDDEN?10:s->index%10):s->focus;
  uint32_t error=s->error>=1&&s->error<=4;
+ visible(v->widgets[TITLE],!catalog||error);
+ visible(v->widgets[FOOTER],!catalog);
+ visible(v->widgets[SELECTED_COUNT],catalog);
+ if(catalog)caption(v->widgets[SELECTED_COUNT],1116+m10v_library_count(&s->saved));
+ if(!catalog){
+  caption(v->widgets[TITLE],films?M10V_VIEW_FILMS:M10V_VIEW_STAMP);
+  caption(v->widgets[FOOTER],films?M10V_VIEW_FILM_HELP:
+    s->screen==M10V_SETTINGS_VALUE||name_page?M10V_VIEW_VALUE_HELP:M10V_VIEW_STAMP_HELP);
+ }
+ visible(v->widgets[NAME],0);
  visible(v->widgets[ERROR_TEXT],!films&&error);
  if(error)caption(v->widgets[films?TITLE:ERROR_TEXT],s->error==4?1127:M10V_VIEW_EMPTY+s->error-1);
  ((fn2)0x5339658cu)(v->widgets[TITLE],films&&error?10:31);
- if(s->screen==M10V_SETTINGS_CATALOG){
-  for(uint32_t k=0;k<M10V_SLOT_COUNT;k++)if(s->saved.slots[k].film&&!M10V_CUSTOM(s->saved.slots[k].film)&&!m10v_directory_name(s->saved.slots[k].film)){
-   caption(v->widgets[FOOTER],1129);break;
-  }
- }
  if(films&&!v->widgets[M10V_VIEW_HEAP])v->widgets[M10V_VIEW_HEAP]=((fn1)0x536af2a8u)(M10V_CARD_HEAP_BYTES);
  for(uint32_t i=0;i<10;i++){
   uint32_t id=films?film(s,o,i):0;
@@ -121,37 +129,39 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   if(id){
    uint32_t icon=id==M10V_MARLBORO_ID?M10V_MARLBORO_ICON:M10V_THREE_FILM(id)?M10V_THREE_FILM_ICON(id):M10V_LEICA(id)?M10V_LEICA_ICON(id):M10V_FOUR_LOOKS(id)?M10V_FOUR_LOOKS_ICON(id):M10V_EXTRA_FILM(id)?M10V_EXTRA_FILM_ICON(id):M10V_C41(id)?M10V_C41_ICON(id):M10V_ANIME_E6(id)?M10V_ANIME_E6_ICON_FIRST+id-306:M10V_D76(id)?775+id-M10V_D76_FIRST:id==M10V_5213_ID?774:M10V_STYLE(id)?762+id-M10V_STYLE_FIRST:id==M10V_PIXEL_ID?761:id==M10V_CHAR_ID?755:M10V_CUSTOM(id)?754:670+id;
    if(v->widgets[M10V_VIEW_HEAP]){
-    uint32_t *pixels=(uint32_t *)(uintptr_t)(v->widgets[M10V_VIEW_HEAP]+i*M10V_CARD_PIXELS*4);
+    uint32_t *pixels=(uint32_t *)(uintptr_t)(v->widgets[M10V_VIEW_HEAP]+i*M10V_CARD_TILE_PIXELS*4);
+    char custom[24];
+    const char *name=0;
     int rendered;
     if(M10V_CUSTOM(id)){
-     char name[24];uint32_t index=first+((s->index-first)/10)*10+i;
-     int ok=s->screen==M10V_SETTINGS_CATALOG?
-      m10v_sd_camera_catalog_name(index,id,name,sizeof(name)):
-      m10v_sd_camera_custom_name(&s->saved,i,name,sizeof(name));
-     rendered=m10v_film_card_custom(pixels,ok?name:"LUT",i,enabled);
-    }else rendered=m10v_film_card_render(pixels,id,i,enabled);
+     uint32_t index=(s->index/10)*10+i;
+     int ok=catalog?m10v_sd_camera_catalog_name(index,id,custom,sizeof(custom)):
+      m10v_sd_camera_custom_name(&s->saved,i,custom,sizeof(custom));
+     name=ok?custom:"LUT";
+     rendered=m10v_film_card_custom(pixels,name,i,enabled);
+    }else{
+     if(catalog)name=m10v_directory[(s->index/10)*10+i].name;
+     rendered=m10v_film_card_render(pixels,id,i,enabled);
+    }
     if(!rendered){
-    uint32_t *d=card_descriptors(v)+i*2;
-    uint32_t *directory=(uint32_t *)(uintptr_t)(v->widgets[M10V_VIEW_HEAP]+M10V_CARD_DIRECTORY_OFFSET);
-    d[0]=M10V_CARD_WIDTH|(M10V_CARD_HEIGHT<<16);d[1]=ptr(pixels)/4;
-    directory[M10V_CARD_ID(i)-M10V_CARD_FIRST]=ptr(d);
-    icon=M10V_CARD_ID(i);
+     m10v_film_card_label(pixels,catalog?name:0,i==focus);
+     icon=M10V_CARD_ID(i);
+     bitmap(v,i,icon,pixels,M10V_CARD_WIDTH,M10V_CARD_TILE_HEIGHT);
     }
    }
    ((fn2)0x5339a9a0u)(v->widgets[ICON+i],icon);
 
   }
  }
- visible(v->widgets[PAGE],films);
- if(films){
-  uint32_t current=s->index/10+1,total=((s->group>=M10V_DIRECTORY_COUNT&&s->group<=M10V_SD_DIRECTORY_LIMIT?s->group:M10V_DIRECTORY_COUNT)+9)/10,n=0;
-  char page[6];
-  if(current>=10)page[n++]=(char)('0'+current/10);
-  page[n++]=(char)('0'+current%10);page[n++]='/';
-  if(total>=10)page[n++]=(char)('0'+total/10);
-  page[n++]=(char)('0'+total%10);page[n]=0;
-  ((fn2)0x53390ef8u)(v->widgets[PAGE],ptr(page));
+ uint32_t heap=v->widgets[M10V_VIEW_HEAP];
+ if(catalog&&heap){
+  uint32_t total=((s->group>=M10V_DIRECTORY_COUNT&&s->group<=M10V_SD_DIRECTORY_LIMIT?s->group:M10V_DIRECTORY_COUNT)+9)/10;
+  uint32_t *dots=(uint32_t *)(uintptr_t)(heap+M10V_CARD_DOTS_OFFSET);
+  m10v_film_card_dots(dots,s->index/10,total);
+  bitmap(v,M10V_CARD_COUNT,M10V_CARD_DOTS_ID,dots,M10V_CARD_DOTS_WIDTH,M10V_CARD_DOTS_HEIGHT);
+  ((fn2)0x5339a9a0u)(v->widgets[PAGE],M10V_CARD_DOTS_ID);
  }
+ visible(v->widgets[PAGE],catalog&&heap);
 
  uint32_t values[4]={s->saved.stamp,s->saved.format,s->saved.corner,s->saved.color};
  if(s->screen==M10V_SETTINGS_VALUE&&s->focus<4)values[s->focus]=s->value;
@@ -211,10 +221,11 @@ extern uint32_t m10v_zoom_bits(unsigned);
 extern uint32_t m10v_zoom_caption(uint32_t);
 void m10v_settings_view_zoom(m10v_settings_view *v,const m10v_zoom_menu *s){
  if(!v||!s||v->count!=COUNT)return;
+ visible(v->widgets[TITLE],1);visible(v->widgets[FOOTER],1);
  uint32_t title=m10v_zoom_title();
  caption(v->widgets[TITLE],title);
  caption(v->widgets[FOOTER],title+(s->editing?4:3));
- visible(v->widgets[NAME],0);visible(v->widgets[PAGE],0);
+ visible(v->widgets[NAME],0);visible(v->widgets[PAGE],0);visible(v->widgets[SELECTED_COUNT],0);
  visible(v->widgets[ERROR_TEXT],s->error!=0);
  if(s->error)caption(v->widgets[ERROR_TEXT],title+(s->error==2?6:5));
  for(uint32_t i=0;i<10;i++){
@@ -239,9 +250,10 @@ void m10v_settings_view_zoom(m10v_settings_view *v,const m10v_zoom_menu *s){
 #if M10V_SHUTDOWN_ALBUM
 void m10v_settings_view_shutdown(m10v_settings_view *v,const m10v_settings *s,uint32_t count){
  if(!v||!s||v->count!=COUNT)return;
+ visible(v->widgets[TITLE],1);visible(v->widgets[FOOTER],1);
  caption(v->widgets[TITLE],1230);
  caption(v->widgets[FOOTER],M10V_VIEW_STAMP_HELP);
- visible(v->widgets[NAME],0);visible(v->widgets[PAGE],0);
+ visible(v->widgets[NAME],0);visible(v->widgets[PAGE],0);visible(v->widgets[SELECTED_COUNT],0);
  visible(v->widgets[ERROR_TEXT],s->error!=0);
  if(s->error)caption(v->widgets[ERROR_TEXT],M10V_VIEW_FAILED);
  for(uint32_t i=0;i<10;i++){
@@ -273,9 +285,10 @@ static uint32_t adj_value_resource(uint32_t id){
 }
 void m10v_settings_view_adj(m10v_settings_view *v,const m10v_settings *s){
  if(!v||!s||v->count!=COUNT)return;
+ visible(v->widgets[TITLE],1);visible(v->widgets[FOOTER],1);
  caption(v->widgets[TITLE],1191);
  caption(v->widgets[FOOTER],1201);
- visible(v->widgets[NAME],0);visible(v->widgets[PAGE],0);
+ visible(v->widgets[NAME],0);visible(v->widgets[PAGE],0);visible(v->widgets[SELECTED_COUNT],0);
  visible(v->widgets[ERROR_TEXT],s->error!=0);
  if(s->error)caption(v->widgets[ERROR_TEXT],M10V_VIEW_FAILED);
  for(uint32_t i=0;i<10;i++){

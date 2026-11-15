@@ -45,7 +45,7 @@ class DeliveredAdjSetupTests(unittest.TestCase):
         u.mem_write(fs + 0x100, struct.pack('<I', fs + 0x200))
         u.mem_write(fs + 0x220, b'\x01')
         u.mem_write(page + 0x158, struct.pack('<I', 0x55040000))
-        u.mem_write(page + 0x158 + 56*4, struct.pack('<I', 53))
+        u.mem_write(page + 0x158 + 56*4, struct.pack('<I', 54))
         records = {}
         writes = []
         captions = {}

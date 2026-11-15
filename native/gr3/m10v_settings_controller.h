@@ -31,6 +31,7 @@ typedef struct {
 #if M10V_SHUTDOWN_ALBUM
  uint32_t shutdown_album; /* Volatile selection mirror, loaded outside power-off. */
 #endif
+ uint32_t film_touch_start,film_touch_last,film_touch_dragged;
 } m10v_settings_controller;
 _Static_assert(sizeof(m10v_native_ab_host)<=sizeof(m10v_settings),"exclusive host state capacity");
 #define M10V_SETTINGS_OWNER_BYTES 0x13bcu

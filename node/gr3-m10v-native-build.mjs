@@ -442,7 +442,11 @@ function checkRuntime(runtime, manifest) {
       runtime.readUInt32LE(at+4)*4===pixels&&runtime.subarray(pixels-BASE,pixels-BASE+icon.length).equals(icon),'native custom LUT icon differs');
     need(JSON.stringify(custom.name_resources)==='[1007,1011]'&&JSON.stringify(custom.appended_name_resources)==='[1111,1115]'&&custom.name_storage==='getter-stack-80-bytes'&&Number.isInteger(manifest.symbols.m10v_menu_custom_resource),'native custom LUT name resources differ');
     const c=manifest.film_cards;
-    need(c?.first_id===749&&c.last_id===773&&c.width===128&&c.height===128&&c.artwork_height===128&&c.caption_height===0&&c.heap_bytes===655540&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===655360&&c.directory_offset===655440&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory,'native film card ownership differs');
+    need(c?.first_id===749&&c.last_id===773&&c.width===128&&c.height===172&&c.artwork_height===128&&c.caption_height===44&&
+      c.page_dots?.id===857&&c.page_dots.width===448&&c.page_dots.height===8&&c.page_dots.max_pages===28&&
+      c.heap_bytes===895500&&c.descriptor_storage==='view-owned-heap'&&c.descriptor_offset===894976&&
+      c.directory_offset===895064&&c.directory_provider===manifest.symbols.m10v_settings_controller_card_directory&&
+      runtime.readUInt32LE(icons.table-BASE+857*4)===0,'native film card ownership differs');
     for(const name of ['width','height','draw']){
       const at=c.directory_hooks?.[name];need(Number.isInteger(at)&&at>=BASE&&at+100<=BASE+runtime.length&&at===manifest.symbols['m10v_icon_directory_'+name],'native dynamic directory hook differs');
       need(runtime.readUInt32LE(at-BASE)===0xe92d5fff&&runtime.readUInt32LE(at-BASE+4)===0xe10fc000,'native dynamic directory register guard differs');
