@@ -7,7 +7,7 @@ try:
     request = json.load(sys.stdin)
     raw = base64.b64decode(request['jpeg_base64'], validate=True)
     capacity = request['capacity']
-    if capacity not in (112509, 16687): raise ValueError('unsupported capacity')
+    if capacity not in (112509, 16687, 91119, 107902): raise ValueError('unsupported capacity')
     with Image.open(io.BytesIO(raw)) as source:
         if source.format != 'JPEG' or source.size != (720, 480): raise ValueError('JPEG must be 720 x 480')
         source.load()

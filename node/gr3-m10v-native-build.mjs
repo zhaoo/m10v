@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { inspectNativeSource as inspectOfficial } from './gr3-native-source.mjs';
 import { decodeFrameMap, sum32 } from './gr3-frames.mjs';
-import {settingsSources,settingsPatches,checkSettings,abPatches,settingsOwnerBytes,adjExtraPatches} from './gr3-settings-menu.mjs';
+import {settingsSources,settingsPatches,dialRecipePatches,checkSettings,abPatches,settingsOwnerBytes,adjExtraPatches} from './gr3-settings-menu.mjs';
 import {guidesPatches} from './gr3-guides.mjs';
 const rawDevelopmentSources=['scripts/build_gr3_raw_ingress.py','native/gr3/m10v_raw_ingress.c',
  'scripts/build_gr3_raw_menu.py','native/gr3/m10v_raw_menu.c'];
@@ -268,7 +268,7 @@ function checkRuntime(runtime, manifest) {
     'native source changed since compilation: '+name);
   need(manifest.flags.includes('-DM10V_APPENDED_SLOTS=1')===!!manifest.appended_slots,'appended compile mode differs');
   need(typeof manifest.universal_halation==='boolean'&&manifest.flags.includes('-DM10V_UNIVERSAL_HALATION=1')===manifest.universal_halation,'universal halation capability differs');
-  checkIspBase(runtime,manifest);
+  ispBasePatches(manifest,runtime);
   appendedSlotPatches(runtime,manifest);
   if(manifest.experimental_capture?.candidate_color){
     const header=readFileSync(new URL('../native/gr3/m10v_film_color_candidates.h',import.meta.url),'utf8');
@@ -498,7 +498,8 @@ function checkRuntime(runtime, manifest) {
   }
   const guideLabels=['黄金分割','黄金螺旋（左上）','黄金螺旋（右上）','黄金螺旋（左下）','黄金螺旋（右下）'];
   const adjLabels=['ADJ','设置 6','设置 7','设置 8','设置 9','构图线','胶卷库','逐卷效果','画幅','HDF 模拟','左右调整 OK 保存'];
-  const resourceCount=leica?444:420+(manifest.pure_isp_effects?.imprint?12:0)+(manifest.torn_overlay?.enabled?8:0);
+  const shutdownAlbum=manifest.flags.includes('-DM10V_SHUTDOWN_ALBUM=1');
+  const resourceCount=leica?444+6*Number(shutdownAlbum):420+(manifest.pure_isp_effects?.imprint?12:0)+(manifest.torn_overlay?.enabled?8:0);
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   if(manifest.torn_overlay?.enabled)
@@ -514,7 +515,7 @@ function checkRuntime(runtime, manifest) {
   const threeFilmStart=manifest.pure_isp_effects?.imprint?425:417;
   need(JSON.stringify(manifest.resources.texts.slice(threeFilmStart,threeFilmStart+3))===JSON.stringify(['SHD50','Revolog KOLOR','Pegasus']),'three-film captions differ');
   if(manifest.pure_isp_effects?.imprint)need(JSON.stringify(manifest.resources.texts.slice(428,432))===JSON.stringify(['暗角','暗角开关','暗角强度','开']),'vignette captions differ');
-  if(leica)need(JSON.stringify(manifest.resources.texts.slice(440))===JSON.stringify(['Leica Chrome','Leica Brass','Leica Teal','Leica Classic']),'Leica captions differ');
+  if(leica)need(JSON.stringify(manifest.resources.texts.slice(440))===JSON.stringify(['Leica Chrome','Leica Brass','Leica Teal','Leica Classic',...(shutdownAlbum?['关机图','原厂画面','图片 1','图片 2','图片 3','使用中']:[])]),'Leica or shutdown captions differ');
   for (let i=0;i<resourceCount;i++) {
     const at = manifest.resources.descriptors[i] - BASE, text = manifest.resources.texts[i];
     need(Number.isInteger(at) && at >= 0 && at + 8 < runtime.length && typeof text === 'string', 'native text pointer invalid');
@@ -607,23 +608,56 @@ function checkDetail(runtime,manifest,raw) {
   }
  }
 }
-function checkIspBase(runtime,manifest) {
+function ispBasePatches(manifest,runtime) {
  const m=manifest.isp_base, base=manifest.base;
- need(m?.schema==='m10v-gr3-isp-base/v2'&&m.bytes===504&&m.base%16===0&&m.base>=base&&m.base+504<=base+runtime.length&&
+ const preview=!!manifest.symbols.m10v_isp_frame_photo_recipe_write;
+ const inventory=preview?[...ispHooks,[0x536dc998,0xe5d5c77c,4,0xe5940000,'live_cache_tone']]:ispHooks;
+ const entries=inventory.map(h=>h[4]).concat(preview?['live_refresh','live_ctor']:[]);
+ need(m?.schema===(preview?'m10v-gr3-isp-base/v3':'m10v-gr3-isp-base/v2')&&m.base%16===0&&m.base>=base&&m.base+m.bytes<=base+runtime.length&&
   m.base_tone===11&&m.still_vtable===0x53dbd8a0&&m.live_vtable===0x53dbd938&&m.live_view==='standard'&&m.still_plan_return===0x53513620&&JSON.stringify(m.carriers)===(manifest.appended_slots?'[25,26,27,28,29,30,31,32,33,34]':'[12,18,19,20,21]'), 'native ISP base contract differs');
- need(Object.keys(m.entries||{}).sort().join('|')===ispHooks.map(h=>h[4]).sort().join('|')&&m.patches?.length===5,'native ISP inventory differs');
- for(const [i,[address,expected,reg,object,name]] of ispHooks.entries()) {
-  const at=m.base+i*104, off=4+reg*4, compare=name==='local_process'?0x53513620:0x53dbd8a0;
+ need(Object.keys(m.entries||{}).sort().join('|')===entries.sort().join('|')&&m.patches?.length===(preview?9:5),'native ISP inventory differs');
+ const patches=[];
+ let at=m.base;
+ for(const [i,[address,expected,reg,object,name]] of inventory.entries()) {
+  const off=4+reg*4, compare=name==='local_process'?0x53513620:0x53dbd8a0;
+  const cache=name==='live_cache_tone';
   need(m.entries[name]===at&&JSON.stringify(m.patches[i])===JSON.stringify({address,expected,entry:at}),'native ISP entry differs');
-  const words=[0xe92d500f,0xe10fc000,0xe52dc004,expected,(0xe58d0000|(reg<<12)|off)>>>0,object,
+  const words=[0xe92d500f,0xe10fc000,0xe52dc004,expected,(0xe58d0000|((cache?12:reg)<<12)|off)>>>0,object,
    movw(1,compare&65535),(0xe3401000|(((compare>>>16)&0xf000)<<4)|((compare>>>16)&0xfff))>>>0,
    0xe1500001,0x1a000007,0xe59d2000|off,0xe352000c,0x0a000002,0xe2422012,0xe3520003,0x8a000001,
    0xe3a0200b,0xe58d2000|off,0xe49dc004,0xe12cf00c,0xe8bd500f];
   if(manifest.appended_slots){words.splice(11,5,0xe2422019,0xe3520009,0x8a000003,0xe320f000,0xe320f000);if(name==='parameters')words[16]=0xe3a02019;}
   if(name!=='local_process')words.splice(9,0,0x0a000003,movw(1,0xd938),0xe34513db,0xe1500001);
+  if(preview&&name!=='local_process'){
+   const loads=name==='parameters'?[0xe59d2004,0xe5922210]:
+    [name==='curve'?0xe5942030:cache?0xe5942210:0xe5962210];
+   const insert=[0, ...loads,0xe6ef2072,0xe3520000,0x158d2000|off];
+   words.splice(13,1,...insert);
+   if(cache)words.splice(13+insert.length,8);
+   const done=words.length-3;
+   words[9]=0x0a000000|((cache?done:13+insert.length)-11);
+   words[13]=0x1a000000|(done-15);
+  }
   words.push(branch(at+words.length*4,address+4));
   for(const [j,word] of words.entries())need(runtime.readUInt32LE(at-base+j*4)===(word>>>0),'native ISP instruction differs: '+name+'+'+j*4);
+  patches.push({address,expected,replacement:branch(address,at),name:'Standard ISP '+name});
+  at+=words.length*4;
  }
+ if(preview){
+  need(m.entries.live_refresh===at,'Live gamma refresh entry differs');
+  const refresh=[0xe92d000c,0xe10f2000,0xe5943210,0xe3530000,0x13a03001,0x15c4300e,
+   0xe12cf002,0xe8bd000c,0xe5d4300b,branch(at+36,0x536de134)];
+  refresh.forEach((w,i)=>need(runtime.readUInt32LE(at-base+i*4)===w,'Live gamma dirty ABI differs'));
+  patches.push({address:0x536de130,expected:0xe5d4300b,replacement:branch(0x536de130,at),name:'Live candidate gamma refresh'});
+  at+=refresh.length*4;
+  need(m.entries.live_ctor===at,'Live tuning constructor entry differs');
+  [0xe3a03000,0xe5843210,0xe89da818].forEach((w,i)=>need(runtime.readUInt32LE(at-base+i*4)===w,'Live tuning constructor ABI differs'));
+  patches.push({address:0x536de408,expected:0xe89da818,replacement:branch(0x536de408,at),name:'Live tuning candidate initialization'});
+  patches.push({address:0x536f032c,expected:0xe3a00e21,replacement:0xe3000218,name:'Live tuning candidate allocation'});
+  at+=12;
+ }
+ need(at-m.base===m.bytes,'native ISP size differs');
+ return patches;
 }
 function lifecyclePatches(manifest,runtime){
  const m=manifest.capture_lifecycle;if(!m)return [];
@@ -749,6 +783,11 @@ function appendedSlotPatches(runtime,manifest,raw) {
  const patches=rows.map(([address,expected,name])=>{read(m.entries[name],4);return {address,expected,replacement:branch(address,m.entries[name]),name:'appended '+name};});
  for(const [address,old,name] of [[0x531ab7a8,0x532a985c,'menu_name'],[0x531ab894,0x532a9988,'menu_icon'],[0x531ab8bc,0x532a9988,'menu_icon'],[0x531a05ac,0x532c2c80,'index'],[0x531a070c,0x532c2c80,'index'],[0x531a0588,0x532a985c,'adj_name'],[0x531a06e0,0x532a9988,'adj_icon']]){const to=manifest.symbols['m10v_tone_menu_'+name];read(to,4);patches.push({address,expected:branch(address,old,true),replacement:branch(address,to,true),name:'appended visible '+name});}
  for(const [address,name] of [[0x531abe0c,'menu_matches'],[0x531a1500,'adj_matches'],[0x531a0ba0,'adj_select']]){const to=manifest.symbols['m10v_tone_menu_'+name];read(to,4);patches.push({address,expected:0xe1a0c00d,replacement:branch(address,to),name:'appended visible '+name});}
+ if(manifest.symbols.m10v_isp_frame_photo_recipe_write){
+  const address=0x531a4eac,to=manifest.symbols.m10v_tone_menu_adj_confirm;
+  read(to,4);
+  patches.push({address,expected:branch(address,0x531a1998,true),replacement:branch(address,to,true),name:'ADJ confirm highlighted tone'});
+ }
  need(m.exif_bytes===88,'appended EXIF capacity differs');
  const table=read(m.exif_table,88);
  if(raw)need(table.subarray(0,48).equals(raw.subarray(0xd2b6f4,0xd2b724)),'stock EXIF pairs changed');
@@ -778,7 +817,21 @@ function appendedSlotPatches(runtime,manifest,raw) {
   check('return',[0xe92d5fff,0xe10fc000,0xe92d5000,0xe1a00001,[clear],0xe8bd5000,0xe128f00c,0xe8bd5fff,0xe5c32024,[0x53523a6c,false]]);
   check('writer',[0xe92d401f,0xe1a00002,[code],0xe3500000,0x0a000005,0xe1a02000,0xe59d0004,0xe3a01000,0xe28dd010,0xe8bd4010,[0x535d02c8,false],0xe8bd401f,[0x535c780c,false]]);
   check('copy',[0xe92d401f,[clear],0xe8bd401f,[0x5313fd80,false]]);
-  const extra=[{address:0x53523984,expected:0xe3043270,replacement:movw(3,0x4280)},...[['pool_init',0x535239e4,branch(0x535239e4,0x5355e87c,true)],['checkout',0x53523e00,0xe5c12024],['return',0x53523a68,0xe5c32024]].map(([name,address,expected])=>({address,expected,replacement:branch(address,h[name])})),{address:0x53510830,expected:branch(0x53510830,0x5313fd80,true),replacement:branch(0x53510830,h.copy,true)},...[0x53608080,0x5361c0cc].map(address=>({address,expected:branch(address,0x535c780c,true),replacement:branch(address,h.writer,true)}))];
+  const recipe=m.photo_recipe,recipeWriter=manifest.symbols.m10v_isp_frame_photo_recipe_write;
+  const extra=[{address:0x53523984,expected:0xe3043270,replacement:movw(3,recipeWriter?0x4330:0x4280)},...[['pool_init',0x535239e4,branch(0x535239e4,0x5355e87c,true)],['checkout',0x53523e00,0xe5c12024],['return',0x53523a68,0xe5c32024]].map(([name,address,expected])=>({address,expected,replacement:branch(address,h[name])})),{address:0x53510830,expected:branch(0x53510830,0x5313fd80,true),replacement:branch(0x53510830,h.copy,true)},...[0x53608080,0x5361c0cc].map(address=>({address,expected:branch(address,0x535c780c,true),replacement:branch(address,h.writer,true)}))];
+  if(recipeWriter){
+   const insert=manifest.symbols.m10v_isp_frame_photo_recipe_insert;
+   read(insert,4);read(recipeWriter,4);
+   const verify=(entry,words)=>need(words.every((word,i)=>read(entry+i*4,4).readUInt32LE()===word>>>0),'photo recipe adapter instructions differ');
+   for(const [name,address] of [['jpg',0x53609564],['dng',0x535f9c00]]){
+    const entry=recipe?.[name];
+    verify(entry,[0xe1a00006,0xe92d4010,branch(entry+8,insert,true),0xe8bd4010,0xe51b2028,branch(entry+20,address+4)]);
+    extra.push({address,expected:0xe51b2028,replacement:branch(address,entry)});
+   }
+   const entry=recipe?.setter,address=0x53606738;
+   verify(entry,[0xe1d1c0b4,movw(2,0xc7f1),0xe15c0002,branch(entry+12,recipeWriter)&0x0fffffff,0xe1a0c00d,branch(entry+20,address+4)]);
+   extra.push({address,expected:0xe1a0c00d,replacement:branch(address,entry)});
+  }
   patches.splice(patches.length-3,0,...extra);
  }
  const label=playback.name;
@@ -945,7 +998,7 @@ function patchList(manifest,runtime) {
   need(rawEnabled===!!manifest.raw_development?.ingress&&rawEnabled===!!manifest.raw_development?.menu,'RAW development partial build');
   const ingress=rawIngressPatches(runtime,manifest);
   const appended=appendedSlotPatches(runtime,manifest).filter(p=>!ingress.some(raw=>p.address===raw.address));
-  return [...purePatches,...guidesPatches(runtime,manifest),...adjExtraPatches(runtime,manifest),...(manifest.half_pair?.enabled?[{address:0x531b6be4,expected:0xea026e6e,replacement:branch(0x531b6be4,manifest.symbols.m10v_half_pair_select),name:'Half pair explicit menu cancellation'}]:[]),...borderPatches(runtime,manifest),...halfPairIipPatches(runtime,manifest),...zoomPatches(runtime,manifest),...appended,...ingress,...rawMenuPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispHooks.map(([address,expected,,,name])=>({address,expected,replacement:branch(address,manifest.isp_base.entries[name]),name:'Standard still ISP '+name})),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
+  return [...purePatches,...guidesPatches(runtime,manifest),...adjExtraPatches(runtime,manifest),...(manifest.half_pair?.enabled?[{address:0x531b6be4,expected:0xea026e6e,replacement:branch(0x531b6be4,manifest.symbols.m10v_half_pair_select),name:'Half pair explicit menu cancellation'}]:[]),...borderPatches(runtime,manifest),...halfPairIipPatches(runtime,manifest),...zoomPatches(runtime,manifest),...appended,...dialRecipePatches(manifest),...ingress,...rawMenuPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispBasePatches(manifest,runtime),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
     replacement:branch(address,manifest.symbols[name],link),name})),
     {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum primary'},
     {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum secondary'},

@@ -148,7 +148,11 @@ class RenderTests(unittest.TestCase):
  def test_nv12_uv_has_half_height_and_all_profiles_are_build_time(self):
   self.configure(fmt=2);self.assertEqual(self.invoke(),1)
   gran=[c for c in self.calls if c[0]=='granulation'];self.assertEqual(gran[1][2][4]>>16,150);self.assertEqual(gran[1][6],60000)
-  curves=self.symbols['m10v_render_curves'];all_c=struct.unpack('<9216h',self.u.mem_read(curves,18432));self.assertTrue(all(0<=v<=255 for v in all_c))
+  curves=self.symbols['m10v_render_curves']
+  rows=self.words(curves,36)
+  self.assertEqual(len(set(rows)),12)
+  self.assertTrue(all(BASE<=row<=BASE+len(self.code)-512 and not row&1 for row in rows))
+  all_c=tuple(v for row in rows for v in struct.unpack('<256h',self.u.mem_read(row,512)))
   self.assertEqual(all_c,tuple(v for profile in build.leak_curves()+build.rainbow_curves() for row in profile for v in row))
   self.assertEqual(all_c[255+256],255) # white luma remains white
   self.assertEqual(all_c[9*768:9*768+256],(0,)*256)

@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.15.1",
+      "date": "2026-11-15",
+      "title": "GR III 新增机内关机图与拍摄配方联动",
+      "changes": [
+        "GR III 2.10 工作台支持将 1 至 3 张图片加入固件。刷入后在「设置 → 关机图」选择，关机图和边框各有独立入口。",
+        "配套的 GRemote 联动固件可以把拍摄时的胶卷、白平衡偏移和色温随 JPG 与 DNG 保存，并校验自定义胶卷的内容身份。原拍配方复用需使用支持该功能的 GRemote 和匹配的 SD 连接服务。",
+        "在配套固件上可用机身原有「保存设置」为 U1、U2、U3 保存配方。ADJ 影像控制支持取景试色，确认后切换胶卷，取消后恢复。机内 RAW 显影走原厂 ISP。"
+      ],
+      "notice": "适用机型为 GR III 2.10。关机图菜单修正版已通过用户真机验证。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.12.2",
       "date": "2026-11-12",
       "title": "GR III 新增四款莱卡风格胶卷",
@@ -11,9 +25,9 @@
         "GRemote 1.2.12 支持新胶卷目录，并兼容此前的莱卡测试候选。相机装卷需配套固件与 SD 连接服务。"
       ],
       "notice": "四款效果依据公开样片拟合，已完成离线构建和 ARM 回归。真机色彩、LCD 显示和保存速度仍待验证。适用机型为 GR III 2.10。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "b44b9c3cf2bbc872021508902a0ba63c0a9a29ca",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/43253178905"
     },
     {
       "version": "2026.11.12.1",

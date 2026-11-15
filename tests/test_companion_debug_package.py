@@ -23,6 +23,10 @@ class DebugPackageTests(unittest.TestCase):
   self.assertEqual(any(n.endswith('FILMS.M10')for n in files),'film_pack'in self.options)
   script=files['02_SERVICE/SD_ROOT/SCRIPT/MCW1101/SERVICE.SH'].decode();self.assertIn('/tmp/m10v-companion-1101.log',script)
   self.assertNotIn('keyHex',files['手机安装说明.txt'].decode())
+  native=json.loads(files['evidence/runtime-manifest.json'])
+  if native.get('debug_mode') and native.get('appended_slots',{}).get('photo_recipe'):
+   self.assertIn('联动验收与日志.md',files)
+   self.assertIn(b'recipe.dial.load',files['tools/read_gr3_debug_log.py'])
  def test_other_valid_pairing_key_rejected_before_output(self):
   service=self.d/'service';shutil.copytree(self.service,service)
   path=service/'pairing.json';pair=json.loads(path.read_text());key=bytes.fromhex(pair['keyHex']);key=bytes([key[0]^1])+key[1:];pair['keyHex']=key.hex();pair['keyId']=hashlib.sha256(key).hexdigest()[:32];path.write_text(json.dumps(pair))
@@ -31,8 +35,11 @@ class DebugPackageTests(unittest.TestCase):
  def test_changed_apk_camera_catalog_rejected_before_output(self):
   apk=self.d/'changed.apk';prefix='assets/flutter_assets/assets/films/'
   with zipfile.ZipFile(self.apk)as original,zipfile.ZipFile(apk,'w')as changed:
-   catalog=json.loads(original.read(prefix+'camera-catalog.json'));catalog['entries'][0]['name']='changed'
-   changed.writestr(prefix+'camera-catalog.json',json.dumps(catalog));changed.writestr(prefix+'camera-contract.json',original.read(prefix+'camera-contract.json'))
+   for item in original.infolist():
+    data=original.read(item.filename)
+    if item.filename.startswith(prefix) and item.filename.endswith('-catalog.json'):
+     catalog=json.loads(data);catalog['entries'][0]['name']='changed';data=json.dumps(catalog).encode()
+    changed.writestr(item,data)
   with self.assertRaisesRegex(ValueError,'APK camera catalog differs'):module.package_debug(self.native,self.service,apk,self.d/'never')
   self.assertFalse((self.d/'never').exists())
 
@@ -81,7 +88,7 @@ class DebugPackageTests(unittest.TestCase):
   native=json.loads((self.native/'M10V-runtime-manifest.json').read_text())
   if not native.get('companion',{}).get('extensions'):self.skipTest('legacy v2 package has no extension component')
   service=self.d/'old-service';shutil.copytree(self.service,service)
-  path=service/'m10v-companion.elf';data=path.read_bytes();current=b'c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d'
+  path=service/'m10v-companion.elf';data=path.read_bytes();current=module._extension_info(native)['contractHash'].encode()
   self.assertIn(current,data);data=data.replace(current,b'f1a60c6593fad7d22ffdbd168c9199567799b2153de15ab84064efcd215f93dc');path.write_bytes(data)
   receipt=service/'service-receipt.json';meta=json.loads(receipt.read_text());meta['serviceSha256']=hashlib.sha256(data).hexdigest();receipt.write_text(json.dumps(meta))
   with self.assertRaisesRegex(ValueError,'service extension identity differs'):
@@ -98,7 +105,7 @@ class ExtensionDeliveryContractTests(unittest.TestCase):
  def test_extension_marker_binds_exact_independent_contract(self):
   self.assertTrue(hasattr(module,'_extension_info'),'packager must recognize extension marker independently')
   info=module._extension_info(self.native())
-  self.assertEqual(info['contractHash'],'c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d')
+  self.assertEqual(info['contractHash'],'23a5ca8eaa31e77be7a915270937c65968554df965d092c5372380739ecea81e')
   self.assertEqual(info['available'],(1<<24)-1)
   for change in ['schema','available','source']:
    native=self.native()
@@ -117,7 +124,7 @@ class ExtensionDeliveryContractTests(unittest.TestCase):
   native=self.native();native['companion']['extensions']['features']['torn']=True;native['companion']['extensions']['available']=(1<<25)-1
   info=module._extension_info(native);self.assertEqual(info['available'],(1<<25)-1)
   text=module._extensions_readme({'buildId':'11'*32},info,True,False)
-  for phrase in ['撕纸叠映','白底暗色','待拍轮廓','待拍素材','原厂 ISP/IIP','YC422','RAW','实验','彩边','不自动','25 项']:
+  for phrase in ['撕纸叠映','白底暗色','待拍轮廓','待拍素材','原厂 ISP/IIP','YC422','RAW','实验','彩边','不自动','扩展设置']:
    with self.subTest(phrase=phrase):self.assertIn(phrase,text)
   native['companion']['extensions']['features']['torn']=False
   with self.assertRaisesRegex(ValueError,'extension availability'):module._extension_info(native)

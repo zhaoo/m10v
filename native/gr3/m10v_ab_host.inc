@@ -183,6 +183,9 @@ static int ab_host_event(m10v_settings_controller *p,uint32_t c,uint32_t event){
 }
 #endif
 uint32_t m10v_settings_controller_ab_adj_refresh(uint32_t c){
+#if M10V_PHOTO_RECIPE
+ m10v_camera_library_adj_tone_set(0);
+#endif
  M10V_EXIT_LOG(260,c,0,0,0);
  m10v_settings_controller *p=ab_owner();m10v_native_ab_host *h=ab_host(p);
  int target=ab_ram(c,0x274)&&ab_host_word(c,0)==0x53b394e0u&&ab_host_word(c,0x124)==0x02000000u;
@@ -210,6 +213,9 @@ uint32_t m10v_settings_controller_ab_adj_changed(uint32_t c){
  return m10v_ab_adj_changed_original(c);
 }
 uint32_t m10v_settings_controller_ab_adj_exit(uint32_t c){
+#if M10V_PHOTO_RECIPE
+ m10v_camera_library_adj_tone_set(0);
+#endif
  M10V_EXIT_LOG(237,c,ab_ram(c,0x280)?ab_host_word(c,0x124):0,ab_ram(c,0x280)?ab_host_word(c,0x1f0):0,ab_ram(c,0x280)?*(const uint8_t *)(uintptr_t)(c+0x270):0xffffffffu);
  m10v_settings_controller *p=ab_owner();ab_host_restore(p,c);
  M10V_EXIT_LOG(264,c,0,0,0);
@@ -220,6 +226,9 @@ uint32_t m10v_settings_controller_ab_adj_exit(uint32_t c){
  M10V_EXIT_LOG(238,c,r,0,0);return r;
 }
 uint32_t m10v_settings_controller_ab_adj_destroy(uint32_t c){
+#if M10V_PHOTO_RECIPE
+ m10v_camera_library_adj_tone_set(0);
+#endif
  M10V_EXIT_LOG(265,c,0,0,0);
  m10v_settings_controller *p=ab_owner();m10v_native_ab_host *h=ab_host(p);
  if(p&&p->ab_exit_source==c)p->ab_exit_source=0;

@@ -91,15 +91,15 @@ int m10v_isp_effects_render(uint32_t ctx,const uint32_t photo[8],uint32_t work,u
   if(prepare(field,work,capacity,w,h,field->width,field->height,0,format,&plan,frozen.source_si)!=1)return -4;
   copy_words(uvview,p,8);uvview[1]=p[2];uvview[2]=0;uvview[4]=w|(uvh<<16);uvview[5]=stride|(uvh<<16);
   copy_words(maskview,uvview,8);maskview[1]=work+noise_y;maskview[5]=noise_stride|(uvh<<16);
-  if(m10v_isp_effect_granulation_luma((void*)(uintptr_t)ctx,maskview,p,m10v_render_curves[9])!=1)return -4;
-  if(m10v_isp_effect_granulation_owned((void*)(uintptr_t)ctx,uvview,uvview,1,(void*)(uintptr_t)(work+noise_y),noise_stride*uvh,m10v_render_curves[profile+1u])!=1)return -4;
+  if(m10v_isp_effect_granulation_luma_rows((void*)(uintptr_t)ctx,maskview,p,m10v_render_curves[9])!=1)return -4;
+  if(m10v_isp_effect_granulation_owned_rows((void*)(uintptr_t)ctx,uvview,uvview,1,(void*)(uintptr_t)(work+noise_y),noise_stride*uvh,m10v_render_curves[profile+1u])!=1)return -4;
   field=&fields[at][1];
   if(prepare(field,work,capacity,w,h,field->width,field->height,0,format,&plan,frozen.source_si)!=1)return -4;
-  if(m10v_isp_effect_granulation_luma((void*)(uintptr_t)ctx,maskview,p,m10v_render_curves[9])!=1)return -4;
-  if(m10v_isp_effect_granulation_owned((void*)(uintptr_t)ctx,uvview,uvview,1,(void*)(uintptr_t)(work+noise_y),noise_stride*uvh,m10v_render_curves[profile+2u])!=1)return -4;
+  if(m10v_isp_effect_granulation_luma_rows((void*)(uintptr_t)ctx,maskview,p,m10v_render_curves[9])!=1)return -4;
+  if(m10v_isp_effect_granulation_owned_rows((void*)(uintptr_t)ctx,uvview,uvview,1,(void*)(uintptr_t)(work+noise_y),noise_stride*uvh,m10v_render_curves[profile+2u])!=1)return -4;
   /* Original Y stays intact for BOTH chroma gates. Last Resize retained the
    * identical spatial Y mask; finish exposure only after both luma reads. */
-  if(m10v_isp_effect_granulation_owned((void*)(uintptr_t)ctx,p,p,1,(void*)(uintptr_t)work,noise_y,m10v_render_curves[profile])!=1)return -4;
+  if(m10v_isp_effect_granulation_owned_rows((void*)(uintptr_t)ctx,p,p,1,(void*)(uintptr_t)work,noise_y,m10v_render_curves[profile])!=1)return -4;
  }
 #if M10V_ISP_IMPRINTS_BOUND
  if(imprint){
@@ -115,9 +115,9 @@ int m10v_isp_effects_render(uint32_t ctx,const uint32_t photo[8],uint32_t work,u
   for(uint32_t sign=0;sign<2;sign++){
    const m10v_isp_effect_texture *field=&m10v_render_imprints[imprint-1u][sign];
    IMPRINT_JOB(1u+sign*2u,field->base,prepare(field,work,capacity,w,h,field->width,field->height,0,format,&plan,frozen.source_si));
-   IMPRINT_JOB(2u+sign*2u,work+noise_y,m10v_isp_effect_granulation_owned((void*)(uintptr_t)ctx,uvview,uvview,1,(void*)(uintptr_t)(work+noise_y),noise_stride*uvh,m10v_render_imprint_curves[sign]));
+   IMPRINT_JOB(2u+sign*2u,work+noise_y,m10v_isp_effect_granulation_owned_rows((void*)(uintptr_t)ctx,uvview,uvview,1,(void*)(uintptr_t)(work+noise_y),noise_stride*uvh,m10v_render_imprint_curves[sign]));
   }
-  IMPRINT_JOB(5u,work,m10v_isp_effect_granulation_owned((void*)(uintptr_t)ctx,p,p,1,(void*)(uintptr_t)work,noise_y,m10v_render_imprint_curves[2]));
+  IMPRINT_JOB(5u,work,m10v_isp_effect_granulation_owned_rows((void*)(uintptr_t)ctx,p,p,1,(void*)(uintptr_t)work,noise_y,m10v_render_imprint_curves[2]));
   imprint_trace(frozen.owner,0x46584900u,6u,1u);
  }
 #endif
@@ -136,7 +136,7 @@ int m10v_isp_effects_render(uint32_t ctx,const uint32_t photo[8],uint32_t work,u
     void *plane=(void*)(uintptr_t)(component?work+noise_y:work);
     uint32_t bytes=component?noise_stride*uvh:noise_y;
     void *view=component?(void*)uvview:(void*)p;
-    if(m10v_isp_effect_granulation_owned((void*)(uintptr_t)ctx,view,view,strength,plane,bytes,m10v_render_curves[10u+sign])!=1)return -4;
+    if(m10v_isp_effect_granulation_owned_rows((void*)(uintptr_t)ctx,view,view,strength,plane,bytes,m10v_render_curves[10u+sign])!=1)return -4;
    }
   }
  }
@@ -144,7 +144,7 @@ int m10v_isp_effects_render(uint32_t ctx,const uint32_t photo[8],uint32_t work,u
   static const uint16_t crops[3][2]={{3000,2000},{1500,1000},{1008,672}};
   uint32_t size=s->grain_size;
   if(prepare(&m10v_render_grain,work,capacity,w,h,crops[size][0],crops[size][1],frozen.source_si&63u,2,&plan,frozen.source_si)!=1)return -4;
-  if(m10v_isp_effect_granulation_owned((void*)(uintptr_t)ctx,p,p,4u-frozen.effective_grain_strength,(void*)(uintptr_t)work,noise_y,0)!=1)return -4;
+  if(m10v_isp_effect_granulation_owned_rows((void*)(uintptr_t)ctx,p,p,4u-frozen.effective_grain_strength,(void*)(uintptr_t)work,noise_y,0)!=1)return -4;
  }
  return 1;
 }

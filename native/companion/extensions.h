@@ -2,8 +2,8 @@
 #define M10V_COMPANION_EXTENSIONS_H
 #include "operations.h"
 #define M10V_EXTENSIONS_SCHEMA "m10v.extensions/v1"
-#define M10V_EXTENSIONS_HASH "c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d"
-#define M10V_EXTENSION_FIELDS 25u
+#define M10V_EXTENSIONS_HASH "23a5ca8eaa31e77be7a915270937c65968554df965d092c5372380739ecea81e"
+#define M10V_EXTENSION_FIELDS 29u
 #define M10V_EXTENSION_MASK ((1u<<M10V_EXTENSION_FIELDS)-1u)
 enum {M10V_READ_EXTENSIONS=5,M10V_APPLY_EXTENSIONS=6,M10V_POLL_EXTENSIONS=7};
 typedef struct {uint32_t available,busy,values[M10V_EXTENSION_FIELDS];uint8_t revision[32];} m10v_extension_snapshot;
@@ -24,7 +24,8 @@ typedef struct {
  int (*write)(void*,uint32_t field,uint32_t value);
 } m10v_extension_services;
 extern const char *const m10v_extension_names[M10V_EXTENSION_FIELDS];
-extern const uint8_t m10v_extension_min[M10V_EXTENSION_FIELDS],m10v_extension_max[M10V_EXTENSION_FIELDS],m10v_extension_persistent[M10V_EXTENSION_FIELDS];
+extern const uint16_t m10v_extension_min[M10V_EXTENSION_FIELDS],m10v_extension_max[M10V_EXTENSION_FIELDS];
+extern const uint8_t m10v_extension_persistent[M10V_EXTENSION_FIELDS];
 int m10v_extensions_parse(const uint8_t*,uint32_t,m10v_json_token*,m10v_extension_patch*);
 int m10v_extensions_valid(const m10v_extension_snapshot*);
 int m10v_extensions_writable(uint32_t field,uint32_t value);

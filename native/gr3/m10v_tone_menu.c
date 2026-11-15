@@ -50,10 +50,58 @@ uint32_t m10v_tone_menu_adj_matches(uint32_t controller,uint32_t row){
  uint32_t address=(uint32_t)(uintptr_t)m;
  return matches(address,((fn1)0x532bd6b4u)(address),row,((fn1)0x532bd6d4u)(address));
 }
-uint32_t m10v_tone_menu_adj_select(uint32_t controller,uint32_t row){
- if(shooting(model())){
+#if M10V_PHOTO_RECIPE
+extern void m10v_camera_library_adj_tone_set(uint32_t);
+extern uint32_t m10v_camera_library_adj_tone(void);
+/* ADJ's +0x28 callback runs on highlight, including initial selection.
+ * Keep its candidate in the UI owner. The real OK callback commits below. */
+static int adj_scope(uint32_t c){
+    return c>=0x55000000u&&c<=0x80000000u-0x274u&&!(c&3u)&&
+        *(const uint32_t *)(uintptr_t)c==0x53b394e0u&&
+        *(const uint32_t *)(uintptr_t)(c+0x124)==0x02000000u&&
+        *(const uint8_t *)(uintptr_t)(c+0x270)==0;
+}
+#endif
+static uint32_t adj_commit_row(uint32_t controller,uint32_t row,uint8_t *m){
+ if(shooting(m)){
   if(row==12||row==13)row=m10v_camera_library_shooting_count()+row-12;
   else if(row>=14&&row<m10v_camera_library_menu_index())row-=2;
  }
  return ((fn2)(M10V_NATIVE_BASE+0xe0u))(controller,row);
 }
+uint32_t m10v_tone_menu_adj_select(uint32_t controller,uint32_t row){
+ uint8_t *m=model();
+#if M10V_PHOTO_RECIPE
+ if(adj_scope(controller)&&shooting(m)){
+  uint32_t tone=m10v_tone_menu_index((uint32_t)(uintptr_t)m,row);
+  if(row!=12&&row!=13&&row<m10v_camera_library_menu_index()&&m10v_tone_valid(tone)){
+   m10v_camera_library_adj_tone_set(tone);return 0;
+  }
+  m10v_camera_library_adj_tone_set(0);
+  /* Factory Custom1/2 select a backing bank. Leave their native handling
+   * to confirmation rather than showing an unrelated virtual look. */
+  return 0;
+ }
+#endif
+ return adj_commit_row(controller,row,m);
+}
+#if M10V_PHOTO_RECIPE
+extern int m10v_debug_log(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t);
+uint32_t m10v_tone_menu_adj_confirm(uint32_t controller){
+ if(adj_scope(controller)&&((fn2)0x531a2820u)(controller,
+      *(const uint8_t *)(uintptr_t)(controller+0x1f4))==12){
+  uint32_t list=*(const uint32_t *)(uintptr_t)(controller+0x1f0);
+  uint8_t *m=model();
+  if(list>=0x55000000u&&list<=0x80000000u-0x80u&&!(list&3u)&&shooting(m)){
+   uint32_t row=((fn1)0x53394820u)(list);
+   uint32_t previous=m10v_camera_library_adj_tone();
+   if(row<m10v_camera_library_menu_index()){
+    adj_commit_row(controller,row,m);
+    m10v_debug_log(144,row,previous,1,0);
+   }
+  }
+ }
+ m10v_camera_library_adj_tone_set(0);
+ return ((fn1)0x531a1998u)(controller);
+}
+#endif

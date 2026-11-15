@@ -48,6 +48,9 @@ def build_appended_slots(base, native_base, stock, symbols):
         patch(at,branch(at,old,True),branch(at,symbols['m10v_tone_menu_'+name],True))
     for at,name in [(0x531abe0c,'menu_matches'),(0x531a1500,'adj_matches'),(0x531a0ba0,'adj_select')]:
         patch(at,0xe1a0c00d,branch(at,symbols['m10v_tone_menu_'+name]))
+    if 'm10v_tone_menu_adj_confirm' in symbols:
+        at=0x531a4eac
+        patch(at,branch(at,0x531a1998,True),branch(at,symbols['m10v_tone_menu_adj_confirm'],True))
     # Preserve all official EXIF pairs, append distinct private ImageTone codes.
     table=base+len(image)
     pairs=stock[0xd2b6f4:0xd2b6f4+48]+b''.join(struct.pack('<BBH',25+i,0,0x10c+i) for i in range(10))
@@ -63,11 +66,13 @@ def build_appended_slots(base, native_base, stock, symbols):
     ]:patch(at,old,new)
     identity_enabled='m10v_isp_frame_identity_code' in symbols
     identity_hooks={}
+    photo_recipe={}
     if identity_enabled:
         # Only ProcessingManager's dedicated 100-element SI pool grows. Other
         # factory/config objects keep their stock extent. Clear at constructor,
         # checkout and return so reusing a slot cannot inherit an old identity.
-        patch(0x53523984,0xe3043270,movw(3,0x4280))
+        recipe_enabled='m10v_isp_frame_photo_recipe_write' in symbols
+        patch(0x53523984,0xe3043270,movw(3,0x4330 if recipe_enabled else 0x4280))
         identity_hooks['pool_init']=hook(0x535239e4,branch(0x535239e4,0x5355e87c,True),
             'push {r4,lr};mov r4,r0;bl 0x5355e87c;movw ip,#0x4270;movt ip,#7;add ip,r4,ip;'
             'mov r1,#0;str r1,[ip];str r1,[ip,#4];str r1,[ip,#8];str r1,[ip,#12];pop {r4,lr};b 0x535239e8')
@@ -87,6 +92,14 @@ def build_appended_slots(base, native_base, stock, symbols):
             'original:;pop {r0-r4,lr};b 0x535c780c',writer))
         for at in (0x53608080,0x5361c0cc):patch(at,branch(at,0x535c780c,True),branch(at,writer,True))
         identity_hooks['writer']=writer
+        if recipe_enabled:
+            insert=hex(symbols['m10v_isp_frame_photo_recipe_insert'])
+            for name,at in [('jpg',0x53609564),('dng',0x535f9c00)]:
+                photo_recipe[name]=hook(at,0xe51b2028,
+                    'mov r0,r6;push {r4,lr};bl '+insert+';pop {r4,lr};ldr r2,[fp,#-0x28];b '+hex(at+4))
+            photo_recipe['setter']=hook(0x53606738,0xe1a0c00d,
+                'ldrh ip,[r1,#4];movw r2,#0xc7f1;cmp ip,r2;beq '+hex(symbols['m10v_isp_frame_photo_recipe_write'])+
+                ';mov ip,sp;b 0x5360673c')
     # The legacy EXIF writer stores slot tones 25..34 as ImageTone 0x10c..0x115.
     # Official EXIF reader 0x535c24ec clamps normalized values >11 to zero.
     # Preserve its stock mapping and teach only its unknown branch about our
@@ -130,7 +143,7 @@ def build_appended_slots(base, native_base, stock, symbols):
         tones=list(range(25,35)),stock_choices=12,shooting_choices='12+enabled_films',shooting_choices_max=22,
         library_index='14+enabled_films',movie_choices=10,raw_development_choices=12,
         entries=dict(count=count,index=index,position=position,maximum=maximum,display=display),
-        exif_table=table,exif_bytes=88,patches=patches,
+        exif_table=table,exif_bytes=88,patches=patches,photo_recipe=photo_recipe,
         playback=dict(icon=icon,detail=detail,name=name,metadata_decode=metadata_decode,icon_id=876,metadata_key=0x25,recorded_codes=[0x10c,0x115],identity="recorded-film-short-v1",identity_hooks=identity_hooks,identity_enabled=identity_enabled,
             recording=dict(builtin='0x1000+film_id',custom='0x2000+(film_id-79)*235+bank-21',custom_banks=[21,255],custom_codes=[0x2000,0xe0c5],si_tail_offset=0x74270,si_tail_bytes=16,pool_count=100,extra_pool_bytes=1600,source='immutable recipe snapshot; leased ShootingInfo only',filesystem_calls=0,legacy='unknown film icon; never current slot',mutable_legacy_custom='slot-only fallback')),
         stock_parameter_proxy=False,state_version=5,camera_tested=False)

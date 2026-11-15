@@ -3,6 +3,23 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {decodeFrameMap,sum32} from './gr3-frames.mjs';
 const module=await import('./gr3-power-images.mjs').catch(()=>({}));
+test('album assets stay separate and preserve the stock request table',()=>{
+ const source=readFileSync(new URL('../bin/fwdc239b-gr3-official.bin',import.meta.url));
+ const original=decodeFrameMap(source).decoded;
+ const jpeg=original.subarray(59298689,59298689+112509).toString('base64');
+ const input={shutdownAlbum:[{jpeg_base64:jpeg},{jpeg_base64:jpeg},{jpeg_base64:jpeg}]};
+ const prepared=module.preparePowerImages(source,input);
+ assert.deepEqual(prepared.shutdownAlbum.map(i=>i.request),[13,14,15]);
+ const result=module.applyPowerImages(source,source,input);
+ const actual=decodeFrameMap(result.candidate).decoded;
+ assert.equal(actual[0x10870+0xb22abc],66);
+ for(const offset of [0xb229cc,0xb229ac,0xb2298c])assert.equal(actual[0x10870+offset],66);
+ for(const name of ['GB_ING.jpg','GB_Urban.jpg','GB_Diary.jpg'])assert.ok(actual.includes(Buffer.from(`A:\\Resource\\Jpeg\\${name}\0`)));
+ const table=0x10870+0x107e0bc;
+ assert.deepEqual(actual.subarray(table,table+48),original.subarray(table,table+48));
+ assert.throws(()=>module.preparePowerImages(source,{...input,shutdown:{jpeg_base64:jpeg}}),/不能同时/);
+ assert.throws(()=>module.preparePowerImages(source,{shutdownAlbum:new Array(1)}),/数据无效/);
+});
 test('shutdown export installs A-drive JPEG and all five factory shutdown requests, with fresh container readback',()=>{
  assert.equal(typeof module.applyPowerImages,'function','power-image builder is required');
  const source=readFileSync(new URL('../bin/fwdc239b-gr3-official.bin',import.meta.url));

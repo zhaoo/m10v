@@ -162,6 +162,13 @@ class DebugLogArmTests(unittest.TestCase):
         self.assertIn('not an encoded JPEG',rows[1]['cpu_samples']['scope'])
         self.assertEqual(rows[2]['layout']['stock_tone'],18)
 
+    def test_raw_development_log_distinguishes_an_isp_identity_from_stock(self):
+        for code in (0x114b, 0):
+            self.assertEqual(self.log(139,0x55001000,code,0,0),1)
+        records=self.decoded()['records']
+        self.assertEqual(records[0]['raw_development']['film_code'],0x114b)
+        self.assertEqual(records[1]['raw_development']['film_code'],None)
+
     def test_debug_capture_chain_restores_stock_arguments_flags_and_stack(self):
         registers=(UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3,UC_ARM_REG_R4,
                    UC_ARM_REG_R5,UC_ARM_REG_R6,UC_ARM_REG_R7,UC_ARM_REG_R8,UC_ARM_REG_R9,

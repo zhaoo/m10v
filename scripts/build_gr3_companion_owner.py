@@ -10,8 +10,8 @@ def identity_flags(identity):
 def build_companion_owner(base,imports,identity,folder,extensions=None):
  from scripts.build_gr3_m10v_library import FLAGS,link_object
  extensions=extensions or {}
- if set(extensions)-{'ab','hdf','border','isp','zoom','aspect','torn'} or any(type(v)is not bool for v in extensions.values()):raise ValueError('invalid companion feature flags')
- feature_flags=[f'-DM10V_COMPANION_EXT_{name.upper()}={int(extensions.get(name,False))}' for name in ['ab','hdf','border','isp','zoom','aspect']]
+ if set(extensions)-{'ab','hdf','border','isp','zoom','aspect','torn','wb'} or any(type(v)is not bool for v in extensions.values()):raise ValueError('invalid companion feature flags')
+ feature_flags=[f'-DM10V_COMPANION_EXT_{name.upper()}={int(extensions.get(name,False))}' for name in ['ab','hdf','border','isp','zoom','aspect','wb']]
  flags=feature_flags+identity_flags(identity)+['-DM10V_COMPANION_RTOS_ONLY=1','-DM10V_LIVE_COLOR=1','-DM10V_APPENDED_SLOTS=1',f'-DM10V_TORN_ENABLED={int(extensions.get("torn",False))}']
  if base&15:raise ValueError('companion component must be aligned')
  compiler=os.environ.get('M10V_LLVM_CLANG') or shutil.which('clang');folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
@@ -31,5 +31,6 @@ def build_companion_owner(base,imports,identity,folder,extensions=None):
   image+=bytes(at-base-len(image))+code;symbols.update(entries);exports.update(entries)
  available=((1<<17)-(1<<12)) | (7 if extensions.get('ab') else 0) | (1<<3 if extensions.get('hdf') else 0) | (1<<4 if extensions.get('border') else 0) | ((1<<12)-(1<<5) if extensions.get('isp') else 0) | (7<<21 if extensions.get('isp') else 0) | (7<<17 if extensions.get('zoom') else 0) | (1<<20 if extensions.get('aspect') else 0)
  if extensions.get('torn'):available|=1<<24
+ if extensions.get('wb'):available|=15<<25
  report={'extensions':{'schema':'m10v.extensions/v1','available':available,'features':extensions,'powerImages':'firmwareBuildOnly'},'schema':'m10v-companion-owner/v2','enabled':True,'base':base,'bytes':len(image),'descriptor_offset':0x6400,'descriptor_bytes':64,'owner_bytes':0x6440,'per_owner_allocation_limit':16384,'mailbox_lifetime':'retainedUntilPoweroff','requestOffset':128,'payloadBytes':1024,'identity':identity,'symbols':exports,'camera_tested':False,'continuousCacheValidated':False,'sources':{name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in SOURCES+HEADERS}}
  return bytes(image),report

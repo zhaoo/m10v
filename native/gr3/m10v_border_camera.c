@@ -5,6 +5,25 @@
 #define CACHE_MAGIC 0x3143424du
 typedef struct {uint32_t magic,version,sequence,style,reserved,crc;} border_record;
 static const char names[2][12]={"BORDERA.BIN","BORDERB.BIN"};
+#if M10V_PHOTO_RECIPE
+extern const char *m10v_camera_library_box_path(uint32_t,uint32_t,uint32_t);
+extern uint32_t m10v_camera_library_box_id(void);
+#endif
+static const char *journal_path(uint32_t box,uint32_t page){
+#if M10V_PHOTO_RECIPE
+ if(box)return m10v_camera_library_box_path(box,1,page);
+#else
+ (void)box;
+#endif
+ return names[page];
+}
+static uint32_t journal_box(void){
+#if M10V_PHOTO_RECIPE
+ return m10v_camera_library_box_id();
+#else
+ return 0;
+#endif
+}
 _Static_assert(sizeof(border_record)==24,"border journal ABI");
 _Static_assert(sizeof(m10v_border_cache)==16,"border owner cache ABI");
 static int ram(uintptr_t p,uint32_t n){return !(p&3)&&p>=0x55000000u&&p<=0x80000000u-n;}
@@ -17,9 +36,9 @@ static uint32_t filesystem(void){
  uint32_t a=*(const uint32_t *)(uintptr_t)(m+8);if(!ram(a,4))return 0;
  uint32_t fs=*(const uint32_t *)(uintptr_t)a;return ram(fs,0x24)&&*(const uint8_t *)(uintptr_t)(fs+0x20)?fs:0;
 }
-static int latest(uint32_t fs,border_record *out){
+static int latest(uint32_t fs,uint32_t box,border_record *out){
  border_record r[2];int good[2];for(uint32_t i=0;i<sizeof(r);i++)((uint8_t *)r)[i]=0;
- for(uint32_t i=0;i<2;i++)good[i]=((int (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,names[i],24,&r[i])&&valid(&r[i]);
+ for(uint32_t i=0;i<2;i++)good[i]=((int (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,journal_path(box,i),24,&r[i])&&valid(&r[i]);
  if(!good[0]&&!good[1])return 0;
  uint32_t i=!good[0]||(good[1]&&r[1].sequence>r[0].sequence);
  for(uint32_t n=0;n<6;n++)((uint32_t *)out)[n]=((const uint32_t *)&r[i])[n];return 1;
@@ -37,33 +56,43 @@ static int publish(m10v_border_cache *c,uint32_t style,uint32_t sequence){
 int m10v_border_camera_refresh(uint32_t owner){
  m10v_border_cache *c=cache(owner);if(!c)return -1;
  uint32_t fs=filesystem();if(!fs)return -1;
- border_record r;int found=latest(fs,&r);return publish(c,found?r.style:M10V_BORDER_OFF,found?r.sequence:0);
+ uint32_t box=journal_box();
+ border_record r;int found=latest(fs,box,&r)||(box&&latest(fs,0,&r));
+ if(box!=journal_box())return -1;
+ return publish(c,found?r.style:M10V_BORDER_OFF,found?r.sequence:0);
 }
-int m10v_border_camera_save(uint32_t owner,uint32_t style){
+static int save_box(uint32_t owner,uint32_t box,uint32_t style){
  m10v_border_cache *c=cache(owner);if(!c||style>M10V_BORDER_FILM)return -1;
  uint32_t fs=filesystem();if(!fs)return -2;
- border_record old,r,back;uint32_t sequence=latest(fs,&old)?old.sequence:0;
+ border_record old,r,back;uint32_t sequence=latest(fs,box,&old)?old.sequence:0;
  /* UI is the sole journal writer. A stable authenticated cache supplies a
   * lower sequence bound when card reads fail transiently; never rewind it. */
  uint32_t version=__atomic_load_n(&c->version,__ATOMIC_ACQUIRE);
- if(version&&!(version&1u)&&c->magic==CACHE_MAGIC&&c->style<=M10V_BORDER_FILM){
+ if(box==journal_box()&&version&&!(version&1u)&&c->magic==CACHE_MAGIC&&c->style<=M10V_BORDER_FILM){
   uint32_t floor=c->sequence;__atomic_thread_fence(__ATOMIC_ACQUIRE);
   if(version==__atomic_load_n(&c->version,__ATOMIC_RELAXED)&&floor>sequence)sequence=floor;
  }
  if(sequence==0xffffffffu)return -3;
  r.magic=BORDER_MAGIC;r.version=1;r.sequence=sequence+1;r.style=style;r.reserved=0;r.crc=crc(&r);
  for(uint32_t i=0;i<sizeof(back);i++)((uint8_t *)&back)[i]=0;
- if(!((int (*)(uint32_t,const char *,uint32_t,const void *))0x53825fa8u)(fs,names[r.sequence&1],24,&r))return -4;
- if(!((int (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,names[r.sequence&1],24,&back))return -5;
+ if(!((int (*)(uint32_t,const char *,uint32_t,const void *))0x53825fa8u)(fs,journal_path(box,r.sequence&1),24,&r))return -4;
+ if(!((int (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,journal_path(box,r.sequence&1),24,&back))return -5;
  if(!valid(&back))return -6;
  for(uint32_t i=0;i<6;i++)if(((const uint32_t *)&r)[i]!=((const uint32_t *)&back)[i])return -7;
  /* Readback of one slot does not prove that it wins the journal. In
   * particular an unpublished cache plus failed initial reads can hide an
   * older higher-sequence slot. Report failure instead of false success. */
- if(!latest(fs,&old))return -8;
+ if(!latest(fs,box,&old))return -8;
  for(uint32_t i=0;i<6;i++)if(((const uint32_t *)&r)[i]!=((const uint32_t *)&old)[i])return -9;
- return publish(c,style,r.sequence)?-10:0;
+ return box==journal_box()&&publish(c,style,r.sequence)?-10:0;
 }
+int m10v_border_camera_save(uint32_t owner,uint32_t style){return save_box(owner,journal_box(),style);}
+#if M10V_PHOTO_RECIPE
+int m10v_border_camera_copy_box(uint32_t owner,uint32_t box){
+ uint32_t style;
+ return m10v_border_camera_snapshot(&style)?save_box(owner,box,style):-1;
+}
+#endif
 int m10v_border_camera_snapshot(uint32_t *out){
  if(!ram((uintptr_t)out,4)||!(*(const volatile uint32_t *)0x55063910u&1u))return 0;
  uint32_t owner=__atomic_load_n((const uint32_t *)0x55063988u,__ATOMIC_ACQUIRE);

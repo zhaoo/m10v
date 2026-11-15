@@ -20,6 +20,9 @@
 #include "m10v_save_trace.h"
 #endif
 #include "m10v_isp_recipe_color.h"
+#if M10V_RAW_DEVELOPMENT && M10V_DEBUG_MODE
+#include "m10v_film_identity.h"
+#endif
 #if M10V_PURE_ISP_EFFECTS
 #include "m10v_isp_effects_pipeline.h"
 #endif
@@ -52,7 +55,7 @@ static void trace_append(m10v_capture_trace *trace,uint32_t e,uint32_t a,uint32_
 #if M10V_CAPTURE_PROFILE
     /* Keep three one-shot film samples inside the existing 63-record page.
      * Timing checkpoints replace CPU hashes and redundant render markers. */
-    if(e!=100&&e!=101&&e!=102&&e!=112&&e!=113&&e!=121&&e!=124&&e!=125&&e!=126&&e!=132&&e!=135&&e!=137&&e!=138)return;
+    if(e!=100&&e!=101&&e!=102&&e!=112&&e!=113&&e!=121&&e!=124&&e!=125&&e!=126&&e!=132&&e!=135&&e!=137&&e!=138&&e!=139)return;
 #endif
     if(trace->count>=sizeof(trace->events)/sizeof(trace->events[0]))return;
     uint32_t *r=trace->events[trace->count++];r[0]=e;r[1]=a;r[2]=b;r[3]=c;r[4]=d;
@@ -238,7 +241,10 @@ int m10v_capture_library(uint32_t context) {
 #if M10V_RAW_DEVELOPMENT
     /* Mode 12 owns its completed color and identity in Still Make. The
      * developed JPEG never uses the live capture journal or residual effects. */
-    if(sequence_mode==12u)return 0;
+    if(sequence_mode==12u){
+        CAPTURE_LOG(139,context,m10v_film_identity_read(shooting),0,0);
+        return 0;
+    }
 #endif
 #if M10V_PURE_ISP_EFFECTS
     /* This bridge's return value is not an encoder abort. The authenticated

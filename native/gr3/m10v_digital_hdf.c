@@ -39,6 +39,25 @@ static hdf_shot *owner(uintptr_t p){
 /* A separate 24-byte journal. No film state or film defaults are read. */
 typedef struct {uint32_t magic,version,sequence,strength,reserved,crc;} hdf_record;
 static const char names[2][12]={"M10VHD0.BIN","M10VHD1.BIN"};
+#if M10V_PHOTO_RECIPE
+extern const char *m10v_camera_library_box_path(uint32_t,uint32_t,uint32_t);
+extern uint32_t m10v_camera_library_box_id(void);
+#endif
+static const char *journal_path(uint32_t box,uint32_t page){
+#if M10V_PHOTO_RECIPE
+ if(box)return m10v_camera_library_box_path(box,0,page);
+#else
+ (void)box;
+#endif
+ return names[page];
+}
+static uint32_t journal_box(void){
+#if M10V_PHOTO_RECIPE
+ return m10v_camera_library_box_id();
+#else
+ return 0;
+#endif
+}
 static __attribute__((always_inline)) inline uint32_t crc(const hdf_record *r){
  uint32_t c=0xffffffffu;for(uint32_t i=0;i<20;i++){c^=((const uint8_t *)r)[i];for(uint32_t b=0;b<8;b++)c=(c>>1)^(0xedb88320u&(0u-(c&1u)));}return ~c;
 }
@@ -49,10 +68,10 @@ static uint32_t filesystem(void){
  uint32_t fs=*(const uint32_t *)(uintptr_t)a;
  return ram(fs,0x24)&&*(const uint8_t *)(uintptr_t)(fs+0x20)?fs:0;
 }
-static int latest(uint32_t fs,hdf_record *out){
+static int latest(uint32_t fs,uint32_t box,hdf_record *out){
  hdf_record records[2];int good[2];
  for(uint32_t i=0;i<sizeof(records);i++)((uint8_t *)records)[i]=0;
- for(uint32_t i=0;i<2;i++)good[i]=((int (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,names[i],24,&records[i])&&valid(&records[i]);
+ for(uint32_t i=0;i<2;i++)good[i]=((int (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,journal_path(box,i),24,&records[i])&&valid(&records[i]);
  if(!good[0]&&!good[1])return 0;
  uint32_t i=!good[0]||(good[1]&&records[1].sequence>records[0].sequence);
  for(uint32_t n=0;n<6;n++)((uint32_t *)out)[n]=((const uint32_t *)&records[i])[n];return 1;
@@ -78,17 +97,27 @@ int m10v_hdf_cached(uint32_t *strength){
 int m10v_hdf_load(uint32_t *strength){
  if(!ram((uintptr_t)strength,4))return -1;
  uint32_t fs=filesystem();if(!fs)return -1;
- hdf_record r;*strength=latest(fs,&r)?r.strength:M10V_HDF_DEFAULT;publish(*strength);return 0;
+ hdf_record r;uint32_t box=journal_box();
+ *strength=(latest(fs,box,&r)||(box&&latest(fs,0,&r)))?r.strength:M10V_HDF_DEFAULT;
+ if(box!=journal_box())return -1;
+ publish(*strength);return 0;
 }
-int m10v_hdf_save(uint32_t strength){
+static int save_box(uint32_t box,uint32_t strength){
  if(strength>3)return -1;uint32_t fs=filesystem();if(!fs)return -1;
- hdf_record old,r,back;uint32_t sequence=latest(fs,&old)?old.sequence:0;if(sequence==0xffffffffu)return -1;
+ hdf_record old,r,back;uint32_t sequence=latest(fs,box,&old)?old.sequence:0;if(sequence==0xffffffffu)return -1;
  r.magic=HDF_MAGIC;r.version=1;r.sequence=sequence+1;r.strength=strength;r.reserved=0;r.crc=crc(&r);
  for(uint32_t i=0;i<6;i++)((uint32_t *)&back)[i]=0;
- if(!((int (*)(uint32_t,const char *,uint32_t,const void *))0x53825fa8u)(fs,names[r.sequence&1],24,&r)||
-    !((int (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,names[r.sequence&1],24,&back)||!valid(&back))return -1;
- for(uint32_t i=0;i<6;i++)if(((const uint32_t *)&r)[i]!=((const uint32_t *)&back)[i])return -1;publish(strength);return 0;
+ if(!((int (*)(uint32_t,const char *,uint32_t,const void *))0x53825fa8u)(fs,journal_path(box,r.sequence&1),24,&r)||
+    !((int (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,journal_path(box,r.sequence&1),24,&back)||!valid(&back))return -1;
+ for(uint32_t i=0;i<6;i++)if(((const uint32_t *)&r)[i]!=((const uint32_t *)&back)[i])return -1;if(journal_box()==box)publish(strength);return 0;
 }
+int m10v_hdf_save(uint32_t strength){return save_box(journal_box(),strength);}
+#if M10V_PHOTO_RECIPE
+int m10v_hdf_copy_box(uint32_t box){
+ uint32_t strength;
+ return m10v_hdf_cached(&strength)?-1:save_box(box,strength);
+}
+#endif
 void m10v_hdf_bootstrap(void){
 #if M10V_HDF_UI_CACHE
  uint32_t strength;if(m10v_hdf_cached(&strength)<0)m10v_hdf_load(&strength);
@@ -126,6 +155,12 @@ void m10v_hdf_task_snapshot(uint32_t recipe){
      * of color-cache admission. Later task kinds/UI changes cannot retarget
      * it. Both successful and unavailable-cache decisions stay frozen. */
     m10v_hdf_producer(recipe);
+}
+int m10v_hdf_shot_read(uint32_t recipe,uint32_t *strength){
+    const hdf_shot *s=owner(recipe);
+    if(!s||!strength||!(s->ready&1u)||s->strength>3)return 0;
+    *strength=s->strength;
+    return 1;
 }
 void m10v_hdf_gate(uint32_t recipe,uint32_t request,uint32_t si){
     hdf_shot *s=owner(recipe);
@@ -177,7 +212,8 @@ void m10v_hdf_done(uint32_t context,uint32_t params,uint32_t result){
 int m10v_hdf_remote_snapshot(uint32_t *strength,uint32_t *sequence){
  uint32_t fs=filesystem();if(!fs||!strength||!sequence)return -1;
  hdf_record r;uint32_t actual,generation=0,effective;
- if(latest(fs,&r)){actual=r.strength;generation=r.sequence;}else actual=M10V_HDF_DEFAULT;
+ uint32_t box=journal_box();
+ if(latest(fs,box,&r)||(box&&latest(fs,0,&r))){actual=r.strength;generation=r.sequence;}else actual=M10V_HDF_DEFAULT;
 #if M10V_HDF_UI_CACHE
  /* A durable write can precede failed verification/publication. A read must
   * never repair that divergence or claim the capture cache adopted it. */

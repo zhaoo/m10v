@@ -7,13 +7,17 @@ typedef struct {
  uint32_t capacity,magic,context,noise_plane,noise_bytes,curves,nonce;
  volatile uint32_t failed,completed,wait_failures,rng_skipped,submitted,released;
  uint32_t noise_stride;
+ uint32_t curve_rows;
 } m10v_isp_effect_granulation_info;
 int m10v_isp_effect_granulation_owned(void *ctx,void *dst,const void *src,uint32_t strength,void *plane,uint32_t bytes,const int16_t curves[3][256]);
 int m10v_isp_effect_granulation_luma(void *ctx,void *mask,const uint32_t photo[8],const int16_t curves[3][256]);
+int m10v_isp_effect_granulation_owned_rows(void *ctx,void *dst,const void *src,uint32_t strength,void *plane,uint32_t bytes,const int16_t *const curves[3]);
+int m10v_isp_effect_granulation_luma_rows(void *ctx,void *mask,const uint32_t photo[8],const int16_t *const curves[3]);
 /* Single YC byte plane. Metadata descriptors have zero ROI and second plane;
  * only exact src==dst in-place alias is permitted. Caller authenticates native
  * allocation ownership and transitions caches before submission. */
 int m10v_isp_effect_granulation_plane(void *ctx,void *dst,const void *src,void *mask,uint32_t bytes,uint32_t pitch,const int16_t curves[3][256]);
+int m10v_isp_effect_granulation_plane_rows(void *ctx,void *dst,const void *src,void *mask,uint32_t bytes,uint32_t pitch,const int16_t *const curves[3]);
 void m10v_isp_effect_granulation_setup(uint32_t *frame,uint32_t registers[14]);
 uint32_t m10v_isp_effect_granulation_call(void*,void*,const void*,uint32_t,void*,m10v_isp_effect_granulation_info*);
 int m10v_isp_effect_granulation_is_owned(uint32_t *frame);

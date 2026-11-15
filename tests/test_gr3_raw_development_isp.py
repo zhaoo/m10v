@@ -21,7 +21,7 @@ class DeliveredRawIspTests(unittest.TestCase):
         for model in ('gr3', 'gr3x'):
             value = os.environ.get('M10V_RAW_ISP_' + model.upper())
             if not value:
-                raise unittest.SkipTest('set both audited RAW candidate directories')
+                continue
             folder = Path(value)
             manifest = json.loads((folder / 'M10V-runtime-manifest.json').read_text())
             receipt = json.loads((folder / 'M10V-build-receipt.json').read_text())
@@ -29,8 +29,18 @@ class DeliveredRawIspTests(unittest.TestCase):
             image = decode(binary)
             assert sha(binary.read_bytes()) == receipt['candidate_sha256']
             start = manifest['base'] - ROM
-            assert sha(image[start:start + manifest['code_bytes']]) == manifest['code_sha256']
+            runtime = image[start:start + manifest['code_bytes']]
+            power = receipt.get('power_images') or {}
+            album = power.get('shutdown_album_menu')
+            if album:
+                assert sha(runtime) == power['runtime_sha256']
+                marker = manifest['symbols']['m10v_settings_controller_shutdown_config'] - manifest['base']
+                assert runtime[marker:marker + 8] == struct.pack('<II', 0x3141534d, album['entries'])
+                runtime = runtime[:marker + 4] + bytes(4) + runtime[marker + 8:]
+            assert sha(runtime) == manifest['code_sha256']
             cls.artifacts[model] = (manifest, image)
+        if not cls.artifacts:
+            raise unittest.SkipTest('set an audited RAW candidate directory')
 
     def test_owned_raw_make_and_writer_follow_the_processed_film(self):
         for model, (manifest, image) in self.artifacts.items():
@@ -50,7 +60,7 @@ class DeliveredRawIspTests(unittest.TestCase):
                 camera.u.emu_start(0x5350eb10, 0x5350eb38, count=100)
                 pool = camera.alloc(0x218)
                 camera.w32(0x55345328, pool)
-                camera.w32(pool + 0x20, 0x74280)
+                camera.w32(pool + 0x20, 0x74330 if manifest['appended_slots'].get('photo_recipe') else 0x74280)
                 camera.w32(pool + 0x88, si)
                 writes = []
 
@@ -83,6 +93,37 @@ class DeliveredRawIspTests(unittest.TestCase):
                     entry = manifest['appended_slots']['playback']['identity_hooks']['writer']
                     camera.call(entry, 0, 0, si)
                     self.assertEqual(writes[-1], (0x535d02c8, expected) if expected else (0x535c780c, si))
+                    if mode == 12 and model == 'gr3' and manifest['debug_mode']:
+                        context = recipe + 0x9b8
+                        request = camera.alloc(0x40)
+                        for offset, value in (
+                            (0, 0x53d0fbe0), (0x30, recipe + 0x1a8),
+                            (0x34, si), (0x38, request), (0x3c, recipe + 0xb0),
+                            (0x48, recipe + 0x110), (0x4c, recipe + 0x130),
+                        ):
+                            camera.w32(context + offset, value)
+                        camera.w32(recipe + 0x5c, request)
+                        camera.w32(request, 0x53d0fe60)
+                        camera.u.mem_write(request + 12, b'\x01\x01')
+                        camera.u.mem_write(recipe + 0x140, b'\x01')
+                        batches = []
+
+                        def collect(u, address, size, unused):
+                            records = u.reg_read(arm.UC_ARM_REG_R1)
+                            start = u.reg_read(arm.UC_ARM_REG_R0)
+                            batches.extend(struct.iter_unpack('<5I', u.mem_read(start, 20 * records)))
+                            u.reg_write(arm.UC_ARM_REG_PC, u.reg_read(arm.UC_ARM_REG_LR))
+
+                        logger = symbols['m10v_debug_batch']
+                        hook = camera.u.hook_add(UC_HOOK_CODE, collect, begin=logger, end=logger)
+                        try:
+                            self.assertEqual(run('m10v_capture_library', context), 0)
+                        finally:
+                            camera.u.hook_del(hook)
+                        # No pixel planes are mapped, and this RAW branch
+                        # must not enter the CPU image-processing stages.
+                        self.assertIn((139, context, expected, 0, 0), batches)
+                        self.assertFalse(any(event == 138 for event, *_ in batches))
                 self.assertNotEqual(output[33], output[67])
                 self.assertNotEqual(output[33], output[0])
 

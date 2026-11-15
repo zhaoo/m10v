@@ -23,7 +23,7 @@ class ServiceTargetBuildTests(unittest.TestCase):
    self.assertLessEqual(receipt['stagingStaticBytes']+4096,65536)
    self.assertFalse(receipt['cameraPassed'])
    from scripts.package_companion_debug import _extension_service_identity
-   elf=(Path(d)/'service/m10v-companion.elf').read_bytes();current='c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d'
+   elf=(Path(d)/'service/m10v-companion.elf').read_bytes();current='579e3f88435e8547435f61a2e7d9d5bf72b8b2379ee995097fe5576c863b59d0'
    extension={'schema':'m10v.extensions/v1','contractHash':current}
    _extension_service_identity(extension,elf)
    previous=elf.replace(current.encode(),b'f1a60c6593fad7d22ffdbd168c9199567799b2153de15ab84064efcd215f93dc')

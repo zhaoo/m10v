@@ -25,7 +25,7 @@ class TornExtensions(native.ProductionOwner):
   m=self.machine();owner=0x55860000;m.run(self.symbols['m10v_companion_ui_init'],owner);wire=m.word(owner+0x6400+16)
   m.run(self.symbols['m10v_companion_ui_start'],owner);self.exchange(m,wire,2,1,bytes([7]*16))
   code,read=self.exchange(m,wire,4,5);self.assertEqual(code,0);self.assertEqual(struct.unpack_from('<I',read,12)[0],(31<<12)|(1<<24))
-  contract=bytes.fromhex('c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d')
+  contract=bytes.fromhex('579e3f88435e8547435f61a2e7d9d5bf72b8b2379ee995097fe5576c863b59d0')
   def patch(ident,action,revision):return bytes([ident]*16)+bytes([7]*16)+contract+revision+struct.pack('<II',24,action)
   # A local restart that returns to the same visible stage invalidates CAS.
   m.torn_generation=2

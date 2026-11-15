@@ -101,8 +101,8 @@ def _embedded_owner_identity(rom,manifest):
  flags=identity_flags(identity)
  features=component.get('extensions',{}).get('features',{})
  required={'ab','hdf','border','isp','zoom','aspect'}
- if set(features)not in(required,required|{'torn'}) or any(type(v)is not bool for v in features.values()):raise ValueError('runtime owner extension layout differs')
- flags+=[f'-DM10V_COMPANION_EXT_{name.upper()}={int(features[name])}' for name in ['ab','hdf','border','isp','zoom','aspect']]
+ if not (required<=set(features)<=required|{'torn','wb'}) or any(type(v)is not bool for v in features.values()):raise ValueError('runtime owner extension layout differs')
+ flags+=[f'-DM10V_COMPANION_EXT_{name.upper()}={int(features.get(name,False))}' for name in ['ab','hdf','border','isp','zoom','aspect','wb']]
  flags+=['-DM10V_COMPANION_RTOS_ONLY=1','-DM10V_LIVE_COLOR=1','-DM10V_APPENDED_SLOTS=1',f'-DM10V_TORN_ENABLED={int(features.get("torn",False))}']
  for name,digest in component.get('sources',{}).items():
   if name.startswith('/') or '..' in Path(name).parts or _hash((ROOT/name).read_bytes())!=digest:raise ValueError('runtime owner source differs: '+name)
@@ -168,7 +168,21 @@ def _target_metadata(folder,catalog_hash,renderer_hash):
  command="import{readFileSync}from'node:fs';import{decodeFrameMap}from'./node/gr3-frames.mjs';const b=readFileSync(process.argv[1]),d=decodeFrameMap(b,b.readUInt32LE(b.length-8)).decoded;process.stdout.write(d.subarray(0x10870,0x10870+d.readUInt32LE(0x1086c)));"
  rom=subprocess.check_output(['node','--input-type=module','-e',command,str(binary)],cwd=ROOT)
  offset=manifest['base']-0x53000000
- if offset<0 or _hash(rom[offset:offset+manifest['code_bytes']])!=manifest['code_sha256']:raise ValueError('candidate runtime hash differs')
+ runtime=rom[offset:offset+manifest['code_bytes']]
+ power=receipt.get('power_images') or {}
+ album=power.get('shutdown_album_menu')
+ if album is not None:
+  marker=manifest['symbols']['m10v_settings_controller_shutdown_config']-manifest['base']
+  count=album.get('entries')
+  menu=manifest.get('hdf_menu') or manifest['settings_menu']
+  route_offset=0x53b36c88-0x53000000+4*len(menu['rows'])
+  if (album.get('route')!=0x0200f109 or rom[route_offset:route_offset+4]!=struct.pack('<I',album['route']) or
+      type(count)is not int or not 1<=count<=3 or
+      not 0<=marker<=len(runtime)-8 or runtime[marker:marker+8]!=struct.pack('<II',0x3141534d,count) or
+      power.get('runtime_sha256')!=_hash(runtime)):
+   raise ValueError('candidate shutdown album runtime differs')
+  runtime=runtime[:marker+4]+bytes(4)+runtime[marker+8:]
+ if offset<0 or _hash(runtime)!=manifest['code_sha256']:raise ValueError('candidate runtime hash differs')
  embedded=_embedded_owner_identity(rom,manifest)
  if receipt.get('companion_identity')!=embedded:raise ValueError('runtime embedded identity differs from receipt')
  identity=embedded

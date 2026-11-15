@@ -143,7 +143,7 @@ class ProductionOwner(unittest.TestCase):
   self.assertEqual(self.exchange(m,wire,2,1,bytes([7]*16))[0],0)
   code,read=self.exchange(m,wire,4,5);self.assertEqual(code,0)
   self.assertEqual(struct.unpack_from('<I',read,12)[0],31<<12)
-  before=bytes(m.state);contract=bytes.fromhex('c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d')
+  before=bytes(m.state);contract=bytes.fromhex('23a5ca8eaa31e77be7a915270937c65968554df965d092c5372380739ecea81e')
   def patch(ident,field,value,revision):return bytes([ident]*16)+bytes([7]*16)+contract+revision+struct.pack('<II',field,value)
   p=patch(9,12,2,read[-32:]);code,result=self.exchange(m,wire,6,6,p)
   self.assertEqual(code,0);self.assertEqual(struct.unpack_from('<III',result),(2,0,1));self.assertEqual(m.saves,1);self.assertEqual(m.state[92],2)
@@ -157,7 +157,7 @@ class ProductionOwner(unittest.TestCase):
  def test_extension_uncertainty_blocks_local_film_store_until_poll_readback(self):
   m=self.machine();owner=0x55860000;m.run(self.symbols['m10v_companion_ui_init'],owner);wire=m.word(owner+0x6400+16);m.run(self.symbols['m10v_companion_ui_start'],owner)
   self.exchange(m,wire,2,1,bytes([7]*16));_,read=self.exchange(m,wire,4,5)
-  ident=bytes([22]*16);contract=bytes.fromhex('c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d')
+  ident=bytes([22]*16);contract=bytes.fromhex('23a5ca8eaa31e77be7a915270937c65968554df965d092c5372380739ecea81e')
   payload=ident+bytes([7]*16)+contract+read[-32:]+struct.pack('<II',16,1)
   m.fail_after_commit=True;code,result=self.exchange(m,wire,6,6,payload)
   self.assertEqual(struct.unpack_from('<I',result)[0],4);self.assertEqual(m.saves,1)
@@ -169,6 +169,51 @@ class ProductionOwner(unittest.TestCase):
   m.run(self.symbols['m10v_companion_ui_storage_enter'],0);token=m.u.reg_read(UC_ARM_REG_R0);self.assertNotEqual(token,0)
   m.run(self.symbols['m10v_companion_ui_storage_leave'],token)
 
+
+class ProductionWhiteBalance(ProductionOwner):
+ feature_flags=['-DM10V_COMPANION_EXT_WB=1']
+ def test_wb_owner_writes_the_active_bank_and_reads_it_back(self):
+  m=self.machine();owner=0x55860000;model=0x550666e0
+  m.set(0x550662d0,1)
+  m.u.mem_write(model+0x4c,b'\x0e')
+  m.u.mem_write(model+0x58+14,b'\x0e')
+  m.u.mem_write(model+0x69+14,b'\x0e')
+  m.u.mem_write(model+0x52,struct.pack('<H',5000))
+  backend=0x558e1000;parameters=0x558e2000
+  m.set(model+0x18,backend);m.set(backend+4,parameters)
+  m.set(model+0x24,parameters)
+  def commit(u,pc,n,ctx):
+   if pc==0x5355198c:
+    u.reg_write(UC_ARM_REG_PC,u.reg_read(UC_ARM_REG_LR))
+  m.u.hook_add(UC_HOOK_CODE,commit)
+  m.run(self.symbols['m10v_companion_ui_init'],owner);wire=m.word(owner+0x6400+16)
+  m.run(self.symbols['m10v_companion_ui_start'],owner);self.exchange(m,wire,2,1,bytes([7]*16))
+  code,state=self.exchange(m,wire,4,5);self.assertEqual(code,0)
+  self.assertEqual(struct.unpack_from('<3I',state,20+25*4),(14,14,5000))
+  contract=bytes.fromhex('23a5ca8eaa31e77be7a915270937c65968554df965d092c5372380739ecea81e')
+  for index,(field,value) in enumerate(((25,12),(26,15),(27,5600))):
+   patch=bytes([8+index]*16)+bytes([7]*16)+contract+state[-32:]+struct.pack('<II',field,value)
+   code,state=self.exchange(m,wire,6+2*index,6,patch);self.assertEqual(code,0)
+  self.assertEqual(struct.unpack_from('<3I',state,20+25*4),(12,15,5600))
+  self.assertEqual(bytes(m.u.mem_read(parameters+0x76d,2)),bytes((12,15)))
+  self.assertEqual(bytes(m.u.mem_read(parameters+0x770,2)),struct.pack('<H',5600))
+  self.assertEqual(m.saves,0)
+
+ def test_recipe_texture_uses_the_active_film_journal(self):
+  m=self.machine();owner=0x55860000
+  m.state[100]=0x80
+  struct.pack_into('<I',m.state,180,zlib.crc32(m.state[:180]))
+  m.run(self.symbols['m10v_companion_ui_init'],owner);wire=m.word(owner+0x6400+16)
+  m.run(self.symbols['m10v_companion_ui_start'],owner);self.exchange(m,wire,2,1,bytes([7]*16))
+  code,state=self.exchange(m,wire,4,5);self.assertEqual(code,0)
+  self.assertTrue(struct.unpack_from('<I',state,12)[0]&(1<<28))
+  contract=bytes.fromhex((ROOT/'native/companion/extensions.h').read_text().split('M10V_EXTENSIONS_HASH "')[1].split('"')[0])
+  texture=2|(3<<2)|(4<<4)|(2<<7)|(9<<9)
+  patch=bytes([18]*16)+bytes([7]*16)+contract+state[-32:]+struct.pack('<II',28,texture)
+  code,state=self.exchange(m,wire,6,6,patch)
+  self.assertEqual(code,0);self.assertEqual(m.saves,1)
+  self.assertEqual(struct.unpack_from('<I',state,20+28*4)[0],texture)
+  self.assertEqual(bytes(m.state[96:101]),bytes((2,3,4,2,0x89)))
 
 class ProductionHdfDivergence(ProductionOwner):
  feature_flags=['-DM10V_COMPANION_EXT_HDF=1','-DM10V_HDF_UI_CACHE=1','-DM10V_HDF_SHARED_RECIPE=1','-DM10V_HDF_OWNER_OFFSET=0x613c']
@@ -194,7 +239,7 @@ class ProductionHdfDivergence(ProductionOwner):
    u.reg_write(UC_ARM_REG_R0,answer);u.reg_write(UC_ARM_REG_PC,u.reg_read(UC_ARM_REG_LR))
   m.u.hook_add(UC_HOOK_CODE,fs);m.run(self.symbols['m10v_companion_ui_start'],owner)
   self.exchange(m,wire,2,1,bytes([7]*16));code,read=self.exchange(m,wire,4,5);self.assertEqual(code,0)
-  ident=bytes([33]*16);contract=bytes.fromhex('c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d')
+  ident=bytes([33]*16);contract=bytes.fromhex('23a5ca8eaa31e77be7a915270937c65968554df965d092c5372380739ecea81e')
   payload=ident+bytes([7]*16)+contract+read[-32:]+struct.pack('<II',3,3)
   code,result=self.exchange(m,wire,6,6,payload)
   self.assertEqual(struct.unpack_from('<I',result)[0],4);self.assertEqual(len(writes),1)

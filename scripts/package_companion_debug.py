@@ -11,17 +11,17 @@ def _extension_info(native):
  marker=native.get('companion',{}).get('extensions')
  if marker is None:return None
  need(isinstance(marker,dict) and marker.get('schema')=='m10v.extensions/v1','extension schema differs')
- need(type(marker.get('available'))is int and 0<=marker['available']<(1<<25),'extension availability differs')
+ need(type(marker.get('available'))is int and 0<=marker['available']<(1<<29),'extension availability differs')
  features=marker.get('features');required={'ab','hdf','border','isp','zoom','aspect'}
- need(isinstance(features,dict) and set(features)in(required,required|{'torn'}) and all(type(v)is bool for v in features.values()),'extension features differ')
- expected=(31<<12)|(7 if features['ab']else 0)|(1<<3 if features['hdf']else 0)|(1<<4 if features['border']else 0)|(((1<<12)-(1<<5))|(7<<21) if features['isp']else 0)|(7<<17 if features['zoom']else 0)|(1<<20 if features['aspect']else 0)|(1<<24 if features.get('torn')else 0)
+ need(isinstance(features,dict) and required<=set(features)<=required|{'torn','wb'} and all(type(v)is bool for v in features.values()),'extension features differ')
+ expected=(31<<12)|(7 if features['ab']else 0)|(1<<3 if features['hdf']else 0)|(1<<4 if features['border']else 0)|(((1<<12)-(1<<5))|(7<<21) if features['isp']else 0)|(7<<17 if features['zoom']else 0)|(1<<20 if features['aspect']else 0)|(1<<24 if features.get('torn')else 0)|(15<<25 if features.get('wb')else 0)
  need(marker['available']==expected,'extension availability differs from installed features')
  need(marker.get('powerImages')=='firmwareBuildOnly','extension power images boundary differs')
  contract=(ROOT/'contracts/extensions-v1.json').read_bytes()
  need(native.get('companion',{}).get('sources',{}).get('contracts/extensions-v1.json')==sha(contract),'extension contract source differs')
  value=json.loads(contract);canonical=json.dumps(value,sort_keys=True,separators=(',',':')).encode()
  digest=sha(canonical)
- need(value.get('schema')==marker['schema'] and digest=='c5e4a67763f11333c72f40ceee652919b280ab83235b21a535bc9145b73a224d','extension contract identity differs')
+ need(value.get('schema')==marker['schema'] and digest=='23a5ca8eaa31e77be7a915270937c65968554df965d092c5372380739ecea81e','extension contract identity differs')
  return {**marker,'contractHash':digest}
 
 def _extension_service_identity(extensions,elf):
@@ -55,7 +55,7 @@ def _extensions_readme(identity,extensions,retained,has_film):
 7. 安装 GRemote.apk，保留应用数据。'''+pairing+'\n8. '+film+'''
 9. 装回卡并正常开机，手机连接相机 Wi-Fi。在 App「相机 → 扩展」先读取机身状态，再修改一项并等待机身读回确认。
 
-'''+('25 项' if torn else '24 项')+'''扩展设置（是否可用以本包已安装组件及 App 读取的机身可用项为准）
+扩展设置（是否可用以本包已安装组件及 App 读取的机身可用项为准）
 暗角：独立开关，弱/中/强三挡；关闭保留档位，成片走原厂 ISP Shading。
 功能：快切开关、快切 A、快切 B。
 效果：胶卷印花（关闭或七种样式）、HDF、边框、颗粒模式、颗粒尺寸、漏光强度、漏光位置、漏光范围、模糊强度、模糊范围。
@@ -162,6 +162,9 @@ exit 0
  if extensions:
   files['手机安装说明.txt']=_extensions_readme(identity,extensions,retained,film is not None).encode()
   files['evidence/extensions-contract.json']=(ROOT/'contracts/extensions-v1.json').read_bytes()
+ if native.get('debug_mode') and native.get('appended_slots',{}).get('photo_recipe'):
+  files['联动验收与日志.md']=(ROOT/'docs/testing/2026-11-15-shooting-recipe-validation.md').read_bytes()
+  files['tools/read_gr3_debug_log.py']=(ROOT/'scripts/read_gr3_debug_log.py').read_bytes()
  if film is not None:
   files['03_FILMS/SD_ROOT/M10V/FILMS.M10']=film
   files['evidence/film-pack-audit.json']=(json.dumps(film_audit,indent=2)+'\n').encode()

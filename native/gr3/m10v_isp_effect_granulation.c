@@ -47,8 +47,11 @@ void m10v_isp_effect_granulation_submit(uint32_t *f,void *graph){
   if(!p||(p&1)||p!=word(graph,duplicates[c])||word(graph,0x74+c*8)!=256||word(graph,0x78+c*8)!=256)hold(i);
  }
  if(curves){
-  for(uint32_t n=0;n<768;n++)if(curves[n]<0||curves[n]>255)hold(i);
-  for(uint32_t c=0;c<3;c++){int16_t *out=(void*)(uintptr_t)word(graph,offsets[c]);for(uint32_t n=0;n<256;n++)out[n]=curves[c*256+n];}
+  for(uint32_t c=0;c<3;c++){
+   const int16_t *row=i->curve_rows?((const int16_t *const *)(uintptr_t)i->curves)[c]:curves+c*256;
+   int16_t *out=(void*)(uintptr_t)word(graph,offsets[c]);
+   for(uint32_t n=0;n<256;n++){int16_t v=row[n];if(v<0||v>255)hold(i);out[n]=v;}
+  }
  }
  i->submitted=U(graph);
 }
@@ -89,20 +92,28 @@ uint32_t m10v_isp_effect_granulation_release(void *g,uint32_t *f){
  if(i){if(!result||word(g,0x9c)||((uint8_t*)g)[0x40])hold(i);i->released=1;}
  return result;
 }
-static int run(void *ctx,void *dst,const void *src,uint32_t strength,void *plane,uint32_t bytes,const int16_t curves[3][256],uint32_t noise_stride){
+static int run(void *ctx,void *dst,const void *src,uint32_t strength,void *plane,uint32_t bytes,const void *curves,uint32_t noise_stride,uint32_t curve_rows){
  if(!ctx||!dst||!src||!plane||(U(plane)&(noise_stride?3u:15u))||strength<1||strength>3||(U(dst)&3)||(U(src)&3)||(U(ctx)&3)||(curves&&(U(curves)&1)))return -1;
  const uint8_t *d=dst,*s=src;uint32_t w=*(const uint16_t*)(d+0x10),h=*(const uint16_t*)(d+0x12),pitch=(w+15u)&~15u;
  if(d[0]<1||d[0]>2||s[0]<1||s[0]>2||!w||!h||*(const uint16_t*)(s+0x10)!=w||*(const uint16_t*)(s+0x12)!=h||pitch*h>bytes||*(const uint16_t*)(d+0x14)<w||*(const uint16_t*)(s+0x14)<w||!word(dst,4)||!word(src,4))return -1;
- if(curves)for(uint32_t c=0;c<3;c++)for(uint32_t n=0;n<256;n++)if(curves[c][n]<0||curves[c][n]>255)return -1;
+ if(curve_rows&&curves&&(U(curves)&3u||U(curves)<0x53000000u||U(curves)>0x55000000u-12u))return -1;
+ if(curves)for(uint32_t c=0;c<3;c++){
+  const int16_t *row=curve_rows?((const int16_t *const *)curves)[c]:(const int16_t *)curves+c*256;
+  if(curve_rows&&(U(row)&1u||U(row)<0x53000000u||U(row)>0x55000000u-512u))return -1;
+  for(uint32_t n=0;n<256;n++)if(row[n]<0||row[n]>255)return -1;
+ }
  if(noise_stride&&(noise_stride<w||noise_stride>32768u||(noise_stride&3u)||noise_stride*h!=bytes||!m10v_isp_effect_buffer_span(U(plane),bytes)))return -1;
- m10v_isp_effect_granulation_info i={bytes,MAGIC,U(ctx),U(plane),bytes,U(curves),0,0,0,0,0,0,0,noise_stride};i.nonce=MAGIC^U(&i)^U(ctx)^U(plane)^noise_stride;
+ m10v_isp_effect_granulation_info i={bytes,MAGIC,U(ctx),U(plane),bytes,U(curves),0,0,0,0,0,0,0,noise_stride,curve_rows};i.nonce=MAGIC^U(&i)^U(ctx)^U(plane)^noise_stride;
  uint32_t result=m10v_isp_effect_granulation_call(ctx,dst,src,strength,plane,&i);
  return result==1&&!i.failed&&i.completed==1&&i.released==1&&i.rng_skipped==1?1:-4;
 }
 int m10v_isp_effect_granulation_owned(void *ctx,void *dst,const void *src,uint32_t strength,void *plane,uint32_t bytes,const int16_t curves[3][256]){
- return run(ctx,dst,src,strength,plane,bytes,curves,0);
+ return run(ctx,dst,src,strength,plane,bytes,curves,0,0);
 }
-int m10v_isp_effect_granulation_luma(void *ctx,void *mask,const uint32_t photo[8],const int16_t curves[3][256]){
+int m10v_isp_effect_granulation_owned_rows(void *ctx,void *dst,const void *src,uint32_t strength,void *plane,uint32_t bytes,const int16_t *const curves[3]){
+ return run(ctx,dst,src,strength,plane,bytes,curves,0,1);
+}
+static int granulation_luma(void *ctx,void *mask,const uint32_t photo[8],const void *curves,uint32_t rows){
  if(!mask||!photo||!curves||(U(mask)&3u)||(U(photo)&3u))return -1;
  uint32_t *m=mask,w=m[4]&65535u,h=m[4]>>16,ph=photo[4]>>16,pitch=photo[5]&65535u;
  uint32_t format=photo[0]&255u,factor=format==1?1u:2u;
@@ -110,13 +121,20 @@ int m10v_isp_effect_granulation_luma(void *ctx,void *mask,const uint32_t photo[8
  uint32_t n=pitch*ph,mn=(m[5]&65535u)*h;
  if(!m10v_isp_effect_buffer_span(photo[1],n)||!m10v_isp_effect_buffer_span(m[1],mn)||
     (photo[1]<m[1]+mn&&m[1]<photo[1]+n))return -1;
- return run(ctx,mask,mask,1,(void*)(uintptr_t)photo[1],n,curves,pitch*factor);
+ return run(ctx,mask,mask,1,(void*)(uintptr_t)photo[1],n,curves,pitch*factor,rows);
+}
+int m10v_isp_effect_granulation_luma(void *ctx,void *mask,const uint32_t photo[8],const int16_t curves[3][256]){
+ return granulation_luma(ctx,mask,photo,curves,0);
+}
+int m10v_isp_effect_granulation_luma_rows(void *ctx,void *mask,const uint32_t photo[8],const int16_t *const curves[3]){
+ return granulation_luma(ctx,mask,photo,curves,1);
 }
 static int plane_overlap(uint32_t a,uint32_t an,uint32_t b,uint32_t bn){return a<b+bn&&b<a+an;}
-int m10v_isp_effect_granulation_plane(void *ctx,void *dst,const void *src,void *mask,uint32_t bytes,uint32_t pitch,const int16_t curves[3][256]){
+static int granulation_plane(void *ctx,void *dst,const void *src,void *mask,uint32_t bytes,uint32_t pitch,const void *curves,uint32_t rows){
  if(!ram(U(ctx),0x40)||!ram(U(dst),32)||!ram(U(src),32)||!curves||((U(curves)&1u))||
     !pitch||pitch>32768u||(pitch&3u)||!m10v_isp_effect_buffer_span(U(mask),bytes))return -1;
- uint32_t cp=U(curves);if(!((cp>=0x53000000u&&cp<=0x55000000u-1536u)||ram(cp,1536)))return -1;
+ uint32_t cp=U(curves),curve_bytes=rows?12u:1536u;
+ if((rows&&(cp&3u))||!((cp>=0x53000000u&&cp<=0x55000000u-curve_bytes)||ram(cp,curve_bytes)))return -1;
  const uint32_t *d=dst,*s=src;uint32_t w=d[4]&65535u,h=d[4]>>16,dp=d[5]&65535u,sp=s[5]&65535u;
  if(d[0]!=1u||s[0]!=1u||d[2]||s[2]||d[3]||s[3]||d[6]||s[6]||d[7]!=2u||s[7]!=2u||!w||!h||w>6144u||h>4096u||
     s[4]!=d[4]||dp<w||sp<w||dp>32768u||sp>32768u||((dp|sp)&3u)||(d[5]>>16)<h||(s[5]>>16)<h||pitch<w||pitch*h!=bytes)return -1;
@@ -124,7 +142,18 @@ int m10v_isp_effect_granulation_plane(void *ctx,void *dst,const void *src,void *
  if(!m10v_isp_effect_buffer_span(d[1],dn)||!m10v_isp_effect_buffer_span(s[1],sn)||((d[1]|s[1]|U(mask))&3u)||
     plane_overlap(d[1],dn,U(mask),bytes)||(plane_overlap(s[1],sn,U(mask),bytes)&&(s[1]!=U(mask)||sn!=bytes||sp!=pitch))||
     (plane_overlap(d[1],dn,s[1],sn)&&(d[1]!=s[1]||dn!=sn||dp!=sp)))return -1;
- const uint32_t objects[4]={U(ctx),U(dst),U(src),cp},lengths[4]={0x40,32,32,1536};
- for(uint32_t i=0;i<4;i++)if(plane_overlap(objects[i],lengths[i],d[1],dn)||plane_overlap(objects[i],lengths[i],s[1],sn)||plane_overlap(objects[i],lengths[i],U(mask),bytes))return -1;
- return run(ctx,dst,src,1,mask,bytes,curves,pitch);
+ uint32_t objects[7]={U(ctx),U(dst),U(src),cp},lengths[7]={0x40,32,32,curve_bytes};
+ if(rows)for(uint32_t i=4;i<7;i++){
+  uint32_t row=U(((const int16_t *const *)curves)[i-4]);
+  if((row&1u)||!((row>=0x53000000u&&row<=0x55000000u-512u)||ram(row,512)))return -1;
+  objects[i]=row;lengths[i]=512;
+ }
+ for(uint32_t i=0;i<(rows?7u:4u);i++)if(plane_overlap(objects[i],lengths[i],d[1],dn)||plane_overlap(objects[i],lengths[i],s[1],sn)||plane_overlap(objects[i],lengths[i],U(mask),bytes))return -1;
+ return run(ctx,dst,src,1,mask,bytes,curves,pitch,rows);
+}
+int m10v_isp_effect_granulation_plane(void *ctx,void *dst,const void *src,void *mask,uint32_t bytes,uint32_t pitch,const int16_t curves[3][256]){
+ return granulation_plane(ctx,dst,src,mask,bytes,pitch,curves,0);
+}
+int m10v_isp_effect_granulation_plane_rows(void *ctx,void *dst,const void *src,void *mask,uint32_t bytes,uint32_t pitch,const int16_t *const curves[3]){
+ return granulation_plane(ctx,dst,src,mask,bytes,pitch,curves,1);
 }

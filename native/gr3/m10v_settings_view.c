@@ -236,6 +236,28 @@ void m10v_settings_view_zoom(m10v_settings_view *v,const m10v_zoom_menu *s){
  }
 }
 
+#if M10V_SHUTDOWN_ALBUM
+void m10v_settings_view_shutdown(m10v_settings_view *v,const m10v_settings *s,uint32_t count){
+ if(!v||!s||v->count!=COUNT)return;
+ caption(v->widgets[TITLE],1230);
+ caption(v->widgets[FOOTER],M10V_VIEW_STAMP_HELP);
+ visible(v->widgets[NAME],0);visible(v->widgets[PAGE],0);
+ visible(v->widgets[ERROR_TEXT],s->error!=0);
+ if(s->error)caption(v->widgets[ERROR_TEXT],M10V_VIEW_FAILED);
+ for(uint32_t i=0;i<10;i++){
+  visible(v->widgets[FRAME+i],0);visible(v->widgets[INNER+i],0);visible(v->widgets[ICON+i],0);
+ }
+ for(uint32_t i=0;i<4;i++){
+  visible(v->widgets[ROW_FRAME+i],i<=count&&i==s->focus);
+  visible(v->widgets[ROW_INNER+i],i<=count);
+  color(v->widgets[ROW_FRAME+i],6);color(v->widgets[ROW_INNER+i],2);
+  visible(v->widgets[ROW+i],i<=count);visible(v->widgets[VALUE+i],i<=count&&i==s->value);
+  caption(v->widgets[ROW+i],1231+i);caption(v->widgets[VALUE+i],1235);
+  ((fn2)0x5339658cu)(v->widgets[ROW+i],i==s->focus?28:31);
+ }
+}
+#endif
+
 #if M10V_ADJ_EXTRA_CAMERA
 static uint32_t adj_value_resource(uint32_t id){
  if(id&&id<=M10V_ADJ_EXTRA_STOCK_MAX){

@@ -8,6 +8,25 @@ _Static_assert(sizeof(m10v_isp_effects_camera_cache)==44,"ISP cache ABI");
 _Static_assert(!(M10V_ISP_EFFECT_CACHE_OWNER_OFFSET&3u)&&
     M10V_ISP_EFFECT_CACHE_OWNER_OFFSET<=0x2affffd4u,"ISP owner cache bounds");
 static const char effect_record_names[2][12]={"ISPFXA.BIN","ISPFXB.BIN"};
+#if M10V_PHOTO_RECIPE
+extern const char *m10v_camera_library_box_path(uint32_t,uint32_t,uint32_t);
+extern uint32_t m10v_camera_library_box_id(void);
+#endif
+static const char *journal_path(uint32_t box,uint32_t page){
+#if M10V_PHOTO_RECIPE
+ if(box)return m10v_camera_library_box_path(box,2,page);
+#else
+ (void)box;
+#endif
+ return effect_record_names[page];
+}
+static uint32_t journal_box(void){
+#if M10V_PHOTO_RECIPE
+ return m10v_camera_library_box_id();
+#else
+ return 0;
+#endif
+}
 
 static int effect_ram(uintptr_t p,uint32_t bytes){
     return !(p&3u)&&p>=0x55000000u&&p<=0x80000000u-bytes;
@@ -63,7 +82,7 @@ static int effect_publish(m10v_isp_effects_camera_cache *c,
 /* 1 selected, 0 neither valid, -1 conflicting/ambiguous valid generations.
  * Buffers are zeroed first so a failed or short native read cannot expose
  * uninitialized stack metadata. The native API itself supplies exact length. */
-static int effect_latest(uint32_t fs,m10v_isp_effects_settings *settings,
+static int effect_latest(uint32_t fs,uint32_t box,m10v_isp_effects_settings *settings,
     uint32_t *sequence,uint8_t *record){
     uint8_t records[2][M10V_ISP_EFFECTS_RECORD_SIZE];
     int good[2];
@@ -71,7 +90,7 @@ static int effect_latest(uint32_t fs,m10v_isp_effects_settings *settings,
     for(uint32_t i=0;i<2;i++){
         m10v_isp_effects_settings local;uint32_t seq;
         good[i]=((int(*)(uint32_t,const char*,uint32_t,void*))0x53825648u)
-            (fs,effect_record_names[i],M10V_ISP_EFFECTS_RECORD_SIZE,records[i])&&
+            (fs,journal_path(box,i),M10V_ISP_EFFECTS_RECORD_SIZE,records[i])&&
             m10v_isp_effects_decode(records[i],M10V_ISP_EFFECTS_RECORD_SIZE,&local,&seq);
     }
     if(!good[0]&&!good[1])return 0;
@@ -84,7 +103,7 @@ static int effect_latest(uint32_t fs,m10v_isp_effects_settings *settings,
 int m10v_isp_effects_camera_read_legacy(uint32_t fs,m10v_isp_effects_settings *settings){
     uint32_t sequence;
     m10v_isp_effects_defaults(settings);
-    return effect_latest(fs,settings,&sequence,0);
+    return effect_latest(fs,0,settings,&sequence,0);
 }
 /* Compare a journal candidate to an authenticated warm cache. Serial ordering
  * has the same less-than-half-range surviving-generation contract as codec. */
@@ -110,7 +129,10 @@ int m10v_isp_effects_camera_refresh(uint32_t owner){
         version=0;
     }
     uint32_t fs=effect_filesystem();if(!fs)return -2;
-    int found=effect_latest(fs,&selected,&seq,0);
+    uint32_t box=journal_box();
+    int found=effect_latest(fs,box,&selected,&seq,0);
+    if(!found&&box)found=effect_latest(fs,0,&selected,&seq,0);
+    if(box!=journal_box())return -2;
     if(found<0)return -3;
     if(!found){
         m10v_isp_effects_defaults(&selected);seq=0;
@@ -121,7 +143,7 @@ int m10v_isp_effects_camera_refresh(uint32_t owner){
     }else if(warm&&!effect_not_older(&selected,seq,&old,floor))return -3;
     return effect_publish(c,&selected,seq,version);
 }
-int m10v_isp_effects_camera_save(uint32_t owner,const m10v_isp_effects_settings *settings){
+static int save_box(uint32_t owner,uint32_t box,const m10v_isp_effects_settings *settings){
     m10v_isp_effects_camera_cache *c=effect_cache(owner);
     if(!c||!effect_ram((uintptr_t)settings,sizeof(*settings)))return -1;
     m10v_isp_effects_settings desired=*settings;
@@ -129,9 +151,10 @@ int m10v_isp_effects_camera_save(uint32_t owner,const m10v_isp_effects_settings 
     m10v_isp_effects_settings cached,selected;uint32_t floor,version,seq;
     if(!effect_read_cache(c,&cached,&floor,&version))return -2;
     uint32_t fs=effect_filesystem();if(!fs)return -2;
-    int found=effect_latest(fs,&selected,&seq,0);
+    int found=effect_latest(fs,box,&selected,&seq,0);
     if(found<0)return -3;
-    if(found){
+    if(box!=journal_box())floor=found?seq:0;
+    else if(found){
         uint32_t delta=seq-floor;
         if(delta==0x80000000u||(!delta&&!effect_same(&selected,&cached,sizeof(cached))))return -3;
         if(delta&&delta<0x80000000u)floor=seq;
@@ -141,15 +164,30 @@ int m10v_isp_effects_camera_save(uint32_t owner,const m10v_isp_effects_settings 
     if(!m10v_isp_effects_encode(&desired,seq,record,sizeof(record)))return -1;
     for(uint32_t i=0;i<sizeof(back);i++)((volatile uint8_t*)back)[i]=0;
     if(!((int(*)(uint32_t,const char*,uint32_t,const void*))0x53825fa8u)
-        (fs,effect_record_names[seq&1u],sizeof(record),record))return -4;
+        (fs,journal_path(box,seq&1u),sizeof(record),record))return -4;
     if(!((int(*)(uint32_t,const char*,uint32_t,void*))0x53825648u)
-        (fs,effect_record_names[seq&1u],sizeof(back),back)||
+        (fs,journal_path(box,seq&1u),sizeof(back),back)||
         !effect_same(record,back,sizeof(record)))return -5;
     uint32_t winner;
-    if(effect_latest(fs,&selected,&winner,back)!=1||winner!=seq||
+    if(effect_latest(fs,box,&selected,&winner,back)!=1||winner!=seq||
         !effect_same(record,back,sizeof(record)))return -6;
-    return effect_publish(c,&desired,seq,version);
+    return box==journal_box()?effect_publish(c,&desired,seq,version):0;
 }
+int m10v_isp_effects_camera_save(uint32_t owner,const m10v_isp_effects_settings *settings){
+ return save_box(owner,journal_box(),settings);
+}
+#if M10V_PHOTO_RECIPE
+int m10v_isp_effects_camera_copy_box(uint32_t owner,uint32_t box){
+ m10v_isp_effects_settings settings;uint32_t sequence;
+ return m10v_isp_effects_camera_snapshot(&settings,&sequence)?save_box(owner,box,&settings):-1;
+}
+int m10v_isp_effects_camera_reload_box(uint32_t owner){
+ m10v_isp_effects_camera_cache *c=effect_cache(owner);
+ if(!c)return -1;
+ __atomic_store_n(&c->version,0,__ATOMIC_RELEASE);c->magic=0;
+ return m10v_isp_effects_camera_refresh(owner);
+}
+#endif
 int m10v_isp_effects_camera_snapshot(m10v_isp_effects_settings *out,uint32_t *sequence){
     if(!effect_ram((uintptr_t)out,sizeof(*out))||!effect_ram((uintptr_t)sequence,4)||
        effect_overlap((uintptr_t)out,sizeof(*out),(uintptr_t)sequence,4)||

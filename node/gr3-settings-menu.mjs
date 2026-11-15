@@ -51,6 +51,17 @@ export function adjExtraPatches(runtime,m){
   return {address,expected,replacement,name:'ADJ extra '+name};
  });
 }
+export function dialRecipePatches(m){
+ const patches=[],s=m.symbols;
+ if(m.symbols.m10v_isp_frame_photo_recipe_write){
+  for(const [address,original,action] of [[0x531d147c,0x5324b760,'save'],[0x5322421c,0x53279fa0,'load'],[0x53224268,0x53279fa0,'load']]){
+   const target=s['m10v_settings_controller_'+action+'_dial_recipe'];
+   need(Number.isInteger(target)&&target>=m.base&&target+4<=m.base+m.code_bytes,'dial recipe handler bounds');
+   patches.push({address,expected:branch(address,original,true),replacement:branch(address,target,true),name:'dial recipe '+action});
+  }
+ }
+ return patches;
+}
 export function settingsPatches(m){
  if(!m.sd_library)return [];
  need(typeof m.zoom?.enabled==='boolean','explicit zoom enabled contract');

@@ -39,7 +39,7 @@ class TornTests(unittest.TestCase):
    elif name=='m10v_isp_effect_transfer_execute':
     self.resize_calls+=1
     result=int(self.resize_ok and (self.resize_calls%2 or self.shadow_resize_ok))
-   elif name=='m10v_isp_effect_granulation_plane':
+   elif name=='m10v_isp_effect_granulation_plane_rows':
     self.leases.append((self.words(self.owner+0x6d04,1)[0],len([c for c in self.calls if c[0]=='free'])))
     self.descriptors.append((self.words(self.reg(1),8),self.words(self.reg(2),8)))
     if self.during_graph:self.during_graph()
@@ -62,7 +62,7 @@ class TornTests(unittest.TestCase):
   self.assertEqual(self.call('m10v_torn_state',0x55071000,0x55071004),1);return self.words(0x55071000,2)
  def freeze(self,r=None):
   r=r or self.r;self.call('m10v_torn_reserve',r);return self.call('m10v_torn_freeze',r)
- def graphs(self):return [c for c in self.calls if c[0]=='m10v_isp_effect_granulation_plane']
+ def graphs(self):return [c for c in self.calls if c[0]=='m10v_isp_effect_granulation_plane_rows']
  def test_off_freeze_stays_off_after_later_start(self):
   self.freeze();self.assertEqual(self.call('m10v_torn_set',self.owner,1),0)
   self.assertEqual(self.call('m10v_torn_execute',self.r,0x55072000,self.photo),1);self.assertFalse(self.graphs())

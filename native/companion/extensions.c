@@ -5,15 +5,15 @@
 _Static_assert(sizeof(m10v_extension_patch)<=M10V_RESIDENT_PAYLOAD,"extension patch fits resident frame");
 _Static_assert(sizeof(m10v_extension_result)<=M10V_RESIDENT_PAYLOAD,"extension result fits resident frame");
 #if !M10V_COMPANION_RTOS_ONLY
-const char *const m10v_extension_names[M10V_EXTENSION_FIELDS]={"quickSwitch","quickSwitchA","quickSwitchB","hdf","border","grainMode","grainSize","leakGain","leakPosition","leakSpread","blurGain","blurRange","stamp","stampFormat","stampCorner","stampColor","filmNameStamp","focalA","focalB","focalSlot","aspect","imprint","vignetteEnabled","vignetteStrength","tornSession"};
+const char *const m10v_extension_names[M10V_EXTENSION_FIELDS]={"quickSwitch","quickSwitchA","quickSwitchB","hdf","border","grainMode","grainSize","leakGain","leakPosition","leakSpread","blurGain","blurRange","stamp","stampFormat","stampCorner","stampColor","filmNameStamp","focalA","focalB","focalSlot","aspect","imprint","vignetteEnabled","vignetteStrength","tornSession","wbGreenMagenta","wbBlueAmber","wbKelvin","filmTexture"};
 #endif
-const uint8_t m10v_extension_min[M10V_EXTENSION_FIELDS]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,28,28,0,0,0,0,1,0};
-const uint8_t m10v_extension_max[M10V_EXTENSION_FIELDS]={1,21,21,3,2,4,2,3,2,2,3,2,2,3,3,3,1,50,50,2,6,7,1,3,4};
-const uint8_t m10v_extension_persistent[M10V_EXTENSION_FIELDS]={0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,0};
+const uint16_t m10v_extension_min[M10V_EXTENSION_FIELDS]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,28,28,0,0,0,0,1,0,0,0,2500,0};
+const uint16_t m10v_extension_max[M10V_EXTENSION_FIELDS]={1,21,21,3,2,4,2,3,2,2,3,2,2,3,3,3,1,50,50,2,6,7,1,3,4,28,28,10000,6143};
+const uint8_t m10v_extension_persistent[M10V_EXTENSION_FIELDS]={0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,0,0,0,0,1};
 static void zero(void*p,unsigned n){for(unsigned i=0;i<n;i++)((uint8_t*)p)[i]=0;}
 static int equal(const void*a,const void*b,unsigned n){return m10v_constant_equal(a,b,n);}
 int m10v_extensions_valid(const m10v_extension_snapshot*s){if(!s||s->busy>1||(s->available&~M10V_EXTENSION_MASK))return 0;for(unsigned i=0;i<M10V_EXTENSION_FIELDS;i++)if((s->available&(1u<<i))&&(s->values[i]<m10v_extension_min[i]||s->values[i]>m10v_extension_max[i]))return 0;return 1;}
-int m10v_extensions_writable(uint32_t field,uint32_t value){return field<M10V_EXTENSION_FIELDS&&value>=m10v_extension_min[field]&&value<=m10v_extension_max[field]&&(field!=24u||value<=1u);}
+int m10v_extensions_writable(uint32_t field,uint32_t value){return field<M10V_EXTENSION_FIELDS&&value>=m10v_extension_min[field]&&value<=m10v_extension_max[field]&&(field!=24u||value<=1u)&&(field!=28u||((value&3u)<3u&&((value>>4)&7u)<=4u&&((value>>7)&3u)<3u));}
 void m10v_extensions_owner_init(m10v_extension_owner*o){if(o)zero(o,sizeof(*o));}
 static int result(m10v_extension_result*r,unsigned status,unsigned code,const m10v_extension_snapshot*s){zero(r,sizeof(*r));r->status=status;r->code=code;if(s){r->has_snapshot=1;r->snapshot=*s;}return (int)code;}
 static int reject(m10v_extension_result*r,unsigned code){return result(r,M10V_OPERATION_REJECTED,code,0);}

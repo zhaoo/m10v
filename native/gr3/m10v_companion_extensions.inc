@@ -30,6 +30,35 @@ static int extension_busy(void*v){return busy(v)||m10v_settings_controller_remot
 #endif
  ;}
 static int extension_blocked(void*v){return ((ui_context*)v)->transaction.pending.present!=0;}
+#if M10V_COMPANION_EXT_WB
+static uint8_t *white_balance_model(void){
+ return (*(const volatile uint32_t *)0x550662d0u&1u)?(uint8_t *)0x550666e0u:0;
+}
+static void white_balance_read(m10v_extension_snapshot *out){
+ uint8_t *model=white_balance_model();
+ if(!model)return;
+ uint32_t mode=model[0x4c];
+ if(mode>16)return;
+ uint32_t gm=((fn2)0x53283890u)((uint32_t)(uintptr_t)model,mode);
+ uint32_t ba=((fn2)0x532838d0u)((uint32_t)(uintptr_t)model,mode);
+ uint32_t kelvin=((fn2)0x53283910u)((uint32_t)(uintptr_t)model,mode);
+ if(mode!=model[0x4c]||gm>28||ba>28)return;
+ out->values[25]=gm;out->values[26]=ba;out->available|=3u<<25;
+ if(kelvin>=2500&&kelvin<=10000){out->values[27]=kelvin;out->available|=1u<<27;}
+}
+static int white_balance_write(uint32_t field,uint32_t value){
+ uint8_t *model=white_balance_model();
+ if(!model||model[0x4c]>16||!m10v_extensions_writable(field,value))return M10V_IO_NOT_WRITTEN;
+ uint32_t mode=model[0x4c],address=(uint32_t)(uintptr_t)model;
+ if(field==27){
+  if(mode<13)return M10V_IO_NOT_WRITTEN;
+  ((fn3)0x53286cacu)(address,mode,value);
+ }else{
+  ((fn3)(field==25?0x53286b08u:0x53286b88u))(address,mode,value);
+ }
+ return M10V_IO_OK;
+}
+#endif
 static int extension_read(void*v,m10v_extension_snapshot*out){
  ui_context*c=v;if(!current(c)||c->store_depth)return M10V_ERROR_BRIDGE_UNAVAILABLE;
  m10v_companion_snapshot film;int code=snapshot(c,&film);if(code)return code;
@@ -73,6 +102,18 @@ static int extension_read(void*v,m10v_extension_snapshot*out){
  if(!m10v_torn_state(&out->values[24],&generations[5])||out->values[24]>4u)return M10V_ERROR_BRIDGE_UNAVAILABLE;
  out->available|=1u<<24;
 #endif
+#if M10V_COMPANION_EXT_WB
+ white_balance_read(out);
+ if(film.active_slot>=0){
+  const m10v_film_effects *e=&film.state.effects[(uint32_t)film.active_slot];
+  if(m10v_film_fx_tagged(e)){
+   out->values[28]=e->grain_size|(uint32_t)e->leak_gain<<2|
+    (uint32_t)e->leak_position<<4|(uint32_t)e->leak_spread<<7|
+    (uint32_t)(e->leak_variation&15u)<<9;
+   out->available|=1u<<28;
+  }
+ }
+#endif
  out->busy=(uint32_t)extension_busy(c);
  /* Bind every film byte/hash/sequence and all known extension generations.
   * A local change followed by restoring the value still invalidates CAS. */
@@ -87,6 +128,23 @@ static int extension_read(void*v,m10v_extension_snapshot*out){
 }
 static int extension_write(void*v,uint32_t field,uint32_t value){
  ui_context*c=v;if(!current(c)||!c->locked||extension_busy(c)||extension_blocked(c))return M10V_IO_NOT_WRITTEN;
+#if M10V_COMPANION_EXT_WB
+ if(field==28){
+  int slot=active();
+  m10v_library_state state;
+  if(slot<0||m10v_camera_library_read_current(&state)||state.sequence==UINT32_MAX||
+     !state.slots[slot].film||!m10v_film_fx_tagged(&state.effects[slot])||
+     !m10v_extensions_writable(field,value))return M10V_IO_NOT_WRITTEN;
+  m10v_film_effects *e=&state.effects[slot];
+  uint32_t size=value&3u,position=(value>>4)&7u,spread=(value>>7)&3u;
+  if(size>2||position>4||spread>2)return M10V_IO_NOT_WRITTEN;
+  e->grain_size=(uint8_t)size;e->leak_position=(uint8_t)position;e->leak_spread=(uint8_t)spread;
+  e->leak_gain=(value>>2)&3u;e->leak_variation=M10V_FILM_FX_TAG|(value>>9);
+  m10v_companion_state_seal(&state,state.sequence+1);
+  return m10v_camera_library_commit_snapshot(&state)?M10V_IO_UNCERTAIN:M10V_IO_OK;
+ }
+ if(field>=25)return white_balance_write(field,value);
+#endif
 #if M10V_TORN_ENABLED
  if(field==24u)return value<=1u&&!m10v_torn_set(c->ui_owner,value)?M10V_IO_OK:M10V_IO_NOT_WRITTEN;
 #endif

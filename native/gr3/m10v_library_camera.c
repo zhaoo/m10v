@@ -9,6 +9,9 @@
 #include "m10v_tone.h"
 #include <stddef.h>
 #include "m10v_custom_isp.h"
+#if M10V_PHOTO_RECIPE
+#include "../companion/auth.h"
+#endif
 #if M10V_PURE_ISP_EFFECTS
 #include "m10v_isp_effects_camera.h"
 #endif
@@ -27,6 +30,16 @@ static int ram(const void *ptr, uint32_t size) {
     uintptr_t p = (uintptr_t)ptr;
     return !(p & 3) && p >= 0x55000000u && p < 0x80000000u && size <= 0x80000000u - p;
 }
+#if M10V_PHOTO_RECIPE
+/* Native mode switch has already installed box ID and active settings. */
+static uint32_t active_box(void){
+ if(!(*(const volatile uint32_t *)0x55063ed0u&1u))return 0;
+ const uint8_t *header=*(const uint8_t *volatile *)0x55063f30u;
+ if(!ram(header,4))return 0;
+ return header[0]>=1&&header[0]<=6?header[0]:0;
+}
+
+#endif
 static uint32_t filesystem(void) {
     uint32_t manager = ((manager_fn)0x53828014u)();
     if (!ram((void *)(uintptr_t)manager, 12)) return 0;
@@ -46,8 +59,18 @@ static void copy(m10v_library_state *dst, const m10v_library_state *src) {
 #define PREVIEW_OFFSET 0x213cu
 #define PREVIEW_BYTES 0x4000u
 #define PREVIEW_MAGIC 0x3856504du
-typedef struct {uint32_t id,bank;m10v_isp_frame_target target;} custom_profile;
-typedef struct {uint32_t magic,version; m10v_library_state state;custom_profile profiles[M10V_SLOT_COUNT];} preview_cache;
+typedef struct {
+ uint32_t id,bank;
+ m10v_isp_frame_target target;
+#if M10V_PHOTO_RECIPE
+ uint8_t hash[32];
+#endif
+} custom_profile;
+typedef struct {uint32_t magic,version; m10v_library_state state;custom_profile profiles[M10V_SLOT_COUNT];
+#if M10V_PHOTO_RECIPE
+ uint32_t adj_tone,box;
+#endif
+} preview_cache;
 _Static_assert(sizeof(preview_cache)<=PREVIEW_BYTES,"preview owner capacity");
 static preview_cache *preview_owner(void){
     /* Original5316f350 singleton guard,5316fce0 factory+74 TopMenu owner.
@@ -74,6 +97,9 @@ static int refresh_profiles(preview_cache *p,const m10v_library_state *s,uint32_
    * owned memory again; a new constructor starts at version0. */
   if(preview_owner()!=p||__atomic_load_n(&p->version,__ATOMIC_ACQUIRE)!=version){valid=0;break;}
   if(!loaded||m10v_sd_u32(record+M10V_CUSTOM_ISP_OFFSET)!=0x5053494du)continue;
+#if M10V_PHOTO_RECIPE
+  m10v_sha256(record,M10V_SD_RECORD_BYTES,c->hash);
+#endif
   for(uint32_t k=0;k<sizeof(c->target);k++)((uint8_t *)&c->target)[k]=record[M10V_CUSTOM_ISP_OFFSET+16+k];
   c->bank=bank;c->id=id;
  }
@@ -88,7 +114,11 @@ static void publish_preview(preview_cache *p,const m10v_library_state *s){
     uint32_t v=__atomic_load_n(&p->version,__ATOMIC_ACQUIRE);
     if((v&1u)||!__atomic_compare_exchange_n(&p->version,&v,v+1,0,__ATOMIC_ACQ_REL,__ATOMIC_RELAXED))return;
     if(!refresh_profiles(p,s,v+1))return;
-    copy(&p->state,s);__atomic_store_n(&p->version,v+2,__ATOMIC_RELEASE);
+    copy(&p->state,s);
+#if M10V_PHOTO_RECIPE
+    p->box=active_box();
+#endif
+    __atomic_store_n(&p->version,v+2,__ATOMIC_RELEASE);
 }
 #endif
 int m10v_camera_library_mutation_busy(void){
@@ -111,7 +141,11 @@ void m10v_camera_library_mutation_end(const m10v_library_state *state){
 #if M10V_LIVE_COLOR
  preview_cache *p=preview_owner();if(!p)return;
  uint32_t v=__atomic_load_n(&p->version,__ATOMIC_ACQUIRE);if(!(v&1u))return;
- if(m10v_library_valid(state)){if(!refresh_profiles(p,state,v))return;copy(&p->state,state);}
+ if(m10v_library_valid(state)){if(!refresh_profiles(p,state,v))return;copy(&p->state,state);
+#if M10V_PHOTO_RECIPE
+ p->box=active_box();
+#endif
+ }
  __atomic_store_n(&p->version,v+1,__ATOMIC_RELEASE);
 #else
  (void)state;
@@ -122,7 +156,14 @@ int m10v_camera_library_preview(m10v_library_state *out){
     preview_cache *p=preview_owner();if(!p||!ram(out,sizeof(*out)))return 0;
     uint32_t before=__atomic_load_n(&p->version,__ATOMIC_ACQUIRE);
     if(!before||(before&1u))return 0;
+#if M10V_PHOTO_RECIPE
+    uint32_t box=active_box();
+    if(p->box!=box)return 0;
+#endif
     copy(out,&p->state);__atomic_thread_fence(__ATOMIC_ACQUIRE);
+#if M10V_PHOTO_RECIPE
+    if(box!=active_box())return 0;
+#endif
     return p->magic==PREVIEW_MAGIC&&before==__atomic_load_n(&p->version,__ATOMIC_RELAXED)&&m10v_library_valid(out)&&!(out->reserved&510u);
 #else
     (void)out;return 0;
@@ -143,11 +184,36 @@ int m10v_camera_library_custom_profile(const m10v_library_state *state,uint32_t 
  (void)state;(void)slot;(void)out;return 0;
 #endif
 }
+#if M10V_PHOTO_RECIPE
+void m10v_camera_library_adj_tone_set(uint32_t tone){
+ preview_cache *p=preview_owner();
+ if(p)__atomic_store_n(&p->adj_tone,tone,__ATOMIC_RELEASE);
+}
+uint32_t m10v_camera_library_adj_tone(void){
+ preview_cache *p=preview_owner();
+ return p?__atomic_load_n(&p->adj_tone,__ATOMIC_ACQUIRE):0;
+}
+int m10v_camera_library_custom_hash(const m10v_library_state *state,uint32_t slot,uint8_t out[32]){
+ preview_cache *p=preview_owner();
+ if(!p||!state||!ram(out,32)||slot>=M10V_SLOT_COUNT)return 0;
+ uint32_t v=__atomic_load_n(&p->version,__ATOMIC_ACQUIRE);
+ if(!v||(v&1u)||p->state.sequence!=state->sequence)return 0;
+ const custom_profile *c=&p->profiles[slot];
+ if(!M10V_CUSTOM(c->id)||c->id!=state->slots[slot].film||
+    c->bank<M10V_CUSTOM_IMMUTABLE_FIRST||c->bank!=state->effects[slot].reserved[0])return 0;
+ for(uint32_t i=0;i<32;i++)out[i]=c->hash[i];
+ __atomic_thread_fence(__ATOMIC_ACQUIRE);
+ return p->magic==PREVIEW_MAGIC&&v==__atomic_load_n(&p->version,__ATOMIC_RELAXED);
+}
+#endif
 void m10v_camera_library_preview_init(uint32_t owner){
 #if M10V_LIVE_COLOR
     if(!ram((void *)(uintptr_t)owner,PREVIEW_OFFSET+PREVIEW_BYTES))return;
     preview_cache *p=(preview_cache *)(uintptr_t)(owner+PREVIEW_OFFSET);
     p->magic=0;p->version=0;
+#if M10V_PHOTO_RECIPE
+    p->adj_tone=0;p->box=0;
+#endif
     for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)p->profiles[i].id=p->profiles[i].bank=0;
     p->magic=PREVIEW_MAGIC;
     /* Constructor is allocation-only: storage may re-enter the factory.
@@ -166,6 +232,35 @@ void m10v_camera_library_preview_clear(uint32_t owner){
     (void)owner;
 #endif
 }
+#if M10V_PHOTO_RECIPE
+/* Native box IDs are 1..6. Stock assignment can point multiple U positions
+ * at a box, so the extension follows that same box when the user reassigns it. */
+static const char dial_names[6][2][12]={
+ {"M10VU1A.BIN","M10VU1B.BIN"},{"M10VU2A.BIN","M10VU2B.BIN"},
+ {"M10VU3A.BIN","M10VU3B.BIN"},{"M10VU4A.BIN","M10VU4B.BIN"},
+ {"M10VU5A.BIN","M10VU5B.BIN"},{"M10VU6A.BIN","M10VU6B.BIN"}
+};
+const char *m10v_camera_library_box_path(uint32_t box,uint32_t group,uint32_t page){
+ static const char names[6][3][2][12]={
+  {{"U1HD0.BIN","U1HD1.BIN"},{"U1BD0.BIN","U1BD1.BIN"},{"U1FX0.BIN","U1FX1.BIN"}},
+  {{"U2HD0.BIN","U2HD1.BIN"},{"U2BD0.BIN","U2BD1.BIN"},{"U2FX0.BIN","U2FX1.BIN"}},
+  {{"U3HD0.BIN","U3HD1.BIN"},{"U3BD0.BIN","U3BD1.BIN"},{"U3FX0.BIN","U3FX1.BIN"}},
+  {{"U4HD0.BIN","U4HD1.BIN"},{"U4BD0.BIN","U4BD1.BIN"},{"U4FX0.BIN","U4FX1.BIN"}},
+  {{"U5HD0.BIN","U5HD1.BIN"},{"U5BD0.BIN","U5BD1.BIN"},{"U5FX0.BIN","U5FX1.BIN"}},
+  {{"U6HD0.BIN","U6HD1.BIN"},{"U6BD0.BIN","U6BD1.BIN"},{"U6FX0.BIN","U6FX1.BIN"}}
+ };
+ return box&&box<=6&&group<3&&page<2?names[box-1][group][page]:0;
+}
+uint32_t m10v_camera_library_box_id(void){return active_box();}
+static const char (*library_names(uint32_t box))[12]{
+ return box?dial_names[box-1]:state_names;
+}
+#else
+static uint32_t active_box(void){return 0;}
+static const char (*library_names(uint32_t box))[12]{(void)box;return state_names;}
+#endif
+static int read_library_pair(uint32_t,const char names[2][12],m10v_library_state *);
+
 static int store_guarded(void *context, const m10v_library_state *next,uint32_t remote) {
 #if M10V_COMPANION_ENABLED
     uint32_t token=m10v_companion_ui_storage_enter(remote);if(!token)return -1;
@@ -176,8 +271,12 @@ static int store_guarded(void *context, const m10v_library_state *next,uint32_t 
 #if M10V_LIVE_COLOR && M10V_COMPANION_ENABLED
     preview_cache *origin=preview_owner();
 #endif
-    const char *name = state_names[next->sequence & 1];
     m10v_library_state readback;int result=-1;
+    uint32_t box=active_box();
+#if M10V_PHOTO_RECIPE
+    if(origin&&origin->box!=box&&__atomic_load_n(&origin->version,__ATOMIC_ACQUIRE))goto finish;
+#endif
+    const char *name = library_names(box)[next->sequence & 1];
     for (uint32_t i = 0; i < sizeof(readback); ++i) ((uint8_t *)&readback)[i] = 0;
     if (!((write_fn)0x53825fa8u)(fs, name, sizeof(*next), next))goto finish;
 #if M10V_COMPANION_ENABLED
@@ -192,7 +291,7 @@ static int store_guarded(void *context, const m10v_library_state *next,uint32_t 
 #endif
 #if M10V_LIVE_COLOR
 #if M10V_COMPANION_ENABLED
-    if(preview_owner()!=origin)goto finish;
+    if(preview_owner()!=origin||active_box()!=box)goto finish;
     publish_preview(origin,next);
 #else
     publish_preview(preview_owner(),next);
@@ -212,14 +311,10 @@ static int store(void *context,const m10v_library_state *next){return store_guar
 int m10v_camera_library_read_current(m10v_library_state *state){
     if(!ram(state,sizeof(*state)))return M10V_LIBRARY_INVALID;
     uint32_t fs=filesystem();if(!fs)return M10V_LIBRARY_INVALID;
-    m10v_library_state records[2];int good[2]={0,0};
-    for(uint32_t k=0;k<2;k++){
-        for(uint32_t i=0;i<sizeof(*state);i++)((uint8_t*)&records[k])[i]=0;
-        good[k]=((read_fn)0x53825648u)(fs,state_names[k],sizeof(*state),&records[k])&&m10v_library_valid(&records[k]);
-    }
-    if(!good[0]&&!good[1])return M10V_LIBRARY_INVALID;
-    uint32_t selected=!good[0]||(good[1]&&records[1].sequence>records[0].sequence);
-    copy(state,&records[selected]);return M10V_LIBRARY_OK;
+    uint32_t box=active_box();
+    int found=read_library_pair(fs,library_names(box),state);
+    if(!found&&box)found=read_library_pair(fs,state_names,state);
+    return found&&active_box()==box?M10V_LIBRARY_OK:M10V_LIBRARY_INVALID;
 }
 int m10v_camera_library_commit_snapshot(const m10v_library_state *next){
     if(!m10v_library_valid(next)||!m10v_camera_library_mutation_busy())return M10V_LIBRARY_INVALID;
@@ -352,12 +447,66 @@ static int read_library_pair(uint32_t fs,const char names[2][12],m10v_library_st
 static int load_library(m10v_library_state *state){
  if(!ram(state,sizeof(*state)))return M10V_LIBRARY_INVALID;
  uint32_t fs=filesystem();if(!fs)return M10V_LIBRARY_INVALID;
- if(read_library_pair(fs,state_names,state))return 0;
+ uint32_t box=active_box();
+ if(box&&read_library_pair(fs,library_names(box),state))return active_box()==box?0:M10V_LIBRARY_INVALID;
+ if(read_library_pair(fs,state_names,state))return active_box()==box?0:M10V_LIBRARY_INVALID;
 #if M10V_PURE_ISP_EFFECTS
  if(read_library_pair(fs,pre_effects_names,state))return 0;
 #endif
  legacy_state old;int result=load_legacy_library(&old);if(result<0)return result;expand_legacy(state,&old);return result==0?4:result;
 }
+#if M10V_PHOTO_RECIPE
+/* User's stock Save Settings action is the only operation which copies a
+ * whole library to another native box. Dial changes merely load a journal. */
+int m10v_camera_library_save_box(uint32_t box){
+ if(box<1||box>6)return 0;
+ preview_cache *p=preview_owner();
+ m10v_library_state next,prior,back;
+ if(!p||!m10v_camera_library_preview(&next))return 0;
+ for(uint32_t slot=0;slot<M10V_SLOT_COUNT;slot++)
+  if(M10V_CUSTOM(next.slots[slot].film)&&
+     next.effects[slot].reserved[0]<M10V_CUSTOM_IMMUTABLE_FIRST)return 0;
+ uint32_t token=m10v_companion_ui_storage_enter(0);
+ if(!token)return 0;
+ uint32_t fs=filesystem(),source_box=active_box();
+ int saved=0;
+ if(!fs||!m10v_companion_ui_storage_current(token)||preview_owner()!=p)goto finish;
+ int have_prior=read_library_pair(fs,dial_names[box-1],&prior);
+ if(have_prior&&prior.sequence>=next.sequence)next.sequence=prior.sequence;
+ if(next.sequence==UINT32_MAX)goto finish;
+ next.sequence++;
+ next.crc=state_crc(&next,offsetof(m10v_library_state,crc));
+ if(active_box()!=source_box||!m10v_companion_ui_storage_current(token))goto finish;
+ const char *name=dial_names[box-1][next.sequence&1u];
+ if(!((write_fn)0x53825fa8u)(fs,name,sizeof(next),&next)||
+    !m10v_companion_ui_storage_current(token)||
+    !read_library_pair(fs,dial_names[box-1],&back))goto finish;
+ for(uint32_t i=0;i<sizeof(next);i++)
+  if(((const uint8_t *)&back)[i]!=((const uint8_t *)&next)[i])goto finish;
+ if(preview_owner()!=p||active_box()!=source_box)goto finish;
+ if(source_box==box)publish_preview(p,&next);
+ saved=1;
+finish:
+ return m10v_companion_ui_storage_leave(token)&&saved;
+}
+
+int m10v_camera_library_reload_box(void){
+ preview_cache *p=preview_owner();
+ if(!p)return -1;
+ uint32_t version=__atomic_load_n(&p->version,__ATOMIC_ACQUIRE);
+ if(version&1u)return -1;
+ if(version&&p->box==active_box()&&p->state.magic)return (int)p->state.sequence;
+ /* Retire cached data immediately so a card error cannot leak another
+  * box's configuration into a later exposure. Custom targets are refreshed
+  * during the UI load and captured frames retain their existing snapshot. */
+ if(!__atomic_compare_exchange_n(&p->version,&version,version+1u,0,__ATOMIC_ACQ_REL,__ATOMIC_RELAXED))return -1;
+ p->state.magic=0;
+ __atomic_store_n(&p->version,version+2u,__ATOMIC_RELEASE);
+ m10v_library_state state;
+ int result=m10v_camera_library_load(&state);
+ return result>=0&&m10v_camera_library_preview(&state)?(int)state.sequence:-1;
+}
+#endif
 int m10v_camera_library_load(m10v_library_state *state){
     int result=load_library(state);
 #if !M10V_FOUR_LOOKS_NATIVE || !M10V_MARLBORO_NATIVE || !M10V_THREE_FILM_NATIVE || !M10V_LEICA_NATIVE

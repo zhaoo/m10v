@@ -11,7 +11,7 @@ from pathlib import Path
 from scripts import build_gr3_border_wait_guard as guard
 ROOT=Path(__file__).resolve().parents[1]
 SOURCES=('native/gr3/m10v_isp_effects_render.c','native/gr3/m10v_isp_effects_render.h','scripts/build_gr3_isp_effect_render.py','native/gr3/m10v_isp_effect_transfer.h','native/gr3/m10v_isp_effect_transfer_runtime.h','native/gr3/m10v_isp_effects_shot.h','native/gr3/m10v_isp_effects_state.h','native/gr3/m10v_isp_effect_granulation.h','native/gr3/m10v_isp_effect_memory.h')
-EXTERNALS=('m10v_isp_effect_transfer_plan_format','m10v_isp_effect_transfer_execute','m10v_isp_effect_granulation_owned','m10v_isp_effect_granulation_luma')
+EXTERNALS=('m10v_isp_effect_transfer_plan_format','m10v_isp_effect_transfer_execute','m10v_isp_effect_granulation_owned_rows','m10v_isp_effect_granulation_luma_rows')
 FIELDS=('base','bytes','width','height','stride')
 def _texture(t):
  if not isinstance(t,dict) or set(t)!=set(FIELDS) or any(type(t[k])is not int for k in FIELDS):raise ValueError('exact five-field texture descriptor required')
@@ -106,18 +106,26 @@ def _imprints(imprints,bindings,externals):
 def _header(bindings,imprints=None):
  def row(t):return '{'+','.join(str(t[k])+'u' for k in FIELDS)+'}'
  out=['static const m10v_isp_effect_texture m10v_render_grain='+row(bindings['grain'])+';', 'static const m10v_isp_effect_texture m10v_render_leaks[9][2]={'+','.join('{'+','.join(row(t) for t in p)+'}' for p in bindings['leaks'])+'};']
- profiles=[]
- for curve in leak_curves():
-  profiles.append('{'+','.join('{'+','.join(map(str,v))+'}' for v in curve)+'}')
+ rows={}
+ def curves(name,profiles):
+  entries=[]
+  for profile in profiles:
+   names=[]
+   for values in profile:
+    key=tuple(values)
+    if key not in rows:
+     rows[key]=f'm10v_render_row_{len(rows)}'
+     out.append('static const int16_t '+rows[key]+'[256]={'+','.join(map(str,key))+'};')
+    names.append(rows[key])
+   entries.append('{'+','.join(names)+'}')
+  out.append(f'static const int16_t *const {name}[{len(entries)}][3]={{'+','.join(entries)+'};')
  out.append('static const m10v_isp_effect_texture m10v_render_leaks_vertical[9][2]={'+','.join('{'+','.join(row(t) for t in p)+'}' for p in bindings['leaks_vertical'])+'};')
  out.append('static const m10v_isp_effect_texture m10v_render_rainbows[2][4][3][2]={'+','.join('{'+','.join('{'+','.join('{'+','.join(row(t) for t in c)+'}' for c in v)+'}' for v in b)+'}' for b in bindings['rainbows'])+'};')
- for curve in rainbow_curves():
-  profiles.append('{'+','.join('{'+','.join(map(str,v))+'}' for v in curve)+'}')
- out.append('static const int16_t m10v_render_curves[12][3][256]={'+','.join(profiles)+'};')
+ curves('m10v_render_curves',leak_curves()+rainbow_curves())
  out.append('#define M10V_ISP_IMPRINTS_BOUND '+str(int(imprints is not None)))
  if imprints is not None:
   out.append('static const m10v_isp_effect_texture m10v_render_imprints[7][2]={'+','.join('{'+','.join(row(t) for t in pair)+'}' for pair in imprints)+'};')
-  out.append('static const int16_t m10v_render_imprint_curves[3][3][256]={'+','.join('{'+','.join('{'+','.join(map(str,v))+'}' for v in c)+'}' for c in imprint_curves())+'};')
+  curves('m10v_render_imprint_curves',imprint_curves())
  return '\n'.join(out)+'\n'
 def _compile(base,bindings,externals,imprints=None,trace_batch=0):
  bindings,externals=_validated(base,bindings,externals)

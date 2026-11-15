@@ -172,6 +172,10 @@ static uint32_t ab_trace_event_impl(uint32_t controller,uint32_t event){
 uint32_t m10v_settings_controller_ab_adj_event(uint32_t controller,uint32_t event){
 #endif
  uint32_t key=ab_event_key(event);
+#if M10V_PHOTO_RECIPE
+ if(key==1||key==0x35||key==0x89||key==0xaa||key==0xce||key==0xcf||
+    key==0xa1)m10v_camera_library_adj_tone_set(0);
+#endif
  if(key==1)ab_main_off();
  if(key>=0x36&&key<=0x38){
   m10v_settings_controller *closing=ab_owner();
@@ -245,6 +249,10 @@ uint32_t m10v_settings_controller_ab_selector(uint32_t mapper,uint32_t key){
 #endif
  /* Native switch mapping can call this directly, bypassing BaseController's
   * physical-packet hook. Record MAIN before the native ADJ close is queued. */
+#if M10V_PHOTO_RECIPE
+ if(key==1||key==0x35||key==0x89||key==0xaa||key==0xce||key==0xcf||
+    key==0xa1)m10v_camera_library_adj_tone_set(0);
+#endif
  if(key==1)ab_main_off();
  if(ab_live_key(ab_owner(),key))return 1;
  /* ImageControl ignores stock DISP. Use its real controller as the navigation
@@ -299,6 +307,50 @@ static uint32_t ab_live_key(m10v_settings_controller *p,uint32_t key){
 uint32_t m10v_settings_controller_ab_mapper(uint32_t mapper,uint32_t key){
  return ab_live_key(ab_owner(),key)?1:m10v_ab_mapper_original(mapper,key);
 }
+#if M10V_PHOTO_RECIPE
+uint32_t m10v_settings_controller_save_dial_recipe(uint32_t property,uint32_t box){
+ uint32_t result=((fn2)0x5324b760u)(property,box);
+ m10v_settings_controller *p=ab_owner();
+ if(property==0x55063f30u&&p&&box>=1&&box<=6){
+  uint32_t owner=(uint32_t)(uintptr_t)p-M10V_SETTINGS_OWNER_BYTES;
+  uint32_t failures=!m10v_camera_library_save_box(box);
+  failures|=(m10v_isp_effects_camera_copy_box(owner,box)!=0)<<1;
+#if M10V_HDF_UI_CACHE
+  failures|=(m10v_hdf_copy_box(box)!=0)<<2;
+#endif
+#if M10V_BORDER_ENABLED
+  failures|=(m10v_border_camera_copy_box(owner,box)!=0)<<3;
+#endif
+  M10V_LOG(145,box,failures,0,0);
+  (void)failures;
+ }
+ return result;
+}
+uint32_t m10v_settings_controller_load_dial_recipe(uint32_t property,uint32_t box){
+ m10v_camera_library_adj_tone_set(0);
+ uint32_t previous=m10v_camera_library_box_id();
+ uint32_t result=((fn2)0x53279fa0u)(property,box);
+ m10v_settings_controller *p=ab_owner();
+ if(property==0x55063f30u&&p&&p->library_initialized&&!p->power_off_pending){
+  int sequence=m10v_camera_library_reload_box();
+  uint32_t failures=0;
+  if(previous!=m10v_camera_library_box_id()){
+   uint32_t owner=(uint32_t)(uintptr_t)p-M10V_SETTINGS_OWNER_BYTES;
+   failures=(m10v_isp_effects_camera_reload_box(owner)!=0)<<1;
+#if M10V_HDF_UI_CACHE
+   uint32_t strength;
+   failures|=(m10v_hdf_load(&strength)!=0)<<2;
+#endif
+#if M10V_BORDER_ENABLED
+   failures|=(m10v_border_camera_refresh(owner)!=0)<<3;
+#endif
+  }
+  M10V_LOG(146,box,(uint32_t)sequence,failures,0);
+  (void)sequence;(void)failures;
+ }
+ return result;
+}
+#endif
 uint32_t m10v_settings_controller_ab_live_enter(uint32_t live,uint32_t route,uint32_t flags){
  M10V_EXIT_LOG(239,live,route,flags,*(const volatile uint32_t *)0x55063988u);
  m10v_settings_controller *p=ab_owner();
@@ -338,6 +390,9 @@ uint32_t m10v_settings_controller_ab_live_enter(uint32_t live,uint32_t route,uin
   m10v_hdf_bootstrap();
 #endif
   p=ab_owner();if(p&&initialized)p->library_initialized=1;
+#if M10V_SHUTDOWN_ALBUM
+  if(p)shutdown_restore(p);
+#endif
  }
 #if M10V_BORDER_ENABLED
  if(route==0x08000000u){
@@ -474,6 +529,7 @@ uint32_t m10v_settings_controller_ab_dispatch(uint32_t c,uint32_t event){
 static int trace_adj_route(uint32_t route){
  return route==0x02000000u||route==0x02000012u||route==0x02000073u||
         route==0x020000a0u||route==M10V_SETTINGS_FILMS_ROUTE||route==0x0200f108u||
+        route==M10V_SETTINGS_SHUTDOWN_ROUTE||
         route==0x02000107u||route==0x0200010au||route==0x0200010du||route==0x02000112u;
 }
 uint32_t m10v_settings_controller_ab_dispatch(uint32_t c,uint32_t event){

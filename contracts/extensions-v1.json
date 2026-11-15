@@ -176,6 +176,34 @@
       "max": 4,
       "persistence": "runtime",
       "writeMax": 1
+    },
+    {
+      "id": 25,
+      "key": "wbGreenMagenta",
+      "min": 0,
+      "max": 28,
+      "persistence": "runtime"
+    },
+    {
+      "id": 26,
+      "key": "wbBlueAmber",
+      "min": 0,
+      "max": 28,
+      "persistence": "runtime"
+    },
+    {
+      "id": 27,
+      "key": "wbKelvin",
+      "min": 2500,
+      "max": 10000,
+      "persistence": "runtime"
+    },
+    {
+      "id": 28,
+      "key": "filmTexture",
+      "min": 0,
+      "max": 6143,
+      "persistence": "persistent"
     }
   ],
   "powerImages": {

@@ -47,6 +47,13 @@ class DeliveredPureIspTests(unittest.TestCase):
         cls.image = subprocess.check_output(['node', '--input-type=module', '-e', js, str(cls.binary)], cwd=ROOT)
         start = cls.manifest['base'] - BASE
         runtime = cls.image[start:start + cls.manifest['code_bytes']]
+        power = cls.receipt.get('power_images') or {}
+        album = power.get('shutdown_album_menu')
+        if album:
+            assert hashlib.sha256(runtime).hexdigest() == power['runtime_sha256']
+            offset = cls.manifest['symbols']['m10v_settings_controller_shutdown_config'] - cls.manifest['base']
+            assert runtime[offset:offset + 8] == struct.pack('<II',0x3141534d,album['entries'])
+            runtime = runtime[:offset + 4] + bytes(4) + runtime[offset + 8:]
         if hashlib.sha256(runtime).hexdigest() != cls.manifest['code_sha256']:
             raise AssertionError('decoded final runtime no longer matches manifest')
         if cls.manifest['pure_isp_effects'].get('enabled') is not True:
@@ -83,7 +90,9 @@ class DeliveredPureIspTests(unittest.TestCase):
                 for index in range(count):
                     e.debug_records.append(struct.unpack('<5I', u.mem_read(pointer + index * 20, 20)))
             if pc not in (0x5368A92C, 0x536B0A74, 0x53828014, 0x53825648, 0x53825FA8):
-                if pc in (self.symbols['m10v_isp_effects_render'], self.symbols['m10v_isp_effect_granulation_owned'],self.symbols['m10v_isp_effect_granulation_luma']):
+                if pc in (self.symbols['m10v_isp_effects_render'],
+                          self.symbols.get('m10v_isp_effect_granulation_owned_rows',self.symbols['m10v_isp_effect_granulation_owned']),
+                          self.symbols.get('m10v_isp_effect_granulation_luma_rows',self.symbols['m10v_isp_effect_granulation_luma'])):
                     e.events.append(pc)
                 return
             if pc == 0x5368A92C:
@@ -142,7 +151,7 @@ class DeliveredPureIspTests(unittest.TestCase):
         state_pointer = e.alloc(184)
         e.files['M10V7B.bin' if self.per_film else 'M10V6B.bin']=bytes(state)
         self.assertEqual(self.call(e, 'm10v_camera_library_load', state_pointer), 0)
-        recipe = e.alloc(0x57D8)
+        recipe = e.alloc(self.manifest['pure_isp_effects']['recipe_bytes'])
         e.w32(recipe, 0x53D0FC90)
         e.w32(recipe + 0x4778, 0x31545653)
         obj = e.cursor
@@ -164,7 +173,7 @@ class DeliveredPureIspTests(unittest.TestCase):
             # the real producer publishes that identity and freezes the shot.
             pool = e.alloc(0x218)
             e.w32(0x55345328, pool)
-            e.w32(pool + 0x20, 0x74280)
+            e.w32(pool + 0x20, 0x74330 if self.manifest['appended_slots'].get('photo_recipe') else 0x74280)
             e.w32(pool + 0x88, si)
         e.u.reg_write(A.UC_ARM_REG_R0, recipe)
         e.u.reg_write(A.UC_ARM_REG_R4, recipe)
@@ -509,25 +518,37 @@ class DeliveredPureIspTests(unittest.TestCase):
         assets = pure['runtime_assets']
         data = self.image[assets['base'] - BASE:assets['base'] - BASE + assets['bytes']]
         self.assertEqual(hashlib.sha256(data).hexdigest(), assets['sha256'])
-        self.assertEqual(pure['recipe_bytes'], 0x57D8)
+        storage = self.manifest['capture_lifecycle']['owner']['storage']
+        self.assertEqual(pure['recipe_bytes'], storage['extended_recipe_bytes'])
+        self.assertGreaterEqual(pure['recipe_bytes'], storage['effects_offset'] + storage['effects_bytes'])
+        if self.manifest['torn_overlay'].get('enabled'):
+            self.assertEqual(pure['recipe_bytes'], self.manifest['torn_overlay']['recipe_bytes'])
         self.assertEqual(len(pure['patches']), 7)
         self.assertEqual(self.receipt.get('runtime_sha256', self.manifest['code_sha256']), self.manifest['code_sha256'])
 
     def test_final_bin_zero_weight_endpoints_are_identity_including_unselected_uv_bytes(self):
         # Inspect actual decoded delivered data, independently of builder's
         # Python curve generator. This proves data binding, not ISP arithmetic.
-        at=self.symbols['m10v_render_curves']-BASE
-        tables=struct.unpack('<9216h',self.image[at:at+18432])
-        for profile in range(9):
-            offset=profile*768
-            self.assertEqual(tables[offset+256:offset+512],tuple(range(256)))
-            self.assertEqual(tables[offset+512:offset+768],tuple(range(256)))
-        self.assertEqual(tables[9*768:9*768+256],(0,)*256)
-        self.assertEqual(tables[9*768+256:9*768+512],tuple(range(256)))
-        self.assertEqual(tables[10*768:10*768+256],(255,)*256)
-        self.assertEqual(tables[11*768:11*768+256],(0,)*256)
-        for profile in (10,11):
-            self.assertEqual(tables[profile*768+256:profile*768+768],tuple(range(256))*2)
+        at = self.symbols['m10v_render_curves'] - BASE
+        pointers = struct.unpack_from('<36I', self.image, at)
+        code_start = self.manifest['base']
+        code_end = code_start + self.manifest['code_bytes']
+        uses_row_pointers = code_start <= pointers[0] < code_end
+        def row(profile, channel):
+            index = profile * 3 + channel
+            if uses_row_pointers:
+                self.assertTrue(code_start <= pointers[index] <= code_end - 512)
+                self.assertEqual(pointers[index] % 2, 0)
+                offset = pointers[index] - BASE
+            else:
+                offset = at + 512 * index
+            return struct.unpack_from('<256h', self.image, offset)
+        identity = tuple(range(256))
+        for profile in range(12):
+            for channel in (1, 2):
+                self.assertEqual(row(profile, channel), identity)
+        for profile, constant in ((9, 0), (10, 255), (11, 0)):
+            self.assertEqual(row(profile, 0), (constant,) * 256)
 
     def test_all_off_real_producer_query_execution_and_jpeg_bridge_have_zero_pixel_access(self):
         e, recipe, obj, frame, si, request, owner, setting, digital, native, state = self.fixture()
@@ -588,8 +609,8 @@ class DeliveredPureIspTests(unittest.TestCase):
                 self.assertEqual(self.at(e,0x53503AB4,digital,native,execution,0),1)
                 self.assertEqual(int.from_bytes(e.u.mem_read(recipe+0x5778+68,4),'little'),16)
                 self.assertEqual(e.resize_dispatches,6)
-                self.assertEqual(e.events.count(self.symbols['m10v_isp_effect_granulation_owned']),6)
-                self.assertEqual(e.events.count(self.symbols['m10v_isp_effect_granulation_luma']),0)
+                self.assertEqual(e.events.count(self.symbols.get('m10v_isp_effect_granulation_owned_rows',self.symbols['m10v_isp_effect_granulation_owned'])),6)
+                self.assertEqual(e.events.count(self.symbols.get('m10v_isp_effect_granulation_luma_rows',self.symbols['m10v_isp_effect_granulation_luma'])),0)
                 self.jpeg(e,recipe,si,request)
 
     def test_marlboro_real_producer_still_spatial_and_jpeg_preserve_queued_film_without_cpu_pixels(self):
@@ -654,6 +675,10 @@ class DeliveredPureIspTests(unittest.TestCase):
         old[96:104] = bytes(8)
         struct.pack_into('<I', old, 180, zlib.crc32(old[:180]))
         e.files['M10V6B.bin'] = bytes(old)
+        # Exercise journal migration independently of the normal export's
+        # one-time compiled selection. Model a card that has applied that seed.
+        crc, = struct.unpack_from('<I', bytes.fromhex(self.manifest['initial_state_hex']), 180)
+        e.files['M10VCFG.bin'] = struct.pack('<4I', 0x31474643, crc, crc ^ 0xffffffff, 0x31474643 ^ crc)
         e.u.mem_write(settings, struct.pack('<8I', 2, 2, 1, 3, 1, 2, 2, 0))
         record = e.alloc(48)
         self.assertEqual(self.call(e,'m10v_isp_effects_encode',settings,1,record,48),1)
@@ -697,7 +722,9 @@ class DeliveredPureIspTests(unittest.TestCase):
 
     def test_untouched_cold_stock_first_shot_passes_gate_into_original_jpeg_route(self):
         e, recipe, obj, frame, si, request, owner, setting, digital, native, state = self.fixture(cold=True)
-        self.assertEqual(int.from_bytes(e.u.mem_read(recipe + 0x5778 + 8, 4), 'little'), 1 if self.per_film else 2)
+        # A cold imprint cache cannot authenticate a frozen effects record.
+        # The stock-tone encoder gate must still pass the original frame.
+        self.assertEqual(int.from_bytes(e.u.mem_read(recipe + 0x5778 + 8, 4), 'little'), 2)
         self.assertEqual(self.call(e, 'm10v_isp_effects_pipeline_encoder_admit', recipe, si), 1)
         # -4 is the existing stock-tone bypass, chained by the original JPEG
         # hook. It must return, rather than holding an untouched cold frame.
@@ -897,8 +924,8 @@ class DeliveredPureIspTests(unittest.TestCase):
         self.assertEqual(rendered_photos, [holder + 4])
         self.assertEqual(int.from_bytes(e.u.mem_read(recipe + 0x5778 + 80, 4), 'little'), 0)
         self.assertEqual(int.from_bytes(e.u.mem_read(recipe + 0x5778 + 68, 4), 'little'), 3 if grain else 2)
-        self.assertEqual(e.events.count(self.symbols['m10v_isp_effect_granulation_owned']), 4 if grain else 3)
-        self.assertEqual(e.events.count(self.symbols['m10v_isp_effect_granulation_luma']),2)
+        self.assertEqual(e.events.count(self.symbols.get('m10v_isp_effect_granulation_owned_rows',self.symbols['m10v_isp_effect_granulation_owned'])), 4 if grain else 3)
+        self.assertEqual(e.events.count(self.symbols.get('m10v_isp_effect_granulation_luma_rows',self.symbols['m10v_isp_effect_granulation_luma'])),2)
         self.assertEqual(e.resize_dispatches, 3 if grain else 2)
         # Multi-plane native Resize can submit more than one hardware job;
         # every delivered IRQ must still target this same real IIP service.

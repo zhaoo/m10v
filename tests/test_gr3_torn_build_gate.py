@@ -5,6 +5,15 @@ from scripts import build_gr3_m10v_library as build
 from scripts import build_gr3_torn_overlay as torn
 ROOT=Path(__file__).resolve().parents[1]
 class TornBuildGate(unittest.TestCase):
+ def test_torn_curves_share_identical_rows_without_changing_coefficients(self):
+  rows,indices=torn._curve_rows()
+  identity=tuple(range(256))
+  self.assertEqual(len(rows),6)
+  self.assertEqual(tuple(rows[i] for i in indices[0])[:2],(rows[indices[0][0]],)*2)
+  for profile,target in ((1,255),(2,128),(4,205)):
+   self.assertEqual(tuple(rows[i] for i in indices[profile]),((target,)*256,identity,identity))
+  self.assertTrue(all(rows[profile[2]]==identity for profile in indices))
+
  def test_each_mask_splits_one_frame_with_a_single_matching_center_tear(self):
   width,height=torn.MASK_WIDTH,torn.MASK_HEIGHT
   plane=width*height

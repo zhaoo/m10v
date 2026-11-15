@@ -64,6 +64,8 @@ PROFILE_INTERVALS={2:'validation',3:'settings-read',4:'date-seed-allocation',5:'
     10:'stamp',11:'cache-after',12:'release-and-return'}
 EVENTS.update({204:'module.dispatch.enter',205:'module.dispatch.return',206:'module.store.opcode',207:'module.dispatch.time'})
 EVENTS.update({132:'capture.profile.settings',134:'capture.texture.backend',135:'capture.native.completed',137:'capture.native.grain.quality',138:'capture.cpu.residual',150:'capture.profile.time'})
+EVENTS.update({144:'recipe.adj.confirm',145:'recipe.dial.save',146:'recipe.dial.load'})
+EVENTS[139]='raw.develop.jpeg-isp-identity'
 EVENTS.update({180:'save.begin',181:'save.callback.payload',182:'save.return',
     183:'raw.setter.after',184:'raw.pool.dispatch.return',185:'raw.transfer',186:'raw.release.before',
     187:'raw.setter.before',188:'raw.allocation.return',189:'raw.release.after',
@@ -181,6 +183,23 @@ def page_records(data):
         if record['event']==125:
             context,tone,mode,raw=record['arguments']
             record['request_identity']={'context':hex(context),'stock_tone':tone,'sequence_mode':mode,'raw_source':hex(raw)}
+        if record['event']==139:
+            context,film_code,_,_=record['arguments']
+            record['raw_development']={'context':hex(context),'film_code':film_code or None}
+        if record['event']==144:
+            row,candidate,_,_=record['arguments']
+            record['recipe_adj']={'confirmed_row':row,'preview_tone':candidate or None}
+        if record['event'] in (145,146):
+            box,status,load_flags,_=record['arguments']
+            save=record['event']==145
+            failures=status if save else load_flags
+            record['recipe_dial']={'box':box,'failed':[name for bit,name in
+                enumerate(('library','effects','hdf','border')) if failures&(1<<bit)]}
+            if not save:
+                record['recipe_dial']['library_sequence']=status if status<0x80000000 else None
+        if record['event']==140:
+            choice,sequence,_,_=record['arguments']
+            record['shutdown_album']={'choice':choice,'sequence':sequence}
         if record['event']==225 and record['channel']=='torn':
             recipe,generation,packed,result=record['arguments']
             result=struct.unpack('<i',struct.pack('<I',result))[0]

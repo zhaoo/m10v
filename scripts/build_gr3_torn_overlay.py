@@ -4,11 +4,11 @@ from functools import lru_cache
 from pathlib import Path
 from scripts import build_gr3_border_wait_guard as guard
 ROOT=Path(__file__).resolve().parents[1]
-EXTERNALS=('m10v_isp_effect_granulation_plane','m10v_torn_eligible','m10v_torn_camera_busy','m10v_save_trace_recipe_raw_status',
+EXTERNALS=('m10v_isp_effect_granulation_plane_rows','m10v_torn_eligible','m10v_torn_camera_busy','m10v_save_trace_recipe_raw_status',
            'm10v_isp_effect_transfer_plan_format','m10v_isp_effect_transfer_execute')
 TRACE_EXTERNAL='m10v_save_trace_recipe_mark'
 SOURCES=('native/gr3/m10v_torn_overlay.c','native/gr3/m10v_torn_overlay.h','scripts/build_gr3_torn_overlay.py','native/gr3/m10v_isp_effect_granulation.h','native/gr3/m10v_isp_effect_memory.h')
-def _curves():
+def _curve_rows():
  identity=list(range(256))
  # Leave a narrow, opaque white paper lip inside the geometric edge.
  edge=[max(0,min(255,((luma-116)*255+4)//8)) for luma in identity]
@@ -19,7 +19,15 @@ def _curves():
          for luma in identity]
  profiles=((edge,edge,identity),([255]*256,identity,identity),([128]*256,identity,identity),
            (shadow,shadow,identity),([205]*256,identity,identity))
- return 'static const int16_t torn_curves[5][3][256]={'+','.join('{'+','.join('{'+','.join(map(str,row))+'}' for row in profile)+'}' for profile in profiles)+'};\n'
+ rows=list(dict.fromkeys(tuple(row) for profile in profiles for row in profile))
+ return rows, [tuple(rows.index(tuple(row)) for row in profile) for profile in profiles]
+
+def _curves():
+ rows,indices=_curve_rows()
+ data=','.join('{'+','.join(map(str,row))+'}' for row in rows)
+ pointers=','.join('{'+','.join(f'torn_rows[{i}]' for i in profile)+'}' for profile in indices)
+ return ('static const int16_t torn_rows[][256]={'+data+'};\n'
+         'static const int16_t *const torn_curves[][3]={'+pointers+'};\n')
 
 # Preserve the existing ROM budget and the native Resize stride alignment.
 MASK_WIDTH, MASK_HEIGHT = 64, 80

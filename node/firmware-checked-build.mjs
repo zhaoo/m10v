@@ -21,7 +21,7 @@ export function prepareCheckedNative(source,input){
  requireReleaseBaseline(source);
  if(input.version_unlock?.enabled)throw Error('网页安全校验禁止抬高版本，请关闭版本适配。');
  const model=source.readUInt32LE(0x30)===609?'GR IIIx':'GR III';
- const options=resolveIspEffectOptions(source,input,model);
+ const options={...resolveIspEffectOptions(source,input,model),shutdown_album:Array.isArray(input.power_images?.shutdownAlbum)};
  const base=prepareNative(source,input.configuration,options);
  return {options,base,plan:bindPowerPreparation(base,source,input.power_images)};
 }
@@ -39,7 +39,7 @@ export function checkedFirmwareJob(store,id,input,kind='native'){
     const native=await generateNative(source,request.configuration,checked.base.configuration_sha256,{...checked.options,signal});
     if(checked.options.companion_identity)runtimeManifest=native.manifest;
     signal.throwIfAborted();
-    const power=applyPowerImages(source,native.candidate,request.power_images),candidate=power.candidate;
+    const power=applyPowerImages(source,native.candidate,request.power_images,native.manifest),candidate=power.candidate;
     const receipt={...native.receipt,build_source:report.build_source,
      ...(checked.plan.power_images?{power_images:power.receipt,configuration_sha256:plan.configuration_sha256,
       candidate_sha256:sha(candidate),candidate_bytes:candidate.length}:{})};

@@ -40,9 +40,9 @@ __attribute__((noinline)) uint32_t m10v_settings_controller_ab_available(void){
 #endif
 #if M10V_HALF_PAIR_ENABLED
 #include "m10v_half_pair_camera.h"
+#endif
 #if M10V_TORN_ENABLED
 #include "m10v_torn_overlay.h"
-#endif
 #endif
 #ifndef M10V_LIVE_COLOR
 #define M10V_LIVE_COLOR 0
@@ -91,10 +91,86 @@ extern unsigned m10v_zoom_live_slot(void);
 extern int m10v_zoom_live_apply(unsigned);
 static void zoom_ops(m10v_zoom_menu_ops *o){o->load=m10v_zoom_camera_load;o->save=m10v_zoom_camera_save;o->select=m10v_zoom_live_apply;o->current=m10v_zoom_live_slot;}
 static void ops(m10v_settings_ops *o){o->context=0;o->load=load;o->item=item;o->install=install;o->remove=remove_film;o->stamp=stamp;o->film_name_stamp=film_name_stamp;o->extent=extent;}
+#if M10V_SHUTDOWN_ALBUM
+static void shutdown_restore(m10v_settings_controller *p);
+#endif
 static m10v_settings_controller *page(uint32_t owner,uint32_t i){
  return (m10v_settings_controller *)(uintptr_t)(owner+M10V_SETTINGS_OWNER_BYTES+i*M10V_SETTINGS_CONTROLLER_BYTES);
 }
+#if M10V_PHOTO_RECIPE
+extern uint32_t m10v_camera_library_box_id(void);
+extern int m10v_isp_effects_camera_copy_box(uint32_t,uint32_t);
+extern int m10v_isp_effects_camera_reload_box(uint32_t);
+#if M10V_BORDER_ENABLED
+extern int m10v_border_camera_copy_box(uint32_t,uint32_t);
+#endif
+#if M10V_HDF_UI_CACHE
+extern int m10v_hdf_copy_box(uint32_t);
+extern int m10v_hdf_load(uint32_t *);
+#endif
+int m10v_camera_library_save_box(uint32_t);
+int m10v_camera_library_reload_box(void);
+void m10v_camera_library_adj_tone_set(uint32_t);
+uint32_t m10v_camera_library_adj_tone(void);
+#endif
 #include "m10v_ab_camera.inc"
+#if M10V_SHUTDOWN_ALBUM
+#define M10V_SETTINGS_SHUTDOWN 11u
+/* A checked resource build changes the count word after the native build. */
+const uint32_t m10v_settings_controller_shutdown_config[2]={0x3141534du,0};
+typedef struct {uint16_t width,height;const char *path;} shutdown_image;
+static const shutdown_image shutdown_images[3]={
+ {720,480,"A:\\Resource\\Jpeg\\GB_ING.jpg"},
+ {720,480,"A:\\Resource\\Jpeg\\GB_Urban.jpg"},
+ {720,480,"A:\\Resource\\Jpeg\\GB_Diary.jpg"},
+};
+const void *m10v_settings_controller_shutdown_descriptor(uint32_t request){
+ return request>=13&&request<=15?&shutdown_images[request-13]:0;
+}
+static uint32_t shutdown_count(void){
+ const volatile uint32_t *config=m10v_settings_controller_shutdown_config;
+ uint32_t count=config[1];return count<=3?count:0;
+}
+typedef struct {uint32_t magic,sequence,choice,crc;} shutdown_record;
+static const char shutdown_files[2][12]={"M10VSA0.BIN","M10VSA1.BIN"};
+static int shutdown_read(uint32_t fs,uint32_t page,shutdown_record *out){
+ return ((uint32_t (*)(uint32_t,const char *,uint32_t,void *))0x53825648u)(fs,shutdown_files[page],sizeof(*out),out)&&
+  out->magic==0x3141534du&&out->sequence&&(out->sequence&1u)==page&&out->choice<=3&&
+  out->crc==m10v_sd_crc((const uint8_t *)out,12);
+}
+static shutdown_record shutdown_latest(uint32_t fs){
+ shutdown_record a={0},b={0};
+ if(!shutdown_read(fs,0,&a))a.sequence=0;
+ if(!shutdown_read(fs,1,&b))b.sequence=0;
+ return b.sequence>a.sequence?b:a;
+}
+static void shutdown_restore(m10v_settings_controller *p){
+ uint32_t fs=ab_fs(),count=shutdown_count();
+ if(!fs||!count)return;
+ shutdown_record record=shutdown_latest(fs);
+ if(p==ab_owner())p->shutdown_album=record.sequence&&record.choice<=count?record.choice:0;
+}
+static int shutdown_save(uint32_t choice){
+ m10v_settings_controller *p=ab_owner();uint32_t fs=ab_fs();
+ if(!p||!fs||choice>shutdown_count())return 0;
+ shutdown_record record=shutdown_latest(fs),back;
+ if(record.sequence==UINT32_MAX)return 0;
+ record.magic=0x3141534du;record.sequence++;record.choice=choice;
+ record.crc=m10v_sd_crc((const uint8_t *)&record,12);
+ uint32_t page=record.sequence&1u;
+ if(!((uint32_t (*)(uint32_t,const char *,uint32_t,const void *))0x53825fa8u)(fs,shutdown_files[page],sizeof(record),&record)||
+    !shutdown_read(fs,page,&back)||back.sequence!=record.sequence||back.choice!=choice||p!=ab_owner())return 0;
+ p->shutdown_album=choice;
+ M10V_LOG(140,choice,record.sequence,0,0);
+ return 1;
+}
+uint32_t m10v_settings_controller_shutdown_render(uint32_t display,uint32_t request,uint32_t rect,uint32_t context){
+ m10v_settings_controller *p=ab_owner();
+ uint32_t choice=p?p->shutdown_album:0;
+ if(choice&&choice<=shutdown_count())request=12+choice;
+ return ((uint32_t (*)(uint32_t,uint32_t,uint32_t,uint32_t))0x5322e4a8u)(display,request,rect,context);
+}
+#endif
 uint32_t m10v_settings_controller_owner_size(void){
 #if M10V_ADJ_EXTRA_CAMERA || M10V_GUIDES_CAMERA
 #if M10V_TORN_ENABLED
@@ -168,6 +244,12 @@ uint32_t m10v_settings_controller_top_dtor(uint32_t owner){
  return m10v_settings_top_dtor_original(owner);
 }
 uint32_t m10v_settings_controller_factory(uint32_t factory,uint32_t route){
+#if M10V_SHUTDOWN_ALBUM
+ if(route==M10V_SETTINGS_SHUTDOWN_ROUTE){
+  uint32_t owner=m10v_settings_factory_original(factory,0x0200004au);
+  return owner&&shutdown_count()?(uint32_t)(uintptr_t)page(owner,1):0;
+ }
+#endif
 #if M10V_ADJ_EXTRA_CAMERA
  if(route==M10V_SETTINGS_ADJ_ROUTE){
   uint32_t owner=m10v_settings_factory_original(factory,0x0200004au);
@@ -193,6 +275,18 @@ uint32_t m10v_settings_controller_ready(m10v_settings_controller *p,uint32_t rou
  p->base[0x12b]=p->page==M10V_SETTINGS_AB?0:2;
  p->base[0x137]=p->page==M10V_SETTINGS_AB?0:2;
  int opened=0;
+#if M10V_SHUTDOWN_ALBUM
+ if(route==M10V_SETTINGS_SHUTDOWN_ROUTE){
+  m10v_settings_controller *cache=ab_owner();
+  if(!cache||!shutdown_count())return 0;
+  shutdown_restore(cache);
+  if(cache!=ab_owner())return 0;
+  p->page=M10V_SETTINGS_SHUTDOWN;
+  p->state.screen=M10V_SETTINGS_SHUTDOWN;
+  p->state.focus=p->state.value=cache->shutdown_album;
+  p->state.error=0;
+ }else
+#endif
 #if M10V_ADJ_EXTRA_CAMERA
  if(route==M10V_SETTINGS_ADJ_ROUTE){
   m10v_adj_extra_assignments a;
@@ -216,6 +310,10 @@ void m10v_settings_controller_enter(m10v_settings_controller *p,uint32_t route,u
  if(route==M10V_SETTINGS_AB_ROUTE)M10V_LOG(94,(uint32_t)(uintptr_t)p,route,p->state.screen,flags);
  (void)route;(void)flags;m10v_settings_ops o;ops(&o);
  M10V_LOG(80,p->page,route,p->state.screen,p->state.focus);
+#if M10V_SHUTDOWN_ALBUM
+ if(p->page==M10V_SETTINGS_SHUTDOWN)m10v_settings_view_shutdown(&p->view,&p->state,shutdown_count());
+ else
+#endif
 #if M10V_ADJ_EXTRA_CAMERA
  if(p->page==M10V_SETTINGS_ADJ_EXTRA)m10v_settings_view_adj(&p->view,&p->state);
  else
@@ -292,6 +390,19 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
  case 0x86:case 0x89:case 0xda:key=M10V_KEY_BACK;break;
  default:return 0;
  }
+#if M10V_SHUTDOWN_ALBUM
+ if(p->page==M10V_SETTINGS_SHUTDOWN){
+  m10v_settings *s=&p->state;uint32_t count=shutdown_count();
+  if(key==M10V_KEY_BACK){((fn1)0x5316ca28u)((uint32_t)(uintptr_t)p);return 1;}
+  if(key==M10V_KEY_UP)s->focus=s->focus?s->focus-1:count;
+  if(key==M10V_KEY_DOWN)s->focus=s->focus<count?s->focus+1:0;
+  if(key==M10V_KEY_OK){
+   if(shutdown_save(s->focus)){s->value=s->focus;s->error=0;}
+   else s->error=M10V_SETTINGS_SAVE_FAILED;
+  }
+  m10v_settings_view_shutdown(&p->view,s,count);return 1;
+ }
+#endif
 #if M10V_ADJ_EXTRA_CAMERA
  if(p->page==M10V_SETTINGS_ADJ_EXTRA){
   m10v_settings *s=&p->state;
@@ -359,6 +470,9 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
 /* Scoped to the original key dispatch call site, never the global route getter. */
 uint32_t m10v_settings_controller_key_route(uint32_t model){
  uint32_t route=((fn1)0x53228c4cu)(model);
+#if M10V_SHUTDOWN_ALBUM
+ if(route==M10V_SETTINGS_SHUTDOWN_ROUTE&&shutdown_count())return 0x0200004au;
+#endif
 #if M10V_ADJ_EXTRA_CAMERA
  if(route==M10V_SETTINGS_ADJ_ROUTE)return 0x0200004au;
 #endif
