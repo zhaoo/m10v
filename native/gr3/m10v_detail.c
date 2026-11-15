@@ -4,6 +4,7 @@
 #include "m10v_tone.h"
 #include "m10v_library.h"
 #include "m10v_debug.h"
+#include "m10v_menu_detail_style.h"
 #ifndef M10V_ISP_NATIVE_GRAIN_MODE
 #define M10V_ISP_NATIVE_GRAIN_MODE 0
 #endif
@@ -64,9 +65,22 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
    uint32_t view=*(const uint32_t *)(uintptr_t)(row+0xf4-4*i);
    if(!ram(view,0x64))continue;
    uint32_t width=i?(field==29?64u:40u):(field==28?60u:40u);
+   uint32_t x=50;
    const uint32_t *bounds=(const uint32_t *)(uintptr_t)(view+0x20);
-   if(bounds[0]==50&&bounds[1]==10&&bounds[2]==width&&bounds[3]==40)continue;
-   const uint32_t rect[4]={50,10,width,40};
+#if M10V_MENU_HUB
+   /* Only the private text values in the stock Fn rail use the wider accent
+    * treatment. x=52 tags that treatment on recycled LabelViews. */
+   if(!i&&ram(view,0xf4)){
+    if(field>=18&&field<=29&&field!=29&&slot(ui)>=0){
+     x=52;width=64;
+     ((fn2)0x53390d6cu)(view,10);
+    }else if(bounds[0]==52){
+     ((fn2)0x53390d6cu)(view,31);
+    }
+   }
+#endif
+   if(bounds[0]==x&&bounds[1]==10&&bounds[2]==width&&bounds[3]==40)continue;
+   const uint32_t rect[4]={x,10,width,40};
    ((void (*)(uint32_t,const uint32_t *))0x533ab548u)(view,rect);
   }
   return 1;

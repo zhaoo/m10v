@@ -176,7 +176,13 @@ def _target_metadata(folder,catalog_hash,renderer_hash):
   count=album.get('entries')
   menu=manifest.get('hdf_menu') or manifest['settings_menu']
   route_offset=0x53b36c88-0x53000000+4*len(menu['rows'])
-  if (album.get('route')!=0x0200f109 or rom[route_offset:route_offset+4]!=struct.pack('<I',album['route']) or
+  if manifest.get('menu_hub'):
+   menu_count=struct.unpack_from('<I',rom,0x53b36adc-0x53000000)[0]
+   menu_route=struct.unpack_from('<I',rom,0x53b36c88-0x53000000)[0]
+   route_ok=len(menu['rows'])==1 and menu_count==0x1f1d1b19 and menu_route==manifest['menu_hub']['route']==0x0200f10a
+  else:
+   route_ok=rom[route_offset:route_offset+4]==struct.pack('<I',0x0200f109)
+  if (album.get('route')!=0x0200f109 or not route_ok or
       type(count)is not int or not 1<=count<=3 or
       not 0<=marker<=len(runtime)-8 or runtime[marker:marker+8]!=struct.pack('<II',0x3141534d,count) or
       power.get('runtime_sha256')!=_hash(runtime)):

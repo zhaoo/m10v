@@ -632,7 +632,14 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         guides_report = None
         adj_extra_report = None
         camera_extensions = pure_isp_effects and sd_library and appended_slots
-        extra_owner_bytes = (0x6e00 if torn_overlay else 0x6d00) if camera_extensions else 0
+        menu_hub = camera_model=='gr3' and camera_extensions and debug_mode
+        if menu_hub:compile_flags+=['-DM10V_MENU_HUB=1']
+        menu_compile_flags=[('-Oz' if flag=='-Os' else flag) for flag in compile_flags] if menu_hub else compile_flags
+        # GR III 2.10 RTOS functions return quotient in r0 and remainder in
+        # r1 for the EABI *divmod variants. Keep compiler-rt out of the image.
+        menu_math={'__aeabi_uidiv':0x5313d850,'__aeabi_uidivmod':0x5313d86c,
+                   '__aeabi_idiv':0x5313d884,'__aeabi_idivmod':0x5313d8a4} if menu_hub else {}
+        extra_owner_bytes = (0x74c0 if menu_hub else 0x6e00 if torn_overlay else 0x6d00) if camera_extensions else 0
         control_flags = ['-DM10V_GUIDES_CAMERA=1','-DM10V_ADJ_EXTRA_CAMERA=1',
             '-DM10V_GUIDES_OWNER_OFFSET=0x6600','-DM10V_ADJ_EXTRA_OWNER_OFFSET=0x6500',
             '-DM10V_ADJ_EXTRA_HDF='+str(int(bool(hdf_enabled))),
@@ -649,11 +656,12 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             if (ROOT/'native/gr3/m10v_film_card_data.h').read_text()!=card_data():raise ValueError('film card labels differ from catalog')
             for name,prefix in [('m10v_film_card.c','m10v_film_card_'),('m10v_settings.c','m10v_settings_'),('m10v_settings_view.c','m10v_settings_view_')]:
                 obj_path=folder/(name+'.o')
-                subprocess.run([compiler,*compile_flags,*control_flags,*border_flags,f'-DM10V_NATIVE_BASE={base}u','-c',str(ROOT/'native/gr3'/name),'-o',str(obj_path)],check=True,capture_output=True)
+                subprocess.run([compiler,*(menu_compile_flags if name=='m10v_settings_view.c' else compile_flags),*control_flags,*border_flags,f'-DM10V_NATIVE_BASE={base}u','-c',str(ROOT/'native/gr3'/name),'-o',str(obj_path)],check=True,capture_output=True)
                 start=(base+len(image)+15)&~15
                 view_exports=('m10v_settings_view_zoom','m10v_settings_view_adj') if camera_extensions else ('m10v_settings_view_zoom',)
                 if shutdown_album:view_exports+=('m10v_settings_view_shutdown',)
-                code,entries=link_object(obj_path.read_bytes(),start,symbols,prefix,
+                if menu_hub:view_exports+=('m10v_settings_view_hub_create','m10v_settings_view_hub','m10v_settings_view_hub_directory','m10v_settings_view_theme','m10v_settings_view_theme_directory')
+                code,entries=link_object(obj_path.read_bytes(),start,{**symbols,**menu_math},prefix,
                     additional_exports=view_exports if prefix=='m10v_settings_view_' else ())
                 image+=bytes(start-base-len(image))+code;symbols.update(entries)
             if camera_extensions:
@@ -728,16 +736,16 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                                       branch(site,symbols['m10v_adj_extra_camera_'+name],link)),name='ADJ extra '+name)
                     for site,expected,name,link in adj_hooks])
             controller_obj=folder/'settings-controller.o'
-            subprocess.run([compiler,*compile_flags,*debug_flags,*border_flags,*pair_flags,*control_flags,f'-DM10V_AB_ENABLED={int(ab_enabled)}',f'-DM10V_PHOTO_RECIPE={int(photo_recipe)}','-DM10V_LIVE_COLOR='+str(int(owner_cache)),'-c',str(ROOT/'native/gr3/m10v_settings_controller.c'),'-o',str(controller_obj)],check=True,capture_output=True)
+            subprocess.run([compiler,*menu_compile_flags,*debug_flags,*border_flags,*pair_flags,*control_flags,f'-DM10V_AB_ENABLED={int(ab_enabled)}',f'-DM10V_PHOTO_RECIPE={int(photo_recipe)}','-DM10V_LIVE_COLOR='+str(int(owner_cache)),'-c',str(ROOT/'native/gr3/m10v_settings_controller.c'),'-o',str(controller_obj)],check=True,capture_output=True)
             start=(base+len(image)+15)&~15
             placeholders={name:start for name in ['m10v_settings_factory_original','m10v_settings_top_dtor_original','m10v_settings_controller_vtable',*[f'm10v_ab_{n}_original' for n in ['selector','mapper','live_enter','live_leave','live_destroy','live_event','adj_event','adj_refresh','adj_exit','adj_destroy','adj_changed','dispatch']]]}
             controller_exports=(('m10v_settings_controller_save_dial_recipe','m10v_settings_controller_load_dial_recipe') if photo_recipe else ())+AB_CONTROLLER_EXPORTS+(tuple(remote_names[:5]) if companion else ())
             if shutdown_album:controller_exports+=('m10v_settings_controller_shutdown_config','m10v_settings_controller_shutdown_render','m10v_settings_controller_shutdown_descriptor')
-            provisional,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**placeholders},'m10v_settings_controller_',additional_exports=controller_exports)
+            provisional,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**placeholders,**menu_math},'m10v_settings_controller_',additional_exports=controller_exports)
             from scripts.build_gr3_settings_hooks import build_settings_hooks
             hook_start=(start+len(provisional)+15)&~15
             hook_code,settings_report=build_settings_hooks(hook_start,{**symbols,**entries},live_color=owner_cache,appended_slots=appended_slots,custom_zoom=custom_zoom,companion=companion,extra_owner_bytes=extra_owner_bytes,shutdown_album=shutdown_album)
-            code,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**settings_report['exports']},'m10v_settings_controller_',additional_exports=controller_exports)
+            code,entries=link_object(controller_obj.read_bytes(),start,{**symbols,**settings_report['exports'],**menu_math},'m10v_settings_controller_',additional_exports=controller_exports)
             image+=bytes(start-base-len(image))+code
             image+=bytes(hook_start-base-len(image))+hook_code;symbols.update(entries)
         if companion:
@@ -749,14 +757,14 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         hdf_adj_report=None
         if sd_library and (hdf_enabled or border_enabled):
             menu_obj=folder/'hdf-menu.o';start=(base+len(image)+15)&~15
-            subprocess.run([compiler,*compile_flags,*border_flags,f'-DM10V_ADJ_EXTRA_CAMERA={int(camera_extensions)}',f'-DM10V_DEBUG_MODE={int(debug_mode)}',f'-DM10V_ADJ_EXIT_TRACE={int(adj_exit_trace)}',f'-DM10V_HDF_ENABLED={int(hdf_enabled)}',f'-DM10V_HDF_GROUPED={int(film_library)}','-DM10V_HDF_OWNER_OFFSET='+hex(effects_owner_offset),'-c',str(ROOT/'native/gr3/m10v_hdf_menu.c'),'-o',str(menu_obj)],check=True,capture_output=True)
+            subprocess.run([compiler,*menu_compile_flags,*border_flags,f'-DM10V_ADJ_EXTRA_CAMERA={int(camera_extensions)}',f'-DM10V_DEBUG_MODE={int(debug_mode)}',f'-DM10V_ADJ_EXIT_TRACE={int(adj_exit_trace)}',f'-DM10V_HDF_ENABLED={int(hdf_enabled)}',f'-DM10V_HDF_GROUPED={int(film_library)}','-DM10V_HDF_OWNER_OFFSET='+hex(effects_owner_offset),'-c',str(ROOT/'native/gr3/m10v_hdf_menu.c'),'-o',str(menu_obj)],check=True,capture_output=True)
             names=['m10v_hdf_menu_parent_'+n for n in ['ctor','dtor','factory','key_route']]+['m10v_hdf_menu_vtable']
-            provisional,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**dict.fromkeys(names,start)},'m10v_hdf_menu_')
+            provisional,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**dict.fromkeys(names,start),**menu_math},'m10v_hdf_menu_')
             from scripts.build_gr3_hdf_menu import build_hooks as build_hdf_menu
             hook_start=(start+len(provisional)+15)&~15
             hook,hdf_menu_report=build_hdf_menu(hook_start,{**symbols,**entries},settings_report,film_library,live_color=owner_cache,custom_zoom=custom_zoom,pure_isp_effects=pure_isp_effects,companion=companion,extra_owner_bytes=extra_owner_bytes,adj_extra=camera_extensions)
             if border_enabled:hdf_menu_report.update(border_enabled=True,hdf_enabled=hdf_enabled,border_resource_ids=[1155,1156,1157],effects_children=(['HDF'] if hdf_enabled else [])+['Border']+(['FilmImprint','Vignette'] if pure_isp_effects else [])+(['TornOverlay'] if torn_overlay else []))
-            code,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**hdf_menu_report['exports']},'m10v_hdf_menu_')
+            code,entries=link_object(menu_obj.read_bytes(),start,{**symbols,**hdf_menu_report['exports'],**menu_math},'m10v_hdf_menu_')
             image+=bytes(start-base-len(image))+code+bytes(hook_start-start-len(code))+hook;symbols.update(entries)
             # Compose the added ADJ function with the already audited A/B
             # event wrapper. The Node writer replaces this ONE original site,
@@ -906,13 +914,17 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
             texts+=['胶卷印花','小猫吃鱼','樱花纷飞','绚烂彩虹','深海水母','小猫爪爪','呆头大鹅','宝可梦']
         if 786+len(texts)!=(1211 if pure_isp_effects else 1203):raise ValueError('three-film resource allocation differs')
         texts+=['SHD50','Revolog KOLOR','Pegasus']
-        if pure_isp_effects:texts+=['暗角','暗角开关','暗角强度','开']
+        if pure_isp_effects:texts+=['暗角','开关' if menu_hub else '暗角开关','强度' if menu_hub else '暗角强度','开']
         if torn_overlay:texts+=['撕纸效果','开','关','撕纸叠映：关','撕纸叠映：开','撕纸叠映：处理中','撕纸叠映：已完成','撕纸叠映：失败']
         if leica_native:
             texts+=['']*(1226-786-len(texts))
             if 786+len(texts)!=1226:raise ValueError('Leica resource allocation differs')
             texts += [s['name'] for s in json.loads((ROOT/'web/gr3/leica-luts.json').read_text())['stocks']]
             if shutdown_album:texts += ['关机图','原厂画面','图片 1','图片 2','图片 3','使用中']
+        if menu_hub:
+            texts+=['']*(1244-786-len(texts))
+            if 786+len(texts)!=1244:raise ValueError('menu hub resources overlap')
+            texts+=['m10v','无法读取 SD 卡菜单资源','点这里返回','返回','保存']
         last_resource=786+len(texts)-1
         if sd_library:
             from scripts.generate_m10v_card_captions import resource as caption_resource
@@ -1276,8 +1288,10 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
                 text+=f"\n.global m10v_icon_directory_{name}\n.type m10v_icon_directory_{name},%function\nm10v_icon_directory_{name}:\n"
                 text+="push {r0-r12,lr}\nmrs ip,cpsr\npush {ip,lr}\n"
                 text+=f"movw r0,#{icon_table&65535}\nmovt r0,#{icon_table>>16}\nstr r0,[sp,#{8+reg*4}]\nldr r1,[sp,#{8+idreg*4}]\n"
+                if menu_hub:
+                    text+=f"movw ip,#858\nsub ip,r1,ip\ncmp ip,#1\nbls .L{name}_dynamic\n"
                 text+=f"movw ip,#857\ncmp r1,ip\nbeq .L{name}_dynamic\nmovw ip,#749\ncmp r1,ip\nblo .L{name}_done\nmovw ip,#753\ncmp r1,ip\nbls .L{name}_dynamic\nmovw ip,#769\ncmp r1,ip\nblo .L{name}_done\nmovw ip,#773\ncmp r1,ip\nbhi .L{name}_done\n.L{name}_dynamic:\n"
-                text+=f"bl m10v_settings_controller_card_directory\ncmp r0,#0\nstrne r0,[sp,#{8+reg*4}]\n.L{name}_done:\npop {{ip,lr}}\nmsr cpsr_fs,ip\npop {{r0-r12,lr}}\nldr pc,={hex(ret)}\n.ltorg\n"
+                text+=f"mov r0,r1\nbl m10v_settings_controller_card_directory\ncmp r0,#0\nstrne r0,[sp,#{8+reg*4}]\n.L{name}_done:\npop {{ip,lr}}\nmsr cpsr_fs,ip\npop {{r0-r12,lr}}\nldr pc,={hex(ret)}\n.ltorg\n"
             icon_asm.write_text(text)
 
         subprocess.run([compiler,*compile_flags,'-c',str(icon_asm),'-o',str(icon_obj)],check=True,capture_output=True)
@@ -1581,6 +1595,10 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         manifest['adj_extra']=adj_extra_report
         manifest['sources'].update({p:sha((ROOT/p).read_bytes()) for p in CAMERA_EXTENSION_SOURCES})
     manifest['ab_enabled']=ab_enabled
+    if menu_hub:
+        manifest['menu_hub']={'route':0x0200f10a,'owner_offset':0x6e00,'owner_bytes':0x74c0,'caption':1244}
+        for name in ('native/gr3/m10v_menu_hub_view.inc','native/gr3/m10v_menu_detail_style.h'):
+            manifest['sources'][name]=sha((ROOT/name).read_bytes())
     manifest['zoom']=zoom_report
     if zoom_report:manifest['sources'].update(zoom_report['sources'])
     if sd_library:

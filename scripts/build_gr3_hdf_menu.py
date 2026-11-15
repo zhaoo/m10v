@@ -24,12 +24,15 @@ def build_hooks(base,symbols,settings,film_library=True,live_color=False,custom_
         if not film_library or not extra_owner_bytes:raise ValueError('ADJ extras require the extended film settings owner')
         rows.append(setup_row(1191))
         routes.append(0x0200f107)
+    if extra_owner_bytes==0x74c0:
+        rows=[setup_row(1244)]
+        routes=[0x0200f10a]
     offset=(0x613c if live_color else 0x213c) if film_library else 0x13bc;owner=offset+(0x22c if pure_isp_effects else 0x1c0)
     if companion:
         if owner>0x6400:raise ValueError("existing effects overlap companion descriptor")
         owner=0x6440
     if extra_owner_bytes:
-        if not film_library or extra_owner_bytes not in (0x6d00,0x6e00) or settings['owner_bytes']!=extra_owner_bytes or owner>0x6500:
+        if not film_library or extra_owner_bytes not in (0x6d00,0x6e00,0x74c0) or settings['owner_bytes']!=extra_owner_bytes or owner>0x6500:
             raise ValueError('extended controls overlap the HDF menu owner')
         owner=extra_owner_bytes
     patches=[]

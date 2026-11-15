@@ -13,6 +13,11 @@ export function settingsOwnerBytes(m,fallback){
  need(m.adj_extra?.owner_offset===0x6500&&m.adj_extra?.owner_bytes===0x100&&
   m.camera_guides&&m.pure_isp_effects?.enabled===true&&m.sd_library&&m.appended_slots&&parent<=0x6500,
   'camera controls owner regions differ');
+ if(m.menu_hub){
+  const h=m.menu_hub;
+  need(m.camera_model==='gr3'&&m.debug_mode===true&&h.route===0x0200f10a&&h.caption===1244&&h.owner_offset===0x6e00&&h.owner_bytes===0x74c0,'menu hub owner differs');
+  return h.owner_bytes;
+ }
  return m.torn_overlay?.enabled?0x6e00:0x6d00;
 }
 export function adjExtraPatches(runtime,m){

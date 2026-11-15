@@ -1,5 +1,5 @@
 """Create a private per-download GR III GRemote ZIP. Never install or publish it."""
-import argparse,hashlib,importlib.util,json,os,re,subprocess,tempfile,zipfile
+import argparse,hashlib,importlib.util,json,os,re,struct,subprocess,tempfile,zipfile
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -102,11 +102,24 @@ def package_connection(candidate_dir,out,*,include_films=True):
    'evidence/service-receipt.json':(service/'service-receipt.json').read_bytes(),
   }
   if extensions:files['evidence/extensions-contract.json']=(ROOT/'contracts/extensions-v1.json').read_bytes()
+  menu_artwork='native/gr3/m10v_menu_hub_view.inc' in native.get('sources',{})
+  if menu_artwork:
+   need(native.get('menu_hub'),'menu artwork requires the owned menu controller')
+   artwork=candidate_dir/'MENU.M10'
+   published=not artwork.is_file()
+   if published:artwork=ROOT/'web/gr3/MENU.M10'
+   need(16+384*16<artwork.stat().st_size<32*1024*1024,'menu artwork size differs')
+   data=artwork.read_bytes()
+   if published:need(sha(data)=='8b666e2ddfb276078ed09bf486591f3ca10ad91b67ea74c35f289266f63e0be0','published menu artwork hash differs')
+   need(struct.unpack_from('<4sIII',data)==(b'MNU4',4,384,len(data)),'menu artwork header differs')
+   files['04_MENU/SD_ROOT/M10V/MENU.M10']=data
   film_audit=None
   if include_films:
    film,film_audit=_film_pack(temp,ident);files['03_FILMS/SD_ROOT/M10V/FILMS.M10']=film
    files['evidence/film-pack-audit.json']=(json.dumps(film_audit,indent=2)+'\n').encode()
   files['开始前必读.txt']=_instructions(ident,include_films)
+  if menu_artwork:
+   files['开始前必读.txt']+=('菜单资源：将 04_MENU/SD_ROOT/M10V/MENU.M10 复制到 SD 卡的 M10V/MENU.M10。\n').encode()
   manifest={'schema':'m10v-gremote-connection-package/v1','model':'GR III','public_version':'2.10','status':'offline_verified_camera_unverified','camera_tested':False,'installation_allowed':False,'wireless_ready':False,'companion_identity':ident,'firmware_sha256':sha(firmware),'service_sha256':sha(elf),'pairing_policy':'camera-hotspot-per-boot','apk_included':False,'files':{name:{'sha256':sha(data),'bytes':len(data)} for name,data in files.items()}}
   files['manifest.json']=(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n').encode()
   files['SHA256SUMS']=''.join(sha(data)+'  '+name+'\n' for name,data in sorted(files.items())).encode()

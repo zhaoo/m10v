@@ -92,14 +92,16 @@ export function applyPowerImages(source,base,input={},native){const receipt=prep
    const word=value=>{const b=Buffer.alloc(4);b.writeUInt32LE(value);return b;};
    write('RTOS',at-0x53000000,word(before),word(after),stock);
   }
-  need(native.camera_model==='gr3'&&Array.isArray(installedRows)&&installedRows.length>=2&&installedRows.length<=4,
+  need(native.camera_model==='gr3'&&Array.isArray(installedRows)&&installedRows.length>=(native.menu_hub?1:2)&&installedRows.length<=4,
    '关机图相册需要 GR III 原生设置菜单');
   const runtimeEntry=at=>Number.isInteger(at)&&!(at&3)&&at>=native.base&&at+8<=native.base+native.code_bytes;
   need(runtimeEntry(row)&&runtimeEntry(config)&&runtimeEntry(render)&&runtimeEntry(lookup),'关机图相册运行时不完整');
   const count=installedRows.length;
-  instruction(0x53b36adc,((30+count)<<24)|0x1d1b19,((31+count)<<24)|0x1d1b19,false);
-  instruction(0x53b36bd0+count*8,0,row);
-  instruction(0x53b36c88+count*4,0x10000000,shutdownMenuRoute);
+  if(!native.menu_hub){
+   instruction(0x53b36adc,((30+count)<<24)|0x1d1b19,((31+count)<<24)|0x1d1b19,false);
+   instruction(0x53b36bd0+count*8,0,row);
+   instruction(0x53b36c88+count*4,0x10000000,shutdownMenuRoute);
+  }
   const site=0x5319f234,delta=render-site-8;
   need(delta%4===0&&delta>=-(2**25)&&delta<2**25,'关机图相册分支超出范围');
   instruction(site,0xeb023c9b,(0xeb000000|((delta>>2)&0xffffff))>>>0);

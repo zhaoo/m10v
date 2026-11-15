@@ -2,8 +2,9 @@
 #define M10V_SETTINGS_VIEW_H
 #include "m10v_settings.h"
 #include "m10v_zoom_menu.h"
+#include "m10v_menu_detail_style.h"
 /* GR III 2.10 only. Unintegrated view; caller owns route and root lifetime. */
-enum { M10V_VIEW_CAPACITY=56, M10V_VIEW_COUNT=54, M10V_VIEW_HEAP=55 };
+enum { M10V_VIEW_CAPACITY=56, M10V_VIEW_COUNT=M10V_MENU_HUB?47:54, M10V_VIEW_HEAP=55 };
 enum { M10V_FILM_GRID_X=24,M10V_FILM_GRID_Y=60,M10V_FILM_GRID_DX=136,M10V_FILM_GRID_DY=177 };
 typedef struct { uint32_t widgets[M10V_VIEW_CAPACITY]; uint32_t count; } m10v_settings_view;
 enum {
@@ -21,6 +22,17 @@ enum {
 };
 /* Initialize the entire struct to zero before first create. */
 int m10v_settings_view_create(m10v_settings_view *);
+#if M10V_MENU_HUB
+enum { M10V_HUB_ROW_Y=86, M10V_HUB_ROW_HEIGHT=53 };
+#define M10V_HUB_BITMAP_ID 858u /* Retired icon slot, dedicated to this controller. */
+#define M10V_THEME_BITMAP_ID 859u
+uint32_t m10v_settings_view_theme(uint32_t, uint32_t, uint32_t, uint32_t);
+uint32_t m10v_settings_view_theme_directory(uint32_t);
+int m10v_settings_view_hub_create(m10v_settings_view *);
+typedef struct {uint32_t frame,focus,patch[7];} m10v_hub_paint;
+uint32_t m10v_settings_view_hub(m10v_settings_view *,const m10v_hub_paint *);
+uint32_t m10v_settings_view_hub_directory(const m10v_settings_view *);
+#endif
 void m10v_settings_view_draw(m10v_settings_view *, const m10v_settings *, const m10v_settings_ops *);
 void m10v_settings_view_zoom(m10v_settings_view *,const m10v_zoom_menu *);
 #if M10V_SHUTDOWN_ALBUM

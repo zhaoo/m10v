@@ -88,7 +88,8 @@ export const pureIspEffectSources=[
  'scripts/build_gr3_isp_effect_render.py','scripts/build_gr3_isp_effect_resize_status.py',
  'scripts/build_gr3_isp_effect_textures.py'];
 export const filmImprintSources=['scripts/build_gr3_film_imprints.py','scripts/render_film_imprint_assets.mjs','web/shared/film-imprints.mjs',...Array.from({length:7},(_,i)=>`native/gr3/film-imprints/${i+1}.png`),...['025','001','004','007'].map(id=>`native/gr3/film-imprints/pokemon/${id}.png`)];
-export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/gr3_target_relocations.py','node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...leicaSources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources,...filmImprintSources,...cameraExtensionSources,...rawDevelopmentSources,...tornOverlaySources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
+const menuHubSources=['native/gr3/m10v_menu_hub_view.inc','native/gr3/m10v_menu_detail_style.h'];
+export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/gr3_target_relocations.py','node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...leicaSources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources,...filmImprintSources,...cameraExtensionSources,...rawDevelopmentSources,...tornOverlaySources,...menuHubSources].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
 export function validateFilmImprintAssets(runtime,m){
  const p=m.pure_isp_effects,imprint=p?.imprint;if(imprint===undefined)return;
  const fail=(v,s)=>need(v,'pure ISP imprint: '+s),a=imprint.assets,manifest=a?.manifest;
@@ -263,6 +264,7 @@ function checkRuntime(runtime, manifest) {
     need(c.reader_veneers?.[name]===BASE+off&&runtime.readUInt32LE(off)===branch(BASE+off,manifest.symbols[symbol]),'custom ISP reader veneer differs');
    }
   }
+  if(manifest.menu_hub)expectedSources.push(...menuHubSources);
   need(Object.keys(manifest.sources || {}).sort().join('|') === [...expectedSources].sort().join('|'), 'native source inventory differs');
   for (const name of expectedSources) need(manifest.sources[name] === sha(readFileSync(new URL('../'+name,import.meta.url))),
     'native source changed since compilation: '+name);
@@ -503,7 +505,8 @@ function checkRuntime(runtime, manifest) {
   const guideLabels=['黄金分割','黄金螺旋（左上）','黄金螺旋（右上）','黄金螺旋（左下）','黄金螺旋（右下）'];
   const adjLabels=['ADJ','设置 6','设置 7','设置 8','设置 9','构图线','胶卷库','逐卷效果','画幅','HDF 模拟','左右调整 OK 保存'];
   const shutdownAlbum=manifest.flags.includes('-DM10V_SHUTDOWN_ALBUM=1');
-  const resourceCount=leica?444+6*Number(shutdownAlbum):420+(manifest.pure_isp_effects?.imprint?12:0)+(manifest.torn_overlay?.enabled?8:0);
+  const legacyResourceCount=leica?444+6*Number(shutdownAlbum):420+(manifest.pure_isp_effects?.imprint?12:0)+(manifest.torn_overlay?.enabled?8:0);
+  const resourceCount=manifest.menu_hub?463:legacyResourceCount;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   if(manifest.torn_overlay?.enabled)
@@ -518,8 +521,11 @@ function checkRuntime(runtime, manifest) {
   if(manifest.pure_isp_effects?.imprint)need(JSON.stringify(manifest.resources.texts.slice(417,425))===JSON.stringify(['胶卷印花','小猫吃鱼','樱花纷飞','绚烂彩虹','深海水母','小猫爪爪','呆头大鹅','宝可梦']),'imprint captions differ');
   const threeFilmStart=manifest.pure_isp_effects?.imprint?425:417;
   need(JSON.stringify(manifest.resources.texts.slice(threeFilmStart,threeFilmStart+3))===JSON.stringify(['SHD50','Revolog KOLOR','Pegasus']),'three-film captions differ');
-  if(manifest.pure_isp_effects?.imprint)need(JSON.stringify(manifest.resources.texts.slice(428,432))===JSON.stringify(['暗角','暗角开关','暗角强度','开']),'vignette captions differ');
-  if(leica)need(JSON.stringify(manifest.resources.texts.slice(440))===JSON.stringify(['Leica Chrome','Leica Brass','Leica Teal','Leica Classic',...(shutdownAlbum?['关机图','原厂画面','图片 1','图片 2','图片 3','使用中']:[])]),'Leica or shutdown captions differ');
+  if(manifest.pure_isp_effects?.imprint)need(JSON.stringify(manifest.resources.texts.slice(428,432))===JSON.stringify(['暗角',manifest.menu_hub?'开关':'暗角开关',manifest.menu_hub?'强度':'暗角强度','开']),'vignette captions differ');
+  if(leica)need(JSON.stringify(manifest.resources.texts.slice(440,legacyResourceCount))===JSON.stringify(['Leica Chrome','Leica Brass','Leica Teal','Leica Classic',...(shutdownAlbum?['关机图','原厂画面','图片 1','图片 2','图片 3','使用中']:[])]),'Leica or shutdown captions differ');
+  if(manifest.menu_hub)need(manifest.flags.includes('-DM10V_MENU_HUB=1')&&manifest.resources.texts.slice(legacyResourceCount,458).every(s=>s==='')&&
+    JSON.stringify(manifest.resources.texts.slice(458))===JSON.stringify(['m10v','无法读取 SD 卡菜单资源','点这里返回','返回','保存']),
+    'menu hub captions differ');
   for (let i=0;i<resourceCount;i++) {
     const at = manifest.resources.descriptors[i] - BASE, text = manifest.resources.texts[i];
     need(Number.isInteger(at) && at >= 0 && at + 8 < runtime.length && typeof text === 'string', 'native text pointer invalid');

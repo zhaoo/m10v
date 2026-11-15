@@ -2,6 +2,20 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.16.1",
+      "date": "2026-11-16",
+      "title": "GR III 机身 m10v 大卡菜单",
+      "changes": [
+        "原厂设置新增 m10v 统一入口。首屏从左到右排列设置、胶卷库、效果。横滑到第二屏可进入说明或打赏。",
+        "效果和设置的 m10v 功能页采用深色圆角列表。胶卷印花支持上下滑动，保存或返回后回到新版效果列表。暗角提供开关和强度。",
+        "说明显示官网二维码，打赏显示支付宝和微信二维码。工作台提供独立菜单资源下载，配套 GRemote ZIP 内含同一资源。"
+      ],
+      "notice": "适用于 GR III 2.10。R4 日志候选已通过用户真机验证（Build ID c124d8c3）。新版菜单在同时启用胶卷库、ISP 逐卷效果和调试模式时可用，需将 MENU.M10 放在 SD 卡的 M10V 目录。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.15.3",
       "date": "2026-11-15",
       "title": "优化 GR III 机身胶卷库与触屏操作",
@@ -10,9 +24,9 @@
         "GR III 2.10 支持左右滑动翻页，点按封面可以启用或停用胶卷。点按后隐藏黄色焦点框，按方向键时恢复。"
       ],
       "notice": "GR III 2.10 的 R3 胶卷库已通过用户真机验证。本次同步修正 GR IV 构建时的符号校验。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "98e9d8d584b8fb283f53418dba457c0c7b062fd8",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/43724653000"
     },
     {
       "version": "2026.11.15.2",

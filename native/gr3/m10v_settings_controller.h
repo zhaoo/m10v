@@ -32,6 +32,9 @@ typedef struct {
  uint32_t shutdown_album; /* Volatile selection mirror, loaded outside power-off. */
 #endif
  uint32_t film_touch_start,film_touch_last,film_touch_dragged;
+#if M10V_MENU_HUB
+ uint32_t theme_heap,theme_key;
+#endif
 } m10v_settings_controller;
 _Static_assert(sizeof(m10v_native_ab_host)<=sizeof(m10v_settings),"exclusive host state capacity");
 #define M10V_SETTINGS_OWNER_BYTES 0x13bcu
@@ -44,6 +47,9 @@ _Static_assert(sizeof(m10v_settings_controller)<=M10V_SETTINGS_CONTROLLER_BYTES,
 #define M10V_SETTINGS_ZOOM_ROUTE 0x0200f105u
 #define M10V_SETTINGS_ADJ_ROUTE 0x0200f107u
 #define M10V_SETTINGS_SHUTDOWN_ROUTE 0x0200f109u
+#define M10V_SETTINGS_HUB_ROUTE 0x0200f10au
+#define M10V_SETTINGS_HUB_OFFSET 0x6e00u
+#define M10V_SETTINGS_HUB_BYTES (M10V_SETTINGS_HUB_OFFSET+M10V_SETTINGS_CONTROLLER_BYTES)
 _Static_assert(sizeof(m10v_zoom_menu)<=sizeof(m10v_settings),"zoom state capacity");
 uint32_t m10v_settings_controller_owner_size(void);
 uint32_t m10v_settings_controller_top_ctor(uint32_t owner);

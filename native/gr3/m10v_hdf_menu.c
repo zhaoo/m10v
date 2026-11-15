@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include "m10v_debug.h"
 #include "m10v_hdf_state.h"
+#include "m10v_settings_view.h"
 #ifndef M10V_BORDER_ENABLED
 #define M10V_BORDER_ENABLED 0
 #endif
@@ -46,6 +47,7 @@
 #endif
 #define ROUTE 0x0200f102u
 #define WORDS 9u
+#define STYLE_WORDS 8u
 #if M10V_HDF_ENABLED
 extern int m10v_hdf_load(uint32_t *);
 extern int m10v_hdf_save(uint32_t);
@@ -66,6 +68,9 @@ typedef struct {uint8_t base[0x158];uint32_t widgets[WORDS],count,value,saved,er
  uint8_t reserved_cache_tail[0x2c];
 #endif
  uint32_t style;
+#if M10V_MENU_HUB
+ uint32_t touch, touch_last, from_hub, first;
+#endif
 } page;
 _Static_assert(offsetof(page,style)==0x1bc,"HDF style pointer must follow caches");
 #if M10V_BORDER_ENABLED
@@ -80,34 +85,45 @@ static int direct_border_route(uint32_t route){
  (void)route;return 0;
 #endif
 }
-static int menu_route(uint32_t route){return route==ROUTE||direct_border_route(route);}
+static int hub_effect_route(uint32_t route){
+#if M10V_MENU_HUB
+ return route>=0x0200f110u&&route<=0x0200f114u;
+#else
+ (void)route;return 0;
+#endif
+}
+static int menu_route(uint32_t route){return route==ROUTE||direct_border_route(route)||hub_effect_route(route);}
 static uint32_t ptr(const void *p){return (uint32_t)(uintptr_t)p;}
 static void caption(uint32_t w,uint32_t id){((fn3)0x53396f80u)(w,id,0);}
 static int make(page *p,uint32_t type,uint32_t x,uint32_t y,uint32_t width,uint32_t height){
- uint32_t w=((fn1)0x536af2a8u)(type==1?0xf8:type==11?0xf0:0x110);if(!w)return -1;
- uint32_t ctor=type==1?0x5339199c:type==11?0x53393d84:0x53396944;
+ uint32_t w=((fn1)0x536af2a8u)(type==1||type==10?0xf8:type==11?0xf0:0x110);if(!w)return -1;
+ uint32_t ctor=type==1?0x5339199c:type==10?0x5339a908:type==11?0x53393d84:0x53396944;
  ((uint32_t (*)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t))ctor)(w,x,y,width,height);
  p->widgets[p->count++]=w;
  if(type!=1)((fn2)0x533aba64u)(p->widgets[0],w);
  return 0;
 }
 static void clear(page *p){
+#if !M10V_MENU_HUB
  if(p->style){
   uint32_t *w=(uint32_t *)(uintptr_t)p->style,n=0;
-  while(n<8&&w[n])n++;
+  while(n<STYLE_WORDS&&w[n])n++;
   ((fn3)0x5316cde8u)(0,p->style,n);
   ((fn1)0x536af2e4u)(p->style);p->style=0;
  }
+#endif
  ((fn3)0x5316cde8u)(0,ptr(p->widgets),p->count);
  for(uint32_t i=0;i<WORDS;i++)p->widgets[i]=0;p->count=0;
 }
+#if !M10V_MENU_HUB
 static int make_style(page *p){
- p->style=((fn1)0x536af2a8u)(8*4);if(!p->style)return -1;
+ p->style=((fn1)0x536af2a8u)(STYLE_WORDS*4);if(!p->style)return -1;
  uint32_t *words=(uint32_t *)(uintptr_t)p->style;
- for(uint32_t i=0;i<8;i++)words[i]=0;
+ for(uint32_t i=0;i<STYLE_WORDS;i++)words[i]=0;
  for(uint32_t i=0;i<8;i++){
   uint32_t w=((fn1)0x536af2a8u)(0xf0);if(!w)return -1;
-  ((uint32_t (*)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t))0x53393d84u)(w,0,i<4?84+i*72:147+(i-4)*72,720,i<4?64:1);
+  ((uint32_t (*)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t))0x53393d84u)(
+    w,0,i<4?84+i*72:147+(i-4)*72,720,i<4?64:1);
   words[i]=w;((fn2)0x533aba64u)(p->widgets[0],w);
   ((fn2)0x53393e00u)(w,i<4?6:2);
  }
@@ -120,6 +136,7 @@ static void style_row(page *p,uint32_t i,uint32_t visible,uint32_t selected){
  /* Official glyph palette28 is dark; palette10 is yellow text. */
  ((fn2)0x5339658cu)(p->widgets[4+i],visible&&selected?28:31);
 }
+#endif
 #if M10V_PURE_ISP_EFFECTS
 static int vignette_load(page *p){
  m10v_isp_effects_settings settings;uint32_t sequence;
@@ -167,12 +184,16 @@ static int torn_action(page *p,uint32_t action){
 #endif
 #endif
 static void draw(page *p){
- if(p->count!=WORDS||!p->style)return;
+ if(p->count!=WORDS||(!M10V_MENU_HUB&&!p->style))return;
 #if M10V_BORDER_ENABLED
  uint32_t border=!p->root&&p->child;
 #if M10V_PURE_ISP_EFFECTS
  uint32_t imprint=!p->root&&p->child==IMPRINT_CHILD;
+#if M10V_MENU_HUB
+ uint32_t first=imprint?p->first:0;
+#else
  uint32_t first=imprint?(p->value/4u)*4u:0u;
+#endif
  uint32_t root_first=p->root&&p->focus>=4u?p->focus-3u:0u;
  if(imprint)border=0;
 #if M10V_TORN_ENABLED
@@ -180,7 +201,15 @@ static void draw(page *p){
  if(torn)border=0;
 #endif
 #endif
- caption(p->widgets[2],p->root?1140:border?1155:970);caption(p->widgets[3],p->root?941:971);
+ caption(p->widgets[2],p->root?1140:border?1155:970);
+#if M10V_MENU_HUB
+ uint32_t rows=0,active=4;
+ uint32_t confirm=!p->root&&p->child!=VIGNETTE_CHILD;
+ caption(p->widgets[3],1248);
+ ((fn2)0x533ad3c0u)(p->widgets[3],confirm);
+#else
+ caption(p->widgets[3],p->root?941:971);
+#endif
 #if M10V_PURE_ISP_EFFECTS
  if(imprint)caption(p->widgets[2],M10V_ISP_TEXT_IMPRINT);
  if(!p->root&&p->child>=VIGNETTE_CHILD&&p->child<=VIGNETTE_STRENGTH)caption(p->widgets[2],1214);
@@ -217,8 +246,16 @@ static void draw(page *p){
   if(imprint)selected=p->value==first+i;
   if(p->root)selected=p->focus==row;
 #endif
+#if M10V_MENU_HUB
+  rows+=visible;
+  if(visible&&selected)active=i;
+#else
   style_row(p,i,visible,selected);
+#endif
  }
+#if M10V_MENU_HUB
+ (void)m10v_settings_view_theme(p->widgets[1],rows,active,confirm?2:1);
+#endif
 #else
  caption(p->widgets[2],p->root?1140:970);caption(p->widgets[3],p->root?941:971);
  for(uint32_t i=0;i<4;i++){
@@ -265,6 +302,9 @@ uint32_t m10v_hdf_menu_factory(uint32_t factory,uint32_t route){
 uint32_t m10v_hdf_menu_ready(page *p,uint32_t route){
  M10V_LOG(33,ptr(p),route,p->count,p->style);
  (void)route;p->error=0;p->root=M10V_HDF_GROUPED;
+#if M10V_MENU_HUB
+ p->touch=p->first=0;p->from_hub=hub_effect_route(route);
+#endif
 #if M10V_BORDER_ENABLED
  p->root=1;p->focus=0;p->child=0;
  M10V_LOG(34,ptr(p),1,0,0);
@@ -288,20 +328,41 @@ uint32_t m10v_hdf_menu_ready(page *p,uint32_t route){
 #if M10V_BORDER_ENABLED
 build_view:
 #endif
- if(p->count==WORDS&&p->style){M10V_LOG(34,ptr(p),7,1,p->count);return 1;}
+ if(p->count==WORDS&&(M10V_MENU_HUB||p->style)){M10V_LOG(34,ptr(p),7,1,p->count);return 1;}
  if(p->count){clear(p);return 0;}
- if(make(p,1,0,0,720,480)||make(p,11,0,0,720,480)||make(p,17,20,20,680,50)||make(p,17,20,414,680,42))goto fail;
+ if(make(p,1,0,0,720,480)||make(p,M10V_MENU_HUB?10:11,0,0,720,480)||
+    make(p,17,M10V_MENU_HUB?88:20,M10V_MENU_HUB?16:20,M10V_MENU_HUB?584:680,50)||
+    make(p,17,M10V_MENU_HUB?584:20,M10V_MENU_HUB?418:414,M10V_MENU_HUB?90:680,42))goto fail;
+#if M10V_MENU_HUB
+ ((fn2)0x5339aa30u)(p->widgets[1],1);
+ ((fn2)0x5339aa44u)(p->widgets[1],1);
+#else
  ((fn2)0x53393e00u)(p->widgets[1],1);
  if(make_style(p))goto fail;
- for(uint32_t i=0;i<4;i++)if(make(p,17,36,90+i*72,644,52))goto fail;
+#endif
+ for(uint32_t i=0;i<4;i++)if(make(p,17,M10V_MENU_HUB?77:36,
+   (M10V_MENU_HUB?87:90)+i*(M10V_MENU_HUB?53:72),M10V_MENU_HUB?620:644,M10V_MENU_HUB?50:52))goto fail;
+#if M10V_MENU_HUB
+ for(uint32_t i=0;i<4;i++)((fn2)0x53396658u)(p->widgets[4+i],1);
+#endif
  if(make(p,17,20,384,680,30))goto fail;
  uint32_t root=p->widgets[0],*v=(uint32_t *)(uintptr_t)*(uint32_t *)(uintptr_t)root;
  ((fn1)(uintptr_t)v[0x28/4])(root);((fn1)(uintptr_t)v[0x34/4])(root);M10V_LOG(34,ptr(p),7,1,p->count);return 1;
 fail:M10V_LOG(34,ptr(p),8,0,p->count);clear(p);return 0;
 }
+uint32_t m10v_hdf_menu_key(page *,uint32_t);
 void m10v_hdf_menu_enter(page *p,uint32_t route,uint32_t flags){
  M10V_LOG(35,ptr(p),route,flags,p->count);
- (void)route;(void)flags;draw(p);((fn3)0x5316d354u)(ptr(p),0,p->widgets[0]);
+ (void)route;(void)flags;
+#if M10V_MENU_HUB
+ if(p->from_hub&&route-0x0200f110u<root_rows()){
+  p->focus=route-0x0200f110u;
+  uint32_t event=0xd8;
+  m10v_hdf_menu_key(p,ptr(&event));
+ }else
+#endif
+ draw(p);
+ ((fn3)0x5316d354u)(ptr(p),0,p->widgets[0]);
 }
 #if M10V_DEBUG_MODE
 static uint32_t key_impl(page *p,uint32_t event){
@@ -309,6 +370,54 @@ static uint32_t key_impl(page *p,uint32_t event){
 uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
 #endif
  uint32_t key=*(const uint16_t *)(uintptr_t)event;
+#if M10V_MENU_HUB
+ if(key==0x30){
+  uint32_t address=*(const uint32_t *)(uintptr_t)(event+4);
+  if((address&3)||address<0x55000000u||address>0x80000000u-0x58u){p->touch=0;return 0;}
+  const uint8_t *packet=(const uint8_t *)(uintptr_t)address;
+  uint32_t kind=packet[0x50];
+  if((kind==1||kind==5)&&packet[0]==1){
+   uint32_t x=*(const uint32_t *)(packet+8),y=*(const uint32_t *)(packet+12);
+   if(x>=720||y>=480){p->touch=0;return 0;}
+   uint32_t point=(y<<16)|(x+1);
+   if(kind==1)p->touch=point;
+   p->touch_last=point;
+   return 1;
+  }
+  if((kind==2||kind==4||kind==7)&&!packet[0])return 1;
+  uint32_t point=p->touch;p->touch=0;
+  if(kind!=10||packet[0]||!point)return 0;
+  uint32_t x=(point&65535)-1,y=point>>16;
+  uint32_t ex=(p->touch_last&65535)-1,ey=p->touch_last>>16;
+  if(packet[0x28]==1){
+   ex=*(const uint32_t *)(packet+0x30);ey=*(const uint32_t *)(packet+0x34);
+  }
+  if(ex>=720||ey>=480)return 1;
+  if(!p->root&&p->child==IMPRINT_CHILD&&ex+35>=x&&x+35>=ex&&(ey+48<=y||y+48<=ey)){
+   uint32_t first=ey<y?4:0;
+   if(first!=p->first){p->first=first;draw(p);}
+   return 1;
+  }
+  if(ex+12<x||x+12<ex||ey+12<y||y+12<ey)return 1;
+  if(x>=32&&x<77&&y>=18&&y<62)key=0x89;
+  else if(x>=33&&x<687&&y>=86&&y<298){
+   uint32_t row=(y-86)/53;
+   if(p->root){
+    row+=p->focus>=4?p->focus-3:0;
+    if(row>=root_rows())return 1;
+    p->focus=row;
+   }else{
+    uint32_t limit=p->child==IMPRINT_CHILD?8:p->child==VIGNETTE_STRENGTH?3:p->child>=VIGNETTE_CHILD?2:p->child?3:4;
+    if(p->child==IMPRINT_CHILD)row+=p->first;
+    if(row>=limit)return 1;
+    p->value=row;
+    if(p->child!=VIGNETTE_CHILD){draw(p);return 1;}
+   }
+   key=0xd8;
+  }else if(!p->root&&y>=418&&y<466&&x>=558&&x<687)key=0xd8;
+  else return 1;
+ }
+#endif
  if(p->root){
 #if M10V_BORDER_ENABLED
 #if M10V_PURE_ISP_EFFECTS
@@ -335,7 +444,15 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
     p->child=VIGNETTE_CHILD;p->value=p->saved=0;p->root=0;p->error=0;draw(p);return 1;
    }else if(p->focus==(M10V_HDF_ENABLED?2u:1u)){
     p->child=IMPRINT_CHILD;
-    if(imprint_load(p)){p->error=1;draw(p);return 1;}
+    if(imprint_load(p)){
+#if M10V_MENU_HUB
+     if(p->from_hub){p->root=0;p->value=p->saved=0;}
+#endif
+     p->error=1;draw(p);return 1;
+    }
+#if M10V_MENU_HUB
+    p->first=p->value&~3u;
+#endif
    }else
 #endif
    if(p->child)p->value=p->saved=p->border.style;
@@ -353,12 +470,22 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
  #if M10V_PURE_ISP_EFFECTS
 #if M10V_TORN_ENABLED
  if(p->child==TORN_SWITCH){
-  if(key==0x86||key==0x89||key==0xda){p->root=1;p->error=0;}
+  if(key==0x86||key==0x89||key==0xda){
+#if M10V_MENU_HUB
+   if(p->from_hub){((fn1)0x5316ca28u)(ptr(p));return 1;}
+#endif
+   p->root=1;p->error=0;
+  }
   else if(key==0xce||key==0xd0||key==0xd4){p->value=0;p->error=0;}
   else if(key==0xcf||key==0xd3||key==0xd1||key==0xd5){p->value=1;p->error=0;}
   else if(key==0xd8){
    p->error=torn_action(p,p->value)!=0;
-   if(!p->error)p->root=1;
+   if(!p->error){
+#if M10V_MENU_HUB
+    if(p->from_hub){((fn1)0x5316ca28u)(ptr(p));return 1;}
+#endif
+    p->root=1;
+   }
   }else return 0;
   draw(p);return 1;
  }
@@ -374,6 +501,9 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
  if((M10V_HDF_GROUPED||M10V_BORDER_ENABLED)&&(key==0x86||key==0x89||key==0xda)){
 #if M10V_BORDER_ENABLED
   if(p->child==BORDER_DIRECT){((fn1)0x5316ca28u)(ptr(p));return 1;}
+#endif
+#if M10V_MENU_HUB
+  if(p->from_hub){((fn1)0x5316ca28u)(ptr(p));return 1;}
 #endif
   p->value=p->saved;p->root=1;p->error=0;draw(p);return 1;
  }
@@ -438,12 +568,22 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
 #if M10V_BORDER_ENABLED
    if(p->child==BORDER_DIRECT){((fn1)0x5316ca28u)(ptr(p));return 1;}
 #endif
+#if M10V_MENU_HUB
+   if(p->from_hub){
+    if(p->child>=VIGNETTE_SWITCH){p->child=VIGNETTE_CHILD;p->value=p->saved=0;draw(p);}
+    else ((fn1)0x5316ca28u)(ptr(p));
+    return 1;
+   }
+#endif
    if(M10V_HDF_GROUPED||M10V_BORDER_ENABLED){p->root=1;draw(p);}
    else ((fn1)0x5316ca28u)(ptr(p));
    return 1;
   }
  }else if(key==0x86||key==0x89||key==0xda){((fn1)0x5316ca28u)(ptr(p));return 1;}
  else return 0;
+#if M10V_MENU_HUB
+ if(p->child==IMPRINT_CHILD)p->first=p->value&~3u;
+#endif
  draw(p);return 1;
 }
 #if M10V_DEBUG_MODE

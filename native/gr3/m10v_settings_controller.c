@@ -89,7 +89,16 @@ static int film_name_stamp(void *ctx,uint32_t enabled){
 }
 extern unsigned m10v_zoom_live_slot(void);
 extern int m10v_zoom_live_apply(unsigned);
+#if M10V_MENU_HUB
+/* Keep the size-optimized ARM operation table's relocations object-local. */
+static int zoom_load(m10v_zoom_state *s){return m10v_zoom_camera_load(s);}
+static int zoom_save(m10v_zoom_state *s,const m10v_zoom_editor *e){return m10v_zoom_camera_save(s,e);}
+static int zoom_select(unsigned n){return m10v_zoom_live_apply(n);}
+static unsigned zoom_current(void){return m10v_zoom_live_slot();}
+static void zoom_ops(m10v_zoom_menu_ops *o){o->load=zoom_load;o->save=zoom_save;o->select=zoom_select;o->current=zoom_current;}
+#else
 static void zoom_ops(m10v_zoom_menu_ops *o){o->load=m10v_zoom_camera_load;o->save=m10v_zoom_camera_save;o->select=m10v_zoom_live_apply;o->current=m10v_zoom_live_slot;}
+#endif
 static void ops(m10v_settings_ops *o){o->context=0;o->load=load;o->item=item;o->install=install;o->remove=remove_film;o->stamp=stamp;o->film_name_stamp=film_name_stamp;o->extent=extent;}
 #if M10V_SHUTDOWN_ALBUM
 static void shutdown_restore(m10v_settings_controller *p);
@@ -172,7 +181,9 @@ uint32_t m10v_settings_controller_shutdown_render(uint32_t display,uint32_t requ
 }
 #endif
 uint32_t m10v_settings_controller_owner_size(void){
-#if M10V_ADJ_EXTRA_CAMERA || M10V_GUIDES_CAMERA
+#if M10V_MENU_HUB
+ return M10V_SETTINGS_HUB_BYTES;
+#elif M10V_ADJ_EXTRA_CAMERA || M10V_GUIDES_CAMERA
 #if M10V_TORN_ENABLED
  return 0x6e00;
 #else
@@ -184,6 +195,128 @@ uint32_t m10v_settings_controller_owner_size(void){
  return M10V_SETTINGS_OWNER_BYTES+2*M10V_SETTINGS_CONTROLLER_BYTES+(M10V_LIVE_COLOR?0x4000u:0u);
 #endif
 }
+#if M10V_MENU_HUB
+#include "m10v_hdf_state.h"
+#include "m10v_isp_effects_camera.h"
+#include "m10v_border_camera.h"
+extern uint32_t m10v_zoom_live_slot(void);
+extern int m10v_zoom_camera_snapshot(m10v_zoom_state *);
+enum { HUB_PAGE=12 };
+static m10v_settings_controller *hub(uint32_t owner){
+ return (m10v_settings_controller *)(uintptr_t)(owner+M10V_SETTINGS_HUB_OFFSET);
+}
+static uint32_t hub_mask(const m10v_settings_controller *p){
+ if(p->state.screen==1)return 0x2fu|(M10V_TORN_ENABLED?16u:0u)|(m10v_settings_controller_ab_available()?64u:0u);
+ if(p->state.screen==2){
+#if M10V_SHUTDOWN_ALBUM
+  if(shutdown_count())return 63;
+#endif
+  return 61;
+ }
+ return 0;
+}
+static void hub_draw(m10v_settings_controller *p){
+ m10v_settings *s=&p->state;
+ m10v_hub_paint paint={0};
+ uint32_t mask=hub_mask(p),number=0;
+ paint.focus=s->value?s->focus:~0u;
+ if(!s->screen){
+  paint.frame=s->index==4?11:s->index;
+  uint32_t count=m10v_library_count(&s->saved);
+  if(s->index<3&&count<10)paint.patch[0]=16+s->index*11+count;
+ }else if(s->screen==1){
+  uint32_t variant=((mask&16)?1u:0u)|((mask&64)?2u:0u);
+  paint.frame=4+variant;
+  uint32_t start=64+variant*48,seq;
+  if(m10v_hdf_cached(&number)<0||number>3)number=4;
+  if(number)paint.patch[0]=start+number;
+  if(!m10v_border_camera_snapshot(&number)||number>2)number=3;
+  if(number)paint.patch[1]=start+8+number;
+  m10v_isp_effects_settings fx;
+  if(m10v_isp_effects_camera_snapshot(&fx,&seq)){
+   number=m10v_isp_effects_imprint(&fx);
+   if(number&&number<8)paint.patch[2]=start+16+number;
+   if(m10v_isp_vignette_enabled(fx.reserved)){
+    number=m10v_isp_vignette_strength(fx.reserved);
+    if(number&&number<=3)paint.patch[3]=start+24+number;
+   }
+  }
+#if M10V_TORN_ENABLED
+  if(!m10v_torn_state(&number,&seq))paint.patch[4]=start+34;
+  else if(number==1||number==2)paint.patch[4]=start+33;
+#endif
+  m10v_settings_controller *cache=ab_owner();
+  if(mask&64&&cache&&cache->ab.enabled)paint.patch[5]=start+41;
+ }else if(s->screen==2){
+  paint.frame=(mask&2)?9u:8u;
+  uint32_t start=256+(paint.frame-8)*64;
+  number=s->saved.stamp?s->saved.stamp:(s->saved.reserved&1u)?3u:0u;
+  if(number&&number<=3)paint.patch[0]=start+number;
+#if M10V_SHUTDOWN_ALBUM
+  m10v_settings_controller *cache=ab_owner();
+  if((mask&2)&&cache&&cache->shutdown_album&&cache->shutdown_album<=3)
+   paint.patch[1]=start+8+cache->shutdown_album;
+#endif
+#if M10V_COMPANION_ENABLED
+  if(m10v_settings_controller_remote_aspect_read(&number))number=7;
+  if(number&&number<=7)paint.patch[2]=start+16+number;
+#endif
+  m10v_zoom_state zoom;
+  if(!m10v_zoom_camera_snapshot(&zoom)){
+   uint32_t slot=m10v_zoom_live_slot();
+   if(slot<2&&zoom.mm[slot]>=28&&zoom.mm[slot]<=50)paint.patch[3]=start+25+zoom.mm[slot]-28;
+  }
+  number=m10v_guides_camera_mode();
+  if(number&&number<=5)paint.patch[4]=start+49+number;
+ }else paint.frame=s->screen==3?10:12;
+ uint32_t painted=m10v_settings_view_hub(&p->view,&paint);
+ p->state.error=!painted;
+ M10V_LOG(344,paint.frame,painted,paint.patch[0],paint.patch[1]);
+}
+static void hub_activate(m10v_settings_controller *p,uint32_t item){
+ static const uint32_t routes[2][7]={
+  {0x0200f110u,0x0200f111u,0x0200f112u,0x0200f113u,0x0200f114u,0x02000012u,M10V_SETTINGS_AB_ROUTE},
+  {M10V_SETTINGS_STAMP_ROUTE,M10V_SETTINGS_SHUTDOWN_ROUTE,0x02000073u,M10V_SETTINGS_ADJ_ROUTE,
+   0x020000a0u,M10V_SETTINGS_ZOOM_ROUTE,0}
+ };
+ uint32_t pane=p->state.screen,route=0;
+ if(!pane){
+  p->state.index=item;
+  if(!item)route=M10V_SETTINGS_FILMS_ROUTE;
+  else {p->state.screen=item;p->state.focus=p->state.value=0;}
+ }else if(pane<=2){
+  uint32_t mask=hub_mask(p);
+  for(uint32_t i=0;i<7;i++)if((mask>>i)&1u){
+   if(!item){route=routes[pane-1][i];break;}item--;
+  }
+ }
+ M10V_LOG(340,pane,p->state.index,p->state.focus,route);
+ if(route)((fn3)0x5316c9d8u)((uint32_t)(uintptr_t)p,route,M10V_SETTINGS_HUB_ROUTE);
+ else hub_draw(p);
+}
+static uint32_t hub_key(m10v_settings_controller *p,uint32_t key){
+ m10v_settings *s=&p->state;
+ if(key==M10V_KEY_BACK){
+  if(s->screen){s->screen=s->focus=s->value=0;hub_draw(p);}
+  else {s->index=0;((fn1)0x5316ca28u)((uint32_t)(uintptr_t)p);}
+ }else if(s->error)hub_draw(p);
+ else if(key==M10V_KEY_OK)hub_activate(p,s->screen?s->focus:s->index);
+ else if(!s->screen){
+  if(key==M10V_KEY_RIGHT||key==M10V_KEY_LEFT){
+   static const uint8_t adjacent[2][5]={{1,3,0,4,4},{2,0,2,1,3}};
+   s->index=adjacent[key==M10V_KEY_LEFT][s->index];hub_draw(p);
+  }
+ }else if(s->screen<=2&&(key==M10V_KEY_UP||key==M10V_KEY_DOWN)){
+  uint32_t total=0;
+  for(uint32_t bits=hub_mask(p);bits;bits>>=1)total+=bits&1u;
+  if(key==M10V_KEY_UP)s->focus=s->focus?s->focus-1:total-1;
+  else s->focus=s->focus+1<total?s->focus+1:0;
+  s->value=1;
+  hub_draw(p);
+ }
+ return 1;
+}
+#endif
 uint32_t m10v_settings_controller_top_ctor(uint32_t owner){
  ((fn1)0x5319aa68u)(owner);
  for(uint32_t i=0;i<2;i++){
@@ -194,6 +327,14 @@ uint32_t m10v_settings_controller_top_ctor(uint32_t owner){
   p->page=i?M10V_SETTINGS_STAMP:M10V_SETTINGS_FILMS;
   p->ab.a=M10V_APPENDED_SLOTS?12:1;p->ab.b=5;
  }
+#if M10V_MENU_HUB
+ {
+  m10v_settings_controller *p=hub(owner);
+  for(uint32_t n=0;n<sizeof(*p);n++)((uint8_t *)p)[n]=0;
+  ((fn1)0x5316c8d4u)((uint32_t)(uintptr_t)p);
+  *(uint32_t *)p=m10v_settings_controller_vtable();p->page=HUB_PAGE;
+ }
+#endif
 #if M10V_LIVE_COLOR
  m10v_camera_library_preview_init(owner);
 #endif
@@ -241,9 +382,21 @@ uint32_t m10v_settings_controller_top_dtor(uint32_t owner){
  m10v_camera_library_preview_clear(owner);
 #endif
  for(uint32_t i=0;i<2;i++)m10v_settings_controller_destroy(page(owner,i));
+#if M10V_MENU_HUB
+ m10v_settings_controller *menu=hub(owner);
+ m10v_settings_controller_destroy(menu);
+ uint32_t theme=menu->theme_heap;menu->theme_heap=0;
+ if(theme)((fn1)0x536af2e4u)(theme);
+#endif
  return m10v_settings_top_dtor_original(owner);
 }
 uint32_t m10v_settings_controller_factory(uint32_t factory,uint32_t route){
+#if M10V_MENU_HUB
+ if(route==M10V_SETTINGS_HUB_ROUTE){
+  uint32_t owner=m10v_settings_factory_original(factory,0x0200004au);
+  return owner?(uint32_t)(uintptr_t)hub(owner):0;
+ }
+#endif
 #if M10V_SHUTDOWN_ALBUM
  if(route==M10V_SETTINGS_SHUTDOWN_ROUTE){
   uint32_t owner=m10v_settings_factory_original(factory,0x0200004au);
@@ -266,6 +419,12 @@ uint32_t m10v_settings_controller_ready(m10v_settings_controller *p,uint32_t rou
  p->display_trace=0;
  p->pending_source=0;
  p->film_touch_start=p->film_touch_last=0;
+#if M10V_MENU_HUB
+ if(route==M10V_SETTINGS_HUB_ROUTE){
+  p->base[0x12b]=p->base[0x137]=2;
+  return m10v_settings_view_hub_create(&p->view)==0;
+ }
+#endif
  p->page=route==M10V_SETTINGS_ZOOM_ROUTE?M10V_SETTINGS_ZOOM:route==M10V_SETTINGS_AB_ROUTE?M10V_SETTINGS_AB:route==M10V_SETTINGS_NAME_ROUTE?M10V_SETTINGS_NAME:route==M10V_SETTINGS_STAMP_ROUTE?M10V_SETTINGS_WATERMARK:M10V_SETTINGS_FILMS;m10v_settings_ops o;ops(&o);
  /* AB is a shooting ImageControl child, not a generic Setup controller.
   * Match stock 531ab0f8 / 531ab160(route02000012): mode0 waits for the
@@ -308,6 +467,20 @@ uint32_t m10v_settings_controller_ready(m10v_settings_controller *p,uint32_t rou
  return result;
 }
 void m10v_settings_controller_enter(m10v_settings_controller *p,uint32_t route,uint32_t flags){
+#if M10V_MENU_HUB
+ if(p->page==HUB_PAGE){
+  (void)load(0,&p->state.saved);
+#if M10V_SHUTDOWN_ALBUM
+  m10v_settings_controller *cache=ab_owner();
+  if(cache&&p->state.screen==2)shutdown_restore(cache);
+#endif
+  p->state.value=0;
+  hub_draw(p);
+  ((fn3)0x5316d354u)((uint32_t)(uintptr_t)p,0,p->view.widgets[0]);
+  M10V_LOG(341,route,p->state.screen,p->state.index,flags);
+  return;
+ }
+#endif
  if(route==M10V_SETTINGS_AB_ROUTE)M10V_LOG(94,(uint32_t)(uintptr_t)p,route,p->state.screen,flags);
  (void)route;(void)flags;m10v_settings_ops o;ops(&o);
  M10V_LOG(80,p->page,route,p->state.screen,p->state.focus);
@@ -434,10 +607,109 @@ static uint32_t catalog_touch(m10v_settings_controller *p,uint32_t payload){
  M10V_LOG(77,(uint32_t)dx,(uint32_t)dy,before,p->state.index);
  return p->state.index!=before;
 }
+#if M10V_MENU_HUB
+static uint32_t hub_touch(m10v_settings_controller *p,uint32_t payload){
+ if(!ab_ram(payload,0x58)){p->film_touch_start=0;return 0;}
+ const uint8_t *packet=(const uint8_t *)(uintptr_t)payload;
+ uint32_t kind=packet[0x50],fingers=packet[0];
+ if((kind==1||kind==5)&&fingers==1){
+  uint32_t x=*(const uint32_t *)(packet+8),y=*(const uint32_t *)(packet+12);
+  if(x>=720||y>=480){p->film_touch_start=0;return 0;}
+  if(kind==1)p->film_touch_start=(y<<16)|(x+1);
+  if(p->film_touch_start)p->film_touch_last=(y<<16)|(x+1);
+  return 1;
+ }
+ if((kind==2||kind==4||kind==7)&&!fingers)return 1;
+ uint32_t start=p->film_touch_start,last=p->film_touch_last;
+ p->film_touch_start=0;
+ if(!start||kind!=10||fingers)return 0;
+ int dx=(int)(last&65535)-(int)(start&65535),dy=(int)(last>>16)-(int)(start>>16);
+ if(dy<0)dy=-dy;
+ uint32_t x=(start&65535)-1,y=start>>16,pane=p->state.screen;
+ M10V_LOG(342,pane,x,y,(uint32_t)dx);
+ if(p->state.error){
+  if(dx<=12&&dx>=-12&&dy<=12&&y>=248&&y<320)return hub_key(p,M10V_KEY_BACK);
+  return 1;
+ }
+ uint32_t info=p->state.index>=3;
+ if(!pane&&dy<35&&(dx>=60||dx<=-60)){
+  if((info&&dx>=60)||(!info&&dx<=-60)){p->state.index=info?0:3;hub_draw(p);}
+  return 1;
+ }
+ if(dx>12||dx<-12||dy>12)return 1;
+ if(x>=32&&x<79&&y>=18&&y<64)return hub_key(p,M10V_KEY_BACK);
+ if(!pane){
+  if(y>=258&&y<312&&((info&&x<38)||(!info&&x>=682))){
+   p->state.index=info?0:3;hub_draw(p);
+  }else if(info&&y>=151&&y<397){
+   if(x>=124&&x<350)hub_activate(p,3);
+   else if(x>=370&&x<596)hub_activate(p,4);
+  }else if(x>=247&&x<473&&y>=151&&y<397)hub_activate(p,0);
+  else if(!info&&y>=169&&y<380){
+   if(x>=38&&x<233)hub_activate(p,2);
+   else if(x>=487&&x<682)hub_activate(p,1);
+  }
+ }else if(pane<=2){
+  if(x>=34&&x<686&&y>=M10V_HUB_ROW_Y){
+   uint32_t row=(y-M10V_HUB_ROW_Y)/M10V_HUB_ROW_HEIGHT,total=0;
+   for(uint32_t bits=hub_mask(p);bits;bits>>=1)total+=bits&1u;
+   if(row<total){p->state.focus=row;hub_activate(p,row);}
+  }
+ }
+ return 1;
+}
+static uint32_t settings_touch(m10v_settings_controller *p,uint32_t payload){
+ if(!ab_ram(payload,0x58)){p->film_touch_start=0;return 0;}
+ const uint8_t *packet=(const uint8_t *)(uintptr_t)payload;
+ uint32_t kind=packet[0x50],fingers=packet[0];
+ if(kind==1&&fingers==1){
+  uint32_t x=*(const uint32_t *)(packet+8),y=*(const uint32_t *)(packet+12);
+  p->film_touch_start=x<720&&y<480?(y<<16)|(x+1):0;return 1;
+ }
+ if((kind==2||kind==4)&&!fingers)return 1;
+ uint32_t point=p->film_touch_start;p->film_touch_start=0;
+ if(!point||kind!=10||fingers||packet[0x28]!=1)return 0;
+ uint32_t x=(point&65535)-1,y=point>>16,ex=*(const uint32_t *)(packet+0x30),ey=*(const uint32_t *)(packet+0x34);
+ if(ex>=720||ey>=480||ex+12<x||x+12<ex||ey+12<y||y+12<ey)return 1;
+ uint32_t key=0;
+ m10v_settings *s=&p->state;
+ if(x>=32&&x<77&&y>=18&&y<62)key=0x89;
+ else if(x>=33&&x<687&&y>=86&&y<298){
+  uint32_t row=(y-86)/53;
+  if(p->page==M10V_SETTINGS_ZOOM){
+   if(row>=3||p->zoom.error==2)return 1;
+   m10v_zoom_menu_ops z;zoom_ops(&z);
+   while(p->zoom.focus!=row)m10v_zoom_menu_key(&p->zoom,&z,M10V_KEY_DOWN);
+   key=row&&x>=480?(x<600?0xce:0xcf):0xd8;
+#if M10V_SHUTDOWN_ALBUM
+  }else if(p->page==M10V_SETTINGS_SHUTDOWN){
+   if(row>shutdown_count())return 1;
+   s->focus=row;key=0xd8;
+#endif
+#if M10V_ADJ_EXTRA_CAMERA
+  }else if(p->page==M10V_SETTINGS_ADJ_EXTRA){
+   if(s->focus!=row){s->focus=row;s->value=(s->expected>>(8*row))&255u;}
+   key=x>=480?(x<600?0xce:0xcf):0xd8;
+#endif
+  }else if(s->screen==M10V_SETTINGS_WATERMARK||s->screen==M10V_SETTINGS_STAMP||s->screen==M10V_SETTINGS_AB){
+   if(s->screen==M10V_SETTINGS_WATERMARK&&row>=2)return 1;
+   s->focus=row;key=s->screen==M10V_SETTINGS_AB&&row<2?(x>=480?0xcf:0xce):0xd8;
+  }else if(s->screen==M10V_SETTINGS_VALUE||s->screen==M10V_SETTINGS_NAME)
+   key=x>=480?(x<600?0xce:0xcf):0xd8;
+ }
+ M10V_LOG(343,p->page,x,y,key);
+ return key?m10v_settings_controller_key(p,(uint32_t)(uintptr_t)&key):1;
+}
+#endif
 #endif
 uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event){
  uint32_t raw=*(const uint16_t *)(uintptr_t)event,key;
 #if !M10V_CAMERA_GR3X
+#if M10V_MENU_HUB
+ if(raw==0x30&&p->page==HUB_PAGE)return hub_touch(p,*(const uint32_t *)(uintptr_t)(event+4));
+ if(raw==0x30&&p->page!=M10V_SETTINGS_FILMS&&p->page!=AB_HOST_PAGE)
+  return settings_touch(p,*(const uint32_t *)(uintptr_t)(event+4));
+#endif
  if(raw==0x30)return catalog_touch(p,*(const uint32_t *)(uintptr_t)(event+4));
 #endif
  M10V_LOG(82,raw,p->state.screen,p->state.focus,p->state.value);
@@ -469,6 +741,9 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
  case 0x86:case 0x89:case 0xda:key=M10V_KEY_BACK;break;
  default:return 0;
  }
+#if M10V_MENU_HUB
+ if(p->page==HUB_PAGE)return hub_key(p,key);
+#endif
 #if M10V_SHUTDOWN_ALBUM
  if(p->page==M10V_SETTINGS_SHUTDOWN){
   m10v_settings *s=&p->state;uint32_t count=shutdown_count();
@@ -551,6 +826,9 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
 /* Scoped to the original key dispatch call site, never the global route getter. */
 uint32_t m10v_settings_controller_key_route(uint32_t model){
  uint32_t route=((fn1)0x53228c4cu)(model);
+#if M10V_MENU_HUB
+ if(route==M10V_SETTINGS_HUB_ROUTE)return 0x0200004au;
+#endif
 #if M10V_SHUTDOWN_ALBUM
  if(route==M10V_SETTINGS_SHUTDOWN_ROUTE&&shutdown_count())return 0x0200004au;
 #endif
@@ -563,10 +841,20 @@ uint32_t m10v_settings_controller_key_route(uint32_t model){
 /* Dynamic bitmap metadata belongs to the same heap allocation as its pixels.
  * Only the five private icon IDs call this provider. No ROM writes or retained
  * global heap pointers; original TopMenu/root lifetime owns the lookup. */
-uint32_t m10v_settings_controller_card_directory(void){
+uint32_t m10v_settings_controller_card_directory(uint32_t id){
+ (void)id;
  if(!(*(const volatile uint32_t *)0x55063910u&1u))return 0;
  uint32_t owner=*(const volatile uint32_t *)0x55063988u;
  if((owner&3)||owner<0x55000000u||owner>0x80000000u-0x213cu)return 0;
+#if M10V_MENU_HUB
+ if(id==M10V_HUB_BITMAP_ID||id==M10V_THEME_BITMAP_ID){
+  if(owner>0x80000000u-M10V_SETTINGS_HUB_BYTES)return 0;
+  m10v_settings_controller *p=hub(owner);
+  if(*(uint32_t *)p!=m10v_settings_controller_vtable())return 0;
+  return id==M10V_THEME_BITMAP_ID?m10v_settings_view_theme_directory(p->theme_heap):
+    m10v_settings_view_hub_directory(&p->view);
+ }
+#endif
  m10v_settings_controller *p=page(owner,0);
  if(*(uint32_t *)p!=m10v_settings_controller_vtable()||p->view.count!=M10V_VIEW_COUNT)return 0;
  uint32_t heap=p->view.widgets[M10V_VIEW_HEAP];

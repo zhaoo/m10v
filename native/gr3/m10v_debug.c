@@ -26,7 +26,8 @@ static uint32_t event_channel(uint32_t event){
 #if M10V_TORN_ENABLED
     if(event==M10V_TORN_OUTCOME_EVENT)return 5u;
 #endif
-    return (event>=230&&event<=315)||(event>=85&&event<=99)?4u:event>=180&&event<=209?3u:event>=100?2u:1u;
+    return (event>=230&&event<=315)||(event>=85&&event<=99)?4u:event>=180&&event<=209?3u:
+        (event>=340&&event<=344)?1u:event>=100?2u:1u;
 }
 static int ram(uint32_t p,uint32_t n){return !(p&3)&&p>=0x55000000u&&p<0x80000000u&&n<=0x80000000u-p;}
 static int code(uint32_t p,uint32_t n){return !(p&3)&&p>=0x53000000u&&p<0x540b6000u&&n<=0x540b6000u-p;}

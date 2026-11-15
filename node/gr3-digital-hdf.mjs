@@ -59,8 +59,9 @@ export function hdfMenuPatches(runtime,m){
  const d=m.hdf_menu;if(!d)return [];
  const pure=m.pure_isp_effects?.enabled===true;
  const full=m.film_library_enabled!==false,offset=full?(m.capture_lifecycle?.snapshot?.snapshot_ingress_installed?0x613c:0x213c):0x13bc;
- const captions=full?[937,938,1140]:[970],routes=full?[0x0200f100,0x0200f101,0x0200f102]:[0x0200f102];
- if(m.adj_extra){captions.push(1191);routes.push(0x0200f107);}
+ const captions=m.menu_hub?[1244]:full?[937,938,1140]:[970],routes=m.menu_hub?[0x0200f10a]:full?[0x0200f100,0x0200f101,0x0200f102]:[0x0200f102];
+ if(m.adj_extra&&!m.menu_hub){captions.push(1191);routes.push(0x0200f107);}
+ if(m.menu_hub)need(m.resources.texts[1244-m.resources.first_id]==='m10v','menu hub caption differs');
  need(d.schema==='m10v-gr3-hdf-menu/v1'&&d.film_library===full&&d.owner_offset===offset&&d.owner_bytes===settingsOwnerBytes(m,offset+(pure?0x22c:0x1c0))&&d.controller_bytes===(pure?0x200:0x1c0)&&d.route===0x0200f102&&typeof m.zoom?.enabled==='boolean'&&d.rows.length===captions.length,'independent menu ownership differs');
  if(pure)need(JSON.stringify(d.effects_children)===JSON.stringify(['HDF','Border',...(m.pure_isp_effects.imprint?['FilmImprint','Vignette']:[]),...(m.torn_overlay?.enabled?['TornOverlay']:[])]),'effects menu child inventory differs');
  if(pure)need(full&&d.effects_cache_owner_offset===offset+0x200&&d.effects_cache_bytes===44,'effects cache ownership differs');
