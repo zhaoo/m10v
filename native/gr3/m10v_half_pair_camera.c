@@ -18,7 +18,14 @@
 #define CANCEL 1u
 #define BANK_MAX (3u*6144u*4064u)
 typedef struct {uint32_t token,manager,bytes,d[8];} owned_frame;
-typedef struct {uint32_t magic,control,flags,generation;owned_frame first;uint32_t orientation,cookie;} session;
+typedef struct {
+ uint32_t magic,control,flags,generation;
+ owned_frame first;
+ uint32_t orientation,cookie;
+#if M10V_MENU_HUB
+ uint32_t half_enabled; /* Volatile, shared by the camera's aspect selectors. */
+#endif
+} session;
 typedef struct {uint32_t recipe,si,req,raw,raw_bytes,raw_dims,bank,capacity,owner;} exposure;
 _Static_assert(sizeof(session)<=sizeof(((m10v_settings_controller *)0)->half_pair),"owned session capacity");
 static uint32_t word(uint32_t p){return *(const uint32_t *)(uintptr_t)p;}
@@ -62,7 +69,73 @@ int m10v_half_pair_reset(void){
  if(__atomic_load_n(&s->magic,__ATOMIC_ACQUIRE)==MAGIC){M10V_LOG(221u,owner,s->generation,s->first.token,2u);clear_first(s);}
  __atomic_fetch_and(&s->control,~BUSY,__ATOMIC_RELEASE);return 1;
 }
-uint32_t m10v_half_pair_select(uint32_t model,uint32_t raw){uint32_t answer=((uint32_t(*)(uint32_t,uint32_t))0x532525a4u)(model,raw);if(raw!=6u)(void)m10v_half_pair_reset();return answer;}
+static uint32_t native_select(uint32_t model,uint32_t raw){
+ return ((uint32_t(*)(uint32_t,uint32_t))0x532525a4u)(model,raw);
+}
+
+#if M10V_MENU_HUB
+uint32_t m10v_settings_half_enabled(void){
+ session *s=state(current_owner());
+ return s&&__atomic_load_n(&s->half_enabled,__ATOMIC_ACQUIRE);
+}
+
+uint32_t m10v_settings_half_count(void){
+ return 6u+m10v_settings_half_enabled();
+}
+
+static uint32_t live_ratio(uint32_t model){
+ if(!ram(model,8)||!ram(word(model+4u),0x4c3u))return 7;
+ return ((uint32_t(*)(uint32_t))0x53245260u)(model);
+}
+
+static int can_restore_ratio(uint32_t model){
+ /* The native setter can call the backend directly in its inactive path. */
+ if(P(word(model+4u))[0x44u])return 1;
+ uint32_t root=((uint32_t(*)(void))0x53525d5cu)();
+ return ram(root,4)&&ram(word(root),4);
+}
+
+int m10v_settings_half_set(uint32_t enabled){
+ session *s=state(current_owner());
+ if(!s||enabled>1u)return -1;
+ if(enabled==__atomic_load_n(&s->half_enabled,__ATOMIC_ACQUIRE))return 0;
+ if(!enabled){
+  uint32_t root=((uint32_t(*)(void))0x5320ad88u)();
+  uint32_t model=root?((uint32_t(*)(uint32_t))0x5320b31cu)(root):0;
+  uint32_t ratio=live_ratio(model);
+  if(ratio>6u)return -1;
+  if(ratio==6u&&(!can_restore_ratio(model)||!m10v_half_pair_select(model,0)))return -1;
+ }
+ __atomic_store_n(&s->half_enabled,enabled,__ATOMIC_RELEASE);
+ return 0;
+}
+
+int m10v_settings_half_remote_select(uint32_t model){
+ session *s=state(current_owner());
+ if(!s||live_ratio(model)>6u||!can_restore_ratio(model))return 1;
+ /* The companion's explicit raw6 write is also its Half opt-in. Publish
+  * the shared setting only after the native write reads back successfully. */
+ if(!native_select(model,6)||live_ratio(model)!=6u||state(current_owner())!=s)return 2;
+ __atomic_store_n(&s->half_enabled,1,__ATOMIC_RELEASE);
+ return 0;
+}
+
+void m10v_settings_half_sanitize(uint32_t model){
+ /* Normalize just the active InputPropertyModel copy before native apply;
+  * the original U box and every previously captured image retain raw6. */
+ if(!m10v_settings_half_enabled()&&live_ratio(model)==6u&&can_restore_ratio(model))
+  (void)m10v_half_pair_select(model,0);
+}
+#endif
+
+uint32_t m10v_half_pair_select(uint32_t model,uint32_t raw){
+#if M10V_MENU_HUB
+ if(raw==6u&&!m10v_settings_half_enabled())return 0;
+#endif
+ uint32_t answer=native_select(model,raw);
+ if(answer&&raw!=6u)(void)m10v_half_pair_reset();
+ return answer;
+}
 static int protected(const exposure *e,uint32_t a,uint32_t n){return overlap(a,n,e->bank,e->capacity)||overlap(a,n,e->recipe,M10V_SAVE_RECIPE_EXTENDED_BYTES)||overlap(a,n,e->si,0x74270u)||overlap(a,n,e->req,0x3cu)||overlap(a,n,e->raw,e->raw_bytes)||overlap(a,n,e->raw_dims,e->raw_dims?4u:0u)||overlap(a,n,e->owner,0x6300u);}
 static int allocate_frame(owned_frame *f,const exposure *e,uint32_t w,uint32_t h,const owned_frame *other){
  zero(f,sizeof(*f));uint32_t pitch=align64(w),rows=(h+15u)&~15u,plane=pitch*rows;

@@ -67,6 +67,34 @@ function validateComponent(source,component,e){
   (e.aspect&&p.rtos.length===ASPECT_END-LOAD&&sha(p.rtos)===verifiedComponents.get(component)),'camera component source pin differs');
  return p;
 }
+function bindHalfSetting(rtos,manifest){
+ const marker=Buffer.from('4137464700000000','hex');
+ const at=rtos.indexOf(marker,0x540bc000-LOAD);
+ need(at>=0&&at+8<=ASPECT_END-LOAD&&rtos.indexOf(marker,at+1)===-1,'half-frame setting binding differs');
+ const count=manifest.symbols.m10v_settings_half_count;
+ const apply=manifest.symbols.m10v_settings_half_apply;
+ const select=manifest.symbols.m10v_half_pair_select;
+ need([count,apply,select].every(entry=>Number.isInteger(entry)&&entry%4===0&&
+  entry>=manifest.base&&entry<LOAD+rtos.length),'half-frame setting runtime differs');
+ rtos.writeUInt32LE(count,at+4);
+ const patch=(site,expected,target,link=false)=>{
+  need(rtos.readUInt32LE(site-LOAD)===expected,'half-frame setting preimage differs at '+site.toString(16));
+  const delta=target-site-8;
+  need(delta%4===0&&delta>=-(1<<25)&&delta<1<<25,'half-frame setting branch out of range');
+  rtos.writeUInt32LE(((link?0xeb000000:0xea000000)|((delta>>2)&0xffffff))>>>0,site-LOAD);
+ };
+ // The capture pipeline and preset storage remain intact. Gate only the
+ // current input settings when native startup/recall applies its copy.
+ patch(0x532750f8,0xeef17a0c,apply);
+ // Remaining native explicit aspect choices share the MENU pair cleanup
+ // and reject raw6 on stale rows or software requests while Half is off.
+ patch(0x531a0e04,0xea02c5e6,select); // ADJ
+ patch(0x53227170,0xeb00ad0b,select,true); // Assignable aspect cycle
+ patch(0x5328c850,0xebff1753,select,true);
+ patch(0x533074b0,0xebfd2c3b,select,true);
+ patch(0x533074c8,0xebfd2c35,select,true);
+ return {storage:'camera-session',default_enabled:false};
+}
 function expectedImage(source,nativeCandidate,runtime,manifest,component,requested){
  const e=normalizeExtensions(requested),nativeReceipt=auditNativeLibrary(source,nativeCandidate,runtime,manifest);
  need(inspectOfficial(source).model==='GR III'||!activeExtensions(e).length,'组合扩展当前仅支持 GR III');
@@ -74,7 +102,7 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
  const componentEnd=c?LOAD+c.rtos.length:COMPONENT_BASE;
  need(manifest.base===componentEnd,'composition native placement differs');
  const target=Buffer.from(native.decoded),rtos=target.subarray(native.sections.RTOS.offset,native.sections.RTOS.offset+native.sections.RTOS.size);
- let stockWords=0;
+ let stockWords=0,halfSetting=null;
  if(c){
   for(let off=0;off<original.rtos.length;off+=4){
    const stock=original.rtos.subarray(off,off+4),addition=c.rtos.subarray(off,off+4);
@@ -109,6 +137,7 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
      need(halfAt>=0x540bc000-LOAD&&halfAt+12<=ASPECT_END-LOAD&&rtos.indexOf(halfMarker,halfAt+1)===-1,'half-frame model/resource binding differs');
      rtos.writeUInt32LE(manifest.resources.last_id+3,halfAt+4);
      if(manifest.film_library_enabled!==false){need(manifest.half_frame_icon?.id===877,'half-frame icon missing');rtos.writeUInt32LE(877,halfAt+8);}
+     if(manifest.menu_hub&&manifest.half_pair?.enabled)halfSetting=bindHalfSetting(rtos,manifest);
     }else need(halfAt===-1,'half-frame must be disabled for this model');
     const marker=Buffer.from('413752362b03000011030000','hex');
     const at=rtos.indexOf(marker,COMPONENT_END-LOAD);
@@ -144,6 +173,7 @@ function expectedImage(source,nativeCandidate,runtime,manifest,component,request
   six_by_seven_resource_id:e.aspect&&componentEnd===ASPECT_END?manifest.resources.last_id+2:null,
   half_pair:manifest.half_pair||{enabled:false},
   half_frame:{enabled:!!(e.aspect&&componentEnd===ASPECT_END&&manifest.camera_model==='gr3'),raw_id:6,
+   ...(halfSetting?{settings_switch:halfSetting}:{}),
    resource_id:e.aspect&&manifest.camera_model==='gr3'?manifest.resources.last_id+3:null,
    icon_id:e.aspect&&manifest.camera_model==='gr3'&&manifest.film_library_enabled!==false?877:null},
   negative_grain_sites:e.negativeGrain?[0x53b348c0,0x53b3501e]:[],

@@ -509,7 +509,7 @@ function checkRuntime(runtime, manifest) {
   const adjLabels=['ADJ','设置 6','设置 7','设置 8','设置 9','构图线','胶卷库','逐卷效果','画幅','HDF 模拟','左右调整 OK 保存'];
   const shutdownAlbum=manifest.flags.includes('-DM10V_SHUTDOWN_ALBUM=1');
   const legacyResourceCount=leica?444+6*Number(shutdownAlbum):420+(manifest.pure_isp_effects?.imprint?12:0)+(manifest.torn_overlay?.enabled?8:0);
-  const resourceCount=manifest.menu_hub?463:legacyResourceCount;
+  const resourceCount=manifest.menu_hub?475:legacyResourceCount;
   need(manifest.resources?.first_id === 786 && manifest.resources.last_id === 785+resourceCount &&
     manifest.resources.texts?.length === resourceCount && manifest.resources.descriptors?.length === resourceCount, 'native resources incomplete');
   if(manifest.torn_overlay?.enabled)
@@ -527,7 +527,8 @@ function checkRuntime(runtime, manifest) {
   if(manifest.pure_isp_effects?.imprint)need(JSON.stringify(manifest.resources.texts.slice(428,432))===JSON.stringify(['暗角',manifest.menu_hub?'开关':'暗角开关',manifest.menu_hub?'强度':'暗角强度','开']),'vignette captions differ');
   if(leica)need(JSON.stringify(manifest.resources.texts.slice(440,legacyResourceCount))===JSON.stringify(['Leica Chrome','Leica Brass','Leica Teal','Leica Classic',...(shutdownAlbum?['关机图','原厂画面','图片 1','图片 2','图片 3','使用中']:[])]),'Leica or shutdown captions differ');
   if(manifest.menu_hub)need(manifest.flags.includes('-DM10V_MENU_HUB=1')&&manifest.resources.texts.slice(legacyResourceCount,458).every(s=>s==='')&&
-    JSON.stringify(manifest.resources.texts.slice(458))===JSON.stringify(['m10v','无法读取 SD 卡菜单资源','点这里返回','返回','保存']),
+    JSON.stringify(manifest.resources.texts.slice(458))===JSON.stringify(['m10v','无法读取 SD 卡菜单资源','点这里返回','返回','保存','逐卷设置','颗粒尺寸',...Array.from({length:9},(_,i)=>String(i)),'取消'])&&
+    manifest.resources.texts[991-786]==='滤镜快切',
     'menu hub captions differ');
   for (let i=0;i<resourceCount;i++) {
     const at = manifest.resources.descriptors[i] - BASE, text = manifest.resources.texts[i];

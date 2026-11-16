@@ -26,7 +26,7 @@ typedef uint32_t (*ctor)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t);
 enum { ROOT, BACKGROUND, TITLE, NAME, FOOTER, ERROR_TEXT,
  FRAME=6, INNER=16, ICON=26,
 #if M10V_MENU_HUB
- ROW=36, VALUE=40, PAGE=44, SELECTED_COUNT=45, THEME=46,
+ ROW=36, VALUE=40, PAGE=44, SELECTED_COUNT=45, THEME=46, FILM_CANCEL=47, FILM_SAVE=48,
 #else
  ROW_FRAME=36, ROW_INNER=40, ROW=44, VALUE=48, PAGE=52, SELECTED_COUNT=53,
 #endif
@@ -90,10 +90,13 @@ int m10v_settings_view_create(m10v_settings_view *v){
  for(uint32_t i=0;i<4;i++)if(make(v,17,M10V_MENU_HUB?60:36,
    (M10V_MENU_HUB?87:90)+i*(M10V_MENU_HUB?53:72),M10V_MENU_HUB?280:300,M10V_MENU_HUB?50:52))goto fail;
  for(uint32_t i=0;i<4;i++)if(make(v,17,350,(M10V_MENU_HUB?87:90)+i*(M10V_MENU_HUB?53:72),M10V_MENU_HUB?310:330,M10V_MENU_HUB?50:52))goto fail;
- if(make(v,10,(720-M10V_CARD_DOTS_WIDTH)/2,428,M10V_CARD_DOTS_WIDTH,M10V_CARD_DOTS_HEIGHT)||
+ if(make(v,10,(720-M10V_CARD_DOTS_WIDTH)/2,M10V_MENU_HUB?448:428,M10V_CARD_DOTS_WIDTH,M10V_CARD_DOTS_HEIGHT)||
     make(v,17,494,10,202,38))goto fail;
 #if M10V_MENU_HUB
  v->widgets[v->count++]=skin;
+ if(make(v,17,460,419,108,45)||make(v,17,578,419,108,45))goto fail;
+ ((fn2)0x53396644u)(v->widgets[FILM_CANCEL],1);
+ ((fn2)0x53396644u)(v->widgets[FILM_SAVE],1);
  ((fn2)0x5339aa30u)(skin,1);
  ((fn2)0x5339aa44u)(skin,1);
  /* CaptionView f1=2 right aligns, f2=1 vertically centers. */
@@ -151,16 +154,25 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  uint32_t catalog=s->screen==M10V_SETTINGS_CATALOG;
  uint32_t films=s->screen==M10V_SETTINGS_FILMS||catalog;
 #if M10V_MENU_HUB
- color(v->widgets[BACKGROUND],films?1:DETAIL_BACKGROUND);
+ uint32_t film_detail=s->screen==M10V_SETTINGS_FILM_DETAIL;
+ uint32_t film_editing=film_detail&&(s->value&M10V_FILM_DETAIL_EDIT);
+#endif
+#if M10V_MENU_HUB
+ color(v->widgets[BACKGROUND],DETAIL_BACKGROUND);
 #endif
  uint32_t focus=catalog?(s->focus==M10V_CATALOG_TOUCH_FOCUS_HIDDEN?10:s->index%10):s->focus;
  uint32_t error=s->error>=1&&s->error<=4;
- visible(v->widgets[TITLE],!catalog||error);
+ visible(v->widgets[TITLE],M10V_MENU_HUB||!catalog||error);
  visible(v->widgets[FOOTER],!catalog);
  visible(v->widgets[SELECTED_COUNT],catalog);
 #if M10V_MENU_HUB
- visible(v->widgets[THEME],!films&&m10v_settings_view_theme(v->widgets[THEME],
-   name_page?1:s->screen==M10V_SETTINGS_WATERMARK?2:4,name_page?0:s->focus,ab_page));
+ visible(v->widgets[THEME],m10v_settings_view_theme(v->widgets[THEME],
+   films?0:name_page?1:s->screen==M10V_SETTINGS_WATERMARK?2:film_detail?m10v_film_detail_rows(s):4,
+   name_page?0:s->focus,film_editing?3:ab_page));
+ visible(v->widgets[FILM_CANCEL],film_editing);visible(v->widgets[FILM_SAVE],film_editing);
+ const uint32_t title_rect[4]={catalog?70:88,catalog?5:16,catalog?408:560,42};
+ ((void (*)(uint32_t,const uint32_t *))0x533ab548u)(v->widgets[TITLE],title_rect);
+ if(catalog&&!error)caption(v->widgets[TITLE],M10V_VIEW_FILMS);
 #endif
  if(catalog)caption(v->widgets[SELECTED_COUNT],1116+m10v_library_count(&s->saved));
  if(!catalog){
@@ -216,6 +228,43 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   ((fn2)0x5339a9a0u)(v->widgets[PAGE],M10V_CARD_DOTS_ID);
  }
  visible(v->widgets[PAGE],catalog&&heap);
+
+#if M10V_MENU_HUB
+ if(film_detail&&s->slot<M10V_SLOT_COUNT){
+  uint32_t rows=m10v_film_detail_rows(s);
+  const m10v_slot *film=&s->saved.slots[s->slot];
+  const m10v_film_effects *fx=&s->saved.effects[s->slot];
+  uint32_t values[3]={film->grain,m10v_film_fx_tagged(fx)?fx->grain_size:film->grain?film->grain-1u:0,film->halo_gain};
+  if(film_editing&&s->focus<3)values[s->focus]=s->value&255u;
+  static const uint16_t names[3]={1164,1250,862};
+  static const uint16_t grain[4]={973,1179,1176,1180};
+  static const uint16_t sizes[3]={1172,1173,1174};
+  caption(v->widgets[TITLE],1249);
+  visible(v->widgets[FOOTER],!film_editing);
+  caption(v->widgets[FOOTER],M10V_VIEW_STAMP_HELP);
+  if(film_editing){
+   caption(v->widgets[FILM_CANCEL],1260);caption(v->widgets[FILM_SAVE],1248);
+   ((fn2)0x5339658cu)(v->widgets[FILM_SAVE],28);
+  }
+  const uint32_t name_rect[4]={407,19,278,42};
+  char custom[24];
+  const char *name=m10v_library_name(film->film);
+  if(M10V_CUSTOM(film->film)&&m10v_sd_camera_custom_name(&s->saved,s->slot,custom,sizeof(custom)))name=custom;
+  if(name){
+   ((void (*)(uint32_t,const uint32_t *))0x533ab548u)(v->widgets[NAME],name_rect);
+   ((fn2)0x53390ef8u)(v->widgets[NAME],ptr(name));
+   visible(v->widgets[NAME],1);
+  }
+  for(uint32_t i=0;i<4;i++){
+   visible(v->widgets[ROW+i],i<rows);visible(v->widgets[VALUE+i],i<rows);
+   if(i>=rows)continue;
+   style_row(v,i,1,i==s->focus);
+   caption(v->widgets[ROW+i],names[i]);
+   caption(v->widgets[VALUE+i],i==2?1251+values[i]:i==1?sizes[values[i]]:grain[values[i]]);
+  }
+  ((fn1)0x533ad308u)(v->widgets[ROOT]);return;
+ }
+#endif
 
  uint32_t values[4]={s->saved.stamp,s->saved.format,s->saved.corner,s->saved.color};
  if(s->screen==M10V_SETTINGS_VALUE&&s->focus<4)values[s->focus]=s->value;
@@ -283,6 +332,7 @@ extern uint32_t m10v_zoom_caption(uint32_t);
 void m10v_settings_view_zoom(m10v_settings_view *v,const m10v_zoom_menu *s){
  if(!v||!s||v->count!=COUNT)return;
 #if M10V_MENU_HUB
+ visible(v->widgets[FILM_CANCEL],0);visible(v->widgets[FILM_SAVE],0);
  visible(v->widgets[THEME],m10v_settings_view_theme(v->widgets[THEME],3,s->focus,0));
 #endif
  visible(v->widgets[TITLE],1);visible(v->widgets[FOOTER],1);
@@ -311,6 +361,7 @@ void m10v_settings_view_zoom(m10v_settings_view *v,const m10v_zoom_menu *s){
 void m10v_settings_view_shutdown(m10v_settings_view *v,const m10v_settings *s,uint32_t count){
  if(!v||!s||v->count!=COUNT)return;
 #if M10V_MENU_HUB
+ visible(v->widgets[FILM_CANCEL],0);visible(v->widgets[FILM_SAVE],0);
  visible(v->widgets[THEME],m10v_settings_view_theme(v->widgets[THEME],count+1,s->focus,0));
 #endif
  visible(v->widgets[TITLE],1);visible(v->widgets[FOOTER],1);
@@ -346,6 +397,7 @@ static uint32_t adj_value_resource(uint32_t id){
 void m10v_settings_view_adj(m10v_settings_view *v,const m10v_settings *s){
  if(!v||!s||v->count!=COUNT)return;
 #if M10V_MENU_HUB
+ visible(v->widgets[FILM_CANCEL],0);visible(v->widgets[FILM_SAVE],0);
  visible(v->widgets[THEME],m10v_settings_view_theme(v->widgets[THEME],4,s->focus,0));
 #endif
  visible(v->widgets[TITLE],1);visible(v->widgets[FOOTER],1);

@@ -593,6 +593,25 @@ int m10v_camera_library_effects(m10v_library_state *state,uint32_t slot,uint32_t
     if(!ram(state,sizeof(*state)))return M10V_LIBRARY_INVALID;
     uint32_t fs=filesystem();return fs?m10v_library_effects(state,slot,field,value,store,(void *)(uintptr_t)fs):M10V_LIBRARY_STORE_FAILED;
 }
+#if M10V_PURE_ISP_EFFECTS
+int m10v_camera_library_grain(m10v_library_state *state,uint32_t slot,uint32_t size,uint32_t value){
+    if(!ram(state,sizeof(*state))||!m10v_library_valid(state)||slot>=M10V_SLOT_COUNT||
+       !state->slots[slot].film||value>(size?2u:3u)||state->sequence==0xffffffffu)
+        return M10V_LIBRARY_INVALID;
+    uint32_t fs=filesystem();if(!fs)return M10V_LIBRARY_STORE_FAILED;
+    m10v_library_state next;copy(&next,state);
+    m10v_film_effects *effects=&next.effects[slot];
+    uint32_t grain=next.slots[slot].grain;
+    if(!m10v_film_fx_tagged(effects))m10v_film_fx_set(effects,grain?grain-1u:0,0,0,0,0);
+    if(size)effects->grain_size=(uint8_t)value;
+    else next.slots[slot].grain=(uint8_t)value;
+    next.sequence++;
+    next.crc=state_crc(&next,offsetof(m10v_library_state,crc));
+    if(store((void *)(uintptr_t)fs,&next))return M10V_LIBRARY_STORE_FAILED;
+    copy(state,&next);
+    return M10V_LIBRARY_OK;
+}
+#endif
 int m10v_camera_library_reset(m10v_library_state *state,uint32_t slot){
     if(!ram(state,sizeof(*state)))return M10V_LIBRARY_INVALID;
     uint32_t fs=filesystem();return fs?m10v_library_reset(state,slot,store,(void *)(uintptr_t)fs):M10V_LIBRARY_STORE_FAILED;

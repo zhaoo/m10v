@@ -15,7 +15,7 @@ export function settingsOwnerBytes(m,fallback){
   'camera controls owner regions differ');
  if(m.menu_hub){
   const h=m.menu_hub;
-  need(m.camera_model==='gr3'&&m.debug_mode===true&&h.route===0x0200f10a&&h.caption===1244&&h.owner_offset===0x6e00&&h.owner_bytes===0x74c0,'menu hub owner differs');
+  need(m.camera_model==='gr3'&&m.debug_mode===true&&h.route===0x0200f10a&&h.caption===1244&&h.owner_offset===0x6e00&&h.owner_bytes===0x74c0&&h.artwork_version===5,'menu hub owner differs');
   return h.owner_bytes;
  }
  return m.torn_overlay?.enabled?0x6e00:0x6d00;

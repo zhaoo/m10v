@@ -4,8 +4,8 @@
 #include "m10v_zoom_menu.h"
 #include "m10v_menu_detail_style.h"
 /* GR III 2.10 only. Unintegrated view; caller owns route and root lifetime. */
-enum { M10V_VIEW_CAPACITY=56, M10V_VIEW_COUNT=M10V_MENU_HUB?47:54, M10V_VIEW_HEAP=55 };
-enum { M10V_FILM_GRID_X=24,M10V_FILM_GRID_Y=60,M10V_FILM_GRID_DX=136,M10V_FILM_GRID_DY=177 };
+enum { M10V_VIEW_CAPACITY=56, M10V_VIEW_COUNT=M10V_MENU_HUB?49:54, M10V_VIEW_HEAP=55 };
+enum { M10V_FILM_GRID_X=24,M10V_FILM_GRID_Y=M10V_MENU_HUB?72:60,M10V_FILM_GRID_DX=136,M10V_FILM_GRID_DY=177 };
 typedef struct { uint32_t widgets[M10V_VIEW_CAPACITY]; uint32_t count; } m10v_settings_view;
 enum {
  M10V_VIEW_FILMS=937, M10V_VIEW_STAMP, M10V_VIEW_FILM_HELP,
@@ -29,7 +29,7 @@ enum { M10V_HUB_ROW_Y=86, M10V_HUB_ROW_HEIGHT=53 };
 uint32_t m10v_settings_view_theme(uint32_t, uint32_t, uint32_t, uint32_t);
 uint32_t m10v_settings_view_theme_directory(uint32_t);
 int m10v_settings_view_hub_create(m10v_settings_view *);
-typedef struct {uint32_t frame,focus,patch[7];} m10v_hub_paint;
+typedef struct {uint32_t frame,focus,patch[7],save_error;} m10v_hub_paint;
 uint32_t m10v_settings_view_hub(m10v_settings_view *,const m10v_hub_paint *);
 uint32_t m10v_settings_view_hub_directory(const m10v_settings_view *);
 #endif

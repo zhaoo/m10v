@@ -27,10 +27,22 @@ const u8 m10v_aspect_classes[]={2,1,3,4,0,
 __attribute__((used)) const volatile u32 m10v_aspect_wide_record[2]={0x57463741,813};
 u32 m10v_aspect_wide_id(void) { return m10v_aspect_wide_record[1]; }
 u32 m10v_aspect_id(void) { return m10v_aspect_id_record[1]; }
-u32 m10v_aspect_count(void) { return sizeof(m10v_aspect_values); }
+#if M10V_HALF_FRAME
+/* The integrated standalone menu can bind a session-owned gate. Standalone
+ * crop overlays and earlier menu builds still expose Half by default. */
+__attribute__((used)) const volatile u32 m10v_aspect_gate_record[2]={0x47463741,0};
+#endif
+u32 m10v_aspect_count(void) {
+#if M10V_HALF_FRAME
+    u32 count=m10v_aspect_gate_record[1];
+    if(count) return CALL(count,u32 (*)(void))();
+#endif
+    return sizeof(m10v_aspect_values);
+}
 u32 m10v_aspect_next(u32 value) {
-    for(u32 i=0;i<sizeof(m10v_aspect_values);i++) if(m10v_aspect_values[i]==value)
-        return m10v_aspect_values[i+1==sizeof(m10v_aspect_values)?0:i+1];
+    u32 count=m10v_aspect_count();
+    for(u32 i=1;i<count;i++) if(m10v_aspect_values[i-1]==value)
+        return m10v_aspect_values[i];
     return 0;
 }
 u32 m10v_aspect_current(void) {
@@ -371,7 +383,7 @@ u32 m10v_aspect_adj_count(u32 owner) {
     if(!owner || BYTE(owner,0x270)) return 2;
     if(!m10v_aspect_icon_record[1] || !m10v_aspect_icon_record[2]) return 2;
 #if M10V_HALF_FRAME
-    if(!m10v_aspect_half_record[2]) return m10v_aspect_count()-1;
+    if(!m10v_aspect_half_record[2]) return sizeof(m10v_aspect_values)-1;
 #endif
     return m10v_aspect_count();
 }

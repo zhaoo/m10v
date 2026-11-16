@@ -104,14 +104,22 @@ def package_connection(candidate_dir,out,*,include_films=True):
   if extensions:files['evidence/extensions-contract.json']=(ROOT/'contracts/extensions-v1.json').read_bytes()
   menu_artwork='native/gr3/m10v_menu_hub_view.inc' in native.get('sources',{})
   if menu_artwork:
-   need(native.get('menu_hub'),'menu artwork requires the owned menu controller')
+   hub=native.get('menu_hub')
+   need(hub,'menu artwork requires the owned menu controller')
+   version=hub.get('artwork_version',4)
+   assets={
+      4:('MENU.M10','8b666e2ddfb276078ed09bf486591f3ca10ad91b67ea74c35f289266f63e0be0'),
+      5:('MENU-R5.M10','02948b58fbf744212c81e1bb5fe7dae1dab2991c0313836f29a02c245174fe63'),
+   }
+   need(type(version) is int and version in assets,'unknown menu artwork version')
+   filename,digest=assets[version]
    artwork=candidate_dir/'MENU.M10'
    published=not artwork.is_file()
-   if published:artwork=ROOT/'web/gr3/MENU.M10'
+   if published:artwork=ROOT/'web/gr3'/filename
    need(16+384*16<artwork.stat().st_size<32*1024*1024,'menu artwork size differs')
    data=artwork.read_bytes()
-   if published:need(sha(data)=='8b666e2ddfb276078ed09bf486591f3ca10ad91b67ea74c35f289266f63e0be0','published menu artwork hash differs')
-   need(struct.unpack_from('<4sIII',data)==(b'MNU4',4,384,len(data)),'menu artwork header differs')
+   if published:need(sha(data)==digest,'published menu artwork hash differs')
+   need(struct.unpack_from('<4sIII',data)==(f'MNU{version}'.encode(),version,384,len(data)),'menu artwork header differs')
    files['04_MENU/SD_ROOT/M10V/MENU.M10']=data
   film_audit=None
   if include_films:

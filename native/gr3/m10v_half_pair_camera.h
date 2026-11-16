@@ -11,4 +11,9 @@ void m10v_half_pair_destroy(uint32_t owner);
 int m10v_half_pair_camera(uint32_t context);
 int m10v_half_pair_reset(void);
 uint32_t m10v_half_pair_select(uint32_t model,uint32_t raw);
+#if M10V_MENU_HUB
+uint32_t m10v_settings_half_enabled(void);
+int m10v_settings_half_set(uint32_t enabled);
+int m10v_settings_half_remote_select(uint32_t model);
+#endif
 #endif

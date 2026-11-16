@@ -57,6 +57,7 @@ class FinalMenuHub(unittest.TestCase):
         self.icons, self.closed_routes, self.saved_effects = {}, [], []
         self.effect_fixture = False
         self.fn_row = 0
+        self.library_state = None
         self.alloc = HEAP
         self.arm.mem_write(RAM+0x9028, struct.pack("<I", RAM+0x9100))
         self.arm.mem_write(RAM+0x9034, struct.pack("<I", RAM+0x9100))
@@ -96,7 +97,14 @@ class FinalMenuHub(unittest.TestCase):
 
         def boundary(arm, address, _size, _context):
             result = stubs.get(address, 0)
-            if self.effect_fixture and address == symbols["m10v_isp_effects_camera_snapshot"]:
+            if self.library_state and address == symbols["m10v_camera_library_load"]:
+                arm.mem_write(arm.reg_read(A.UC_ARM_REG_R0), self.library_state)
+            elif self.library_state and address == symbols["m10v_sd_camera_directory_extent"]:
+                result = 64
+            elif self.library_state and address == symbols["m10v_sd_camera_directory_item"]:
+                index = arm.reg_read(A.UC_ARM_REG_R0)
+                result = 331 + index - 60 if 60 <= index <= 63 else 0
+            elif self.effect_fixture and address == symbols["m10v_isp_effects_camera_snapshot"]:
                 arm.mem_write(arm.reg_read(A.UC_ARM_REG_R0), bytes(32))
                 result = 1
             elif self.effect_fixture and address == symbols["m10v_isp_effects_camera_save"]:
@@ -107,9 +115,11 @@ class FinalMenuHub(unittest.TestCase):
             elif self.fn_row and address == 0x53390D6C:
                 arm.mem_write(arm.reg_read(A.UC_ARM_REG_R0)+0xea,
                               bytes([arm.reg_read(A.UC_ARM_REG_R1)]))
-            elif self.fn_row and address == 0x533AB548:
+            elif (self.fn_row or self.detail_widgets) and address == 0x533AB548:
                 widget, rect = (arm.reg_read(reg) for reg in REGS[:2])
                 arm.mem_write(widget+0x20, bytes(arm.mem_read(rect,16)))
+            elif self.detail_widgets and address == 0x53390EF8:
+                self.detail_name = bytes(arm.mem_read(arm.reg_read(A.UC_ARM_REG_R1), 24)).split(b"\0")[0]
             elif self.detail_widgets and address == 0x536AF2A8:
                 result = self.alloc
                 self.alloc += (arm.reg_read(A.UC_ARM_REG_R0) + 15) & ~15
@@ -199,7 +209,7 @@ class FinalMenuHub(unittest.TestCase):
         struct.pack_into("<II", packet, 0x30, x, y)
         self.arm.mem_write(PACKET, bytes(packet))
         self.arm.mem_write(EVENT, struct.pack("<II", 0x30, PACKET))
-        self.call_symbol("m10v_settings_controller_key" if controller==PAGE else "m10v_hdf_menu_key",
+        self.call_symbol("m10v_settings_controller_key" if controller in (PAGE,OWNER+0x13bc) else "m10v_hdf_menu_key",
                          controller, EVENT)
 
     def tap(self, x, y):
@@ -257,6 +267,18 @@ class FinalMenuHub(unittest.TestCase):
         self.tap(360, 265)
         self.assertEqual(self.routes[-1][:3], (PAGE, 0x0200F100, HUB))
 
+    def test_half_effect_opens_inside_hub_and_cancel_keeps_the_existing_value(self):
+        self.tap(560, 250)
+        self.tap(450, 365)
+        self.assertEqual(self.routes, [])
+        self.assertEqual(self.draws[-1][:2], (13, 0))
+        self.tap(450, 158)
+        self.assertEqual(self.draws[-1][:2], (13, 1))
+        self.tap(507, 439)
+        self.assertEqual(self.draws[-1][0], 7)
+        self.tap(450, 365)
+        self.assertEqual(self.draws[-1][:2], (13, 0))
+
     def test_physical_keys_focus_cards_in_screen_order(self):
         for key, expected in ((0xce,2),(0xcf,0),(0xcf,1),(0xcf,3),(0xcf,11),(0xce,3),(0xce,1)):
             self.arm.mem_write(EVENT, struct.pack("<I", key))
@@ -272,7 +294,7 @@ class FinalMenuHub(unittest.TestCase):
         self.assertEqual(size,720|(480<<16))
         return struct.unpack("<I", self.arm.mem_read(word_address*4+(y*720+x)*4,4))[0]
 
-    def test_installed_watermark_uses_owned_rounded_panel(self):
+    def test_installed_watermark_uses_flat_warm_focus(self):
         self.detail_widgets = True
         view, state = RAM+0x5200, RAM+0x5400
         self.assertEqual(self.call_symbol("m10v_settings_view_create", view), 0)
@@ -281,9 +303,31 @@ class FinalMenuHub(unittest.TestCase):
         widgets = struct.unpack("<47I", self.arm.mem_read(view, 47*4))
         self.assertEqual(self.icons[widgets[46]],859)
         self.assertEqual(self.rects[widgets[36]],(60,87,280,50))
-        self.assertNotEqual(self.pixels(33,85),self.pixels(80,85))
-        self.assertEqual(self.pixels(37,109),0xfff3b9c8)
+        self.assertEqual(self.pixels(33,85),self.pixels(80,85))
+        self.assertEqual(self.pixels(35,109),0xff7ac4ea)
         self.assertNotEqual(self.pixels(42,109),self.pixels(42,162))
+
+    def test_catalog_fn_opens_the_named_enabled_film_without_switching_routes(self):
+        state = RAM + 0x5000
+        self.call_symbol("m10v_library_init", state)
+        size, = struct.unpack("<H", self.arm.mem_read(state+6, 2))
+        self.library_state = bytes(self.arm.mem_read(state, size))
+        self.detail_widgets = True
+        films = 0x0200F100
+        catalog = self.call("factory", 0, films)
+        self.assertEqual(self.call("ready", catalog, films), 1)
+        self.call("enter", catalog, films, 0)
+        # The name of the second tile begins below its 128 px cover.
+        for kind in (1, 2, 10):
+            self.touch(kind, 185, 213, catalog)
+        self.arm.mem_write(PACKET, struct.pack("<II", 1, 1))
+        self.arm.mem_write(EVENT, struct.pack("<II", 0x1b, PACKET))
+        self.assertEqual(self.call("key", catalog, EVENT), 1)
+        self.assertEqual(self.detail_name, b"Leica Brass")
+        self.assertEqual(self.routes, [])
+        self.arm.mem_write(EVENT, struct.pack("<I", 0x89))
+        self.assertEqual(self.call("key", catalog, EVENT), 1)
+        self.assertEqual(self.closed_routes, [])
 
     def effect_screen(self, route):
         self.detail_widgets = self.effect_fixture = True
@@ -347,13 +391,13 @@ class FinalMenuHub(unittest.TestCase):
         self.draw_real_view = True
         self.view, paint = PAGE + 0x158, RAM + 0x5200
         self.arm.mem_write(self.view + 56 * 4, struct.pack("<I", 4))
-        self.arm.mem_write(paint, struct.pack("<9I", frame, 0xffffffff, patch, *([0]*6)))
+        self.arm.mem_write(paint, struct.pack("<10I", frame, 0xffffffff, patch, *([0]*7)))
         return self.call_symbol("m10v_settings_view_hub", self.view, paint)
 
     def test_approved_default_screens_match_native_blit_pixel_for_pixel(self):
         surface = RAM + 0x20000
         self.arm.mem_write(surface+0x18, struct.pack("<H",720))
-        for frame in (0,1,2,3,7,9,10,11,12):
+        for frame in (0,1,2,3,7,9,10,11,12,13,14):
             with self.subTest(frame=frame):
                 self.assertEqual(self.art(frame), 1)
                 directory = self.call_symbol("m10v_settings_view_hub_directory", self.view)

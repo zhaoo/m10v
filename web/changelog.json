@@ -2,6 +2,21 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.16.3",
+      "date": "2026-11-16",
+      "title": "GR III 机身菜单排版与胶卷设置",
+      "changes": [
+        "保留 m10v 大卡插画，调整文字间距并增加分页指示。效果和设置采用深色列表与暖金焦点，打赏页保留原有的支付宝和微信二维码。",
+        "胶卷库的两排封面向下居中。选中已启用的胶卷后，按 Fn 调整该卷的颗粒、颗粒尺寸和支持的光晕强度。",
+        "A/B 快速对比改名为滤镜快切。开启半格后，画幅显示 Half。XPan 始终可选。",
+        "GRemote 仍可通过原有 Half 开关选用半格。R4 和 R5 固件分别下载对应的菜单资源。"
+      ],
+      "notice": "适用于 GR III 2.10。半格开关在每次开机时默认为关。使用 R5 固件时，将配套的 R5 菜单资源放在 SD 卡的 M10V/MENU.M10。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.16.2",
       "date": "2026-11-16",
       "title": "GR III 机身 m10v 大卡菜单",
@@ -12,9 +27,9 @@
         "修复服务器 ARM 编译器生成的调试菜单构建依赖。"
       ],
       "notice": "适用于 GR III 2.10。R4 日志候选已通过用户真机验证（Build ID c124d8c3）。新版菜单在同时启用胶卷库、ISP 逐卷效果和调试模式时可用，需将 MENU.M10 放在 SD 卡的 M10V 目录。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "47a3fb656d9f62de9cc55d5fa88cc220e4d05aa9",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/43742589642"
     },
     {
       "version": "2026.11.16.1",

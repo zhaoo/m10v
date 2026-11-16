@@ -12,7 +12,7 @@ STOCK_CAPTIONS=bytes.fromhex('e3011901e1011b01e2011d01da011f01db012101dc012301e5
 STOCK_SLIDER=bytes.fromhex('0dc0a0e1f0d82de97c5705e3055445e304b04ce268d04de2003095e50060a0e10040a0e320300be55b7701eb9f7a01eb9811d6e5305904eb0afdffeb04408de50f30a0e300308de51420a0e30c208de5233ea0e310308de54020a0e314208de5c730a0e318308de50070a0e108408de50410a0e10820a0e32d30a0e354004be248c807eb093da0e30420a0e100308de50710a0e11e30a0e354004be258c807eb54004be20410a0e15dc807eb647196e554104be20700a0e19fc807eb5c400be50c00a0e37c0814eb0030a0e1d02f00e31b2345e30700a0e1002083e5042a0ce3044083e51a2345e3086083e564104be264300be55c390ce358200be51a3345e35c300be56efb07eb5c301be5040053e10300000a64004be20320a0e30010a0e133ff2fe120201be5003095e5030052e10100001a1cd04be2f0a89de8d1cb19eb')
 STOCK_LISTS={1404259372: '0200020102020203020402050206020d000e', 1404259056: '0200020102020203020402050206020d000e', 1404258836: '020202030204020502060207020c020d000e000f', 1404260112: '020202030204020502060207020c020d000f', 1404258956: '020202030204020502060207020d000e000f', 1404260432: '020202030204020502060207020c020d000e000f', 1404260364: '0200020102020203020402050206020d000e', 1404258988: '0200020102020203020402050206020d000e', 1404260332: '02000201020202030204020502060208020d000e', 1404259928: '02000201020202030204020502060209020d000e', 1404258768: '02000201020a0010', 1404258744: '0200020102020203020402050206020b020d000e', 1404258804: '02110200020102020203020402050206020d000e', 1404259428: '02110200020102020203020402050206020d000e', 1404259960: '0211020202030204020502060207020c020d000e000f', 1404259088: '0211020202030204020502060207020c020d000f', 1404260180: '0211020202030204020502060207020d000e000f', 1404260144: '0211020202030204020502060207020c020d000e000f', 1404260244: '02110200020102020203020402050206020d000e', 1404259868: '02110200020102020203020402050206020d000e', 1404260076: '021102000201020202030204020502060208020d000e', 1404259460: '021102000201020202030204020502060209020d000e', 1404258884: '021102000201020a0010', 1404260020: '02110200020102020203020402050206020b020d000e'}
 
-def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=False,universal_halation=False,per_film_effects=False):
+def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=False,universal_halation=False,per_film_effects=False,shared_lists=False):
  if type(native_grain)is not bool:raise ValueError("native grain capability must be boolean")
  detail_ids={variant:[id for id in ids if id!=21 or native_grain] for variant,ids in DETAIL_IDS.items()}
  if universal_halation:
@@ -34,7 +34,7 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=
  # Dynamic resolution returns this table or the untouched stock table.
  # Previously this was restricted to one 800T
 
- tables={}
+ tables,lists={},{}
  for variant,ids in detail_ids.items():
   table=bytearray(STOCK_TABLE)
   if appended_slots:table+=STOCK_TABLE[:80]
@@ -42,7 +42,10 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=
    a,n=struct.unpack_from('<II',table,i*8)
    raw=bytes.fromhex(STOCK_LISTS[a]);assert len(raw)==n*2
    if appended_slots:raw=b'';n=0
-   a=data(raw+bytes(sum(([0,x] for x in ids),[])),'detail '+variant+' list '+str(i))
+   raw+=bytes(sum(([0,x] for x in ids),[]))
+   if not shared_lists or raw not in lists:
+    lists[raw]=data(raw,'detail '+variant+' list '+str(i))
+   a=lists[raw]
    struct.pack_into('<II',table,i*8,a,n+len(ids))
   tables[variant]=data(table,'dynamic '+variant+' detail tables')
  table_address=tables['halo']

@@ -5,7 +5,8 @@
  * Backend load must provide a validated journal (including compiled defaults).
  * Backend install must recheck expected ID and commit before returning zero. */
 enum { M10V_SETTINGS_CLOSED, M10V_SETTINGS_FILMS, M10V_SETTINGS_CATALOG,
-       M10V_SETTINGS_STAMP, M10V_SETTINGS_VALUE, M10V_SETTINGS_NAME, M10V_SETTINGS_AB, M10V_SETTINGS_WATERMARK=9 };
+       M10V_SETTINGS_STAMP, M10V_SETTINGS_VALUE, M10V_SETTINGS_NAME, M10V_SETTINGS_AB, M10V_SETTINGS_WATERMARK=9,
+       M10V_SETTINGS_FILM_DETAIL=11 };
 enum { M10V_KEY_LEFT, M10V_KEY_RIGHT, M10V_KEY_UP, M10V_KEY_DOWN,
        M10V_KEY_OK, M10V_KEY_BACK, M10V_KEY_PREVIOUS, M10V_KEY_NEXT, M10V_KEY_DISP, M10V_KEY_CLEAN };
 enum { M10V_SETTINGS_NO_ERROR, M10V_SETTINGS_EMPTY, M10V_SETTINGS_CHANGED,
@@ -13,6 +14,7 @@ enum { M10V_SETTINGS_NO_ERROR, M10V_SETTINGS_EMPTY, M10V_SETTINGS_CHANGED,
 /* The catalog uses focus only to distinguish touch from the hardware cursor.
  * The selected directory index remains available for the next key press. */
 enum { M10V_CATALOG_TOUCH_FOCUS_HIDDEN=1 };
+enum { M10V_FILM_DETAIL_EDIT=0x100 };
 typedef struct {
  void *context;
  int (*load)(void *, m10v_library_state *);
@@ -28,6 +30,12 @@ typedef struct {
  m10v_library_state saved;
  uint32_t screen, focus, slot, index, expected, value, error, group;
 } m10v_settings;
+#if M10V_MENU_HUB
+static inline uint32_t m10v_film_detail_rows(const m10v_settings *s){
+ uint32_t film=s->saved.slots[s->slot].film;
+ return 2u+(M10V_UNIVERSAL_HALATION||m10v_800t_halation_film(film)||film==67);
+}
+#endif
 int m10v_settings_open(m10v_settings *,const m10v_settings_ops *,uint32_t screen);
 void m10v_settings_key(m10v_settings *,const m10v_settings_ops *,uint32_t key);
 int m10v_settings_catalog_tap(m10v_settings *,const m10v_settings_ops *,uint32_t index);
