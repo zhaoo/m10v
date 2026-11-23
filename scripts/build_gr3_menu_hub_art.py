@@ -62,8 +62,12 @@ MORE_CARDS = (
 
 def font_path():
     system_fonts = Path("/System/Library")
-    assets = system_fonts.glob("AssetsV2/com_apple_MobileAsset_Font7/*/AssetData/PingFang.ttc")
-    return next(iter(sorted(assets)), system_fonts / "Fonts/PingFang.ttc")
+    for version in (7, 8):
+        assets = sorted(system_fonts.glob(
+            f"AssetsV2/com_apple_MobileAsset_Font{version}/*/AssetData/PingFang.ttc"))
+        if assets:
+            return assets[0]
+    return system_fonts / "Fonts/PingFang.ttc"
 
 
 def pingfang(font):

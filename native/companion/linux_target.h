@@ -20,17 +20,24 @@ typedef struct {
  m10v_linux_target_config config;m10v_linux_target_transport io;
  uint32_t owner,context,wire,epoch,sequence,pending_command,pending_crc;
  uint64_t pending_since;
- uint8_t ready,failed,pending_id[16],pending_digest[32];
+ uint8_t ready,failed,pending_id[16],pending_digest[32],probe_phase;
  m10v_resident_message scratch;
+ struct m10v_linux_read_cache *reads;
+ uint8_t read_cached,extension_cached;
 } m10v_linux_target;
 /* Init performs RO discovery only. HELLO starts the first request write.
  * A nonempty mailbox is rejected: no automatic sequence or lease recovery. */
 int m10v_linux_target_init(m10v_linux_target*,const m10v_linux_target_config*,const m10v_linux_target_transport*);
 int m10v_linux_target_hello(m10v_linux_target*);
 int m10v_linux_target_exchange(void*,const m10v_backend_request*,m10v_backend_response*);
+/* Retain a completed read for its next caller while releasing the mailbox. */
+void m10v_linux_target_idle(m10v_linux_target*);
+#if M10V_ROLL_LINUX_SERVICE
+void m10v_linux_target_roll_tick(m10v_linux_target*, uint8_t *workspace);
+#endif
 /* open uses O_SYNC and separate RO/RW descriptors. Every actual mmap is RO
  * except bounded request publication. Coherency still needs device proof. */
-typedef struct {int read_fd,write_fd;uint32_t request,request_bytes;} m10v_linux_devmem;
+typedef struct {int read_fd,write_fd;uint32_t request,request_bytes,live,live_bytes;} m10v_linux_devmem;
 int m10v_linux_devmem_open(m10v_linux_devmem*,m10v_linux_target_transport*,uint64_t(*now_ms)(void*));
 void m10v_linux_devmem_close(m10v_linux_devmem*);
 #endif

@@ -15,7 +15,8 @@ export function settingsOwnerBytes(m,fallback){
   'camera controls owner regions differ');
  if(m.menu_hub){
   const h=m.menu_hub;
-  need(m.camera_model==='gr3'&&m.debug_mode===true&&h.route===0x0200f10a&&h.caption===1244&&h.owner_offset===0x6e00&&h.owner_bytes===0x74c0&&h.artwork_version===5,'menu hub owner differs');
+  const deviceRoll=m.roll_capture?.schema==='m10v-gr3-roll-capture/v1'&&m.flags?.includes('-DM10V_ROLL_NATIVE_DEVICE=1');
+  need(m.camera_model==='gr3'&&(m.debug_mode===true||deviceRoll)&&h.route===0x0200f10a&&h.caption===1244&&h.owner_offset===0x6e00&&h.owner_bytes===0x74c0&&h.artwork_version===5,'menu hub owner differs');
   return h.owner_bytes;
  }
  return m.torn_overlay?.enabled?0x6e00:0x6d00;

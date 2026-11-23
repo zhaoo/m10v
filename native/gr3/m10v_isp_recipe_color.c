@@ -330,6 +330,12 @@ int m10v_isp_frame_recipe_state(void *recipe,m10v_library_state *out){
 static int producer_mutating(m10v_isp_recipe_color *s){
  s->version=1;s->bytes=sizeof(*s);s->status=M10V_ISP_RECIPE_MUTATING;s->busy=0;s->selected_tone=0;s->magic=M10V_ISP_RECIPE_COLOR_MAGIC;return 0;
 }
+#if M10V_ROLL_NATIVE_DEVICE
+#include "m10v_roll_device.h"
+#define M10V_RENDER_PREVIEW(out,tone) m10v_camera_library_roll_preview((out),(tone))
+#else
+#define M10V_RENDER_PREVIEW(out,tone) m10v_camera_library_preview((out))
+#endif
 static int recipe_producer(void *recipe){
 #if M10V_ISP_RECIPE_COLOR_PRODUCER
 #if M10V_ISP_SHARED_HDF
@@ -350,16 +356,16 @@ static int recipe_producer(void *recipe){
      * helper only reads the already published owner cache: no FS/alloc/lock. */
     m10v_library_state state;
     if(m10v_camera_library_mutation_busy())return producer_mutating(s);
-    if(!m10v_camera_library_preview(&state))return 0;
-    if(state.reserved&510u)return producer_mutating(s);
     uintptr_t si=*(const uint32_t *)((const uint8_t *)recipe+0x44c8u);
     if(!config_ram(si,0x94c))return 0;
     uint32_t producer_tone=((const volatile uint8_t *)si)[0x77c];
+    if(!M10V_RENDER_PREVIEW(&state,producer_tone))return 0;
+    if(state.reserved&510u)return producer_mutating(s);
     m10v_isp_frame_identity_clear((uint32_t)si);
     if(!m10v_tone_valid(producer_tone))return 0;
     if(m10v_camera_library_mutation_busy())return producer_mutating(s);
     m10v_library_state verify;
-    if(!m10v_camera_library_preview(&verify)||verify.sequence!=state.sequence)return producer_mutating(s);
+    if(!M10V_RENDER_PREVIEW(&verify,producer_tone)||verify.sequence!=state.sequence||verify.crc!=state.crc)return producer_mutating(s);
     if(si!=*(const uint32_t *)((const uint8_t *)recipe+0x44c8u)||
        producer_tone!=((const volatile uint8_t *)si)[0x77c])return producer_mutating(s);
     if(!m10v_isp_frame_recipe_snapshot(recipe,&state))return 0;
@@ -664,7 +670,7 @@ int m10v_isp_frame_live_color(void *tuning,void *info){
 #endif
     uint32_t slot=m10v_tone_slot(tone);
     if(slot>=M10V_SLOT_COUNT)return 0;
-    m10v_library_state state;if(!m10v_camera_library_preview(&state))return 0;
+    m10v_library_state state;if(!M10V_RENDER_PREVIEW(&state,raw_tone))return 0;
     uint32_t film=state.slots[slot].film,exposure=(film==67||film==68)?state.effects[slot].film_exposure:0;
     if(M10V_CUSTOM(film)){
         m10v_isp_frame_target target;
@@ -703,7 +709,7 @@ void m10v_isp_frame_live_prepare(void *tuning,const void *info){
     uint32_t raw_slot=m10v_tone_slot(raw_tone);
     /* Clear the previous custom banks even when current UI tone is stock.
      * Raw stock frames remain entirely outside our base-neutralization route. */
-    if(raw_slot<M10V_SLOT_COUNT&&m10v_camera_library_preview(&state)&&state.slots[raw_slot].film>=33){
+    if(raw_slot<M10V_SLOT_COUNT&&M10V_RENDER_PREVIEW(&state,raw_tone)&&state.slots[raw_slot].film>=33){
         /* Original Live Make otherwise reuses already written frame banks.
          * Invalidate only its internal cached-tone byte; original Make restores
          * it from unmodified SI and reconstructs clean base parameters. */

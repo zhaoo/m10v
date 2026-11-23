@@ -7,7 +7,7 @@ import argparse,hashlib,json,os,re,secrets,shutil,struct,subprocess,tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 SOURCES=['auth.c','http_parser.c','json.c','operations.c','extensions.c','extensions_json.c','http_server.c','linux_io.c','linux_wifi.c','runtime.c','film_upload.c','../gr3/m10v_sd_library.c']
-HEADERS=['auth.h','http_parser.h','json.h','operations.h','extensions.h','http_server.h','linux_io.h','linux_wifi.h','generated_contract.h','film_upload.h','transaction.h','../gr3/m10v_sd_contract.h','../gr3/m10v_sd_library.h']
+HEADERS=['auth.h','http_parser.h','json.h','operations.h','extensions.h','http_server.h','roll_photo.h','../gr3/m10v_roll.h','linux_io.h','linux_wifi.h','generated_contract.h','film_upload.h','transaction.h','../gr3/m10v_sd_contract.h','../gr3/m10v_sd_library.h']
 def _hash(value):return hashlib.sha256(value).hexdigest()
 def _metadata(value):
  if type(value)is not str or not re.fullmatch('[a-f0-9]{64}',value):raise ValueError('expected lowercase SHA256 metadata')
@@ -55,7 +55,13 @@ def _stack_audit(elf,path,linker,frames):
   'm10v_companion_serve':{'m10v_linux_now_ms'},'write_all':{'m10v_linux_now_ms'},
   'm10v_linux_target_init':{'physical_read','bind'},'read_mem':{'physical_read'},
   'discover':{'physical_read'},'publish':{'physical_write','m10v_linux_now_ms'},
-  'receive':{'physical_read','m10v_linux_now_ms'},'m10v_linux_wifi_discover':{'wifi_query'}}
+  'receive':{'physical_read','m10v_linux_now_ms'},'m10v_linux_wifi_discover':{'wifi_query'},
+   'photo_read_exact':{'cached_read','live_file_read'} if 'live_lookup' in functions.values() else {'cached_read'},
+  'route_live':{'live_lookup','live_read'},
+  'route_rolls':{'index_latest','index_photos'},
+  'm10v_live_write_clip':{'live_file_write'},
+  'm10v_linux_live_sample':{'physical_read'},
+  'trace_live_state':{'physical_read'}}
  for line in assembly.splitlines():
   label=re.match(r'^[0-9a-f]+ <([^>]+)>:',line)
   if label:current=label.group(1);continue
@@ -77,6 +83,11 @@ def _stack_audit(elf,path,linker,frames):
    if count>=12:return 0
   return frames[name]+max([bound(child,trail+[name]) for child in graph.get(name,[])]+[0])
  maximum=bound('_start',[])
+ if 'diagnostic_signal' in frames:
+  # ARM EABI rt_sigframe is 880 bytes including ucontext's 512-byte
+  # coprocessor area. Reserve 896 for frame and alignment, then add the
+  # handler on top of the deepest interrupted userspace call chain.
+  maximum+=896+bound('diagnostic_signal',[])
  phoff=struct.unpack_from('<I',elf,28)[0];size,count=struct.unpack_from('<HH',elf,42)
  writable=0
  for index in range(count):
@@ -101,16 +112,19 @@ def _embedded_owner_identity(rom,manifest):
  flags=identity_flags(identity)
  features=component.get('extensions',{}).get('features',{})
  required={'ab','hdf','border','isp','zoom','aspect'}
- if not (required<=set(features)<=required|{'torn','wb'}) or any(type(v)is not bool for v in features.values()):raise ValueError('runtime owner extension layout differs')
+ if not (required<=set(features)<=required|{'torn','wb','roll','live'}) or any(type(v)is not bool for v in features.values()):raise ValueError('runtime owner extension layout differs')
  flags+=[f'-DM10V_COMPANION_EXT_{name.upper()}={int(features.get(name,False))}' for name in ['ab','hdf','border','isp','zoom','aspect','wb']]
  flags+=['-DM10V_COMPANION_RTOS_ONLY=1','-DM10V_LIVE_COLOR=1','-DM10V_APPENDED_SLOTS=1',f'-DM10V_TORN_ENABLED={int(features.get("torn",False))}']
+ if features.get('live'):flags+=['-DM10V_LIVE_NATIVE_DEVICE=1']
+ if features.get('roll'):flags+=['-DM10V_ROLL_NATIVE_DEVICE=1']
  for name,digest in component.get('sources',{}).items():
   if name.startswith('/') or '..' in Path(name).parts or _hash((ROOT/name).read_bytes())!=digest:raise ValueError('runtime owner source differs: '+name)
  compiler=os.environ.get('M10V_LLVM_CLANG') or shutil.which('clang')
  if not compiler:raise RuntimeError('Clang is required for embedded owner identity audit')
  with tempfile.TemporaryDirectory(prefix='m10v-owner-identity-') as private:
   private=Path(private);os.chmod(private,0o700);obj=private/'owner.o'
-  result=subprocess.run([compiler,*FLAGS,*flags,'-c',str(ROOT/'native/gr3/m10v_companion_owner.c'),'-o',str(obj)],capture_output=True)
+  owner_flags=['-Oz' if flag=='-Os' else flag for flag in FLAGS] if features.get('roll') else FLAGS
+  result=subprocess.run([compiler,*owner_flags,*flags,'-c',str(ROOT/'native/gr3/m10v_companion_owner.c'),'-o',str(obj)],capture_output=True)
   if result.returncode:raise ValueError('runtime owner identity audit compilation failed')
   elf=obj.read_bytes()
  shoff=struct.unpack_from('<I',elf,32)[0];entsize,count=struct.unpack_from('<HH',elf,46)
@@ -126,7 +140,8 @@ def _embedded_owner_identity(rom,manifest):
  first=symbols.get('m10v_companion_ui_storage_enter')
  object_base=component.get('symbols',{}).get('m10v_companion_ui_storage_enter')
  if not first or first[0]!=0 or first[3]!=2 or type(object_base)is not int:raise ValueError('runtime owner identity symbol layout differs')
- linked,exports=link_object(elf,object_base,manifest.get('symbols',{}),prefix='m10v_companion_ui_')
+ from scripts.build_gr3_companion_owner import ROLL_EXPORTS, LIVE_EXPORTS
+ linked,exports=link_object(elf,object_base,manifest.get('symbols',{}),prefix='m10v_companion_ui_',additional_exports=(ROLL_EXPORTS if features.get('roll') else ())+(LIVE_EXPORTS if features.get('live') else ()))
  base,length=component.get('base'),component.get('bytes')
  if type(base)is not int or type(length)is not int or not 0<length<65536 or base%128 or object_base<base or object_base+len(linked)>base+length or base<manifest['base'] or base+length>manifest['base']+manifest['code_bytes']:raise ValueError('runtime owner identity bounds differ')
  if any(component['symbols'].get(name)!=address or manifest.get('symbols',{}).get(name)!=address for name,address in exports.items()):raise ValueError('runtime owner identity symbol addresses differ')
@@ -140,7 +155,7 @@ def _embedded_owner_identity(rom,manifest):
    cursor=(cursor+row[8]-1)&~(row[8]-1);starts[index]=cursor;cursor+=row[5]
  readback={}
  for key,label in [('buildId','build'),('catalogHash','catalog'),('rendererHash','renderer')]:
-  symbol=symbols.get('.L__const.m10v_companion_ui_init.'+label)
+  symbol=symbols.get('m10v_'+label+'_identity' if features.get('roll') else '.L__const.m10v_companion_ui_init.'+label)
   if not symbol or symbol[1]!=32 or symbol[3]!=1 or symbol[2] not in starts:raise ValueError('runtime embedded identity constant is missing')
   value,size,section,_=symbol;address=starts[section]+value
   if value+size>sections[section][5] or address<object_base or address+32>object_base+len(linked):raise ValueError('runtime embedded identity constant bounds differ')
@@ -197,9 +212,11 @@ def _target_metadata(folder,catalog_hash,renderer_hash):
   window=rom[address-0x53000000:address-0x53000000+16]
   if len(window)!=16 or not any(window):raise ValueError('missing candidate ROM anchor')
   anchors.append(window)
- return identity,anchors,receipt['candidate_sha256']
+ features=component.get('extensions',{}).get('features',{})
+ return identity,anchors,receipt['candidate_sha256'],bool(features.get('roll')),bool(features.get('live'))
 
-def build_service(output,*,catalog_hash,renderer_hash,key=None,instance_id=None,candidate_dir=None,hotspot_pairing=False):
+def build_service(output,*,catalog_hash,renderer_hash,key=None,instance_id=None,candidate_dir=None,hotspot_pairing=False,diagnostics=False):
+ if type(diagnostics) is not bool:raise ValueError("diagnostics requires explicit boolean")
  catalog_hash=_metadata(catalog_hash);renderer_hash=_metadata(renderer_hash)
  target=_target_metadata(candidate_dir,catalog_hash,renderer_hash) if candidate_dir is not None else None
  if hotspot_pairing and (target is None or key is not None):raise ValueError("hotspot pairing requires a resident target and a boot-local key")
@@ -211,6 +228,14 @@ def build_service(output,*,catalog_hash,renderer_hash,key=None,instance_id=None,
  if not clang or not linker:raise RuntimeError('Clang and LLD are required')
  sources=SOURCES+(['linux_target.c','resident_bridge.c'] if target else [])
  headers=HEADERS+(['linux_target.h','resident_bridge.h','../gr3/m10v_companion_owner.h'] if target else [])
+ roll=bool(target and target[3])
+ live=bool(target and target[4])
+ if roll:
+  sources+=['linux_roll.c','roll_photo.c','../gr3/m10v_roll.c']
+  headers+=['linux_roll.h','roll_photo.h','../gr3/m10v_roll.h','../gr3/m10v_roll_recovery.h']
+ if live:
+  sources+=['linux_live.c','live_clip.c']
+  headers+=['linux_live.h','live_clip.h','../gr3/m10v_live_ingress.h']
  paths=[Path('native/companion')/name for name in sources+headers]+[Path('native/gr3/m10v_library.h'),Path('contracts/companion-v1.json'),Path('contracts/extensions-v1.json'),Path('scripts/build_companion_service.py')]
  source_fingerprint=_hash(json.dumps([[str(p),_hash((ROOT/p).read_bytes())] for p in paths],separators=(',',':')).encode())
  # Reject stale generated rules, including metadata-only contract changes.
@@ -226,40 +251,109 @@ static const m10v_companion_backend backend={0,unavailable};
 __attribute__((noreturn))void _start(void){int result=m10v_companion_serve(&config,&backend);register unsigned r0 __asm__("r0")=(unsigned)result,r7 __asm__("r7")=1;__asm__ volatile("svc 0"::"r"(r0),"r"(r7):"memory");for(;;){}}
 '''
  if target:
-  identity,anchors,candidate_sha=target
+  identity,anchors,candidate_sha,roll,live=target
   main='''#include "linux_io.h"
 #include "linux_target.h"
 static m10v_linux_target target;
 static m10v_linux_devmem memory;
 static m10v_linux_target_transport transport;
+#if M10V_COMPANION_LIVE_SOURCE
+#include "linux_live.h"
+#endif
+#if M10V_ROLL_LINUX_SERVICE
+#include "linux_roll.h"
+void m10v_linux_roll_tick_workspace(uint8_t *workspace){m10v_linux_target_roll_tick(&target,workspace);}
+#endif
 static m10v_linux_target_config target_config={.build=BUILD,.catalog=CATALOG,.renderer=RENDERER,.rom=ANCHORS,.timeout_ms=3000};
 static unsigned boot_used;
-static void stage(const char*p){unsigned n=0;while(p[n])n++;register unsigned r0 __asm__("r0")=1,r1 __asm__("r1")=(unsigned)(uintptr_t)p,r2 __asm__("r2")=n,r7 __asm__("r7")=4;__asm__ volatile("svc 0":"+r"(r0):"r"(r1),"r"(r2),"r"(r7):"memory","cc");}
+static void stage(const char*p){
+#if !M10V_COMPANION_DIAGNOSTICS
+ (void)p;
+#elif M10V_COMPANION_LIVE_SOURCE
+ m10v_linux_trace(p,0,0);
+#else
+ unsigned n=0;while(p[n])n++;register unsigned r0 __asm__("r0")=1,r1 __asm__("r1")=(unsigned)(uintptr_t)p,r2 __asm__("r2")=n,r7 __asm__("r7")=4;__asm__ volatile("svc 0":"+r"(r0):"r"(r1),"r"(r2),"r"(r7):"memory","cc");
+#endif
+}
 static int seeded_random(void*c,uint8_t*out,uint32_t n){(void)c;if(!boot_used){if(n!=16)return 0;for(unsigned i=0;i<16;i++)out[i]=target_config.nonce[i];boot_used=1;return 1;}return m10v_linux_random(0,out,n);}
-static m10v_companion_server_config config={.key=KEY,.instance_id=INSTANCE,.build_id=BUILD,.catalog_hash=CATALOG,.renderer_hash=RENDERER,.key_id="KEYID",.random=seeded_random,.now_ms=m10v_linux_now_ms,.operation_timeout_ms=3000,.read_state=1,.write_state=1,.hotspot_pairing=HOTSPOT};
+static m10v_companion_server_config config={.key=KEY,.instance_id=INSTANCE,.build_id=BUILD,.catalog_hash=CATALOG,.renderer_hash=RENDERER,.key_id="KEYID",.random=seeded_random,.now_ms=m10v_linux_now_ms,.operation_timeout_ms=3000,.read_state=1,.write_state=1,.hotspot_pairing=HOTSPOT
+#if M10V_COMPANION_LIVE_SOURCE
+,.live=&m10v_linux_live_source
+#endif
+#if M10V_ROLL_LINUX_SERVICE
+,.rolls=&m10v_linux_roll_index_source
+#endif
+};
 static const m10v_companion_backend backend={&target,m10v_linux_target_exchange};
 static int run(void){
  stage("M10V_START\\n");
- if(!m10v_linux_random(0,target_config.nonce,16)||!m10v_linux_devmem_open(&memory,&transport,m10v_linux_now_ms))return 1;
+ if(!m10v_linux_random(0,target_config.nonce,16)){stage("RANDOM_OPEN_FAILED\\n");return 1;}
+ if(!m10v_linux_devmem_open(&memory,&transport,m10v_linux_now_ms)){stage("MEMORY_OPEN_FAILED\\n");return 1;}
  stage("MEMORY_OPEN\\n");
- int code=1;for(unsigned i=0;i<160;i++){code=m10v_linux_target_init(&target,&target_config,&transport);if(!code)break;if(!m10v_linux_pause_ms(50))goto done;}if(code)goto done;
+ int code=1;
+#if M10V_ROLL_LINUX_SERVICE
+ stage("OWNER_WAIT\\n");
+ /* Discovery is read-only. Playback/startup can precede AppMain by much
+  * longer than one SD loader attempt. Never retry after publishing HELLO. */
+ unsigned previous=0;
+ while((code=m10v_linux_target_init(&target,&target_config,&transport))!=0){
+  if(target.probe_phase!=previous){
+   static const char *const stages[]={"DISCOVERY_CONFIG","DISCOVERY_ROM","DISCOVERY_APPMAIN",
+     "DISCOVERY_DESCRIPTOR","DISCOVERY_WIRE","DISCOVERY_RECHECK","DISCOVERY_MAILBOX","DISCOVERY_BIND"};
+   previous=target.probe_phase;
+   if(previous<sizeof(stages)/sizeof(stages[0])){stage(stages[previous]);stage("\\n");}
+  }
+  if(!m10v_linux_pause_ms(250))goto done;
+ }
+#else
+ for(unsigned i=0;i<160;i++){code=m10v_linux_target_init(&target,&target_config,&transport);if(!code)break;if(!m10v_linux_pause_ms(50))goto done;}if(code)goto done;
+#endif
  stage("OWNER_FOUND\\n");
- for(unsigned i=0;i<160;i++){code=m10v_linux_target_hello(&target);if(!code)break;if(code!=M10V_ERROR_BUSY||!m10v_linux_pause_ms(50))goto done;}
- if(code)goto done;
+ stage("HELLO_ENTER\\n");
+ for(unsigned i=0;i<160;i++){code=m10v_linux_target_hello(&target);if(!code)break;if(code!=M10V_ERROR_BUSY||!m10v_linux_pause_ms(50))break;}
+ if(code){stage("HELLO_FAILED\\n");goto done;}
  stage("HELLO_OK\\n");
+#if M10V_ROLL_LINUX_SERVICE
+ m10v_linux_roll_idle();
+ stage("OFFLINE_TICKED\\n");
+#endif
  /* The camera can enable Wi-Fi long after startup. Keep the same boot owner
   * and wait for its AP instead of exiting with the per-boot launch lock held. */
  while(!m10v_linux_prepare_wifi(&config)){
+#if M10V_ROLL_LINUX_SERVICE
+  m10v_linux_roll_idle();
+#endif
+#if M10V_ROLL_LINUX_SERVICE
+  for(unsigned i=0;i<14;i++){
+   if(!m10v_linux_pause_ms(35)){code=1;goto done;}
+   m10v_linux_roll_idle();
+  }
+#else
   if(!m10v_linux_pause_ms(500)){code=1;goto done;}
+#endif
  }
- stage("WIFI_OK\\n");code=m10v_companion_serve(&config,&backend);
+ stage("WIFI_OK\\n");boot_used=0;code=m10v_companion_serve(&config,&backend);
  done:m10v_linux_devmem_close(&memory);return code;
 }
-__attribute__((noreturn))void _start(void){int result=run();register unsigned r0 __asm__("r0")=(unsigned)result,r7 __asm__("r7")=1;__asm__ volatile("svc 0"::"r"(r0),"r"(r7):"memory");for(;;){}}
+__attribute__((noreturn))void _start(void){
+ int result;
+#if M10V_COMPANION_LIVE_SOURCE
+ m10v_linux_diagnostics_start();
+ stage("R16_ELF_ENTRY\\n");
+ stage("ROLL_WORKER\\n");
+ result=run();
+ stage("ROLL_WORKER_STOP\\n");
+#else
+ result=run();
+#endif
+ register unsigned r0 __asm__("r0")=(unsigned)result,r7 __asm__("r7")=1;__asm__ volatile("svc 0"::"r"(r0),"r"(r7):"memory");for(;;){}}
 '''
   main=main.replace('ANCHORS','{'+','.join(array(x) for x in anchors)+'}').replace('HOTSPOT',str(int(hotspot_pairing)))
  for token,value in [('KEYID','' if hotspot_pairing else key_id),('KEY',array(bytes(32) if hotspot_pairing else key)),('INSTANCE',array(instance_id)),('BUILD',array(bytes.fromhex(target[0]['buildId'] if target else source_fingerprint))),('CATALOG',array(bytes.fromhex(catalog_hash))),('RENDERER',array(bytes.fromhex(renderer_hash)))]:main=main.replace(token,value)
  flags=['--target=armv7-none-eabi','-mcpu=cortex-a9','-marm','-mfloat-abi=soft','-Os','-std=c11','-ffreestanding','-fno-builtin','-fno-stack-protector','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-ffunction-sections','-fdata-sections','-fno-vectorize','-fno-slp-vectorize','-Wall','-Wextra','-Werror','-fstack-usage','-I',str(ROOT/'native/companion')]
+ flags += [f'-DM10V_COMPANION_DIAGNOSTICS={int(diagnostics)}']
+ if roll:flags+=['-DM10V_ROLL_LINUX_SERVICE=1']
+ if live:flags+=['-DM10V_COMPANION_LIVE_SOURCE=1']
  stack={}
  with tempfile.TemporaryDirectory(prefix='m10v-companion-build-') as private:
   private=Path(private);os.chmod(private,0o700);(private/'main.c').write_text(main);os.chmod(private/'main.c',0o600);objects=[]
@@ -280,7 +374,7 @@ __attribute__((noreturn))void _start(void){int result=run();register unsigned r0
  pairing={'schema':'m10v.companion-pairing/v1','protocol':1,'model':'GR III','instanceId':instance_id.hex(),'keyId':key_id,'keyHex':key.hex()}
  if not hotspot_pairing:
   pair=output/'pairing.json';pair.write_text(json.dumps(pairing,indent=2)+'\n');os.chmod(pair,0o600)
- receipt={'schema':'m10v-companion-service/v1','buildId':source_fingerprint[:24],'sourceFingerprint':source_fingerprint,'serviceSha256':_hash(elf_path.read_bytes()),'catalogHash':catalog_hash,'rendererHash':renderer_hash,'registrySha256':_hash((ROOT/'contracts/companion-v1.json').read_bytes()),'installable':False,'listenEnabled':False,'cameraPassed':False,'capabilities':{'readState':False,'writeState':False,'uploadFilm':False,'captureEvidence':False},'linuxAbiEvidence':'compile-only','reason':'residentOwnerCacheAndWifiInterfaceUnproven','functionStackBytes':stack,'stackAllowanceBytes':4096,'reachableStackBoundBytes':stack_bound,'stagingStaticBytes':staging_bytes}
+ receipt={'schema':'m10v-companion-service/v1','buildId':source_fingerprint[:24],'sourceFingerprint':source_fingerprint,'serviceSha256':_hash(elf_path.read_bytes()),'catalogHash':catalog_hash,'rendererHash':renderer_hash,'registrySha256':_hash((ROOT/'contracts/companion-v1.json').read_bytes()),'installable':False,'listenEnabled':False,'cameraPassed':False,'capabilities':{'readState':False,'writeState':False,'uploadFilm':False,'captureEvidence':False},'linuxAbiEvidence':'compile-only','reason':'residentOwnerCacheAndWifiInterfaceUnproven','functionStackBytes':stack,'stackAllowanceBytes':4096,'reachableStackBoundBytes':stack_bound,'stagingStaticBytes':staging_bytes,'diagnosticsEnabled':diagnostics,'liveEnabled':live}
  if target:receipt.update({'buildId':target[0]['buildId'],'firmwareSha256':target[2],'installable':True,'reason':'debugCandidateRequiresDeviceValidation','listenPolicy':'residentHelloAndVerifiedWifi','capabilities':{'readState':True,'writeState':True,'uploadFilm':False,'captureEvidence':False}})
  if hotspot_pairing:receipt['pairingPolicy']='camera-hotspot-per-boot'
  (output/'service-receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')

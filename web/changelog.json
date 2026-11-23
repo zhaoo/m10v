@@ -2,6 +2,21 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.23.1",
+      "date": "2026-11-23",
+      "title": "GR III 机内胶卷正式包与 GRemote 1.2.15",
+      "changes": [
+        "发布 GR III 2.10 机内胶卷模式：离线开卷、拍摄计数、滤镜锁定、收卷与 App 归档读取，保留 JPEG 与 RAW 独立归卷。",
+        "保留连接、对焦和相机设置的修复，调整 JPEG 卷标记和 HDF 本张拍摄参数绑定。",
+        "Live 暂不可用：正式完整包关闭采集、缓存分配和接口；历史文件与配置保留。",
+        "正式完整包默认关闭排障日志，配套 GRemote 1.2.15 正式签名 Android APK；相册及胶卷支持单张、多选和 JPG／RAW／RAW+JPG 下载。"
+      ],
+      "notice": "正式包适用于 GR III 官方 2.10 基线，需要配套更新固件、SD 服务及 App。机身胶卷与连接沿用用户反馈范围；本次关闭 Live 的正式产物完成离线验证，不扩大真机性能或其他机型兼容性结论。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.16.3",
       "date": "2026-11-16",
       "title": "GR III 机身菜单排版与胶卷设置",
@@ -12,9 +27,9 @@
         "GRemote 仍可通过原有 Half 开关选用半格。R4 和 R5 固件分别下载对应的菜单资源。"
       ],
       "notice": "适用于 GR III 2.10。半格开关在每次开机时默认为关。使用 R5 固件时，将配套的 R5 菜单资源放在 SD 卡的 M10V/MENU.M10。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "7dbfffcddbcba7664712a22f5cfd9bf1346ba693",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/43809277322"
     },
     {
       "version": "2026.11.16.2",

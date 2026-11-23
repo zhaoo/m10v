@@ -14,6 +14,7 @@ enum { M10V_SETTINGS_NO_ERROR, M10V_SETTINGS_EMPTY, M10V_SETTINGS_CHANGED,
 /* The catalog uses focus only to distinguish touch from the hardware cursor.
  * The selected directory index remains available for the next key press. */
 enum { M10V_CATALOG_TOUCH_FOCUS_HIDDEN=1 };
+enum { M10V_ROLL_CATALOG_MODE=0x7243 };
 enum { M10V_FILM_DETAIL_EDIT=0x100 };
 typedef struct {
  void *context;

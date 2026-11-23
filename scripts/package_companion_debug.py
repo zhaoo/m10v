@@ -13,7 +13,9 @@ def _extension_info(native):
  need(isinstance(marker,dict) and marker.get('schema')=='m10v.extensions/v1','extension schema differs')
  need(type(marker.get('available'))is int and 0<=marker['available']<(1<<29),'extension availability differs')
  features=marker.get('features');required={'ab','hdf','border','isp','zoom','aspect'}
- need(isinstance(features,dict) and required<=set(features)<=required|{'torn','wb'} and all(type(v)is bool for v in features.values()),'extension features differ')
+ # Roll and Live describe capture services, not additional extension fields.
+ # Accept their pinned flags without changing the extensions-v1 field mask.
+ need(isinstance(features,dict) and required<=set(features)<=required|{'torn','wb','roll','live'} and all(type(v)is bool for v in features.values()),'extension features differ')
  expected=(31<<12)|(7 if features['ab']else 0)|(1<<3 if features['hdf']else 0)|(1<<4 if features['border']else 0)|(((1<<12)-(1<<5))|(7<<21) if features['isp']else 0)|(7<<17 if features['zoom']else 0)|(1<<20 if features['aspect']else 0)|(1<<24 if features.get('torn')else 0)|(15<<25 if features.get('wb')else 0)
  need(marker['available']==expected,'extension availability differs from installed features')
  need(marker.get('powerImages')=='firmwareBuildOnly','extension power images boundary differs')

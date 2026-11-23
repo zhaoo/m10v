@@ -1,4 +1,4 @@
-import {companionNativeSources} from './gr3-companion-owner.mjs';
+import {companionNativeSources,companionRollSources,companionLiveSources} from './gr3-companion-owner.mjs';
 import {FILM_DIRECTORY} from './gr3-film-directory.mjs';
 import {MAX_NATIVE_RTOS_GROWTH} from './gr3-native-budget.mjs';
 // M10V's original runtime is injected into the exact official GR III source.
@@ -88,8 +88,10 @@ export const pureIspEffectSources=[
  'scripts/build_gr3_isp_effect_render.py','scripts/build_gr3_isp_effect_resize_status.py',
  'scripts/build_gr3_isp_effect_textures.py'];
 export const filmImprintSources=['scripts/build_gr3_film_imprints.py','scripts/render_film_imprint_assets.mjs','web/shared/film-imprints.mjs',...Array.from({length:7},(_,i)=>`native/gr3/film-imprints/${i+1}.png`),...['025','001','004','007'].map(id=>`native/gr3/film-imprints/pokemon/${id}.png`)];
-const menuHubSources=['native/gr3/m10v_menu_hub_view.inc','native/gr3/m10v_menu_detail_style.h'];
-export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/gr3_target_relocations.py','node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...leicaSources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources,...filmImprintSources,...cameraExtensionSources,...rawDevelopmentSources,...tornOverlaySources,...menuHubSources,'native/companion/runtime.c'].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
+const menuHubSources=['native/gr3/m10v_menu_hub_view.inc','native/gr3/m10v_menu_detail_style.h','native/gr3/m10v_roll.h','native/gr3/m10v_roll_device.h'];
+const rollCaptureSources=['native/gr3/m10v_roll_capture.c','native/gr3/m10v_roll_capture.h',
+ 'native/gr3/m10v_roll_save.c','native/gr3/m10v_roll_save.h','native/gr3/m10v_roll_camera_capture.c','scripts/build_gr3_roll_capture.py'];
+export function nativeSourceFingerprint(){return sha(JSON.stringify(['scripts/gr3_target_relocations.py','node/gr3-native-source.mjs','scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c',...sources,...leicaSources,...sdSources,...textureSources,...saveChainSources,...nativeColorSources,...nativeGrainSources,...viewDeferredSources,...borderSources,...halfPairSources,...pureIspEffectSources,...filmImprintSources,...cameraExtensionSources,...rawDevelopmentSources,...tornOverlaySources,...menuHubSources,...rollCaptureSources,...companionLiveSources,'native/gr3/m10v_live_camera.c','native/companion/runtime.c'].map(name=>[name,sha(readFileSync(new URL('../'+name,import.meta.url)))])));}
 export function validateFilmImprintAssets(runtime,m){
  const p=m.pure_isp_effects,imprint=p?.imprint;if(imprint===undefined)return;
  const fail=(v,s)=>need(v,'pure ISP imprint: '+s),a=imprint.assets,manifest=a?.manifest;
@@ -244,6 +246,10 @@ function checkRuntime(runtime, manifest) {
   need(manifest.film_count === (leica?114:110) && manifest.slots === 10 && Array.isArray(manifest.dependencies) &&
     manifest.dependencies.length === 0 && !runtime.includes(Buffer.from('GRLIFE')), 'native runtime provenance differs');
   const expectedSources=[...new Set([...(manifest.appended_slots?['scripts/build_gr3_film_slot_extension.py','native/gr3/m10v_tone_menu.c']:[]),...sources,...leicaSources,...(manifest.raw_development?rawDevelopmentSources:[]),...(manifest.adj_extra?cameraExtensionSources:[]),...(manifest.sd_library?sdSources:[]),...(manifest.experimental_capture?.texture_neon?textureSources:[]),...(manifest.capture_lifecycle?.module_dispatch?saveChainSources:[]),...(manifest.experimental_capture?.native_color?nativeColorSources:[]),...(manifest.experimental_capture?.native_grain?nativeGrainSources:[]),...(manifest.capture_lifecycle?.view_deferred?viewDeferredSources:[]),...(manifest.border?.enabled?borderSources:[]),...(manifest.half_pair?.enabled?halfPairSources:[]),...(manifest.pure_isp_effects?.enabled?pureIspEffectSources:[]),...(manifest.pure_isp_effects?.imprint?filmImprintSources:[]),...(manifest.companion?companionNativeSources:[]),...(manifest.torn_overlay?.enabled?tornOverlaySources:[])])];
+  if(manifest.roll_capture)expectedSources.push(...rollCaptureSources.filter(name=>!expectedSources.includes(name)));
+  if(manifest.companion?.extensions?.features?.roll)expectedSources.push(...companionRollSources.filter(name=>!expectedSources.includes(name)));
+  if(manifest.companion?.extensions?.features?.live)expectedSources.push(...companionLiveSources,'native/gr3/m10v_live_camera.c');
+  rollCapturePatches(runtime,manifest);
   borderPatches(runtime,manifest);
   halfPairIipPatches(runtime,manifest);
   pureIspEffectPatches(runtime,manifest);
@@ -265,7 +271,7 @@ function checkRuntime(runtime, manifest) {
    }
   }
   if(manifest.menu_hub){
-   expectedSources.push(...menuHubSources);
+   expectedSources.push(...menuHubSources.filter(name=>!expectedSources.includes(name)));
    if(!manifest.companion)expectedSources.push('native/companion/runtime.c');
   }
   need(Object.keys(manifest.sources || {}).sort().join('|') === [...expectedSources].sort().join('|'), 'native source inventory differs');
@@ -776,6 +782,56 @@ function lifecyclePatches(manifest,runtime){
  }
  return expected;
 }
+export function rollCapturePatches(runtime,manifest) {
+ const roll=manifest.roll_capture;
+ const live=manifest.flags?.includes('-DM10V_LIVE_NATIVE_DEVICE=1')===true;
+ need(live===!!manifest.companion?.extensions?.features?.live&&
+      (live?roll?.live==='mono-nv12-192x128':!roll?.live),'invalid GR III Live ingress contract');
+ const rollbackSymbols=['m10v_roll_camera_insert_tag','m10v_roll_camera_write_tag','m10v_roll_device_capture_channel'];
+ const liveSymbols=['m10v_live_camera_display','m10v_live_camera_shutter','m10v_live_camera_insert_tag',
+  'm10v_live_camera_write_tag','m10v_live_device_camera','m10v_live_device_mode','m10v_live_device_set_mode'];
+ need(live?liveSymbols.every(name=>manifest.symbols?.[name]):!liveSymbols.some(name=>manifest.symbols?.[name]),'partial GR III Live ingress');
+ if(!roll){need(!rollbackSymbols.some(name=>manifest.symbols?.[name]),'partial GR III roll capture');return [];}
+ const inCode=(at,bytes=4)=>Number.isInteger(at)&&!(at&3)&&at>=manifest.base&&at+bytes<=manifest.base+runtime.length;
+ need(manifest.camera_model==='gr3'&&manifest.companion&&manifest.appended_slots?.photo_recipe?.setter&&
+  roll.schema==='m10v-gr3-roll-capture/v1'&&roll.camera_tested===false&&roll.scheduler_filesystem_calls===0&&
+  roll.rtos_sha256==='8a4eafcad2716e0b21e9909264e1242e534f0e39e05cba82a53546ceb4070b67'&&
+  Number.isInteger(roll.bytes)&&roll.bytes>0&&inCode(roll.base,roll.bytes)&&
+  sha(runtime.subarray(roll.base-manifest.base,roll.base-manifest.base+roll.bytes))===roll.sha256,
+  'invalid GR III roll capture contract');
+ for(const name of rollbackSymbols)need(inCode(manifest.symbols?.[name]),'missing GR III roll binding '+name);
+ if(live)for(const name of liveSymbols)need(inCode(manifest.symbols?.[name]),'missing GR III Live binding '+name);
+ const sites=[
+  [0x5351eaa0,0xe30d3440,'reserve',[0xe1a00001]],
+  [0x5350c438,0xeb067e3a,'group_start',[0xe1a00001,0xe1a01004],0x536abd28],
+  [0x53599708,0xebfffdf1,'writer_start',[0xe1a00004],0x53598ed4],
+  [0x5359970c,0xe5d43019,'writer_finish',[0xe1a00004]],
+  [0x53598f80,0xe0000005,'writer_phases',[0xe1a00006]],
+  [0x53694b90,0xe3500000,'output',[0xe1a03000,0xe1a00005,0xe1a02006,0xe1a01009]],
+  [0x53694c64,0xe12fff33,'group_finish',[0xe1a00002],0xe12fff13],
+  [0x5345a2c8,0xeb09aec3,'lcd_direct',[0xe1a00004,...(live?[0xe59d1108,0xe59d2114,0xe59d3140]:[])],0x536c5ddc],
+  [0x5345a3c0,0xeb09ae4f,'lcd_configured',[0xe1a00004,...(live?[0xe59d1108,0xe1a02006,0xe08a3006]:[])],0x536c5d04],
+ ];
+ need(roll.patches?.length===sites.length,'unexpected roll capture patch inventory');
+ return sites.map(([address,expected,name,args,target],i)=>{
+  const row=roll.patches[i],helper=roll.exports?.['m10v_roll_camera_'+name];
+  need(row.address===address&&row.expected===expected&&inCode(row.entry)&&inCode(helper)&&
+   manifest.symbols?.['m10v_roll_camera_'+name]===helper&&row.replacement===branch(address,row.entry),
+   'invalid GR III roll capture hook '+name);
+  const at=row.entry,next=address+4;
+  const words=[0xe92d5fff,0xe10fc000,0xeef1ea10,0xe92d5000,0xed2d0b20,0xed6d0b20,...args,
+   branch(at+(6+args.length)*4,helper,true),0xecfd0b20,0xecbd0b20,0xe8bd5000,
+   0xeee1ea10,0xe128f00c,0xe8bd5fff];
+  if(!target){words.push(expected,branch(at+(words.length+1)*4,next));}
+  else {
+   words.push(movw(14,next&65535),movw(14,next>>>16)|0x400000);
+   words.push(target===0xe12fff13?target:branch(at+words.length*4,target));
+  }
+  need(inCode(at,words.length*4)&&words.every((word,j)=>runtime.readUInt32LE(at-manifest.base+j*4)===(word>>>0)),
+   'GR III roll capture wrapper differs '+name);
+  return {address,expected,replacement:row.replacement,name:'roll capture '+name};
+ });
+}
 function appendedSlotPatches(runtime,manifest,raw) {
  const m=manifest.appended_slots;if(!m)return [];
  need(manifest.sd_library&&manifest.film_library_enabled!==false&&m.schema==='m10v-gr3-appended-slots/v2'&&
@@ -835,15 +891,27 @@ function appendedSlotPatches(runtime,manifest,raw) {
   const extra=[{address:0x53523984,expected:0xe3043270,replacement:movw(3,recipeWriter?0x4330:0x4280)},...[['pool_init',0x535239e4,branch(0x535239e4,0x5355e87c,true)],['checkout',0x53523e00,0xe5c12024],['return',0x53523a68,0xe5c32024]].map(([name,address,expected])=>({address,expected,replacement:branch(address,h[name])})),{address:0x53510830,expected:branch(0x53510830,0x5313fd80,true),replacement:branch(0x53510830,h.copy,true)},...[0x53608080,0x5361c0cc].map(address=>({address,expected:branch(address,0x535c780c,true),replacement:branch(address,h.writer,true)}))];
   if(recipeWriter){
    const insert=manifest.symbols.m10v_isp_frame_photo_recipe_insert;
+   const rollInsert=manifest.symbols.m10v_roll_camera_insert_tag,rollWrite=manifest.symbols.m10v_roll_camera_write_tag;
+   const liveInsert=manifest.symbols.m10v_live_camera_insert_tag,liveWrite=manifest.symbols.m10v_live_camera_write_tag;
+   need(!!rollInsert===!!rollWrite,'incomplete M10R MakerNote hooks');
+   if(rollInsert){read(rollInsert,4);read(rollWrite,4);}
+   if(liveInsert){read(liveInsert,4);read(liveWrite,4);}
    read(insert,4);read(recipeWriter,4);
    const verify=(entry,words)=>need(words.every((word,i)=>read(entry+i*4,4).readUInt32LE()===word>>>0),'photo recipe adapter instructions differ');
-   for(const [name,address] of [['jpg',0x53609564],['dng',0x535f9c00]]){
+   for(const [name,address] of [['jpg',0x53609564],['jpg_capture',0x53601ad0],['dng',0x535f9c00]]){
     const entry=recipe?.[name];
-    verify(entry,[0xe1a00006,0xe92d4010,branch(entry+8,insert,true),0xe8bd4010,0xe51b2028,branch(entry+20,address+4)]);
+    const jpgLive=!!liveInsert&&name!=='dng';
+    verify(entry,[0xe1a00006,0xe92d4010,branch(entry+8,insert,true),
+     ...(rollInsert?[0xe1a00006,branch(entry+16,rollInsert,true)]:[]),
+     ...(jpgLive?[0xe1a00006,branch(entry+(rollInsert?24:16),liveInsert,true)]:[]),
+     0xe8bd4010,0xe51b2028,branch(entry+20+(rollInsert?8:0)+(jpgLive?8:0),address+4)]);
     extra.push({address,expected:0xe51b2028,replacement:branch(address,entry)});
    }
    const entry=recipe?.setter,address=0x53606738;
-   verify(entry,[0xe1d1c0b4,movw(2,0xc7f1),0xe15c0002,branch(entry+12,recipeWriter)&0x0fffffff,0xe1a0c00d,branch(entry+20,address+4)]);
+   verify(entry,[0xe1d1c0b4,movw(2,0xc7f1),0xe15c0002,branch(entry+12,recipeWriter)&0x0fffffff,
+    ...(rollWrite?[movw(2,0xc7f2),0xe15c0002,branch(entry+24,rollWrite)&0x0fffffff]:[]),
+    ...(liveWrite?[movw(2,0xc7f3),0xe15c0002,branch(entry+(rollWrite?36:24),liveWrite)&0x0fffffff]:[]),
+    0xe1a0c00d,branch(entry+20+(rollWrite?12:0)+(liveWrite?12:0),address+4)]);
    extra.push({address,expected:0xe1a0c00d,replacement:branch(address,entry)});
   }
   patches.splice(patches.length-3,0,...extra);
@@ -1012,7 +1080,7 @@ function patchList(manifest,runtime) {
   need(rawEnabled===!!manifest.raw_development?.ingress&&rawEnabled===!!manifest.raw_development?.menu,'RAW development partial build');
   const ingress=rawIngressPatches(runtime,manifest);
   const appended=appendedSlotPatches(runtime,manifest).filter(p=>!ingress.some(raw=>p.address===raw.address));
-  return [...purePatches,...guidesPatches(runtime,manifest),...adjExtraPatches(runtime,manifest),...(manifest.half_pair?.enabled?[{address:0x531b6be4,expected:0xea026e6e,replacement:branch(0x531b6be4,manifest.symbols.m10v_half_pair_select),name:'Half pair explicit menu cancellation'}]:[]),...borderPatches(runtime,manifest),...halfPairIipPatches(runtime,manifest),...zoomPatches(runtime,manifest),...appended,...dialRecipePatches(manifest),...ingress,...rawMenuPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispBasePatches(manifest,runtime),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
+  return [...purePatches,...guidesPatches(runtime,manifest),...adjExtraPatches(runtime,manifest),...(manifest.half_pair?.enabled?[{address:0x531b6be4,expected:0xea026e6e,replacement:branch(0x531b6be4,manifest.symbols.m10v_half_pair_select),name:'Half pair explicit menu cancellation'}]:[]),...borderPatches(runtime,manifest),...halfPairIipPatches(runtime,manifest),...zoomPatches(runtime,manifest),...appended,...rollCapturePatches(runtime,manifest),...dialRecipePatches(manifest),...ingress,...rawMenuPatches(runtime,manifest),...abHooks,...hdfPatches(runtime,manifest),...hdfAdjPatches(runtime,manifest),...lifecyclePatches(manifest,runtime),...ispBasePatches(manifest,runtime),...(manifest.hdf_menu?hdfMenuPatches(runtime,manifest):settingsPatches(manifest)),...detailPatches,...iconPatches,...hooks.map(([address,expected,name,link])=>({address, expected,
     replacement:branch(address,manifest.symbols[name],link),name})),
     {address:0x533966d4,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum primary'},
     {address:0x533970ec,expected:0xe3003311,replacement:movw(3,manifest.resources.last_id),name:'resource maximum secondary'},

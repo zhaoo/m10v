@@ -143,11 +143,161 @@ static __attribute__((noinline)) int route_extensions(m10v_companion_server*s,co
  return route_upload(s,body,body_bytes);
 }
 
+#if defined(M10V_COMPANION_HOST_TEST) || M10V_COMPANION_LIVE_SOURCE
+static int path_char(char c){
+ return (c>='0'&&c<='9')||(c>='A'&&c<='Z')||(c>='a'&&c<='z')||c=='_'||c=='-';
+}
+static const char *live_segment(const char *path,char *out,unsigned limit){
+ unsigned used=0;
+ while(path_char(*path)){
+  if(used==limit)return 0;
+  out[used++]=*path++;
+ }
+ out[used]=0;
+ return used?path:0;
+}
+static int live_pair_valid(const m10v_live_pair *pair){
+ char stem[17];
+ if(pair->clip_directory[16]||pair->clip_file[22]||
+    !pair->bytes||pair->bytes>M10V_LIVE_HTTP_BYTES||pair->presentation_us>10000000u)return 0;
+ const char *dir=live_segment(pair->clip_directory,stem,16);
+ const char *ext=live_segment(pair->clip_file,stem,16);
+ if(!dir||*dir||!ext||!((pair->kind==1&&equal(ext,".M10L"))||
+    (pair->kind==2&&equal(ext,".MP4"))))return 0;
+ uint32_t jpeg=0,clip=0;
+ for(unsigned i=0;i<32;i++){jpeg|=pair->jpeg_sha256[i];clip|=pair->clip_sha256[i];}
+ return jpeg&&clip;
+}
+static void base64(writer *w,const uint8_t *bytes,unsigned count){
+ static const char alphabet[]="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+ for(unsigned at=0;at<count;at+=3){
+  unsigned remaining=count-at;
+  uint32_t value=(uint32_t)bytes[at]<<16;
+  if(remaining>=2)value|=(uint32_t)bytes[at+1]<<8;
+  if(remaining>=3)value|=bytes[at+2];
+  char chars[5]={alphabet[value>>18],alphabet[(value>>12)&63],
+    remaining>=2?alphabet[(value>>6)&63]:'=',remaining>=3?alphabet[value&63]:'=',0};
+  text(w,chars);
+ }
+}
+static __attribute__((noinline)) int route_live(m10v_companion_server *s,const char *path){
+ const m10v_live_source *source=s->config->live;
+ if(!source||!source->lookup||!source->read)return error(s,404,M10V_ERROR_RESULT_UNKNOWN);
+ char directory[17],file[22],ext[5];
+ const char *end=live_segment(path,directory,16);
+ if(!end||*end!='/')return error(s,400,M10V_ERROR_INVALID_RECIPE);
+ end=live_segment(end+1,file,16);
+ if(!end||*end!='/')return error(s,400,M10V_ERROR_INVALID_RECIPE);
+ end=live_segment(end+1,ext,4);
+ unsigned length=end?text_length(ext):0;
+ char uppercase[5]={0};
+ for(unsigned i=0;i<length;i++)uppercase[i]=(char)(ext[i]&~32);
+ if(!end||!(equal(uppercase,"JPG")||equal(uppercase,"JPEG")))
+  return error(s,400,M10V_ERROR_INVALID_RECIPE);
+ unsigned stem_length=text_length(file);
+ file[stem_length]='.';
+ copy(file+stem_length+1,ext,length+1);
+
+ uint32_t offset=0;
+ int chunk=*end!=0;
+ if(chunk){
+  const char part[]="/clip/";
+  for(unsigned i=0;i<sizeof(part)-1;i++){
+   if(*end++!=part[i])return error(s,400,M10V_ERROR_INVALID_RECIPE);
+  }
+  if(*end<'0'||*end>'9')return error(s,400,M10V_ERROR_INVALID_RECIPE);
+  for(;*end&&offset<=M10V_LIVE_HTTP_BYTES;end++){
+   if(*end<'0'||*end>'9')return error(s,400,M10V_ERROR_INVALID_RECIPE);
+   offset=offset*10u+(uint32_t)(*end-'0');
+  }
+  if(*end||offset>M10V_LIVE_HTTP_BYTES)return error(s,400,M10V_ERROR_INVALID_RECIPE);
+ }
+ m10v_live_pair pair={0};
+ int found=source->lookup(source->context,directory,file,&pair);
+ if(found==0)return error(s,404,M10V_ERROR_RESULT_UNKNOWN);
+ if(found!=1||!live_pair_valid(&pair))return error(s,503,M10V_ERROR_BRIDGE_UNAVAILABLE);
+ if(chunk){
+  if(offset>=pair.bytes)return error(s,400,M10V_ERROR_INVALID_RECIPE);
+  _Static_assert(M10V_LIVE_HTTP_CHUNK <= M10V_HTTP_MAX_BODY, "Live uses the empty request buffer");
+  uint8_t *data=s->input;
+  uint32_t bytes=pair.bytes-offset;
+  if(bytes>M10V_LIVE_HTTP_CHUNK)bytes=M10V_LIVE_HTTP_CHUNK;
+  if(source->read(source->context,&pair,offset,data,bytes)!=1)
+   return error(s,503,M10V_ERROR_BRIDGE_UNAVAILABLE);
+  writer w=begin(s,200);
+  text(&w,"{\"offset\":");number(&w,offset);
+  text(&w,",\"bytes\":");number(&w,pair.bytes);
+  text(&w,",\"data\":\"");base64(&w,data,bytes);text(&w,"\"}");
+  return finish(s,&w);
+ }
+ writer w=begin(s,200);
+ text(&w,"{\"version\":1,\"jpeg\":{\"directory\":");quoted(&w,directory);
+ text(&w,",\"file\":");quoted(&w,file);
+ text(&w,",\"sha256\":");hex(&w,pair.jpeg_sha256,32);
+ text(&w,"},\"clip\":{\"format\":");quoted(&w,pair.kind==1?"m10l":"mp4");
+ text(&w,",\"directory\":");quoted(&w,pair.clip_directory);
+ text(&w,",\"file\":");quoted(&w,pair.clip_file);
+ text(&w,",\"sha256\":");hex(&w,pair.clip_sha256,32);
+ text(&w,",\"bytes\":");number(&w,pair.bytes);
+ text(&w,"},\"presentationTimestampUs\":");number(&w,pair.presentation_us);
+ text(&w,"}");
+ return finish(s,&w);
+}
+
+#endif
+
+#if defined(M10V_COMPANION_HOST_TEST) || M10V_ROLL_LINUX_SERVICE
+static __attribute__((noinline)) int route_rolls(m10v_companion_server *s, const char *path) {
+ const m10v_roll_index_source *source=s->config->rolls;
+ if(!source||!source->latest||!source->photos)return error(s,404,M10V_ERROR_RESULT_UNKNOWN);
+ writer w;
+ if(equal(path,"latest")) {
+  m10v_roll_record roll={0};int found=source->latest(source->context,&roll);
+  if(found<0)return error(s,503,M10V_ERROR_BRIDGE_UNAVAILABLE);
+  w=begin(s,200);text(&w,"{\"version\":1,\"latest\":");
+  if(!found)text(&w,"null");
+  else {text(&w,"{\"id\":");hex(&w,roll.id,16);text(&w,",\"sequence\":");number(&w,roll.sequence);text(&w,",\"filmId\":");number(&w,roll.film);text(&w,",\"aspect\":");number(&w,roll.aspect);text(&w,",\"target\":");number(&w,roll.target);text(&w,",\"count\":");number(&w,roll.count);text(&w,",\"status\":");number(&w,roll.status);text(&w,"}");}
+  text(&w,"}");return finish(s,&w);
+ }
+ const char prefix[]="photos/";unsigned i=0;while(i<sizeof(prefix)-1&&path[i]==prefix[i])++i;
+ if(i!=sizeof(prefix)-1||!path[i])return error(s,400,M10V_ERROR_INVALID_RECIPE);
+ uint32_t cursor=0;unsigned digits=0;
+ while(path[i]){unsigned digit=(unsigned)(path[i++]-'0');if(digit>9||++digits>10||cursor>(UINT32_MAX-digit)/10)return error(s,400,M10V_ERROR_INVALID_RECIPE);cursor=cursor*10+digit;}
+ if(digits>1&&path[sizeof(prefix)-1]=='0')return error(s,400,M10V_ERROR_INVALID_RECIPE);
+ /* Authenticated GET has no body; reuse its exhausted input workspace. */
+ _Static_assert(sizeof(m10v_roll_index_page)<=M10V_HTTP_MAX_BODY,"roll page fits HTTP input");
+ m10v_roll_index_page *page=&s->roll_index_page;int found=source->photos(source->context,cursor,page);
+ if(found<0)return error(s,503,M10V_ERROR_BRIDGE_UNAVAILABLE);
+ if(!found)return error(s,409,M10V_ERROR_REVISION_CONFLICT);
+ if(page->count>M10V_ROLL_INDEX_PAGE)return error(s,503,M10V_ERROR_BRIDGE_UNAVAILABLE);
+ w=begin(s,200);text(&w,"{\"version\":1,\"nextCursor\":");number(&w,page->next_cursor);text(&w,",\"hasMore\":");text(&w,page->has_more?"true":"false");text(&w,",\"truncated\":");text(&w,page->truncated?"true":"false");text(&w,",\"checked\":");number(&w,page->checked);text(&w,",\"skipped\":");number(&w,page->skipped);text(&w,",\"photos\":[");
+ for(unsigned n=0;n<page->count;++n){const m10v_roll_index_photo *photo=&page->photos[n];if(n)text(&w,",");text(&w,"{\"id\":");hex(&w,photo->marker.id,16);text(&w,",\"frame\":");number(&w,photo->marker.frame);text(&w,",\"target\":");number(&w,photo->marker.target);text(&w,",\"filmCode\":");number(&w,photo->marker.film_code);text(&w,",\"directory\":");quoted(&w,photo->directory);text(&w,",\"file\":");quoted(&w,photo->file);text(&w,"}");}
+ text(&w,"]}");return finish(s,&w);
+}
+#endif
+
 static __attribute__((noinline)) int route_authenticated(m10v_companion_server*s,const uint8_t*body,uint32_t body_bytes){
  const char*method=s->request.method,*path=s->request.path;
+#if defined(M10V_COMPANION_HOST_TEST) || M10V_ROLL_LINUX_SERVICE
+ const char rolls_prefix[]="/m10v/v1/rolls/";unsigned rolls=0;
+ while(rolls<sizeof(rolls_prefix)-1&&path[rolls]==rolls_prefix[rolls])++rolls;
+ if(rolls==sizeof(rolls_prefix)-1&&equal(method,"GET")){
+  if(body_bytes)return error(s,400,M10V_ERROR_INVALID_RECIPE);
+  return route_rolls(s,path+rolls);
+ }
+#endif
+#if defined(M10V_COMPANION_HOST_TEST) || M10V_COMPANION_LIVE_SOURCE
+ const char live_prefix[]="/m10v/v1/live/";
+ unsigned live=0;
+ while(live<sizeof(live_prefix)-1&&path[live]==live_prefix[live])live++;
+ if(live==sizeof(live_prefix)-1&&equal(method,"GET")){
+  if(body_bytes)return error(s,400,M10V_ERROR_INVALID_RECIPE);
+  return route_live(s,path+live);
+ }
+#endif
  if(equal(method,"GET")&&equal(path,"/m10v/v1/capabilities")){
   writer w=begin(s,200);text(&w,"{\"protocol\":1,\"model\":\"GR III\",\"recipeSchema\":1,\"stateSchema\":2,\"slotCount\":10,\"firmwareIdentity\":\"d6a3c9c288d784080e7b283222ecdd8752adfeed6faa36dab44f73115354bfd4\",\"bootId\":");hex(&w,s->auth.boot,16);text(&w,",\"sessionId\":");quoted(&w,s->session);text(&w,",\"instanceId\":");hex(&w,s->config->instance_id,16);text(&w,",\"buildId\":");hex(&w,s->config->build_id,32);text(&w,",\"catalogHash\":");hex(&w,s->config->catalog_hash,32);text(&w,",\"rendererHash\":");hex(&w,s->config->renderer_hash,32);
-  text(&w,",\"capabilities\":{\"readState\":");text(&w,s->config->read_state?"true":"false");text(&w,",\"writeState\":");text(&w,s->config->write_state?"true":"false");text(&w,",\"uploadFilm\":");text(&w,s->config->upload_film?"true":"false");text(&w,",\"captureEvidence\":");text(&w,s->config->capture_evidence?"true":"false");text(&w,"},\"parameters\":");text(&w,M10V_PARAMETERS_JSON);text(&w,",\"readOnlyParameters\":");text(&w,M10V_READONLY_JSON);text(&w,",\"limits\":");text(&w,M10V_LIMITS_JSON);text(&w,"}");return finish(s,&w);
+  text(&w,",\"capabilities\":{\"readState\":");text(&w,s->config->read_state?"true":"false");text(&w,",\"writeState\":");text(&w,s->config->write_state?"true":"false");text(&w,",\"uploadFilm\":");text(&w,s->config->upload_film?"true":"false");text(&w,",\"captureEvidence\":");text(&w,s->config->capture_evidence?"true":"false");text(&w,",\"live\":");text(&w,s->config->live?"true":"false");text(&w,"},\"parameters\":");text(&w,M10V_PARAMETERS_JSON);text(&w,",\"readOnlyParameters\":");text(&w,M10V_READONLY_JSON);text(&w,",\"limits\":");text(&w,M10V_LIMITS_JSON);text(&w,"}");return finish(s,&w);
  }
  if(equal(method,"GET")&&equal(path,"/m10v/v1/state")){
   if(!s->config->read_state)return error(s,503,M10V_ERROR_BRIDGE_UNAVAILABLE);m10v_companion_snapshot snapshot;m10v_backend_request request={.command=M10V_BACKEND_READ_STATE};m10v_backend_response response={M10V_OPERATION_UNKNOWN,0,&snapshot};int code=s->backend.exchange(s->backend.ctx,&request,&response);if(code||!response.has_snapshot)return error(s,503,code?code:response.status==M10V_OPERATION_APPLYING?M10V_ERROR_BUSY:M10V_ERROR_BRIDGE_UNAVAILABLE);writer w=begin(s,200);snapshot_json(s,&w,&snapshot);return finish(s,&w);

@@ -69,7 +69,7 @@ typedef struct {uint8_t base[0x158];uint32_t widgets[WORDS],count,value,saved,er
 #endif
  uint32_t style;
 #if M10V_MENU_HUB
- uint32_t touch, touch_last, from_hub, first;
+ uint32_t touch, touch_last, from_hub;
 #endif
 } page;
 _Static_assert(offsetof(page,style)==0x1bc,"HDF style pointer must follow caches");
@@ -95,23 +95,25 @@ static int hub_effect_route(uint32_t route){
 static int menu_route(uint32_t route){return route==ROUTE||direct_border_route(route)||hub_effect_route(route);}
 static uint32_t ptr(const void *p){return (uint32_t)(uintptr_t)p;}
 static void caption(uint32_t w,uint32_t id){((fn3)0x53396f80u)(w,id,0);}
-static int make(page *p,uint32_t type,uint32_t x,uint32_t y,uint32_t width,uint32_t height){
- uint32_t w=((fn1)0x536af2a8u)(type==1||type==10?0xf8:type==11?0xf0:0x110);if(!w)return -1;
+static uint32_t widget(page *p,uint32_t type,uint32_t x,uint32_t y,uint32_t width,uint32_t height){
+ uint32_t w=((fn1)0x536af2a8u)(type==1||type==10?0xf8:type==11?0xf0:0x110);if(!w)return 0;
  uint32_t ctor=type==1?0x5339199c:type==10?0x5339a908:type==11?0x53393d84:0x53396944;
  ((uint32_t (*)(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t))ctor)(w,x,y,width,height);
- p->widgets[p->count++]=w;
  if(type!=1)((fn2)0x533aba64u)(p->widgets[0],w);
- return 0;
+ return w;
+}
+static int make(page *p,uint32_t type,uint32_t x,uint32_t y,uint32_t width,uint32_t height){
+ uint32_t w=widget(p,type,x,y,width,height);
+ if(!w)return -1;
+ p->widgets[p->count++]=w;return 0;
 }
 static void clear(page *p){
-#if !M10V_MENU_HUB
  if(p->style){
   uint32_t *w=(uint32_t *)(uintptr_t)p->style,n=0;
   while(n<STYLE_WORDS&&w[n])n++;
   ((fn3)0x5316cde8u)(0,p->style,n);
   ((fn1)0x536af2e4u)(p->style);p->style=0;
  }
-#endif
  ((fn3)0x5316cde8u)(0,ptr(p->widgets),p->count);
  for(uint32_t i=0;i<WORDS;i++)p->widgets[i]=0;p->count=0;
 }
@@ -166,6 +168,20 @@ static int imprint_save(page *p){
     !m10v_isp_effects_validate(&settings)||!m10v_isp_effects_set_imprint(&settings,p->value))return -1;
  return m10v_isp_effects_camera_save(ptr(p)-M10V_HDF_OWNER_OFFSET,&settings);
 }
+#if M10V_MENU_HUB
+static void make_imprint_rows(page *p){
+ uint32_t storage=((fn1)0x536af2a8u)(STYLE_WORDS*4);if(!storage)return;
+ uint32_t *rows=(uint32_t *)(uintptr_t)storage;
+ for(uint32_t i=0;i<STYLE_WORDS;i++){
+  rows[i]=widget(p,17,77,M10V_HUB_ROW_Y+1+i*M10V_HUB_IMPRINT_HEIGHT,620,M10V_HUB_IMPRINT_HEIGHT-3);
+  if(!rows[i]){
+   ((fn3)0x5316cde8u)(0,storage,i);((fn1)0x536af2e4u)(storage);return;
+  }
+  ((fn2)0x53396658u)(rows[i],1);
+ }
+ p->style=storage;
+}
+#endif
 static uint32_t root_rows(void){return (M10V_HDF_ENABLED?4u:3u)+M10V_TORN_ENABLED;}
 #if M10V_TORN_ENABLED
 static int torn_action(page *p,uint32_t action){
@@ -189,9 +205,7 @@ static void draw(page *p){
  uint32_t border=!p->root&&p->child;
 #if M10V_PURE_ISP_EFFECTS
  uint32_t imprint=!p->root&&p->child==IMPRINT_CHILD;
-#if M10V_MENU_HUB
- uint32_t first=imprint?p->first:0;
-#else
+#if !M10V_MENU_HUB
  uint32_t first=imprint?(p->value/4u)*4u:0u;
 #endif
  uint32_t root_first=p->root&&p->focus>=4u?p->focus-3u:0u;
@@ -223,7 +237,11 @@ static void draw(page *p){
   uint32_t row=p->root?root_first+i:i;
   if(p->root)visible=row<root_rows();
   if(!p->root&&p->child>=VIGNETTE_CHILD)visible=i<(p->child==VIGNETTE_STRENGTH?3u:2u);
+#if M10V_MENU_HUB
+  if(imprint)visible=0;
+#else
   if(imprint)visible=first+i<8u;
+#endif
 #endif
   ((fn2)0x533ad3c0u)(p->widgets[4+i],visible);
   uint32_t id=p->root?(M10V_HDF_ENABLED&&i==0?1141:1155):border?(i==0?972:i==1?1156:1157):972+i;
@@ -238,12 +256,16 @@ static void draw(page *p){
   if(!p->root&&p->child==VIGNETTE_CHILD)id=1215+i;
   if(!p->root&&p->child==VIGNETTE_SWITCH)id=i?1217:M10V_ISP_TEXT_OFF;
   if(!p->root&&p->child==VIGNETTE_STRENGTH)id=973+i;
+#if !M10V_MENU_HUB
   if(imprint)id=first+i?M10V_ISP_TEXT_IMPRINT_CATS+first+i-1u:M10V_ISP_TEXT_OFF;
+#endif
 #endif
   caption(p->widgets[4+i],id);
   uint32_t selected=p->root?p->focus==i:p->value==i;
 #if M10V_PURE_ISP_EFFECTS
+#if !M10V_MENU_HUB
   if(imprint)selected=p->value==first+i;
+#endif
   if(p->root)selected=p->focus==row;
 #endif
 #if M10V_MENU_HUB
@@ -254,7 +276,19 @@ static void draw(page *p){
 #endif
  }
 #if M10V_MENU_HUB
- (void)m10v_settings_view_theme(p->widgets[1],rows,active,confirm?2:1);
+ uint32_t theme=confirm?2:1;
+#if M10V_PURE_ISP_EFFECTS
+ uint32_t *options=(uint32_t *)(uintptr_t)p->style;
+ if(options)for(uint32_t i=0;i<STYLE_WORDS;i++){
+  ((fn2)0x533ad3c0u)(options[i],imprint);
+  if(imprint)caption(options[i],i?M10V_ISP_TEXT_IMPRINT_CATS+i-1u:M10V_ISP_TEXT_OFF);
+ }
+ if(imprint){
+  if(options){rows=STYLE_WORDS;active=p->value;theme=M10V_HUB_IMPRINT_THEME;}
+  else p->error=1;
+ }
+#endif
+ (void)m10v_settings_view_theme(p->widgets[1],rows,active,theme);
 #endif
 #else
  caption(p->widgets[2],p->root?1140:970);caption(p->widgets[3],p->root?941:971);
@@ -303,7 +337,7 @@ uint32_t m10v_hdf_menu_ready(page *p,uint32_t route){
  M10V_LOG(33,ptr(p),route,p->count,p->style);
  (void)route;p->error=0;p->root=M10V_HDF_GROUPED;
 #if M10V_MENU_HUB
- p->touch=p->first=0;p->from_hub=hub_effect_route(route);
+ p->touch=0;p->from_hub=hub_effect_route(route);
 #endif
 #if M10V_BORDER_ENABLED
  p->root=1;p->focus=0;p->child=0;
@@ -345,7 +379,10 @@ build_view:
 #if M10V_MENU_HUB
  for(uint32_t i=0;i<4;i++)((fn2)0x53396658u)(p->widgets[4+i],1);
 #endif
- if(make(p,17,20,384,680,30))goto fail;
+ if(make(p,17,20,M10V_MENU_HUB?420:384,M10V_MENU_HUB?520:680,30))goto fail;
+#if M10V_MENU_HUB && M10V_PURE_ISP_EFFECTS
+ make_imprint_rows(p);
+#endif
  uint32_t root=p->widgets[0],*v=(uint32_t *)(uintptr_t)*(uint32_t *)(uintptr_t)root;
  ((fn1)(uintptr_t)v[0x28/4])(root);((fn1)(uintptr_t)v[0x34/4])(root);M10V_LOG(34,ptr(p),7,1,p->count);return 1;
 fail:M10V_LOG(34,ptr(p),8,0,p->count);clear(p);return 0;
@@ -393,22 +430,18 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
    ex=*(const uint32_t *)(packet+0x30);ey=*(const uint32_t *)(packet+0x34);
   }
   if(ex>=720||ey>=480)return 1;
-  if(!p->root&&p->child==IMPRINT_CHILD&&ex+35>=x&&x+35>=ex&&(ey+48<=y||y+48<=ey)){
-   uint32_t first=ey<y?4:0;
-   if(first!=p->first){p->first=first;draw(p);}
-   return 1;
-  }
   if(ex+12<x||x+12<ex||ey+12<y||y+12<ey)return 1;
+  uint32_t imprint=!p->root&&p->child==IMPRINT_CHILD;
   if(x>=32&&x<77&&y>=18&&y<62)key=0x89;
-  else if(x>=33&&x<687&&y>=86&&y<298){
-   uint32_t row=(y-86)/53;
+  else if(x>=33&&x<687&&y>=M10V_HUB_ROW_Y&&y<(imprint?M10V_HUB_ROW_Y+STYLE_WORDS*M10V_HUB_IMPRINT_HEIGHT:298)){
+   if(imprint&&!p->style)return 1;
+   uint32_t row=(y-M10V_HUB_ROW_Y)/(imprint?M10V_HUB_IMPRINT_HEIGHT:M10V_HUB_ROW_HEIGHT);
    if(p->root){
     row+=p->focus>=4?p->focus-3:0;
     if(row>=root_rows())return 1;
     p->focus=row;
    }else{
     uint32_t limit=p->child==IMPRINT_CHILD?8:p->child==VIGNETTE_STRENGTH?3:p->child>=VIGNETTE_CHILD?2:p->child?3:4;
-    if(p->child==IMPRINT_CHILD)row+=p->first;
     if(row>=limit)return 1;
     p->value=row;
     if(p->child!=VIGNETTE_CHILD){draw(p);return 1;}
@@ -450,9 +483,6 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
 #endif
      p->error=1;draw(p);return 1;
     }
-#if M10V_MENU_HUB
-    p->first=p->value&~3u;
-#endif
    }else
 #endif
    if(p->child)p->value=p->saved=p->border.style;
@@ -524,7 +554,12 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
 #if M10V_BORDER_ENABLED
 #if M10V_PURE_ISP_EFFECTS
   if(p->child>=VIGNETTE_SWITCH)result=vignette_save(p);
-  else if(p->child==IMPRINT_CHILD)result=imprint_save(p);
+  else if(p->child==IMPRINT_CHILD){
+#if M10V_MENU_HUB
+   if(p->style)
+#endif
+   result=imprint_save(p);
+  }
   else
 #endif
   if(p->child){
@@ -581,9 +616,6 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
   }
  }else if(key==0x86||key==0x89||key==0xda){((fn1)0x5316ca28u)(ptr(p));return 1;}
  else return 0;
-#if M10V_MENU_HUB
- if(p->child==IMPRINT_CHILD)p->first=p->value&~3u;
-#endif
  draw(p);return 1;
 }
 #if M10V_DEBUG_MODE

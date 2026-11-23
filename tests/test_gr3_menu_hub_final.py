@@ -51,6 +51,7 @@ class FinalMenuHub(unittest.TestCase):
         self.arm.mem_write(0x55063910,struct.pack("<I",1))
         self.arm.mem_write(0x55063988,struct.pack("<I",OWNER))
         self.draws, self.routes = [], []
+        self.painted_roll_film = 0
         self.draw_real_view = False
         self.detail_widgets = False
         self.rects, self.colors, self.inks, self.captions, self.visibility = {}, {}, {}, {}, {}
@@ -141,6 +142,7 @@ class FinalMenuHub(unittest.TestCase):
                     return
                 pointer = arm.reg_read(A.UC_ARM_REG_R1)
                 self.draws.append(struct.unpack("<9I", arm.mem_read(pointer, 36)))
+                self.painted_roll_film, = struct.unpack("<I", arm.mem_read(pointer+44,4))
                 result = 1
             elif self.draw_real_view and address == 0x535847D8:
                 result = manager
@@ -169,7 +171,7 @@ class FinalMenuHub(unittest.TestCase):
                 result = FRAMEBUFFER
             elif self.draw_real_view and address == 0x536AF2A8:
                 result = HEAP
-            elif self.draw_real_view and address in (0x533AD3C0, 0x53396F80, 0x5339A9A0, 0x533AD308):
+            elif self.draw_real_view and address in (0x533AD3C0, 0x53396F80, 0x5339A9A0, 0x533AD308, 0x533AB548, 0x53390EF8):
                 pass
             elif address in callbacks:
                 callbacks[address](tuple(arm.reg_read(register) for register in
@@ -286,6 +288,37 @@ class FinalMenuHub(unittest.TestCase):
             self.assertEqual(self.draws[-1][0], expected)
         self.assertEqual(self.routes, [])
 
+    def test_r8_moves_selection_between_all_second_screen_cards(self):
+        filename = os.getenv("M10V_MENU_ROLL_ASSET")
+        if not filename:
+            self.skipTest("M10V_MENU_ROLL_ASSET is required")
+        self.file = Path(filename).read_bytes()
+        self.assertEqual(self.art(0), 1)
+        self.assertEqual(self.call_symbol("m10v_settings_view_hub_artwork", self.view), 8)
+
+        def framebuffer(x, y):
+            return struct.unpack("<I", self.arm.mem_read(HEAP+(y*720+x)*4,4))[0]
+
+        def key(code):
+            self.arm.mem_write(EVENT,struct.pack("<I",code))
+            self.call("key", PAGE, EVENT)
+
+        gold = 0xff7fd1ef
+        self.swipe(430,275)
+        self.assertEqual(framebuffer(39,220),gold)
+        self.assertNotEqual(framebuffer(360,152),gold)
+        self.assertNotEqual(framebuffer(488,220),gold)
+        key(0xcf)
+        self.assertNotEqual(framebuffer(39,220),gold)
+        self.assertEqual(framebuffer(360,152),gold)
+        key(0xcf)
+        self.assertNotEqual(framebuffer(360,152),gold)
+        self.assertEqual(framebuffer(488,220),gold)
+        self.tap(580,256)
+        offset, = struct.unpack_from("<I",self.file,16+12*16)
+        self.assertEqual(bytes(self.arm.mem_read(HEAP,720*480*4)),
+                         self.file[offset:offset+720*480*4])
+
     def pixels(self, x, y):
         directory = self.call("card_directory", 859)
         self.assertNotEqual(directory, 0)
@@ -338,6 +371,33 @@ class FinalMenuHub(unittest.TestCase):
         self.assertEqual(self.icons[widgets[1]],859)
         return controller,widgets
 
+    def test_roll_catalog_picks_a_late_film_without_editing_library(self):
+        filename = os.getenv("M10V_MENU_ROLL_ASSET")
+        if not filename:
+            self.skipTest("M10V_MENU_ROLL_ASSET is required")
+        self.file = Path(filename).read_bytes()
+        self.assertEqual(self.art(0),1)
+        self.draw_real_view = False
+        self.swipe(430,275)
+        self.tap(350,250)
+        self.tap(666,34)
+        self.tap(431,248)
+        films = 0x0200f100
+        self.assertEqual(self.routes[-1][1:3],(films,HUB))
+        state = RAM+0x5000
+        self.call_symbol("m10v_library_init",state)
+        size, = struct.unpack("<H",self.arm.mem_read(state+6,2))
+        self.library_state = bytes(self.arm.mem_read(state,size))
+        self.detail_widgets = True
+        catalog = self.call("factory",0,films)
+        self.assertEqual(self.call("ready",catalog,films),1)
+        for raw in (0xcf,0xcf,0xd8):
+            self.arm.mem_write(EVENT,struct.pack("<I",raw))
+            self.assertEqual(self.call("key",catalog,EVENT),1)
+        self.assertEqual(self.closed_routes[-1][0],catalog)
+        self.call("enter",PAGE,HUB,0)
+        self.assertEqual(self.painted_roll_film,333)
+
     def effect_gesture(self, controller, x, start, end):
         self.touch(1,x,start,controller)
         if start!=end:
@@ -345,17 +405,22 @@ class FinalMenuHub(unittest.TestCase):
         self.touch(2,x,end,controller)
         self.touch(10,x,end,controller)
 
-    def test_imprint_swipe_browses_without_saving_and_returns_to_hub(self):
+    def test_all_imprints_share_one_screen_and_save_the_last_row(self):
         controller, widgets = self.effect_screen(0x0200f112)
         self.assertEqual(self.captions[widgets[2]],1203)
-        self.assertEqual(self.captions[widgets[4]],1169)
+        options, = struct.unpack("<I",self.arm.mem_read(controller+0x1bc,4))
+        choices = struct.unpack("<8I",self.arm.mem_read(options,32))
+        self.assertEqual([self.captions[w] for w in choices],[1169,*range(1204,1211)])
+        self.assertEqual([self.rects[w][1] for w in choices],list(range(87,407,40)))
+        self.assertTrue(all(self.visibility[w] for w in choices))
+        self.assertFalse(any(self.visibility[w] for w in widgets[4:8]))
         self.effect_gesture(controller,160,244,110)
-        self.assertEqual(self.captions[widgets[4]],1207)
         self.assertEqual(self.saved_effects,[])
-        self.effect_gesture(controller,140,156,156)
+        self.assertTrue(all(self.visibility[w] for w in choices))
+        self.effect_gesture(controller,140,378,378)
         self.assertEqual(self.saved_effects,[])
         self.effect_gesture(controller,622,444,444)
-        self.assertEqual([v >> 7 & 7 for v in self.saved_effects],[5])
+        self.assertEqual([v >> 7 & 7 for v in self.saved_effects],[7])
         self.assertEqual(self.closed_routes[-1][0],controller)
         self.assertEqual(self.captions[widgets[2]],1203)
 
@@ -387,11 +452,11 @@ class FinalMenuHub(unittest.TestCase):
         self.assertEqual(struct.unpack("<4I",self.arm.mem_read(label+0x20,16)),(50,10,40,40))
         self.assertEqual(bytes(self.arm.mem_read(label+0xea,1)),b"\x1f")
 
-    def art(self, frame, patch=0):
+    def art(self, frame, patch=0, film=0):
         self.draw_real_view = True
         self.view, paint = PAGE + 0x158, RAM + 0x5200
-        self.arm.mem_write(self.view + 56 * 4, struct.pack("<I", 4))
-        self.arm.mem_write(paint, struct.pack("<10I", frame, 0xffffffff, patch, *([0]*7)))
+        self.arm.mem_write(self.view + 56 * 4, struct.pack("<I", 6))
+        self.arm.mem_write(paint, struct.pack("<13I", frame, 0xffffffff, patch, *([0]*8), film, 0))
         return self.call_symbol("m10v_settings_view_hub", self.view, paint)
 
     def test_approved_default_screens_match_native_blit_pixel_for_pixel(self):
@@ -430,3 +495,78 @@ class FinalMenuHub(unittest.TestCase):
         self.file=bytes(bad)
         self.assertEqual(self.art(0),0)
         self.assertEqual(self.closed,3)
+
+    def test_roll_menu_loads_v8_artwork_and_gates_start_without_camera_adapter(self):
+        filename = os.getenv("M10V_MENU_ROLL_ASSET")
+        if not filename:
+            self.skipTest("M10V_MENU_ROLL_ASSET is required")
+        self.file = Path(filename).read_bytes()
+        self.assertEqual(self.art(0), 1)
+        self.assertEqual(self.call_symbol("m10v_settings_view_hub_artwork", self.view), 8)
+
+        def record(index):
+            offset, _, x, y, width, height = struct.unpack_from(
+                "<II4H", self.file, 16 + index * 16)
+            length = 1024 + width * height if index >= 512 else width * height * 4
+            return self.file[offset:offset + length], (x, y, width, height)
+
+        def current_matches(index, patch_ids=(), canister=None):
+            data, size = record(index)
+            self.assertEqual(size, (0, 0, 720, 480))
+            expected = Image.frombytes("RGBA", (720, 480), data)
+            for patch_id in patch_ids:
+                patch, (x, y, width, height) = record(patch_id)
+                expected.paste(Image.frombytes("RGBA", (width, height), patch), (x, y))
+            if canister is not None:
+                tile, (_, _, width, height) = record(canister)
+                palette, indices = tile[:1024], tile[1024:1024 + width * height]
+                display = index == 386
+                left, top = (163, 123) if display else (86, 138)
+                dest_w, dest_h = (width, height) if display else (109, 150)
+                for y in range(dest_h):
+                    for x in range(dest_w):
+                        color = indices[(y * height // dest_h) * width + x * width // dest_w]
+                        if color:
+                            expected.putpixel((left + x, top + y), tuple(palette[4 * color:4 * color + 4]))
+            actual = bytes(self.arm.mem_read(HEAP, 720 * 480 * 4))
+            self.assertEqual(actual, expected.tobytes())
+
+        for frame in (386, 387):
+            self.assertEqual(self.art(frame, film=333), 1)  # Leica Teal
+            current_matches(frame, canister=574)
+        self.assertEqual(self.art(0), 1)
+        self.swipe(430, 275)
+        self.tap(350, 250)
+        current_matches(386, canister=512)
+        self.tap(666, 34)
+        current_matches(387, (480,), canister=512)
+        self.tap(312, 150)
+        self.tap(360, 295)
+        current_matches(387, (457, 458, 478, 480), canister=576)
+        self.tap(645, 411)  # 联调中: staging build cannot create camera state
+        current_matches(387, (457, 458, 478, 480), canister=576)
+        self.assertEqual(self.routes, [])
+        self.tap(52, 31)
+        current_matches(386, (414,), canister=576)
+        self.tap(52, 31)
+        self.tap(558, 260)
+        current_matches(12)  # Original donation QR artwork
+        self.tap(52, 31)
+        self.swipe(260, 420)
+        self.tap(560, 250)
+        if "m10v_live_device_mode" in self.symbols:
+            self.tap(500, 386)  # Live picker with unavailable recorder.
+            header, (x, y, width, height) = record(390)
+            actual = bytes(self.arm.mem_read(HEAP, 720 * 480 * 4))
+            image = Image.frombytes("RGBA", (720, 480), actual)
+            self.assertEqual(image.crop((x, y, x + width, y + height)).tobytes(), header)
+            self.tap(52, 31)
+        self.assertEqual(self.routes, [])
+        self.tap(500, 334)  # Half stays in front of Live.
+        expected, _ = record(13)
+        actual = bytes(self.arm.mem_read(HEAP, 720 * 480 * 4))
+        row_start, row_end = 86 * 720 * 4, (86 + 53) * 720 * 4
+        self.assertEqual(actual[:row_start], expected[:row_start])
+        self.assertEqual(actual[row_end:], expected[row_end:])
+        focus_marker = (92 * 720 + 34) * 4
+        self.assertEqual(actual[focus_marker:focus_marker + 4], bytes.fromhex("eac47aff"))

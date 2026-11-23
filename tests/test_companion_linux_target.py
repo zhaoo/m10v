@@ -91,6 +91,51 @@ int linux_extension_case(void){fixture f;fixture_init(&f);REQUIRE(!initialize(&f
  REQUIRE(!m10v_linux_target_exchange(&f.t,&r,&out));REQUIRE(f.w.request.command==6&&f.w.request.bytes==sizeof(p));unsigned writes=f.writes;p.value=0;REQUIRE(m10v_linux_target_exchange(&f.t,&r,&out)==M10V_ERROR_INVALID_RECIPE);REQUIRE(f.writes==writes);p.value=1;
  REQUIRE(!consume(&f));r.command=M10V_BACKEND_POLL_EXTENSIONS;REQUIRE(!m10v_linux_target_exchange(&f.t,&r,&out));REQUIRE(out.status==M10V_OPERATION_COMMITTED);REQUIRE(!m10v_linux_target_exchange(&f.t,&r,&out));REQUIRE(f.w.request.command==7&&f.w.request.bytes==16);REQUIRE(!consume(&f));REQUIRE(!m10v_linux_target_exchange(&f.t,&r,&out));return 0;
 }
+
+int linux_read_drain_case(unsigned mode){
+ fixture f;fixture_init(&f);REQUIRE(!initialize(&f));REQUIRE(!hello(&f));
+ m10v_companion_snapshot film;
+ m10v_extension_snapshot extension;
+ m10v_backend_request read={.command=mode==1?M10V_BACKEND_READ_STATE:M10V_BACKEND_READ_EXTENSIONS};
+ m10v_backend_response out={M10V_OPERATION_UNKNOWN,0,mode==1?(void*)&film:(void*)&extension};
+ REQUIRE(!m10v_linux_target_exchange(&f.t,&read,&out));REQUIRE(out.status==M10V_OPERATION_APPLYING);
+ m10v_linux_target_idle(&f.t);REQUIRE(f.t.pending_command);REQUIRE(!f.t.read_cached&&!f.t.extension_cached);
+ REQUIRE(!consume(&f));
+ if(mode==2){
+  f.w.response.crc^=1;m10v_linux_target_idle(&f.t);
+  REQUIRE(f.t.failed&&!f.t.extension_cached);return 0;
+ }
+ if(mode==3){
+  read.command=M10V_BACKEND_READ_STATE;out.snapshot=&film;
+  REQUIRE(!m10v_linux_target_exchange(&f.t,&read,&out));
+  REQUIRE(f.t.pending_command==2&&f.t.extension_cached);
+  REQUIRE(!consume(&f));
+ }else if(mode==1){
+  read.command=M10V_BACKEND_READ_EXTENSIONS;out.snapshot=(void*)&extension;
+  REQUIRE(!m10v_linux_target_exchange(&f.t,&read,&out));
+  REQUIRE(f.t.pending_command==5&&f.t.read_cached);
+  REQUIRE(!consume(&f));
+ }
+ m10v_linux_target_idle(&f.t);REQUIRE(!f.t.pending_command&&!f.t.failed);
+ unsigned writes=f.writes;
+ REQUIRE(!m10v_linux_target_exchange(&f.t,&read,&out));
+ REQUIRE(out.has_snapshot&&out.status==M10V_OPERATION_COMMITTED&&f.writes==writes);
+ if(mode==3){
+  read.command=M10V_BACKEND_READ_EXTENSIONS;out.snapshot=(void*)&extension;
+  REQUIRE(!m10v_linux_target_exchange(&f.t,&read,&out));REQUIRE(out.has_snapshot&&f.writes==writes);
+ }else if(mode==1){
+  read.command=M10V_BACKEND_READ_STATE;out.snapshot=&film;
+  REQUIRE(!m10v_linux_target_exchange(&f.t,&read,&out));REQUIRE(out.has_snapshot&&f.writes==writes);
+ }
+ REQUIRE(!f.t.pending_command);
+ m10v_companion_patch p;patch(&f,&p);read.command=M10V_BACKEND_SUBMIT;read.patch=&p;out.snapshot=&film;
+ REQUIRE(!m10v_linux_target_exchange(&f.t,&read,&out));REQUIRE(f.t.pending_command==3);
+ REQUIRE(!consume(&f));writes=f.writes;
+ m10v_linux_target_idle(&f.t);REQUIRE(f.t.pending_command==3&&f.writes==writes);
+ read.command=M10V_BACKEND_POLL;
+ REQUIRE(!m10v_linux_target_exchange(&f.t,&read,&out));REQUIRE(out.has_snapshot);
+ REQUIRE(!f.t.read_cached&&!f.t.extension_cached&&f.writes==writes);return 0;
+}
 '''
 class LinuxTargetTests(unittest.TestCase):
  @classmethod
@@ -99,6 +144,9 @@ class LinuxTargetTests(unittest.TestCase):
   result=subprocess.run(['clang','-std=c11','-O2','-Wall','-Wextra','-Werror','-DM10V_COMPANION_HOST_TEST','-dynamiclib','-I',str(ROOT/'native/companion'),str(source),str(ROOT/'native/companion/linux_target.c'),str(ROOT/'native/companion/resident_bridge.c'),str(ROOT/'native/companion/auth.c'),str(ROOT/'native/companion/extensions.c'),'-o',str(library)],capture_output=True,text=True)
   if result.returncode:raise AssertionError(result.stderr)
   cls.lib=C.CDLL(str(library));cls.lib.linux_target_case.argtypes=[C.c_uint];cls.lib.linux_target_case.restype=C.c_int
+ def test_idle_and_cross_domain_reads_retain_snapshots_and_release_live_mailbox(self):
+  for mode in range(4):
+   with self.subTest(mode=mode):self.assertEqual(self.lib.linux_read_drain_case(mode),0)
  def test_extension_read_apply_poll_use_separate_bounded_frames(self):self.assertEqual(self.lib.linux_extension_case(),0)
  def test_async_hello_read_apply_poll_and_ten_slot_identity(self):self.assertEqual(self.lib.linux_target_case(0),0)
  def test_discovery_rejects_wrong_rom_descriptor_dead_owner_build_and_existing_sequence(self):

@@ -44,7 +44,25 @@ class CurrentFilmPipelineTests(unittest.TestCase):
             cls.image = subprocess.check_output(['node', '--input-type=module', '-e', js, str(folder / 'fwdc239b.bin')], cwd=ROOT)
         offset = cls.manifest['base'] - 0x53000000
         runtime = cls.image[offset:offset + cls.manifest['code_bytes']]
-        assert hashlib.sha256(runtime).hexdigest() == cls.manifest['code_sha256']
+        power = receipt.get('power_images', {}) if delivery else {}
+        if power.get('runtime_sha256'):
+            # Final power-image composition binds the reviewed shutdown album
+            # count inside the runtime. Authenticate both images and permit
+            # exactly that existing, receipt-described four-byte binding.
+            raw = (folder / 'M10V-runtime-arm.bin').read_bytes()
+            assert hashlib.sha256(raw).hexdigest() == cls.manifest['code_sha256']
+            expected = bytearray(raw)
+            at = cls.manifest['symbols']['m10v_settings_controller_shutdown_config'] - cls.manifest['base']
+            assert struct.unpack_from('<II', expected, at) == (0x3141534d, 0)
+            count = power['shutdown_album_menu']['entries']
+            assert count == len(power['shutdownAlbum']) and 1 <= count <= 3
+            struct.pack_into('<I', expected, at + 4, count)
+            assert runtime == expected
+            assert hashlib.sha256(runtime).hexdigest() == power['runtime_sha256']
+            cls.audit_runtime = raw
+        else:
+            assert hashlib.sha256(runtime).hexdigest() == cls.manifest['code_sha256']
+            cls.audit_runtime = runtime
 
     def call(self, e, name, *args):
         e.call(self.manifest['symbols'][name], *args)
@@ -691,8 +709,10 @@ for(const [id,prior] of [[331],[332],[333],[334],[330,old],[33,rc1],[334,rc1]]){
         with tempfile.TemporaryDirectory() as d:
             folder = Path(d)
             (folder / 'manifest.json').write_text(json.dumps(self.manifest))
-            at = self.manifest['base'] - 0x53000000
-            (folder / 'runtime.bin').write_bytes(self.image[at:at + self.manifest['code_bytes']])
+            # This auditor composes a runtime before power-image binding. The
+            # final BIN and its exact shutdown-count binding were authenticated
+            # independently above; use the authenticated compiler output here.
+            (folder / 'runtime.bin').write_bytes(self.audit_runtime)
             js = """import{readFileSync}from'node:fs';import{createHash}from'node:crypto';
 import assert from'node:assert/strict';import{buildNativeLibrary}from'./node/gr3-m10v-native-build.mjs';
 const folder=process.argv[1],m=JSON.parse(readFileSync(folder+'/manifest.json')),
@@ -731,6 +751,12 @@ writeFileSync(process.argv[1]+'/manifest.json',JSON.stringify(r.manifest));
             for extra in ({}, {0x77d: 1, 0x77e: 7, 0x780: 2, 0x793: 6, 0x794: 2}):
                 with self.subTest(film=film, extra=extra):
                     e, recipe, obj, frame, si, request, data = self.fixture(film)
+                    if self.manifest.get('pure_isp_effects',{}).get('enabled'):
+                        # Freeze color and independent effect settings through
+                        # the real task producer before Still/encoder admission.
+                        self.publish_owner(e,data)
+                        e.u.mem_write(recipe+0x4a08,bytes(1796))
+                        self.enqueue(e,recipe,19)
                     for offset, value in extra.items():
                         e.u.mem_write(si + 0x71248 + offset, bytes([value]))
                     self.make(e, recipe, obj, frame)
@@ -756,6 +782,11 @@ writeFileSync(process.argv[1]+'/manifest.json',JSON.stringify(r.manifest));
         for film in (62, 299):
             with self.subTest(film=film):
                 e, recipe, obj, frame, si, request, data = self.fixture(film)
+                if self.manifest.get('pure_isp_effects',{}).get('enabled'):
+                    # Preserve this intentionally inconsistent color snapshot,
+                    # but give the independent effects their real task ingress.
+                    self.publish_owner(e,data)
+                    self.enqueue(e,recipe,19)
                 e.u.mem_write(recipe + 0x4a08 + 22, struct.pack('<H', 25))
                 e.u.mem_write(si + 0x77c, b'\x0b')
                 e.u.mem_write(si + 0x71248 + 0x77c, b'\x0b')

@@ -149,12 +149,18 @@ void m10v_hdf_reserve(uint32_t recipe){
      * reset ownership only; settings freeze later at actual task ingress. */
     s->ready=0;s->strength=0;s->si=0;
 }
+void m10v_hdf_gate(uint32_t recipe,uint32_t request,uint32_t si);
 void m10v_hdf_task_snapshot(uint32_t recipe){
     hdf_shot *s=owner(recipe);if(!s||s->ready)return;
     /* Original task ingress5351ea9c freezes this shot once, independently
      * of color-cache admission. Later task kinds/UI changes cannot retarget
      * it. Both successful and unavailable-cache decisions stay frozen. */
     m10v_hdf_producer(recipe);
+    /* Native53510800 initialized the request before first5351ea9c enqueue.
+     * Its earlier gate saw ready0. Bind this frozen exposure and arm the
+     * original request now, before native module planning consumes it. */
+    m10v_hdf_gate(recipe,*(const uint32_t *)(uintptr_t)(recipe+0x5c),
+        *(const uint32_t *)(uintptr_t)(recipe+0x44c8));
 }
 int m10v_hdf_shot_read(uint32_t recipe,uint32_t *strength){
     const hdf_shot *s=owner(recipe);

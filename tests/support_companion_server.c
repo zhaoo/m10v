@@ -49,8 +49,45 @@ static int exchange(void*ctx,const m10v_backend_request*r,m10v_backend_response*
  else {m10v_companion_snapshot base;code=snapshot(0,&base);if(code)return code;code=m10v_companion_apply(&base,r->patch,&io,&result);}
  out->status=result.status;out->has_snapshot=result.has_snapshot;if(result.has_snapshot)*out->snapshot=result.snapshot;return code;
 }
+static int live_lookup(void *context,const char *dir,const char *file,m10v_live_pair *pair){
+ (void)context;
+ if(strcmp(dir,"100RICOH")||strcmp(file,"R0000001.JPG"))return 0;
+ memset(pair->jpeg_sha256, 0x21, 32);
+ memset(pair->clip_sha256, 0x32, 32);
+ strcpy(pair->clip_directory,"M10VLIVE");
+ strcpy(pair->clip_file,"A01.M10L");
+ pair->kind=1;
+ pair->presentation_us=1500000;
+ pair->bytes=2052;
+ return 1;
+}
+static int live_read(void *context,const m10v_live_pair *pair,uint32_t offset,uint8_t *out,uint32_t count){
+ (void)context;
+ if(count>pair->bytes||offset>pair->bytes-count)return 0;
+ for(uint32_t i=0;i<count;i++)out[i]=(uint8_t)(offset+i);
+ return 1;
+}
+static const m10v_live_source live={NULL,live_lookup,live_read};
+
+static int roll_latest(void *ctx,m10v_roll_record *out){
+ (void)ctx;*out=(m10v_roll_record){.sequence=3,.film=66,.target=36,.count=0,.status=3};
+ for(unsigned i=0;i<16;++i)out->id[i]=(uint8_t)(i+1);
+ return 1;
+}
+static int roll_photos(void *ctx,uint32_t cursor,m10v_roll_index_page *out){
+ (void)ctx;if(cursor)return 0;*out=(m10v_roll_index_page){0};
+ out->count=1;out->checked=16;out->skipped=2;out->has_more=1;out->next_cursor=65537;
+ m10v_roll_index_photo *photo=&out->photos[0];
+ for(unsigned i=0;i<16;++i)photo->marker.id[i]=0x11;
+ photo->marker.frame=7;photo->marker.target=24;photo->marker.film_code=0x1042;
+ strcpy(photo->directory,"100RICOH");strcpy(photo->file,"R0000001.JPG");return 1;
+}
+static const m10v_roll_index_source rolls={NULL,roll_latest,roll_photos};
+
 int main(void){
- m10v_companion_server_config cfg={0};ext_io=(m10v_extension_services){.owner=&ext_owner,.is_current=is_current,.enter=enter,.leave=leave,.is_busy=busy,.blocked=ext_blocked,.read=ext_read,.write=ext_write};ext_state.available=M10V_EXTENSION_MASK;ext_state.values[23]=1;ext_state.values[17]=28;ext_state.values[18]=28;ext_state.revision[0]=1;for(unsigned i=0;i<32;i++){cfg.key[i]=(uint8_t)i;cfg.build_id[i]=2;cfg.catalog_hash[i]=3;cfg.renderer_hash[i]=4;}for(unsigned i=0;i<16;i++)cfg.instance_id[i]=1;strcpy(cfg.key_id,"fixture-key");cfg.random=random_bytes;cfg.now_ms=m10v_linux_now_ms;cfg.operation_timeout_ms=getenv("M10V_TEST_MISMATCH")?10000:100;cfg.read_state=1;cfg.write_state=1;if(getenv("M10V_TEST_CURRENT")){const char *catalog=getenv("M10V_TEST_CATALOG_HASH"),*renderer=getenv("M10V_TEST_RENDERER_HASH");if(!catalog)catalog="653acf3c1b04db0ea2dd10114a1306b78bb4b584534945be8f9de9da25ebab4a";if(!renderer)renderer="80a4d357be06ff0e9510a20bef1035dc3e848ec585bd5d5cdee466c3980506a4";if(strlen(catalog)!=64||strlen(renderer)!=64||!m10v_unhex(catalog,32,cfg.catalog_hash)||!m10v_unhex(renderer,32,cfg.renderer_hash))return 2;}
+ m10v_companion_server_config cfg={0};ext_io=(m10v_extension_services){.owner=&ext_owner,.is_current=is_current,.enter=enter,.leave=leave,.is_busy=busy,.blocked=ext_blocked,.read=ext_read,.write=ext_write};ext_state.available=M10V_EXTENSION_MASK;for(unsigned i=0;i<M10V_EXTENSION_FIELDS;i++)ext_state.values[i]=m10v_extension_min[i];ext_state.revision[0]=1;for(unsigned i=0;i<32;i++){cfg.key[i]=(uint8_t)i;cfg.build_id[i]=2;cfg.catalog_hash[i]=3;cfg.renderer_hash[i]=4;}for(unsigned i=0;i<16;i++)cfg.instance_id[i]=1;strcpy(cfg.key_id,"fixture-key");cfg.random=random_bytes;cfg.now_ms=m10v_linux_now_ms;cfg.operation_timeout_ms=getenv("M10V_TEST_MISMATCH")?10000:100;cfg.read_state=1;cfg.write_state=1;if(getenv("M10V_TEST_CURRENT")){const char *catalog=getenv("M10V_TEST_CATALOG_HASH"),*renderer=getenv("M10V_TEST_RENDERER_HASH");if(!catalog)catalog="653acf3c1b04db0ea2dd10114a1306b78bb4b584534945be8f9de9da25ebab4a";if(!renderer)renderer="80a4d357be06ff0e9510a20bef1035dc3e848ec585bd5d5cdee466c3980506a4";if(strlen(catalog)!=64||strlen(renderer)!=64||!m10v_unhex(catalog,32,cfg.catalog_hash)||!m10v_unhex(renderer,32,cfg.renderer_hash))return 2;}
+ if(getenv("M10V_TEST_LIVE"))cfg.live=&live;
+ if(getenv("M10V_TEST_ROLL_INDEX"))cfg.rolls=&rolls;
  if(getenv("M10V_TEST_HOTSPOT")){cfg.wifi_verified=1;cfg.hotspot_pairing=1;}
  if(getenv("M10V_TEST_UPLOAD")){cfg.upload_film=1;memcpy(cfg.renderer_hash,m10v_sd_renderer_hash,32);}
  m10v_library_init(&current);if(getenv("M10V_TEST_FULL_TEN")){for(unsigned i=0;i<10;i++){current.slots[i].film=(uint16_t)(34+i);current.slots[i].grain=3;current.slots[i].halo_profile=6;current.slots[i].halo_spread=3;current.slots[i].halo_threshold=5;}m10v_companion_state_seal(&current,7);}

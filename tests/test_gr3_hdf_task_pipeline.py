@@ -67,19 +67,20 @@ class HdfTaskPipelineTests(unittest.TestCase):
   owner=self.warm_ui(e,data,3)
   trap=self.trap_storage(e);self.reserve(e,recipe)
   self.enqueue(e,recipe,19)
-  self.assertEqual(struct.unpack('<3I',e.u.mem_read(recipe+0x5134,12)),(1,3,0))
+  self.assertEqual(struct.unpack('<3I',e.u.mem_read(recipe+0x5134,12)),(3,3,si))
+  self.assertEqual(bytes(e.u.mem_read(request+0x24,1)),b'\1')
   self.make(e,recipe,obj,frame)
   self.assertEqual(self.call(e,'m10v_isp_frame_recipe_completed',recipe,si,25,data),1)
   e.u.hook_del(trap)
   # UI commits next strength, but the already queued shot keeps its snapshot.
   ui=e.u.hook_add(UC_HOOK_CODE,self.storage);self.assertEqual(self.call(e,'m10v_hdf_save',1),0);e.u.hook_del(ui)
   trap=self.trap_storage(e);self.enqueue(e,recipe,0)
-  self.assertEqual(struct.unpack('<3I',e.u.mem_read(recipe+0x5134,12)),(1,3,0))
+  self.assertEqual(struct.unpack('<3I',e.u.mem_read(recipe+0x5134,12)),(3,3,si))
   # Next exposure can reuse both native recipe and SI addresses. The actual
   # official factory allocation hook clears the complete owned tail even
   # at the identical address, then reservation and true task ingress run.
   self.genuine_recipe_allocation(e,recipe);self.reserve(e,recipe);self.enqueue(e,recipe,19)
-  self.assertEqual(struct.unpack('<3I',e.u.mem_read(recipe+0x5134,12)),(1,1,0))
+  self.assertEqual(struct.unpack('<3I',e.u.mem_read(recipe+0x5134,12)),(3,1,si))
   e.u.hook_del(trap)
  def test_hdf_task_snapshot_is_independent_of_cold_or_busy_color_cache(self):
   for version in (0,1):
@@ -88,5 +89,6 @@ class HdfTaskPipelineTests(unittest.TestCase):
     self.genuine_recipe_allocation(e,recipe);owner=self.warm_ui(e,data,2)
     e.w32(owner+0x2140,version)
     trap=self.trap_storage(e);self.reserve(e,recipe);self.enqueue(e,recipe,19)
-    self.assertEqual(struct.unpack('<3I',e.u.mem_read(recipe+0x5134,12)),(1,2,0))
+    self.assertEqual(struct.unpack('<3I',e.u.mem_read(recipe+0x5134,12)),(3,2,si))
+    self.assertEqual(bytes(e.u.mem_read(request+0x24,1)),b'\1')
     e.u.hook_del(trap)

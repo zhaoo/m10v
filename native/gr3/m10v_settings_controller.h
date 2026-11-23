@@ -34,6 +34,9 @@ typedef struct {
  uint32_t film_touch_start,film_touch_last,film_touch_dragged;
 #if M10V_MENU_HUB
  uint32_t theme_heap,theme_key;
+ uint32_t roll_film; /* Stable film ID, independent of shooting slot order. */
+ uint16_t roll_catalog_index;
+ uint8_t roll_aspect,roll_short,roll_picker;
 #endif
 } m10v_settings_controller;
 _Static_assert(sizeof(m10v_native_ab_host)<=sizeof(m10v_settings),"exclusive host state capacity");

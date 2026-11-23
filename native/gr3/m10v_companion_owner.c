@@ -10,6 +10,15 @@
 #include "../companion/auth.h"
 #include "../companion/extensions.h"
 #include <stddef.h>
+#if M10V_ROLL_NATIVE_DEVICE
+#include "m10v_roll_capture.h"
+#include "m10v_roll_device.h"
+#include "m10v_roll_owner.h"
+#include "m10v_roll_recovery.h"
+#endif
+#if M10V_LIVE_NATIVE_DEVICE
+#include "m10v_live_camera.h"
+#endif
 #if !M10V_COMPANION_ENABLED || !M10V_LIVE_COLOR || !M10V_APPENDED_SLOTS
 #error Companion owner requires explicit opt-in, live cache and ten appended slots
 #endif
@@ -28,6 +37,20 @@ typedef struct {
  m10v_extension_owner extensions;
  m10v_companion_owner_services services;
  m10v_companion_snapshot base;
+#if M10V_ROLL_NATIVE_DEVICE
+ struct {
+  m10v_roll_owner owner;
+  m10v_roll_capture_channel channel;
+  uint32_t booted,boot_stage,retry,ticket,pending_ticket,armed_tone,armed_aspect,proof_failed;
+  uint32_t previous_model,previous_tone,previous_bank,previous_aspect,applied_tone,applied_aspect;
+  int32_t pending_outputs;
+  uint8_t pending_marker[M10V_ROLL_MARKER_BYTES];
+ } roll;
+#endif
+#if M10V_LIVE_NATIVE_DEVICE
+ m10v_live_camera live;
+ uint32_t live_alloc_tried;
+#endif
 } ui_context;
 _Static_assert(sizeof(ui_context)<16384,"bounded permanent owner allocation");
 _Static_assert(sizeof(m10v_companion_result)<=M10V_RESIDENT_PAYLOAD,"result fits mailbox");
@@ -113,10 +136,16 @@ static int snapshot(void*v,m10v_companion_snapshot*out){
 }
 static int persist(void*v,const m10v_library_state*state){
  ui_context*c=v;if(!current(c)||!c->locked||busy(c))return M10V_IO_NOT_WRITTEN;
+#if M10V_ROLL_NATIVE_DEVICE
+ if(m10v_roll_device_locked())return M10V_IO_NOT_WRITTEN;
+#endif
  return m10v_camera_library_commit_snapshot(state)==0?M10V_IO_OK:M10V_IO_UNCERTAIN;
 }
 static int set_tone(void*v,unsigned slot){
  ui_context*c=v;if(!current(c)||!c->locked||busy(c)||slot>=M10V_SLOT_COUNT||!c->base.state.slots[slot].film)return M10V_IO_NOT_WRITTEN;
+#if M10V_ROLL_NATIVE_DEVICE
+ if(m10v_roll_device_locked())return M10V_IO_NOT_WRITTEN;
+#endif
  uint32_t m=model();if(!m)return M10V_IO_NOT_WRITTEN;
  uint8_t*bytes=(void*)(uintptr_t)m;uint8_t prior=bytes[0x1b];bytes[0x1b]=0;
  ((fn2)0x532bd61cu)(m,0);((fn2)0x532c26c0u)(m,m10v_slot_tone(slot));bytes[0x1b]=prior;
@@ -124,8 +153,18 @@ static int set_tone(void*v,unsigned slot){
 }
 static int cache_in(void*v,void*p,uint32_t n){ui_context*c=v;if(p!=&c->wire.request||n!=sizeof(c->wire.request))return 0;((cache_fn)0x5383c834u)(p,n);return 1;}
 static int cache_out(void*v,void*p,uint32_t n){ui_context*c=v;if(p!=&c->wire.response||n>sizeof(c->wire.response))return 0;((cache_fn)0x5383c870u)(p,n);return 1;}
-static int film_enter(void*v){ui_context*c=v;return !c->extensions.pending.present&&enter(v);}
+static int film_enter(void*v){ui_context*c=v;return !c->extensions.pending.present&&
+#if M10V_ROLL_NATIVE_DEVICE
+ !m10v_roll_device_locked()&&
+#endif
+ enter(v);}
 #include "m10v_companion_extensions.inc"
+#if M10V_ROLL_NATIVE_DEVICE
+#include "m10v_roll_device_camera.inc"
+#endif
+#if M10V_LIVE_NATIVE_DEVICE
+#include "m10v_live_device_camera.inc"
+#endif
 static int execute(void*v,uint32_t command,const uint8_t*in,uint32_t bytes,uint8_t*out,uint32_t*length){
  ui_context*c=v;
  if(command==1){
@@ -134,6 +173,58 @@ static int execute(void*v,uint32_t command,const uint8_t*in,uint32_t bytes,uint8
   copy(c->services.metadata.boot_id,in,16);c->session_bound=1;
   copy(out,in,16);copy(out+16,c->wire.build,32);*length=48;return 0;
  }
+#if M10V_LIVE_NATIVE_DEVICE
+ if(command==M10V_LIVE_DESCRIBE_COMMAND||command==M10V_LIVE_HEARTBEAT_COMMAND){
+  *length=0;
+  if(!current(c)||!c->session_bound)return M10V_ERROR_BRIDGE_UNAVAILABLE;
+  if(command==M10V_LIVE_DESCRIBE_COMMAND)
+   return bytes?M10V_ERROR_INVALID_RECIPE:live_describe(c,out,length);
+  uint32_t epoch;
+  if(bytes!=sizeof(epoch)||!c->live.arena)return M10V_ERROR_INVALID_RECIPE;
+  copy(&epoch,in,sizeof(epoch));
+  uint32_t tick=live_tick_now();
+  if(epoch!=c->wire.epoch||!tick)return M10V_ERROR_BRIDGE_UNAVAILABLE;
+  __atomic_store_n(&c->live.consumer_tick,tick,__ATOMIC_RELEASE);
+  return 0;
+ }
+#endif
+#if M10V_ROLL_NATIVE_DEVICE
+ if(command==M10V_ROLL_RECOVERY_COMMAND){
+  *length=0;
+  return bytes==sizeof(m10v_roll_recovery)?roll_proof(c,(const void*)in):M10V_ERROR_INVALID_RECIPE;
+ }
+ if(command==M10V_ROLL_RECOVERY_NEEDED){
+  *length=0;
+  if(bytes||!current(c)||!c->session_bound)return M10V_ERROR_BRIDGE_UNAVAILABLE;
+  out[0]=!c->roll.proof_failed&&c->roll.pending_ticket&&c->roll.pending_outputs<0;
+  copy(out+1,&c->roll.pending_ticket,4);
+  const m10v_roll_capture_channel *channel=&c->roll.channel;
+  const m10v_roll_diagnostic diagnostic={
+   .version=M10V_ROLL_DIAGNOSTIC_VERSION,
+   .lcd_direct=__atomic_load_n(&channel->lcd_direct,__ATOMIC_RELAXED),
+   .lcd_configured=__atomic_load_n(&channel->lcd_configured,__ATOMIC_RELAXED),
+   .still_producer=__atomic_load_n(&channel->still_producer,__ATOMIC_RELAXED),
+   .still_claimed=__atomic_load_n(&channel->still_claimed,__ATOMIC_RELAXED),
+   .lcd_direct_at_still=__atomic_load_n(&channel->lcd_direct_at_still,__ATOMIC_RELAXED),
+   .lcd_configured_at_still=__atomic_load_n(&channel->lcd_configured_at_still,__ATOMIC_RELAXED),
+   .visible_geometry=__atomic_load_n(&channel->visible_geometry,__ATOMIC_RELAXED),
+   .channel_state=__atomic_load_n(&channel->state,__ATOMIC_RELAXED),
+   .marked_outputs=__atomic_load_n(&channel->marked_outputs,__ATOMIC_RELAXED),
+   .reached_outputs=__atomic_load_n(&channel->reached_outputs,__ATOMIC_RELAXED),
+   .roll_status=c->roll.owner.loaded==1?c->roll.owner.current.status:0,
+   .confirmed_frames=c->roll.owner.loaded==1?c->roll.owner.current.count:0
+  };
+  copy(out+M10V_ROLL_NEEDED_BYTES,&diagnostic,sizeof(diagnostic));
+  *length=M10V_ROLL_NEEDED_BYTES+sizeof(diagnostic);return 0;
+ }
+ if(command==M10V_ROLL_RECOVERY_ABORT){
+  *length=0;
+  uint32_t ticket;
+  if(bytes!=sizeof(ticket)||!current(c)||!c->session_bound)return M10V_ERROR_BRIDGE_UNAVAILABLE;
+  copy(&ticket,in,sizeof(ticket));
+  return roll_abort(c,ticket);
+ }
+#endif
  if(command>=M10V_READ_EXTENSIONS&&command<=M10V_POLL_EXTENSIONS){
   *length=sizeof(m10v_extension_result);m10v_extension_result*r=(void*)out;zero(r,sizeof(*r));r->status=M10V_OPERATION_REJECTED;
   if(!c->session_bound||!current(c)){r->code=M10V_ERROR_BRIDGE_UNAVAILABLE;return (int)r->code;}
@@ -154,6 +245,13 @@ static int execute(void*v,uint32_t command,const uint8_t*in,uint32_t bytes,uint8
  r->code=M10V_ERROR_INVALID_RECIPE;return (int)r->code;
 }
 static uint32_t noop(uint32_t a,uint32_t b,uint32_t c){(void)a;(void)b;(void)c;return 0;}
+#if M10V_ROLL_NATIVE_DEVICE
+/* Keep exact named immutable identities under size optimization. The packager
+ * verifies these bytes in the final relocated owner, not just its metadata. */
+__attribute__((used)) static const uint8_t m10v_build_identity[32]=M10V_COMPANION_BUILD_BYTES;
+__attribute__((used)) static const uint8_t m10v_catalog_identity[32]=M10V_COMPANION_CATALOG_BYTES;
+__attribute__((used)) static const uint8_t m10v_renderer_identity[32]=M10V_COMPANION_RENDERER_BYTES;
+#endif
 void m10v_companion_ui_init(uint32_t owner){
  m10v_companion_ui_descriptor*d=descriptor(owner);if(!d)return;zero(d,sizeof(*d));
  uint32_t allocated=((fn1)0x536af2a8u)(sizeof(ui_context)+127u),address=(allocated+127u)&~127u;
@@ -161,7 +259,11 @@ void m10v_companion_ui_init(uint32_t owner){
  ui_context*c=(void*)(uintptr_t)address;zero(c,sizeof(*c));c->ui_owner=owner;
  c->vtable_words[0]=c->vtable_words[1]=(uint32_t)(uintptr_t)noop;c->vtable_words[2]=(uint32_t)(uintptr_t)m10v_companion_ui_timer;c->vtable=(uint32_t)(uintptr_t)c->vtable_words;
  c->wire.magic=M10V_RESIDENT_MAGIC;c->wire.version=2;c->wire.bytes=sizeof(c->wire);c->wire.owner=owner;c->wire.epoch=address;c->services.metadata.owner_generation=address;
+#if M10V_ROLL_NATIVE_DEVICE
+ const uint8_t *build=m10v_build_identity,*catalog=m10v_catalog_identity,*renderer=m10v_renderer_identity;
+#else
  const uint8_t build[32]=M10V_COMPANION_BUILD_BYTES,catalog[32]=M10V_COMPANION_CATALOG_BYTES,renderer[32]=M10V_COMPANION_RENDERER_BYTES;
+#endif
  copy(c->wire.build,build,32);copy(c->services.metadata.build_id,build,32);copy(c->services.metadata.catalog_hash,catalog,32);copy(c->services.metadata.renderer_hash,renderer,32);
  c->services.ctx=c;c->services.owner=&c->transaction;c->services.is_current=current;c->services.enter=film_enter;c->services.leave=leave;c->services.is_busy=busy;c->services.snapshot=snapshot;c->services.persist_once=persist;c->services.set_tone=set_tone;
  ((cache_fn)0x5383c870u)(&c->wire,sizeof(c->wire));
@@ -204,10 +306,17 @@ uint32_t m10v_companion_ui_timer(uint32_t value,uint32_t timer,uint32_t ignored)
 #endif
  m10v_resident_ops ops={c,cache_in,cache_out,execute};
  (void)m10v_resident_consume(&c->wire,&c->consumer,&ops);
+#if M10V_ROLL_NATIVE_DEVICE
+ if(current(c))roll_tick(c);
+#endif
  if(current(c))m10v_companion_ui_start(c->ui_owner);return 0;
 }
 void m10v_companion_ui_stop(uint32_t owner){
  ui_context*c=context(owner);if(!c)return;
+#if M10V_ROLL_NATIVE_DEVICE
+ if(c->roll.booted&&roll_idle(c))(void)roll_drain(c);
+ if(c->roll.ticket)(void)m10v_roll_capture_revoke(&c->roll.channel,c->roll.ticket);
+#endif
  c->wire.alive=0;((cache_fn)0x5383c870u)(&c->wire,128);
  uint32_t timer=c->timer_id;c->timer_id=0;
  if(timer&&(*(const volatile uint32_t*)0x550645acu&1u)){uint32_t root=((uint32_t(*)(void))0x5320ad88u)();((fn2)0x5322b1ecu)(((fn1)0x5320b01cu)(root),timer);}

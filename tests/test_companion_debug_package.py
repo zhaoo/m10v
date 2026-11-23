@@ -96,6 +96,20 @@ class DebugPackageTests(unittest.TestCase):
   self.assertFalse((self.d/'never').exists())
 
 class ExtensionDeliveryContractTests(unittest.TestCase):
+ def test_roll_live_markers_do_not_change_extension_field_mask(self):
+  native=self.native()
+  features=native['companion']['extensions']['features']
+  features.update(roll=True,live=True)
+  info=module._extension_info(native)
+  self.assertEqual(info['available'],(1<<24)-1)
+  self.assertTrue(info['features']['live'])
+  features['future']=True
+  with self.assertRaisesRegex(ValueError,'extension features'):
+   module._extension_info(native)
+  del features['future']
+  features['live']=1
+  with self.assertRaisesRegex(ValueError,'extension features'):
+   module._extension_info(native)
  def native(self):
   contract=(ROOT/'contracts/extensions-v1.json').read_bytes()
   return {'companion':{'extensions':{'schema':'m10v.extensions/v1','available':(1<<24)-1,'features':dict.fromkeys(['ab','hdf','border','isp','zoom','aspect'],True),'powerImages':'firmwareBuildOnly'},'sources':{'contracts/extensions-v1.json':hashlib.sha256(contract).hexdigest()}}}

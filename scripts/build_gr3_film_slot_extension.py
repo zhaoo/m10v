@@ -94,11 +94,23 @@ def build_appended_slots(base, native_base, stock, symbols):
         identity_hooks['writer']=writer
         if recipe_enabled:
             insert=hex(symbols['m10v_isp_frame_photo_recipe_insert'])
-            for name,at in [('jpg',0x53609564),('dng',0x535f9c00)]:
+            roll_insert=symbols.get('m10v_roll_camera_insert_tag')
+            roll_write=symbols.get('m10v_roll_camera_write_tag')
+            if bool(roll_insert)!=bool(roll_write):raise ValueError('incomplete M10R MakerNote hooks')
+            live_insert=symbols.get('m10v_live_camera_insert_tag')
+            live_write=symbols.get('m10v_live_camera_write_tag')
+            if bool(live_insert)!=bool(live_write):raise ValueError('incomplete M10L MakerNote hooks')
+            roll_calls=f';mov r0,r6;bl {roll_insert:#x}' if roll_insert else ''
+            # The camera's ordinary JPEG writer uses the 86-tag constructor;
+            # retain the separate 88-tag variant and DNG path as well.
+            for name,at in [('jpg',0x53609564),('jpg_capture',0x53601ad0),('dng',0x535f9c00)]:
+                live_calls=f';mov r0,r6;bl {live_insert:#x}' if live_insert and name!='dng' else ''
                 photo_recipe[name]=hook(at,0xe51b2028,
-                    'mov r0,r6;push {r4,lr};bl '+insert+';pop {r4,lr};ldr r2,[fp,#-0x28];b '+hex(at+4))
+                    'mov r0,r6;push {r4,lr};bl '+insert+roll_calls+live_calls+';pop {r4,lr};ldr r2,[fp,#-0x28];b '+hex(at+4))
+            roll_dispatch=f';movw r2,#0xc7f2;cmp ip,r2;beq {roll_write:#x}' if roll_write else ''
+            live_dispatch=f';movw r2,#0xc7f3;cmp ip,r2;beq {live_write:#x}' if live_write else ''
             photo_recipe['setter']=hook(0x53606738,0xe1a0c00d,
-                'ldrh ip,[r1,#4];movw r2,#0xc7f1;cmp ip,r2;beq '+hex(symbols['m10v_isp_frame_photo_recipe_write'])+
+                'ldrh ip,[r1,#4];movw r2,#0xc7f1;cmp ip,r2;beq '+hex(symbols['m10v_isp_frame_photo_recipe_write'])+roll_dispatch+live_dispatch+
                 ';mov ip,sp;b 0x5360673c')
     # The legacy EXIF writer stores slot tones 25..34 as ImageTone 0x10c..0x115.
     # Official EXIF reader 0x535c24ec clamps normalized values >11 to zero.

@@ -152,7 +152,8 @@ def _compile(base,bindings,externals,imprints=None,trace_batch=0):
      if (info&15==2 and s=='m10v_isp_effects_render') or s in ('m10v_render_grain','m10v_render_leaks','m10v_render_leaks_vertical','m10v_render_rainbows','m10v_render_curves','m10v_render_imprints','m10v_render_imprint_curves'):symbols[s]=v
   textures=[bindings['grain']]+[v for pair in bindings['leaks']+bindings['leaks_vertical'] for v in pair]+[t for b in bindings['rainbows'] for v in b for c in v for t in c]+[v for pair in (imprints or []) for v in pair]
   for d in textures:
-   if base<d['base']+d['bytes'] and d['base']<base+len(image):raise ValueError('renderer overlaps immutable texture bytes')
+   if base<d['base']+d['bytes'] and d['base']<base+len(image):
+    raise ValueError(f"renderer end {base + len(image):#x} overlaps texture at {d['base']:#x}")
   if any(base<=a<base+len(image) for a in externals.values()):raise ValueError('renderer overlaps bound native export')
   expected={'m10v_isp_effects_render','m10v_render_grain','m10v_render_leaks','m10v_render_leaks_vertical','m10v_render_rainbows','m10v_render_curves'}
   if imprints is not None:expected|={'m10v_render_imprints','m10v_render_imprint_curves'}

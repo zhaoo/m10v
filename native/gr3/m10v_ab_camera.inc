@@ -1,6 +1,7 @@
 /* Included in the settings adapter: uses its explicit owner and stock ABI.
  * Only UI code accesses this state. No capture worker, mutable global or new
  * parameter bank. The separately journalled pair contains no active flag. */
+#include "m10v_roll_device.h"
 #if M10V_BORDER_ENABLED
 #include "m10v_border_camera.h"
 #endif
@@ -41,6 +42,7 @@ static __attribute__((always_inline)) inline void ab_main_off(void){
  m10v_settings_controller *p=ab_owner();if(p)p->power_off_pending=1;
 }
 static int ab_apply(uint32_t slot){
+ if(m10v_roll_device_locked())return -1;
  if(slot>=m10v_camera_library_shooting_count())return -1;
  uint32_t root=((uint32_t (*)(void))0x5320ad88u)();
  uint32_t model=((fn1)0x5320ba9cu)(root);

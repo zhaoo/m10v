@@ -32,7 +32,7 @@ def stamp_orientation_contract(rom):
         live_direction_reads=0,stamp_offset=0x5140,stamp_bytes=16,extended_recipe_bytes=0x5778,
         guard_words={hex(k):hex(v) for k,v in words.items()},exif_table=0x53d30190)
 
-def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,producer_snapshot=False,native_color=False,native_grain=False,external_noise=False,live_color=False,shared_hdf=False,appended_slots=False,border_snapshot=False,pure_isp_effects=False,four_looks_native=False,raw_development=False,torn_overlay=False,leica_native=False,photo_recipe_identity=None):
+def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,producer_snapshot=False,native_color=False,native_grain=False,external_noise=False,live_color=False,shared_hdf=False,appended_slots=False,border_snapshot=False,pure_isp_effects=False,four_looks_native=False,raw_development=False,torn_overlay=False,leica_native=False,photo_recipe_identity=None,roll_device=False):
     photo_recipe=photo_recipe_identity is not None
     rom=bytes(rom)
     if hashlib.sha256(rom).hexdigest()!=SHA:raise ValueError('wrong official RTOS')
@@ -54,6 +54,7 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
     required=(('m10v_hdf_reserve','m10v_hdf_task_snapshot','m10v_hdf_settings','m10v_hdf_done') if shared_hdf else ())+ (('m10v_camera_library_preview','m10v_camera_library_custom_profile') if live_color or producer_snapshot else ())+('m10v_library_valid',)+(('m10v_library_tables',) if not observer else ())+(('m10v_camera_library_mutation_busy',) if producer_snapshot else ())+(('m10v_border_shot_freeze',) if border_snapshot else ())
     if native_color:required+=('m10v_c41_native_data',)
     if leica_native:required+=('m10v_leica_native_data',)
+    if roll_device:required+=('m10v_camera_library_roll_preview',)
     if pure_isp_effects:
         required+=('m10v_isp_effects_shot_freeze','m10v_isp_effects_shot_reserve','m10v_isp_effects_shot_read','m10v_isp_effects_pipeline_settings')
     if photo_recipe:
@@ -68,6 +69,7 @@ def build(out,rom,library_exports,owner_manifest,base=0x54180000,observer=True,p
         pure_flags=['-DM10V_PURE_ISP_EFFECTS=1','-DM10V_ISP_EFFECTS_SHOT_OFFSET=0x5778',f'-DM10V_TORN_ENABLED={int(torn_overlay)}'] if pure_isp_effects else []
         recipe_flags=['-Oz' if flag=='-Os' else flag for flag in FLAGS] if pure_isp_effects else FLAGS
         raw_flags=['-DM10V_RAW_DEVELOPMENT=1'] if raw_development else []
+        if roll_device:raw_flags+=['-DM10V_ROLL_NATIVE_DEVICE=1']
         raw_exports=('m10v_isp_frame_raw_supported','m10v_isp_frame_raw_snapshot') if raw_development else ()
         if photo_recipe:
             from scripts.build_gr3_companion_owner import identity_flags

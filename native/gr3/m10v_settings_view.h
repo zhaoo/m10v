@@ -23,14 +23,24 @@ enum {
 /* Initialize the entire struct to zero before first create. */
 int m10v_settings_view_create(m10v_settings_view *);
 #if M10V_MENU_HUB
-enum { M10V_HUB_ROW_Y=86, M10V_HUB_ROW_HEIGHT=53 };
+enum { M10V_HUB_ROW_Y=86, M10V_HUB_ROW_HEIGHT=53, M10V_HUB_EFFECT_R6_HEIGHT=46,
+ M10V_HUB_IMPRINT_HEIGHT=40, M10V_HUB_IMPRINT_THEME=4, M10V_HUB_LIVE_UNAVAILABLE=2 };
+enum {
+ M10V_HUB_DECK_EXTENDED=384,M10V_HUB_DECK_ROLL=385,M10V_HUB_ROLL_FRAME=386,
+ M10V_HUB_ROLL_NEW=387,M10V_HUB_ROLL_PAUSED=388,M10V_HUB_ROLL_ACTIVE=389
+};
 #define M10V_HUB_BITMAP_ID 858u /* Retired icon slot, dedicated to this controller. */
 #define M10V_THEME_BITMAP_ID 859u
 uint32_t m10v_settings_view_theme(uint32_t, uint32_t, uint32_t, uint32_t);
 uint32_t m10v_settings_view_theme_directory(uint32_t);
 int m10v_settings_view_hub_create(m10v_settings_view *);
-typedef struct {uint32_t frame,focus,patch[7],save_error;} m10v_hub_paint;
+typedef struct {
+ uint32_t frame,focus,patch[7],save_error;
+ uint16_t marker_x,marker_y;
+ uint32_t film,film_index;
+} m10v_hub_paint;
 uint32_t m10v_settings_view_hub(m10v_settings_view *,const m10v_hub_paint *);
+uint32_t m10v_settings_view_hub_artwork(const m10v_settings_view *);
 uint32_t m10v_settings_view_hub_directory(const m10v_settings_view *);
 #endif
 void m10v_settings_view_draw(m10v_settings_view *, const m10v_settings *, const m10v_settings_ops *);

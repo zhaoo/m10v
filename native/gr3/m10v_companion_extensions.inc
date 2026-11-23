@@ -31,33 +31,44 @@ static int extension_busy(void*v){return busy(v)||m10v_settings_controller_remot
  ;}
 static int extension_blocked(void*v){return ((ui_context*)v)->transaction.pending.present!=0;}
 #if M10V_COMPANION_EXT_WB
-static uint8_t *white_balance_model(void){
- return (*(const volatile uint32_t *)0x550662d0u&1u)?(uint8_t *)0x550666e0u:0;
+/* Capture WB is not RAW development WB. The latter dereferences its selected
+ * image (+0x24), which is absent during remote capture. See R11 ABI evidence. */
+static int white_balance_ram(uint32_t p,uint32_t size){
+ return !(p&3u)&&p>=0x55000000u&&p<=0x60000000u-size;
+}
+static uint32_t white_balance_backend(void){
+ if(!(*(const volatile uint32_t *)0x553458acu&1u))return 0;
+ uint32_t backend=*(const volatile uint32_t *)0x553458b0u;
+ if(!white_balance_ram(backend,0x51cu))return 0;
+ uint32_t holder=*(const volatile uint32_t *)(uintptr_t)(backend+0x518u);
+ if(!white_balance_ram(holder,4))return 0;
+ uint32_t image=*(const volatile uint32_t *)(uintptr_t)holder;
+ return white_balance_ram(image,0x774u)?backend:0;
 }
 static void white_balance_read(m10v_extension_snapshot *out){
- uint8_t *model=white_balance_model();
- if(!model)return;
- uint32_t mode=model[0x4c];
- if(mode>16)return;
- uint32_t gm=((fn2)0x53283890u)((uint32_t)(uintptr_t)model,mode);
- uint32_t ba=((fn2)0x532838d0u)((uint32_t)(uintptr_t)model,mode);
- uint32_t kelvin=((fn2)0x53283910u)((uint32_t)(uintptr_t)model,mode);
- if(mode!=model[0x4c]||gm>28||ba>28)return;
+ uint32_t backend=white_balance_backend();if(!backend)return;
+ uint32_t gm=((fn1)0x53549d94u)(backend);
+ uint32_t ba=((fn1)0x53549dd8u)(backend);
+ uint32_t kelvin=((fn1)0x53549e1cu)(backend);
+ if(backend!=white_balance_backend()||gm>28||ba>28)return;
  out->values[25]=gm;out->values[26]=ba;out->available|=3u<<25;
  if(kelvin>=2500&&kelvin<=10000){out->values[27]=kelvin;out->available|=1u<<27;}
 }
 static int white_balance_write(uint32_t field,uint32_t value){
- uint8_t *model=white_balance_model();
- if(!model||model[0x4c]>16||!m10v_extensions_writable(field,value))return M10V_IO_NOT_WRITTEN;
- uint32_t mode=model[0x4c],address=(uint32_t)(uintptr_t)model;
- if(field==27){
-  if(mode<13)return M10V_IO_NOT_WRITTEN;
-  ((fn3)0x53286cacu)(address,mode,value);
- }else{
-  ((fn3)(field==25?0x53286b08u:0x53286b88u))(address,mode,value);
- }
+ /* Only use the initialized capture controller, never construct a RAW model
+  * or reconfigure the controller's still/movie mode for a remote request. */
+ uint8_t *model=(uint8_t *)0x5506791cu;
+ if(!(*(const volatile uint32_t *)0x550645a8u&1u)||model[7]!=0||model[6]||
+    !white_balance_backend()||!(*(const volatile uint32_t *)0x55063ed0u&1u)||
+    !white_balance_ram(*(const volatile uint32_t *)0x55063f34u,0xae8u)||
+    !m10v_extensions_writable(field,value))return M10V_IO_NOT_WRITTEN;
+ uint32_t mode=((fn1)0x532ca4a0u)((uint32_t)(uintptr_t)model);
+ if(mode>17u&&mode<253u)return M10V_IO_NOT_WRITTEN;
+ if(field==27&&mode!=13u&&mode<253u)return M10V_IO_NOT_WRITTEN;
+ ((fn2)(field==25?0x532ca504u:field==26?0x532ca89cu:0x532cac60u))((uint32_t)(uintptr_t)model,value);
  return M10V_IO_OK;
 }
+
 #endif
 static int extension_read(void*v,m10v_extension_snapshot*out){
  ui_context*c=v;if(!current(c)||c->store_depth)return M10V_ERROR_BRIDGE_UNAVAILABLE;

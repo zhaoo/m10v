@@ -4,6 +4,9 @@
 #include "m10v_settings_controller.h"
 #if M10V_COMPANION_ENABLED
 #include "m10v_companion_owner.h"
+#if M10V_LIVE_NATIVE_DEVICE
+#include "m10v_live_camera.h"
+#endif
 #endif
 #include "m10v_debug.h"
 #include "m10v_sd_library.h"
@@ -201,12 +204,97 @@ uint32_t m10v_settings_controller_owner_size(void){
 #include "m10v_border_camera.h"
 extern uint32_t m10v_zoom_live_slot(void);
 extern int m10v_zoom_camera_snapshot(m10v_zoom_state *);
-enum { HUB_PAGE=12, HUB_HALF=5 };
+#include "m10v_roll_device.h"
+enum { HUB_PAGE=12,HUB_HALF=5,HUB_ROLL_DISPLAY=6,HUB_ROLL_SETTINGS=7,HUB_LIVE=8,HUB_ROLL_CARD=5 };
+enum {
+ ROLL_LIMIT_24=0,ROLL_LIMIT_36,ROLL_ASPECT,ROLL_CATALOG,ROLL_NEGATIVE,
+ ROLL_CLOSE,ROLL_PAUSE,ROLL_PRIMARY,ROLL_OPTIONS
+};
+typedef struct {uint16_t x0,y0,x1,y1;} hub_box;
+static const hub_box roll_fields[]={
+ {262,130,360,174},{367,130,466,174},{481,130,686,174},
+ {262,226,686,269},{262,277,470,320}
+};
+static const hub_box roll_primary={601,392,686,431},roll_options={650,13,694,62};
+static const hub_box roll_pause={514,392,595,431};
+static const hub_box roll_close[2]={{541,392,595,431},{453,392,507,431}};
+static m10v_settings_controller *hub(uint32_t owner);
+static m10v_settings_controller *roll_catalog_parent(m10v_settings_controller *p){
+ return hub((uint32_t)(uintptr_t)p-M10V_SETTINGS_OWNER_BYTES);
+}
+static const uint8_t roll_ratio[]={0,2,5,4};
+static int hub_extended(const m10v_settings_controller *p){
+ return m10v_settings_view_hub_artwork(&p->view)==8;
+}
+static int hub_inside(hub_box b,uint32_t x,uint32_t y){
+ return x>=b.x0&&x<b.x1&&y>=b.y0&&y<b.y1;
+}
+static void hub_focus_marker(m10v_hub_paint *paint,hub_box b){
+ paint->marker_x=b.x0+2;
+ paint->marker_y=(b.y0+b.y1)/2-8;
+}
+static void hub_patch(m10v_hub_paint *paint,uint32_t id){
+ for(uint32_t i=0;i<sizeof(paint->patch)/sizeof(*paint->patch);i++){
+  if(!paint->patch[i]){paint->patch[i]=id;return;}
+ }
+}
+static uint32_t roll_ratio_index(uint32_t id){
+ for(uint32_t i=0;i<4;i++)if(roll_ratio[i]==id)return i;
+ return 0;
+}
+static int roll_open(const m10v_roll_record *r,int valid){
+ return valid>0&&(r->status==M10V_ROLL_ACTIVE||r->status==M10V_ROLL_PAUSED);
+}
+static uint32_t roll_action_mask(int available,int open,int active){
+ if(open)return (1u<<ROLL_CLOSE)|(1u<<ROLL_PRIMARY)|(active?(1u<<ROLL_PAUSE):0u);
+ return ((1u<<ROLL_CLOSE)-1u)|(available>=0?(1u<<ROLL_PRIMARY):0u);
+}
+static hub_box roll_box(uint32_t choice,int active){
+ if(choice<=ROLL_NEGATIVE)return roll_fields[choice];
+ if(choice==ROLL_CLOSE)return roll_close[active];
+ if(choice==ROLL_PAUSE)return roll_pause;
+ if(choice==ROLL_OPTIONS)return roll_options;
+ return roll_primary;
+}
+static void hub_roll_draw(m10v_settings_controller *p,m10v_hub_paint *paint){
+ m10v_settings *s=&p->state;
+ m10v_roll_record r={0};
+ int available=m10v_roll_device_snapshot(&r),open=roll_open(&r,available);
+ int active=open&&r.status==M10V_ROLL_ACTIVE;
+ uint32_t count=available>0&&r.count<=36?r.count:0;
+ int show_record=open||(s->screen==HUB_ROLL_DISPLAY&&available>0);
+ uint32_t film=show_record?r.film:p->roll_film?p->roll_film:33;
+ paint->film=film;
+ paint->film_index=film==p->roll_film?p->roll_catalog_index:0;
+ int short_roll=(show_record?r.target:(p->roll_short?24u:36u))==24u;
+ paint->focus=~0u;
+ paint->save_error=p->display_trace;
+ if(s->screen==HUB_ROLL_DISPLAY){
+  paint->frame=M10V_HUB_ROLL_FRAME;
+  if(count>=10)hub_patch(paint,401+count/10);
+  if(count%10)hub_patch(paint,404+count%10);
+  if(short_roll)hub_patch(paint,414);
+  if(s->value)hub_focus_marker(paint,roll_options);
+ }else{
+  paint->frame=active?M10V_HUB_ROLL_ACTIVE:open?M10V_HUB_ROLL_PAUSED:M10V_HUB_ROLL_NEW;
+  if(open&&count)hub_patch(paint,420+count);
+  if(short_roll){hub_patch(paint,457);hub_patch(paint,open?459:458);}
+  uint32_t ratio=open?roll_ratio_index(r.aspect):p->roll_aspect&3u;
+  if(ratio)hub_patch(paint,(open?462:459)+ratio);
+  if(!open&&film==0x10016u)hub_patch(paint,478);
+  if(available>0&&!open)hub_patch(paint,479);
+  if(available<0){hub_patch(paint,480);paint->save_error=100u-(uint32_t)available;}
+  if(s->value&&(roll_action_mask(available,open,active)&(1u<<s->focus)))
+   hub_focus_marker(paint,roll_box(s->focus,active));
+ }
+}
+
 static m10v_settings_controller *hub(uint32_t owner){
  return (m10v_settings_controller *)(uintptr_t)(owner+M10V_SETTINGS_HUB_OFFSET);
 }
 static uint32_t hub_mask(const m10v_settings_controller *p){
- if(p->state.screen==1)return 0x2fu|(M10V_TORN_ENABLED?16u:0u)|(m10v_settings_controller_ab_available()?64u:0u);
+ if(p->state.screen==1)return 0x2fu|(M10V_TORN_ENABLED?16u:0u)|
+  (m10v_settings_controller_ab_available()?64u:0u)|(hub_extended(p)?128u:0u);
  if(p->state.screen==2){
 #if M10V_SHUTDOWN_ALBUM
   if(shutdown_count())return 63;
@@ -221,7 +309,19 @@ static void hub_draw(m10v_settings_controller *p){
  uint32_t mask=hub_mask(p),number=0;
  paint.focus=s->value?s->focus:~0u;
  if(!s->screen){
-  paint.frame=s->index==4?11:s->index;
+  paint.frame=s->index>=3?(s->index==4?11:3):s->index;
+  if(hub_extended(p)&&s->index>=3){
+   paint.frame=s->index==HUB_ROLL_CARD?M10V_HUB_DECK_ROLL:M10V_HUB_DECK_EXTENDED;
+   if(s->index!=HUB_ROLL_CARD){
+    uint32_t first=s->index==3?499:503;
+    for(uint32_t i=0;i<4;i++)hub_patch(&paint,first+i);
+   }
+   m10v_roll_record r;
+   if(m10v_roll_device_snapshot(&r)>0){
+    if(r.status==M10V_ROLL_ACTIVE)hub_patch(&paint,400);
+    if(r.status==M10V_ROLL_PAUSED)hub_patch(&paint,401);
+   }
+  }
   uint32_t count=m10v_library_count(&s->saved);
   if(s->index<3&&count<10)paint.patch[0]=16+s->index*11+count;
  }else if(s->screen==1){
@@ -247,6 +347,12 @@ static void hub_draw(m10v_settings_controller *p){
 #endif
   m10v_settings_controller *cache=ab_owner();
   if(mask&64&&cache&&cache->ab.enabled)paint.patch[5]=start+41;
+#if M10V_LIVE_NATIVE_DEVICE
+  int mode=m10v_live_device_configured_mode();
+  if(mask&128u)paint.film_index=start+36+(uint32_t)mode;
+#else
+  if(mask&128u)paint.film_index=start+39; /* Formal build: Live unavailable. */
+#endif
 #if M10V_HALF_PAIR_ENABLED
   if(m10v_settings_half_enabled())paint.patch[6]=start+35;
 #endif
@@ -271,16 +377,89 @@ static void hub_draw(m10v_settings_controller *p){
   }
   number=m10v_guides_camera_mode();
   if(number&&number<=5)paint.patch[4]=start+49+number;
+#if M10V_LIVE_NATIVE_DEVICE
+ }else if(s->screen==HUB_LIVE){
+  paint.frame=13;
+  for(uint32_t i=0;i<5;i++)paint.patch[i]=390+i;
+  int mode=m10v_live_device_mode();
+  if(mode)paint.patch[5]=mode<0?397:394+(uint32_t)mode;
+  if(mode<0||s->slot)paint.save_error=200u+(mode<0?(uint32_t)(-mode):4u);
+#endif
  }else if(s->screen==HUB_HALF){
   paint.frame=13;
 #if M10V_HALF_PAIR_ENABLED
   paint.frame+=m10v_settings_half_enabled();
 #endif
   paint.save_error=s->slot;
- }else paint.frame=s->screen==3?10:12;
+ }else if(s->screen==HUB_ROLL_DISPLAY||s->screen==HUB_ROLL_SETTINGS)
+  hub_roll_draw(p,&paint);
+ else paint.frame=s->screen==3?10:12;
  uint32_t painted=m10v_settings_view_hub(&p->view,&paint);
  p->state.error=!painted;
  M10V_LOG(344,paint.frame,painted,paint.patch[0],paint.patch[1]);
+}
+/* Returns nonzero when stock navigation takes ownership of the page. */
+static int hub_roll_action(m10v_settings_controller *p,uint32_t action){
+ m10v_settings *s=&p->state;
+ p->display_trace=0;
+ if(s->screen==HUB_ROLL_DISPLAY){
+  if(action==ROLL_OPTIONS){
+   m10v_roll_device_prepare();
+   s->screen=HUB_ROLL_SETTINGS;s->focus=s->value=0;
+  }
+  return 0;
+ }
+ m10v_roll_record r={0};
+ int available=m10v_roll_device_snapshot(&r),open=roll_open(&r,available);
+ int active=open&&r.status==M10V_ROLL_ACTIVE;
+ if(!(roll_action_mask(available,open,active)&(1u<<action)))return 0;
+ if(action==ROLL_LIMIT_24||action==ROLL_LIMIT_36)p->roll_short=action==ROLL_LIMIT_24;
+ else if(action==ROLL_ASPECT)p->roll_aspect=(p->roll_aspect+1)&3u;
+ else if(action==ROLL_CATALOG){
+  p->roll_picker=1;
+  ((fn3)0x5316c9d8u)((uint32_t)(uintptr_t)p,M10V_SETTINGS_FILMS_ROUTE,M10V_SETTINGS_HUB_ROUTE);
+  return 1;
+ }else if(action==ROLL_NEGATIVE)p->roll_film=0x10016u;
+ else if(action==ROLL_CLOSE){
+  if(!m10v_roll_device_change(M10V_ROLL_CLOSED))p->display_trace=1;
+  else s->focus=0;
+ }else if(action==ROLL_PAUSE){
+  if(m10v_roll_device_change(M10V_ROLL_PAUSED))s->screen=0;
+  else p->display_trace=1;
+ }else if(action==ROLL_PRIMARY){
+  if(active){
+   s->screen=s->value=0;
+   ((fn1)0x5316ca28u)((uint32_t)(uintptr_t)p);
+   return 1;
+  }else if(open?m10v_roll_device_change(M10V_ROLL_ACTIVE):
+    m10v_roll_device_open(p->roll_film?p->roll_film:33,roll_ratio[p->roll_aspect&3u],p->roll_short?24u:36u))
+   {s->screen=HUB_ROLL_DISPLAY;s->focus=s->value=0;}
+  else p->display_trace=1;
+ }
+ return 0;
+}
+static uint32_t hub_roll_key(m10v_settings_controller *p,uint32_t key){
+ m10v_settings *s=&p->state;
+ if(key==M10V_KEY_BACK){
+  s->screen=s->screen==HUB_ROLL_SETTINGS?HUB_ROLL_DISPLAY:0;
+  s->value=p->display_trace=0;
+ }else if(s->screen==HUB_ROLL_DISPLAY){
+  if(key==M10V_KEY_OK||key==M10V_KEY_RIGHT)hub_roll_action(p,ROLL_OPTIONS);
+ }else if(key==M10V_KEY_OK){
+  if(hub_roll_action(p,s->focus))return 1;
+ }else if(key==M10V_KEY_LEFT||key==M10V_KEY_RIGHT||key==M10V_KEY_UP||key==M10V_KEY_DOWN){
+  m10v_roll_record r={0};
+  int available=m10v_roll_device_snapshot(&r),open=roll_open(&r,available);
+  uint32_t mask=roll_action_mask(available,open,open&&r.status==M10V_ROLL_ACTIVE);
+  int previous=key==M10V_KEY_LEFT||key==M10V_KEY_UP;
+  for(uint32_t i=0;i<=ROLL_PRIMARY;i++){
+   if(s->value||i)s->focus=previous?(s->focus?s->focus-1:ROLL_PRIMARY):(s->focus==ROLL_PRIMARY?0:s->focus+1);
+   if(mask&(1u<<s->focus))break;
+  }
+  s->value=1;
+ }
+ hub_draw(p);
+ return 1;
 }
 static void hub_activate(m10v_settings_controller *p,uint32_t item){
  static const uint32_t routes[2][7]={
@@ -291,11 +470,17 @@ static void hub_activate(m10v_settings_controller *p,uint32_t item){
  uint32_t pane=p->state.screen,route=0;
  if(!pane){
   p->state.index=item;
-  if(!item)route=M10V_SETTINGS_FILMS_ROUTE;
-  else {p->state.screen=item;p->state.focus=p->state.value=0;}
+  if(!item){p->roll_picker=0;route=M10V_SETTINGS_FILMS_ROUTE;}
+  else {
+   if(item==HUB_ROLL_CARD)m10v_roll_device_prepare();
+   p->state.screen=item==HUB_ROLL_CARD?HUB_ROLL_DISPLAY:item;
+   p->state.focus=p->state.value=0;
+  }
  }else if(pane<=2){
   uint32_t mask=hub_mask(p);
-  for(uint32_t i=0;i<7;i++)if((mask>>i)&1u){
+  for(uint32_t slot=0;slot<8;slot++){
+   uint32_t i=(mask&128u)&&slot>=6?13-slot:slot;
+   if(!((mask>>i)&1u))continue;
    if(!item){
     if(pane==1&&i==5){
      p->state.group=p->state.focus;
@@ -305,7 +490,18 @@ static void hub_activate(m10v_settings_controller *p,uint32_t item){
 #if M10V_HALF_PAIR_ENABLED
      p->state.focus=m10v_settings_half_enabled();
 #endif
-    }else route=routes[pane-1][i];
+#if M10V_LIVE_NATIVE_DEVICE
+    }else if(pane==1&&i==7){
+     m10v_settings_controller *owner=ab_owner();
+     if(owner)m10v_companion_ui_start((uint32_t)(uintptr_t)owner-M10V_SETTINGS_OWNER_BYTES);
+     p->state.group=p->state.focus;
+     p->state.screen=HUB_LIVE;
+     p->state.value=1;
+     int mode=m10v_live_device_mode();
+     p->state.focus=mode<0?0:(uint32_t)mode;
+     p->state.slot=0;
+#endif
+    }else if(i<7)route=routes[pane-1][i];
     break;
    }
    item--;
@@ -317,6 +513,24 @@ static void hub_activate(m10v_settings_controller *p,uint32_t item){
 }
 static uint32_t hub_key(m10v_settings_controller *p,uint32_t key){
  m10v_settings *s=&p->state;
+ if(s->screen==HUB_ROLL_DISPLAY||s->screen==HUB_ROLL_SETTINGS)return hub_roll_key(p,key);
+#if M10V_LIVE_NATIVE_DEVICE
+ if(s->screen==HUB_LIVE&&!s->error){
+  if(key==M10V_KEY_OK&&!m10v_live_device_set_mode(s->focus)){
+   s->slot=1;hub_draw(p);return 1;
+  }
+  if(key==M10V_KEY_BACK||key==M10V_KEY_OK){
+   s->screen=1;s->focus=s->group;s->slot=0;
+  }else if(key==M10V_KEY_UP||key==M10V_KEY_LEFT){
+   if(s->focus)s->focus--;
+   s->slot=0;
+  }else if(key==M10V_KEY_DOWN||key==M10V_KEY_RIGHT){
+   if(s->focus<2)s->focus++;
+   s->slot=0;
+  }
+  hub_draw(p);return 1;
+ }
+#endif
  if(s->screen==HUB_HALF&&!s->error){
   if(key==M10V_KEY_OK){
 #if M10V_HALF_PAIR_ENABLED
@@ -341,7 +555,10 @@ static uint32_t hub_key(m10v_settings_controller *p,uint32_t key){
  else if(!s->screen){
   if(key==M10V_KEY_RIGHT||key==M10V_KEY_LEFT){
    static const uint8_t adjacent[2][5]={{1,3,0,4,4},{2,0,2,1,3}};
-   s->index=adjacent[key==M10V_KEY_LEFT][s->index];hub_draw(p);
+   static const uint8_t extended[2][6]={{1,3,0,5,4,4},{2,0,2,1,5,3}};
+   s->index=hub_extended(p)?extended[key==M10V_KEY_LEFT][s->index]:
+    adjacent[key==M10V_KEY_LEFT][s->index%5];
+   hub_draw(p);
   }
  }else if(s->screen<=2&&(key==M10V_KEY_UP||key==M10V_KEY_DOWN)){
   uint32_t total=0;
@@ -496,6 +713,21 @@ uint32_t m10v_settings_controller_ready(m10v_settings_controller *p,uint32_t rou
 #endif
  if(p->page==M10V_SETTINGS_ZOOM){m10v_zoom_menu_ops z;zoom_ops(&z);m10v_zoom_menu_open(&p->zoom,&z);}
  else opened=m10v_settings_open(&p->state,&o,p->page);
+ #if M10V_MENU_HUB
+ if(p->page==M10V_SETTINGS_FILMS&&route==M10V_SETTINGS_FILMS_ROUTE){
+  m10v_settings_controller *parent=roll_catalog_parent(p);
+  p->roll_picker=parent->roll_picker;
+  parent->roll_picker=0;
+  if(p->roll_picker&&!opened){
+   uint32_t film=parent->roll_film?parent->roll_film:33;
+   uint32_t i=parent->roll_catalog_index;
+   if(!M10V_CUSTOM(film))
+    for(i=0;i<M10V_DIRECTORY_COUNT&&m10v_directory[i].id!=film;i++){}
+   if(i<p->state.group&&item(0,i)==film){p->state.index=i;p->state.expected=film;}
+   p->state.slot=M10V_ROLL_CATALOG_MODE;
+  }
+ }
+ #endif
  if(route==M10V_SETTINGS_AB_ROUTE)M10V_LOG(92,route,(uint32_t)opened,p->state.screen,p->view.count);
  if(opened)return 0;
  if(p->page==M10V_SETTINGS_AB){p->ab.down=0;ab_pair(&p->ab);p->state.slot=p->ab.a;p->state.index=p->ab.b;}
@@ -646,6 +878,22 @@ static uint32_t catalog_tile(uint32_t x,uint32_t y){
     y%M10V_FILM_GRID_DY>=M10V_CARD_TILE_HEIGHT)return 10;
  return row*5+column;
 }
+#if M10V_MENU_HUB
+static uint32_t roll_catalog_pick(m10v_settings_controller *p,uint32_t index){
+ uint32_t id=index<p->state.group?item(0,index):0;
+ if(M10V_CUSTOM(id)&&!m10v_roll_device_film_available(id)){
+  p->state.error=M10V_SETTINGS_SAVE_FAILED;
+  m10v_settings_ops o;ops(&o);m10v_settings_view_draw(&p->view,&p->state,&o);
+  return 1;
+ }
+ if(id){
+  m10v_settings_controller *parent=roll_catalog_parent(p);
+  parent->roll_film=id;parent->roll_catalog_index=index;
+  ((fn1)0x5316ca28u)((uint32_t)(uintptr_t)p);
+ }
+ return 1;
+}
+#endif
 static uint32_t catalog_touch(m10v_settings_controller *p,uint32_t payload){
  if(p->page!=M10V_SETTINGS_FILMS||p->state.screen!=M10V_SETTINGS_CATALOG)return 0;
  /* Stock GR III 2.10 TouchModel (5323e768) publishes a 0x58-byte packet.
@@ -702,6 +950,7 @@ static uint32_t catalog_touch(m10v_settings_controller *p,uint32_t payload){
    m10v_settings_ops o;ops(&o);
    uint32_t index=(before/10)*10+tile;
 #if M10V_MENU_HUB
+   if(p->roll_picker)return roll_catalog_pick(p,index);
    if((y-M10V_FILM_GRID_Y)%M10V_FILM_GRID_DY>=M10V_CARD_HEIGHT){
     uint32_t id=index<end?item(0,index):0;
     for(uint32_t i=0;id&&i<M10V_SLOT_COUNT;i++)if(p->state.saved.slots[i].film==id){
@@ -761,22 +1010,42 @@ static uint32_t hub_touch(m10v_settings_controller *p,uint32_t payload){
   if(y>=258&&y<312&&((info&&x<38)||(!info&&x>=682))){
    p->state.index=info?0:3;hub_draw(p);
   }else if(info&&y>=151&&y<397){
-   if(x>=124&&x<350)hub_activate(p,3);
-   else if(x>=370&&x<596)hub_activate(p,4);
+   if(hub_extended(p)){
+    if(x>=247&&x<473)hub_activate(p,HUB_ROLL_CARD);
+    else if(y>=169&&y<380&&x>=38&&x<233)hub_activate(p,3);
+    else if(y>=169&&y<380&&x>=487&&x<682)hub_activate(p,4);
+   }else{
+    if(x>=124&&x<350)hub_activate(p,3);
+    else if(x>=370&&x<596)hub_activate(p,4);
+   }
   }else if(x>=247&&x<473&&y>=151&&y<397)hub_activate(p,0);
   else if(!info&&y>=169&&y<380){
    if(x>=38&&x<233)hub_activate(p,2);
    else if(x>=487&&x<682)hub_activate(p,1);
   }
- }else if(pane==HUB_HALF){
-  if(x>=34&&x<686&&y>=86&&y<192){p->state.focus=(y-86)/53;p->state.slot=0;hub_draw(p);}
+ }else if(pane==HUB_ROLL_DISPLAY){
+  if(hub_inside(roll_options,x,y)){hub_roll_action(p,ROLL_OPTIONS);hub_draw(p);}
+ }else if(pane==HUB_ROLL_SETTINGS){
+  m10v_roll_record r={0};
+  int available=m10v_roll_device_snapshot(&r),open=roll_open(&r,available);
+  int active=open&&r.status==M10V_ROLL_ACTIVE;
+  uint32_t mask=roll_action_mask(available,open,active);
+  for(uint32_t i=0;i<=ROLL_PRIMARY;i++){
+   if((mask&(1u<<i))&&hub_inside(roll_box(i,active),x,y)){
+    if(!hub_roll_action(p,i))hub_draw(p);
+    break;
+   }
+  }
+ }else if(pane==HUB_HALF||pane==HUB_LIVE){
+  if(x>=34&&x<686&&y>=86&&y<(pane==HUB_LIVE?245u:192u)){p->state.focus=(y-86)/53;p->state.slot=0;hub_draw(p);}
   else if(y>=419&&y<464){
    if(x>=460&&x<568)return hub_key(p,M10V_KEY_BACK);
    if(x>=578&&x<686)return hub_key(p,M10V_KEY_OK);
   }
  }else if(pane<=2){
   if(x>=34&&x<686&&y>=M10V_HUB_ROW_Y){
-   uint32_t row=(y-M10V_HUB_ROW_Y)/M10V_HUB_ROW_HEIGHT,total=0;
+   uint32_t height=pane==1&&hub_extended(p)?M10V_HUB_EFFECT_R6_HEIGHT:M10V_HUB_ROW_HEIGHT;
+   uint32_t row=(y-M10V_HUB_ROW_Y)/height,total=0;
    for(uint32_t bits=hub_mask(p);bits;bits>>=1)total+=bits&1u;
    if(row<total){p->state.focus=row;hub_activate(p,row);}
   }
@@ -852,6 +1121,7 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
   * dispatch adapter retries only an unhandled first press on this owned page. */
  if(raw==4||raw==5||raw==0x1b){
 #if M10V_MENU_HUB
+  if(p->page==M10V_SETTINGS_FILMS&&p->roll_picker&&raw==0x1b)return 1;
   if(raw==5&&p->page==M10V_SETTINGS_FILMS&&p->state.screen==M10V_SETTINGS_FILM_DETAIL){
    uint32_t payload=*(const uint32_t *)(uintptr_t)(event+4);
    if(!ab_ram(payload,8)||*(const uint8_t *)(uintptr_t)payload!=1||
@@ -895,6 +1165,8 @@ uint32_t m10v_settings_controller_key(m10v_settings_controller *p,uint32_t event
 #if M10V_MENU_HUB
  if(p->page==HUB_PAGE)return hub_key(p,key);
 #if !M10V_CAMERA_GR3X
+ if(p->page==M10V_SETTINGS_FILMS&&p->roll_picker&&p->state.screen==M10V_SETTINGS_CATALOG&&key==M10V_KEY_OK)
+  return roll_catalog_pick(p,p->state.index);
  if(p->page==M10V_SETTINGS_FILMS&&p->state.screen==M10V_SETTINGS_FILM_DETAIL)return film_detail_key(p,key);
 #endif
 #endif

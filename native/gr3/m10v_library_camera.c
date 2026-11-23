@@ -70,6 +70,11 @@ typedef struct {uint32_t magic,version; m10v_library_state state;custom_profile 
 #if M10V_PHOTO_RECIPE
  uint32_t adj_tone,box;
 #endif
+#if M10V_ROLL_NATIVE_DEVICE
+ uint32_t roll_tone,roll_crc;
+ m10v_slot roll_slot;
+ m10v_film_effects roll_effect;
+#endif
 } preview_cache;
 _Static_assert(sizeof(preview_cache)<=PREVIEW_BYTES,"preview owner capacity");
 static preview_cache *preview_owner(void){
@@ -115,6 +120,9 @@ static void publish_preview(preview_cache *p,const m10v_library_state *s){
     if((v&1u)||!__atomic_compare_exchange_n(&p->version,&v,v+1,0,__ATOMIC_ACQ_REL,__ATOMIC_RELAXED))return;
     if(!refresh_profiles(p,s,v+1))return;
     copy(&p->state,s);
+#if M10V_ROLL_NATIVE_DEVICE
+    p->roll_tone=0;
+#endif
 #if M10V_PHOTO_RECIPE
     p->box=active_box();
 #endif
@@ -142,6 +150,9 @@ void m10v_camera_library_mutation_end(const m10v_library_state *state){
  preview_cache *p=preview_owner();if(!p)return;
  uint32_t v=__atomic_load_n(&p->version,__ATOMIC_ACQUIRE);if(!(v&1u))return;
  if(m10v_library_valid(state)){if(!refresh_profiles(p,state,v))return;copy(&p->state,state);
+#if M10V_ROLL_NATIVE_DEVICE
+ p->roll_tone=0;
+#endif
 #if M10V_PHOTO_RECIPE
  p->box=active_box();
 #endif
@@ -151,7 +162,7 @@ void m10v_camera_library_mutation_end(const m10v_library_state *state){
  (void)state;
 #endif
 }
-int m10v_camera_library_preview(m10v_library_state *out){
+static int preview_state(m10v_library_state *out,uint32_t tone){
 #if M10V_LIVE_COLOR
     preview_cache *p=preview_owner();if(!p||!ram(out,sizeof(*out)))return 0;
     uint32_t before=__atomic_load_n(&p->version,__ATOMIC_ACQUIRE);
@@ -160,15 +171,71 @@ int m10v_camera_library_preview(m10v_library_state *out){
     uint32_t box=active_box();
     if(p->box!=box)return 0;
 #endif
-    copy(out,&p->state);__atomic_thread_fence(__ATOMIC_ACQUIRE);
+#if M10V_ROLL_NATIVE_DEVICE
+    copy(out,&p->state);
+    if(tone&&p->roll_tone==tone){
+        uint32_t slot=m10v_tone_slot(tone);
+        if(slot>=M10V_SLOT_COUNT)return 0;
+        out->slots[slot]=p->roll_slot;
+        out->effects[slot]=p->roll_effect;
+        out->sequence++;
+        out->crc=p->roll_crc;
+    }
+#else
+    (void)tone;copy(out,&p->state);
+#endif
+    __atomic_thread_fence(__ATOMIC_ACQUIRE);
 #if M10V_PHOTO_RECIPE
     if(box!=active_box())return 0;
 #endif
     return p->magic==PREVIEW_MAGIC&&before==__atomic_load_n(&p->version,__ATOMIC_RELAXED)&&m10v_library_valid(out)&&!(out->reserved&510u);
 #else
-    (void)out;return 0;
+    (void)out;(void)tone;return 0;
 #endif
 }
+int m10v_camera_library_preview(m10v_library_state *out){return preview_state(out,0);}
+#if M10V_ROLL_NATIVE_DEVICE
+int m10v_camera_library_roll_preview(m10v_library_state *out,uint32_t tone){return preview_state(out,tone);}
+
+static int roll_in_memory(void *context,const m10v_library_state *state){
+ (void)context;(void)state;return 0;
+}
+
+uint32_t m10v_camera_library_roll_prepare(uint32_t film,int apply){
+ preview_cache *p=preview_owner();
+ if(!p)return 0;
+ uint32_t version=__atomic_load_n(&p->version,__ATOMIC_ACQUIRE);
+ if(!version||(version&1u))return 0;
+ if(!film){
+  if(!__atomic_compare_exchange_n(&p->version,&version,version+1,0,__ATOMIC_ACQ_REL,__ATOMIC_RELAXED))return 0;
+  p->roll_tone=0;
+  __atomic_store_n(&p->version,version+2,__ATOMIC_RELEASE);
+  return 1;
+ }
+ m10v_library_state state;
+ if(!preview_state(&state,0))return 0;
+ uint32_t count=m10v_library_count(&state),slot=0;
+ while(slot<count&&state.slots[slot].film!=film)slot++;
+ int temporary=slot==count;
+ if(temporary){
+  if(!M10V_BUILTIN(film)||M10V_ANIME(film))return 0;
+  slot=count<M10V_SLOT_COUNT?count:0u;
+  if(m10v_library_select(&state,slot,film,roll_in_memory,0))return 0;
+ }else if(M10V_CUSTOM(film)){
+  uint32_t bank=state.effects[slot].reserved[0];
+  if(bank<M10V_CUSTOM_IMMUTABLE_FIRST||p->profiles[slot].id!=film||p->profiles[slot].bank!=bank)return 0;
+ }
+ uint32_t tone=m10v_slot_tone(slot);
+ if(!apply)return tone;
+ if(preview_owner()!=p||!__atomic_compare_exchange_n(&p->version,&version,version+1,0,__ATOMIC_ACQ_REL,__ATOMIC_RELAXED))return 0;
+ p->roll_tone=temporary?tone:0;
+ if(temporary){
+  p->roll_slot=state.slots[slot];p->roll_effect=state.effects[slot];p->roll_crc=state.crc;
+ }
+ __atomic_store_n(&p->version,version+2,__ATOMIC_RELEASE);
+ return tone;
+}
+#endif
 int m10v_camera_library_custom_profile(const m10v_library_state *state,uint32_t slot,m10v_isp_frame_target *out){
 #if M10V_LIVE_COLOR && M10V_SD_LIBRARY
  preview_cache *p=preview_owner();
@@ -211,6 +278,9 @@ void m10v_camera_library_preview_init(uint32_t owner){
     if(!ram((void *)(uintptr_t)owner,PREVIEW_OFFSET+PREVIEW_BYTES))return;
     preview_cache *p=(preview_cache *)(uintptr_t)(owner+PREVIEW_OFFSET);
     p->magic=0;p->version=0;
+#if M10V_ROLL_NATIVE_DEVICE
+    p->roll_tone=0;
+#endif
 #if M10V_PHOTO_RECIPE
     p->adj_tone=0;p->box=0;
 #endif

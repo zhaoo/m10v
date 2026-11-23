@@ -1,5 +1,5 @@
 """Use real sockets against the compiled C service with an explicit host backend."""
-import hashlib,hmac,http.client,json,os,subprocess,tempfile,time,unittest
+import base64,hashlib,hmac,http.client,json,os,subprocess,tempfile,time,unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 KEY=bytes(range(32)) # Public fixture only; never a package key.
@@ -11,6 +11,8 @@ class Server(unittest.TestCase):
   if result.returncode:raise AssertionError(result.stderr)
  def setUp(self):
   env=dict(os.environ);self.key=KEY;self.key_id='fixture-key'
+  if self._testMethodName.startswith('test_live_'):env['M10V_TEST_LIVE']='1'
+  if self._testMethodName.startswith('test_roll_index_'):env['M10V_TEST_ROLL_INDEX']='1'
   if self._testMethodName=='test_hotspot_bootstrap_reads_and_signs_with_boot_key':env['M10V_TEST_HOTSPOT']='1'
   if self._testMethodName=='test_upload_chunks_verified_then_install_is_separate':env['M10V_TEST_UPLOAD']='1'
   if self._testMethodName=='test_full_ten_slot_snapshot_and_receipt_fit_response_budget':env['M10V_TEST_FULL_TEN']='1'
@@ -69,14 +71,49 @@ class Server(unittest.TestCase):
    _,receipt=self.request('GET','/m10v/v1/operations/'+'a'*32)
    if receipt['status']=='committed':break
   self.assertEqual(receipt['status'],'committed')
+ def test_roll_index_reads_closed_journal_before_any_jpeg_download(self):
+  code,value=self.request('GET','/m10v/v1/rolls/latest');self.assertEqual(code,200)
+  self.assertEqual(value['latest']['status'],3);self.assertEqual(value['latest']['count'],0)
+  self.assertEqual(value['latest']['filmId'],66)
+  code,value=self.request('GET','/m10v/v1/rolls/photos/0');self.assertEqual(code,200)
+  self.assertEqual(value['photos'][0]['id'],'11'*16)
+  self.assertEqual(value['photos'][0]['frame'],7)
+  self.assertEqual(value['nextCursor'],65537);self.assertTrue(value['hasMore'])
+  self.assertEqual(self.request('GET','/m10v/v1/rolls/photos/1')[0],409)
+ def test_roll_index_rejects_malformed_bounds_and_requires_authentication(self):
+  for suffix in ['photos/4294967296','photos/0001','photos/-1','photos/1x','photos/','other']:
+   self.assertEqual(self.request('GET','/m10v/v1/rolls/'+suffix)[0],400)
+  self.assertEqual(self.request('GET','/m10v/v1/rolls/latest',bad_signature=True)[0],401)
+  self.assertNotEqual(self.request('POST','/m10v/v1/rolls/latest')[0],200)
+ def test_live_returns_authenticated_manifest_and_bounded_chunks(self):
+  path='/m10v/v1/live/100RICOH/R0000001/JPG'
+  code,manifest=self.request('GET',path)
+  self.assertEqual(code,200)
+  self.assertEqual(manifest,{'version':1,
+      'jpeg':{'directory':'100RICOH','file':'R0000001.JPG','sha256':'21'*32},
+      'clip':{'format':'m10l','directory':'M10VLIVE','file':'A01.M10L','sha256':'32'*32,'bytes':2052},
+      'presentationTimestampUs':1500000})
+  code,chunk=self.request('GET',path+'/clip/0')
+  self.assertEqual(code,200)
+  self.assertEqual(chunk['offset'],0)
+  self.assertEqual(chunk['bytes'],2052)
+  self.assertEqual(base64.b64decode(chunk['data']),bytes(range(256))*8)
+  code,chunk=self.request('GET',path+'/clip/2048')
+  self.assertEqual(code,200)
+  self.assertEqual(base64.b64decode(chunk['data']),b'\0\1\2\3')
+  self.assertEqual(self.request('GET',path+'/clip/2052')[0],400)
+  self.assertEqual(self.request('GET',path+'/clip/99999999999999999')[0],400)
+  self.assertEqual(self.request('GET',path.replace('0000001','0000002'))[0],404)
+  self.assertEqual(self.request('GET',path,bad_signature=True)[0],401)
+
  def test_legacy_service_never_releases_its_pairing_key(self):
   self.assertEqual(self.hotspot({'Host':'192.168.0.1:18743','X-M10V-Hotspot':'1'})[0],401)
  def envelope(self,state,request_id='a'*32):return {'protocol':1,'requestId':request_id,'bootId':self.boot,'baseRevision':state['revision'],'catalogHash':state['catalogHash'],'rendererHash':state['rendererHash'],'patch':[{'slot':0,'grain':2}],'activateSlot':None}
  def test_extensions_independent_discovery_and_verified_commit(self):
   status,caps=self.request('GET','/m10v/v1/extensions/capabilities');self.assertEqual(status,200)
-  self.assertEqual(caps['schema'],'m10v.extensions/v1');self.assertEqual(len(caps['fields']),25)
+  self.assertEqual(caps['schema'],'m10v.extensions/v1')
   contract=json.loads((ROOT/'contracts/extensions-v1.json').read_text())
-  self.assertEqual([{k:v for k,v in f.items() if k!='supported'} for f in caps['fields']],[{k:v for k,v in f.items() if k!='id'} for f in contract['fields']])
+  self.assertEqual([{k:v for k,v in f.items() if k!='supported'} for f in caps['fields']],[{k:f[k] for k in ('key','min','max','persistence')} for f in contract['fields']])
   self.assertEqual(caps['powerImages'],{'supported':False,'reason':'firmwareBuildRequired'})
   status,state=self.request('GET','/m10v/v1/extensions/state');self.assertEqual(status,200)
   self.assertEqual(set(state['values']),set(state['supported']))
@@ -201,6 +238,7 @@ class Server(unittest.TestCase):
 
  def test_capabilities_and_snapshot_include_all_ten_slots(self):
   code,caps=self.request('GET','/m10v/v1/capabilities');self.assertEqual(code,200);self.assertEqual(caps['slotCount'],10)
+  self.assertIs(caps['capabilities']['live'],False)
   code,state=self.request('GET','/m10v/v1/state');self.assertEqual(code,200);self.assertEqual(state['schemaVersion'],2);self.assertEqual(len(state['config']['slots']),10)
   self.assertEqual(state['config']['slots'][9]['filmId'],0)
 

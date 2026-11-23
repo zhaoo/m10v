@@ -3,6 +3,7 @@
  * domain; Custom1/2 are bank selectors, never tone IDs written to a frame. */
 #include "m10v_tone.h"
 #include "m10v_library.h"
+#include "m10v_roll_device.h"
 #ifndef M10V_NATIVE_BASE
 #define M10V_NATIVE_BASE 0x540b6000u
 #endif
@@ -63,6 +64,7 @@ static int adj_scope(uint32_t c){
 }
 #endif
 static uint32_t adj_commit_row(uint32_t controller,uint32_t row,uint8_t *m){
+ if(shooting(m)&&m10v_roll_device_locked())return 0;
  if(shooting(m)){
   if(row==12||row==13)row=m10v_camera_library_shooting_count()+row-12;
   else if(row>=14&&row<m10v_camera_library_menu_index())row-=2;
@@ -71,6 +73,12 @@ static uint32_t adj_commit_row(uint32_t controller,uint32_t row,uint8_t *m){
 }
 uint32_t m10v_tone_menu_adj_select(uint32_t controller,uint32_t row){
  uint8_t *m=model();
+ if(shooting(m)&&m10v_roll_device_locked()){
+#if M10V_PHOTO_RECIPE
+  m10v_camera_library_adj_tone_set(0);
+#endif
+  return 0;
+ }
 #if M10V_PHOTO_RECIPE
  if(adj_scope(controller)&&shooting(m)){
   uint32_t tone=m10v_tone_menu_index((uint32_t)(uintptr_t)m,row);

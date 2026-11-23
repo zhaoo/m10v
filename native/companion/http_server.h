@@ -2,6 +2,7 @@
 #define M10V_COMPANION_HTTP_SERVER_H
 #include "auth.h"
 #include "extensions.h"
+#include "roll_photo.h"
 #define M10V_HTTP_RESPONSE_BYTES 4096u
 #include "operations.h"
 #include "film_upload.h"
@@ -14,6 +15,37 @@ typedef struct {unsigned status,has_snapshot;m10v_companion_snapshot *snapshot;}
 /* exchange is one NONBLOCKING owner-mailbox turn. Never retain output pointers
  * or run RTOS/storage calls on Linux. BUSY/asynchronous progress is polled. */
 typedef struct {void *ctx;int (*exchange)(void*,const m10v_backend_request*,m10v_backend_response*);} m10v_companion_backend;
+enum {M10V_LIVE_HTTP_CHUNK=2048u,M10V_LIVE_HTTP_BYTES=24u+48u*(131072u+8u)};
+typedef struct {
+ uint8_t jpeg_sha256[32],clip_sha256[32];
+ char clip_directory[17],clip_file[23];
+ uint32_t bytes,presentation_us;
+ uint8_t kind; /* 1: M10L, 2: MP4 */
+} m10v_live_pair;
+typedef struct {
+ void *context;
+ /* Resolves only a completed pair for this exact DCF photo. 0 means absent,
+  * 1 available, and -1 unavailable. A read must match the immutable pair. */
+ int (*lookup)(void *,const char *,const char *,m10v_live_pair *);
+ int (*read)(void *,const m10v_live_pair *,uint32_t,uint8_t *,uint32_t);
+} m10v_live_source;
+enum { M10V_ROLL_INDEX_PAGE = 12 };
+typedef struct {
+ m10v_roll_photo_metadata marker;
+ char directory[9], file[13];
+} m10v_roll_index_photo;
+typedef struct {
+ uint32_t next_cursor, checked, skipped;
+ uint8_t count, has_more, truncated;
+ m10v_roll_index_photo photos[M10V_ROLL_INDEX_PAGE];
+} m10v_roll_index_page;
+typedef struct {
+ void *context;
+ /* latest: 1 valid, 0 no journal, -1 unreadable; never writes/recovers. */
+ int (*latest)(void *,m10v_roll_record *);
+ /* 1 page, 0 stale cursor, -1 unavailable. Cursor 0 starts a bounded scan. */
+ int (*photos)(void *,uint32_t,m10v_roll_index_page *);
+} m10v_roll_index_source;
 typedef struct {
  uint8_t key[32],instance_id[16],build_id[32],catalog_hash[32],renderer_hash[32];char key_id[33];
  m10v_random_bytes random;void *random_ctx;
@@ -21,11 +53,13 @@ typedef struct {
  uint32_t operation_timeout_ms;
  uint8_t read_state,write_state,upload_film,capture_evidence,wifi_verified,hotspot_pairing;
  uint8_t wifi_address[4];char wifi_interface[16];
+ const m10v_live_source *live;
+ const m10v_roll_index_source *rolls;
 } m10v_companion_server_config;
 typedef struct {uint8_t request_id[16],digest[32];union {m10v_companion_snapshot snapshot;m10v_extension_snapshot extension_snapshot;};uint8_t status,error,has_snapshot,occupied,extension;} m10v_operation_receipt;
 typedef struct {
  const m10v_companion_server_config *config;m10v_companion_backend backend;m10v_auth_state auth;
- uint8_t input[M10V_HTTP_MAX_BODY];union {uint8_t bytes[M10V_HTTP_RESPONSE_BYTES];m10v_json_token tokens[M10V_JSON_TOKENS];} output;
+ union {uint8_t input[M10V_HTTP_MAX_BODY];m10v_roll_index_page roll_index_page;};union {uint8_t bytes[M10V_HTTP_RESPONSE_BYTES];m10v_json_token tokens[M10V_JSON_TOKENS];} output;
  uint8_t staging[12288];union {uint8_t reserved[128];m10v_film_upload upload;} film;uint8_t seen_operations[256];
  m10v_operation_receipt receipts[32];union {m10v_companion_patch pending_patch;m10v_extension_patch pending_extension;};
  m10v_http_request request;uint64_t pending_since;int pending_index;

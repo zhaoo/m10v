@@ -152,6 +152,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  uint32_t name_page=s->screen==M10V_SETTINGS_NAME;
  uint32_t ab_page=s->screen==M10V_SETTINGS_AB;
  uint32_t catalog=s->screen==M10V_SETTINGS_CATALOG;
+ uint32_t roll_catalog=catalog&&s->slot==M10V_ROLL_CATALOG_MODE;
  uint32_t films=s->screen==M10V_SETTINGS_FILMS||catalog;
 #if M10V_MENU_HUB
  uint32_t film_detail=s->screen==M10V_SETTINGS_FILM_DETAIL;
@@ -164,7 +165,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
  uint32_t error=s->error>=1&&s->error<=4;
  visible(v->widgets[TITLE],M10V_MENU_HUB||!catalog||error);
  visible(v->widgets[FOOTER],!catalog);
- visible(v->widgets[SELECTED_COUNT],catalog);
+ visible(v->widgets[SELECTED_COUNT],catalog&&!roll_catalog);
 #if M10V_MENU_HUB
  visible(v->widgets[THEME],m10v_settings_view_theme(v->widgets[THEME],
    films?0:name_page?1:s->screen==M10V_SETTINGS_WATERMARK?2:film_detail?m10v_film_detail_rows(s):4,
@@ -191,7 +192,7 @@ void m10v_settings_view_draw(m10v_settings_view *v,const m10v_settings *s,const 
   visible(v->widgets[ICON+i],films&&id);
   /* Rectangle palette6 is yellow; unselected frames use background1. */
   color(v->widgets[FRAME+i],i==focus?6:1);
-  uint32_t enabled=0;for(uint32_t k=0;k<M10V_SLOT_COUNT;k++)if(s->saved.slots[k].film==id&&id)enabled=1;
+  uint32_t enabled=0;for(uint32_t k=0;!roll_catalog&&k<M10V_SLOT_COUNT;k++)if(s->saved.slots[k].film==id&&id)enabled=1;
   if(id){
    uint32_t icon=id==M10V_MARLBORO_ID?M10V_MARLBORO_ICON:M10V_THREE_FILM(id)?M10V_THREE_FILM_ICON(id):M10V_LEICA(id)?M10V_LEICA_ICON(id):M10V_FOUR_LOOKS(id)?M10V_FOUR_LOOKS_ICON(id):M10V_EXTRA_FILM(id)?M10V_EXTRA_FILM_ICON(id):M10V_C41(id)?M10V_C41_ICON(id):M10V_ANIME_E6(id)?M10V_ANIME_E6_ICON_FIRST+id-306:M10V_D76(id)?775+id-M10V_D76_FIRST:id==M10V_5213_ID?774:M10V_STYLE(id)?762+id-M10V_STYLE_FIRST:id==M10V_PIXEL_ID?761:id==M10V_CHAR_ID?755:M10V_CUSTOM(id)?754:670+id;
    if(v->widgets[M10V_VIEW_HEAP]){

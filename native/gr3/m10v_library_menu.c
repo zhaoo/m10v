@@ -6,6 +6,7 @@
  * the five real stock slots. The original controller owns view allocation.
  */
 #include "m10v_tone.h"
+#include "m10v_roll_device.h"
 #include "m10v_library.h"
 #include "m10v_debug.h"
 #include "m10v_recorded_film.h"
@@ -288,6 +289,7 @@ void m10v_menu_playback_name_refresh(uint32_t controller) {
 #endif
 uint32_t m10v_menu_focus(uint32_t controller, uint32_t index) {
     uint8_t *m = model();
+    if(supported(m)&&m10v_roll_device_locked())return 0;
     M10V_LOG(30,controller,index,m[0],(uint32_t)m[0x1d]|((uint32_t)m[0x1e]<<8));
     uint32_t result=0;
     if(M10V_APPENDED_SLOTS&&supported(m)&&!mode(m)&&index>=12&&index<m10v_camera_library_menu_index()){
@@ -341,6 +343,7 @@ uint32_t m10v_menu_confirm(uint32_t controller) {
 #endif
     uint8_t *m = model();
     if (!supported(m)) return ((get_fn)(M10V_NATIVE_BASE + 0x60u))(controller);
+    if(m10v_roll_device_locked())return 0;
     uint32_t view = *(const uint32_t *)(uintptr_t)(controller + 0x174u);
     uint32_t index = ((get_fn)0x53394820u)(view), group = mode(m);
     if((group>=15&&group<=20)||group==4)return 0;
