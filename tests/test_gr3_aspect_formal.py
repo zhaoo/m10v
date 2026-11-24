@@ -120,11 +120,24 @@ class FormalAspectSelection(unittest.TestCase):
 
         def boot(files):
             machine = card.card_machine(files, original_aspect=True)
+            if card.manifest.get('debug_mode'):
+                # This fixture owns roll-journal I/O, not the separate GUI SD
+                # logging facade. Capture that diagnostic filesystem boundary;
+                # diagnostic producer and CRC logger instructions have separate
+                # exact-ARM coverage, while all roll/control code stays real.
+                machine.diagnostic_events=[]
+                def diagnostic_sink(u,address,_size,_context):
+                    if address==symbols['m10v_debug_log']:
+                        machine.diagnostic_events.append(u.reg_read(registers.UC_ARM_REG_R0))
+                        u.reg_write(registers.UC_ARM_REG_R0,0)
+                        u.reg_write(registers.UC_ARM_REG_PC,u.reg_read(registers.UC_ARM_REG_LR))
+                machine.u.hook_add(UC_HOOK_CODE,diagnostic_sink)
             machine.set(0x55063ed0, 1)
             machine.set(0x55063f34, support.PROPERTIES)
             machine.u.mem_write(support.PROPERTIES + 0x44, b'\1')
             machine.run(symbols['m10v_half_pair_init'], roll.OWNER)
             self.assertEqual(machine.run(symbols['m10v_settings_half_set'], 1), 0)
+            if card.manifest.get('debug_mode'):self.assertIn(415,machine.diagnostic_events)
 
             def publication(u, address, _size, _context):
                 if address == 0x532288b0:

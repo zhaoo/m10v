@@ -27,7 +27,7 @@ static uint32_t event_channel(uint32_t event){
     if(event==M10V_TORN_OUTCOME_EVENT)return 5u;
 #endif
     return (event>=230&&event<=315)||(event>=85&&event<=99)?4u:event>=180&&event<=209?3u:
-        (event>=340&&event<=344)?1u:event>=100?2u:1u;
+        ((event>=340&&event<=344)||(event>=360&&event<=383)||(event>=400&&event<=417))?1u:event>=100?2u:1u;
 }
 static int ram(uint32_t p,uint32_t n){return !(p&3)&&p>=0x55000000u&&p<0x80000000u&&n<=0x80000000u-p;}
 static int code(uint32_t p,uint32_t n){return !(p&3)&&p>=0x53000000u&&p<0x540b6000u&&n<=0x540b6000u-p;}
@@ -60,7 +60,15 @@ int m10v_debug_batch(const uint32_t *events,uint32_t count){
 #if M10V_ADJ_EXIT_TRACE
     /* Diagnostic candidate only: retain exit and guide evidence, suppress unrelated
      * preview/capture/menu traffic and its filesystem transactions. */
-    for(uint32_t i=0;i<count;i++)if(events[i*5]!=198&&events[i*5]!=212&&(events[i*5]<230||events[i*5]>315))return 0;
+#if M10V_CONTROLS_TRACE_ONLY
+    for(uint32_t i=0;i<count;i++)if((events[i*5]<360||events[i*5]>383)&&
+        (events[i*5]<400||events[i*5]>417))return 0;
+#else
+    for(uint32_t i=0;i<count;i++)if(events[i*5]!=198&&events[i*5]!=212&&
+        (events[i*5]<230||events[i*5]>315)&&
+        (events[i*5]<360||events[i*5]>383)&&
+        (events[i*5]<400||events[i*5]>417))return 0;
+#endif
 #endif
     uint32_t channel=event_channel(events[0]),mask=1;
     for(uint32_t i=0;i<count;++i)if(event_channel(events[i*5])!=channel)return 0;

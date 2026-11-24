@@ -8,7 +8,7 @@ int m10v_linux_pause_ms(unsigned);
 #ifndef M10V_COMPANION_DIAGNOSTICS
 #define M10V_COMPANION_DIAGNOSTICS 0
 #endif
-#if M10V_COMPANION_LIVE_SOURCE && M10V_COMPANION_DIAGNOSTICS
+#if M10V_COMPANION_DIAGNOSTICS
 void m10v_linux_diagnostics_start(void);
 void m10v_linux_trace(const char *, const uint32_t *, unsigned);
 #else

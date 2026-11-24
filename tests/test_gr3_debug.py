@@ -362,3 +362,37 @@ class ExitOnlyLogArmTests(unittest.TestCase):
     def test_unavailable_card_returns_without_retry_or_fabricated_record(self):
         self.available=False;self.assertEqual(self.log(230),0)
         self.assertEqual(self.calls,[]);self.assertEqual(self.files,{})
+
+    def test_film_selection_trace_survives_exit_filter_on_the_menu_channel(self):
+        for event in range(360,384):
+            self.assertEqual(self.log(event,0x55050000,25,331,7),1)
+        rows=self.decoded()['records']
+        self.assertEqual([r['event'] for r in rows],list(range(360,384)))
+        self.assertTrue(all(r['channel']=='menu' for r in rows))
+        self.assertEqual(set(self.files),{'C:\\M10VMN0.BIN','C:\\M10VMN1.BIN'})
+        self.assertEqual(rows[0]['film_selection']['chosen_tone'],7)
+        self.assertEqual(rows[0]['film_selection']['active_tone'],25)
+        self.assertEqual(rows[0]['film_selection']['candidate_tone'],331)
+        self.assertTrue(rows[0]['film_selection']['diagnostic_only'])
+
+    def test_film_trace_decodes_target_slot_value_signed_failure_and_context(self):
+        self.assertEqual(self.log(366,0x55050000,0x0200f100,(8<<16)|2,27),1)
+        self.assertEqual(self.log(370,0x55050200,332,1,(2<<16)|0x103),1)
+        self.assertEqual(self.log(371,0x55050200,332,0xffffffff,19),1)
+        rows=self.decoded()['records']
+        self.assertEqual(rows[0]['film_selection']['route'],'0x200f100')
+        self.assertEqual(rows[0]['film_selection']['screen'],8)
+        self.assertEqual(rows[0]['film_selection']['target_slot'],2)
+        self.assertEqual(rows[1]['film_selection']['field'],2)
+        self.assertEqual(rows[1]['film_selection']['value'],3)
+        self.assertTrue(rows[1]['film_selection']['editing'])
+        self.assertEqual(rows[2]['film_selection']['result'],-1)
+
+    def test_fn_route_decode_keeps_parent150_separate_from_native_flag128(self):
+        self.assertEqual(self.log(383,0x59f55820,0x02000014,0x02000000,0x02000001),1)
+        row=self.decoded()['records'][-1]
+        self.assertEqual(row['stage'],'film.fn.native-routing')
+        trace=row['film_selection']
+        self.assertEqual(trace['route'],'0x2000014')
+        self.assertEqual(trace['parent_route'],'0x2000000')
+        self.assertEqual(trace['native_flag128'],0x02000001)

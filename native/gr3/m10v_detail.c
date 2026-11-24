@@ -16,18 +16,61 @@ static int ram(uint32_t p,uint32_t n){return !(p&3)&&p>=0x55000000u&&p<0x8000000
 /* Fn owns a frozen editing target. ADJ browsing deliberately does not change
  * the shooting model: sample its pending look only at this page entry. Never
  * retarget a slider while another highlight or live preview changes later. */
+extern uint32_t m10v_detail_open_original(uint32_t,uint32_t);
+uint32_t m10v_detail_open(uint32_t controller,uint32_t action){
+#if M10V_PHOTO_RECIPE
+ extern uint32_t m10v_camera_library_detail_stage(uint32_t);
+ extern uint32_t m10v_adj_extra_camera_virtual_focus(uint32_t);
+ extern uint32_t m10v_adj_extra_camera_detail_cursor(uint32_t);
+ if(action==2){
+  uint32_t tone=0,row=0xffffffffu,kind=0,list=0;
+  uint32_t virtual_focus=m10v_adj_extra_camera_virtual_focus(controller);
+  m10v_camera_library_detail_stage(0);
+  if(ram(controller,0x274)&&*(const uint32_t *)(uintptr_t)controller==0x53b394e0u&&
+     *(const uint32_t *)(uintptr_t)(controller+0x124)==0x02000000u&&
+     !*(const uint8_t *)(uintptr_t)(controller+0x270)){
+   kind=((fn2)0x531a2820u)(controller,*(const uint8_t *)(uintptr_t)(controller+0x1f4));
+   list=*(const uint32_t *)(uintptr_t)(controller+0x1f0);
+   if(kind==12&&m10v_adj_extra_camera_detail_cursor(controller)&&ram(list,0x112)){
+    uint32_t model=((fn1)0x5320ba9cu)(((fn1)0x5320ad88u)(0));
+    row=((fn1)0x53394820u)(list);
+    if(model==0x55068200u&&!((const uint8_t *)(uintptr_t)model)[0x1b]&&
+       row>=14u&&row-14u<M10V_SLOT_COUNT)tone=25u+row-14u;
+   }
+  }
+  M10V_LOG(376,controller,action,kind,list);
+  M10V_LOG(377,controller,row,tone,m10v_tone_slot(tone));
+  uint32_t staged=m10v_camera_library_detail_stage(tone);
+  M10V_LOG(378,controller,tone,staged,virtual_focus);
+  (void)virtual_focus;(void)staged;
+ }
+#endif
+ return m10v_detail_open_original(controller,action);
+}
 uint32_t m10v_detail_tone(uint32_t address,uint32_t ui){
  (void)ui; /* Profiles without photo recipes keep the exact stock getter. */
 #if M10V_PHOTO_RECIPE
  extern uint32_t m10v_camera_library_adj_tone(void);
+ extern uint32_t m10v_camera_library_detail_claim(uint32_t);
  if(ram(ui,0x1a0)&&!((const uint8_t *)(uintptr_t)ui)[0x19b]&&
     !((const uint8_t *)(uintptr_t)ui)[0x19d]&&
     address==0x55068200u&&!((const uint8_t *)(uintptr_t)address)[0x1b]){
-  uint32_t candidate=m10v_camera_library_adj_tone();
-  if(m10v_tone_slot(candidate)<M10V_SLOT_COUNT)return candidate;
+  M10V_LOG(383,ui,*(const uint32_t *)(uintptr_t)(ui+0x124),
+    *(const uint32_t *)(uintptr_t)(ui+0x150),*(const uint32_t *)(uintptr_t)(ui+0x128));
+  uint32_t handoff=m10v_camera_library_detail_claim(ui);
+  uint32_t candidate=handoff?handoff:m10v_camera_library_adj_tone();
+  M10V_LOG(379,ui,handoff,candidate,*(const uint32_t *)(uintptr_t)(ui+0x150));
+  if(m10v_tone_slot(candidate)<M10V_SLOT_COUNT){
+   M10V_LOG(360,ui,((fn1)0x532bd6b4u)(address),candidate,candidate);
+   M10V_LOG(361,ui,((const uint8_t *)(uintptr_t)ui)[0x19b]|((uint32_t)((const uint8_t *)(uintptr_t)ui)[0x19d]<<8),address,1|((uint32_t)((const uint8_t *)(uintptr_t)address)[0x1b]<<8));
+   return candidate;
+  }
  }
 #endif
- return ((fn1)0x532bd6b4u)(address);
+ uint32_t active=((fn1)0x532bd6b4u)(address);
+ M10V_LOG(360,ui,active,0,active);
+ M10V_LOG(361,ui,ram(ui,0x1a0)?((const uint8_t *)(uintptr_t)ui)[0x19b]|((uint32_t)((const uint8_t *)(uintptr_t)ui)[0x19d]<<8):0xffffffffu,address,address==0x55068200u?((uint32_t)((const uint8_t *)(uintptr_t)address)[0x1b]<<8):0xffff0000u);
+ return active;
 }
 uint32_t m10v_detail_kind(uint32_t ui,uint32_t tone){
  /* All appended carriers use the private per-film list; the stock switch has
@@ -139,6 +182,8 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
  if(op==2||op==7){
   if(op==2&&(v>limit(field)||(field==10&&film==67&&v>1)))return 0;
   uint32_t previous=op==2?value(&s,(uint32_t)target,field):0;
+  M10V_LOG(362,ui,op,arg,(uint32_t)target);
+  M10V_LOG(363,ui,film,s.sequence,s.crc);
   int result;
   if(op==2&&field==6)M10V_EXIT_LOG(312,ui,previous,v,s.sequence);
   if(op==2&&field==3)M10V_EXIT_LOG(314,ui,previous,v,s.sequence);
@@ -162,6 +207,7 @@ uint32_t m10v_detail_control(uint32_t op,uint32_t ui,uint32_t arg){
   if(op==2&&field==6)M10V_EXIT_LOG(313,ui,v,(uint32_t)result,s.sequence);
   if(op==2&&field==3)M10V_EXIT_LOG(315,ui,v,(uint32_t)result,s.sequence);
   M10V_LOG(70,18+field,previous,v,((uint32_t)target<<16)|(uint16_t)result);
+  M10V_LOG(364,ui,(uint32_t)target,(uint32_t)result,s.sequence);
   if(result){
    uint32_t slider=*(const uint32_t *)(uintptr_t)(ui+0x164),caption=*(const uint32_t *)(uintptr_t)(ui+0x160);
    if(op==2&&ram(slider,4))((fn2)0x5339ee0cu)(slider,previous);

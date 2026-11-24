@@ -243,3 +243,43 @@ int m10v_roll_camera_write_tag(const uint32_t *setter, uint32_t *entry) {
         __atomic_fetch_or(&channel->marked_outputs, kind, __ATOMIC_RELEASE);
     return 1;
 }
+
+#if M10V_DEBUG_MODE
+/* These exact JPEG worker boundaries only publish five scalar words. Native
+ * wait, thread service and descriptor ownership are untouched by observers. */
+void m10v_roll_camera_jpeg_wait(uint32_t context) {
+    m10v_roll_capture_channel *c=m10v_roll_device_capture_channel();
+    if(!c||!ram(context,0x58u))return;
+    sample(&c->jpeg_context,context);
+    sample(&c->jpeg_submits,observe(&c->jpeg_submits)+1u);
+}
+void m10v_roll_camera_jpeg_return(uint32_t context) {
+    m10v_roll_capture_channel *c=m10v_roll_device_capture_channel();
+    if(!c||!ram(context,0x58u))return;
+    uint32_t main=word(context+0x50u),extra=word(context+0x54u);
+    sample(&c->jpeg_main_bytes,ram(main,16u)?word(main+12u):0xffffffffu);
+    sample(&c->jpeg_extra_bytes,ram(extra,16u)?word(extra+12u):0xffffffffu);
+    sample(&c->jpeg_context,context);
+    sample(&c->jpeg_returns,observe(&c->jpeg_returns)+1u);
+}
+/* One bounded try-publish per real native handoff. Never reads photo planes,
+ * retains caller objects, waits, or changes native buffer ownership. */
+void m10v_roll_camera_review(uint32_t stage,uint32_t source,uint32_t value,uint32_t owner){
+ m10v_roll_capture_channel *c=m10v_roll_device_capture_channel();
+ if(!c||!stage||stage>6u||!ram(source,32u))return;
+ uint32_t *d=c->review_records[stage-1u],v=__atomic_load_n(d,__ATOMIC_RELAXED);
+ if((v&1u)||!__atomic_compare_exchange_n(d,&v,v+1u,0,__ATOMIC_ACQUIRE,__ATOMIC_RELAXED))return;
+ d[1]=value;
+ for(uint32_t i=0;i<8u;i++)d[i+2u]=word(source+4u*i);
+ if(stage==1u&&ram(value,0x368u)&&ram(owner,0x50u)){
+  c->review_bank[0]=word(value+0x304u);c->review_bank[1]=word(value+0x364u);
+  /* The BE owner owns this native manager at this exact call boundary. */
+  static const uint8_t offsets[5]={0x38,0x40,0x44,0x48,0x4c};
+  for(uint32_t i=0;i<5u;i++)c->review_bank[i+2u]=word(owner+offsets[i]);
+ }
+ /* Global even stamps preserve cross-stage observation order without a lock. */
+ uint32_t stamp=__atomic_fetch_add(&c->review_clock,2u,__ATOMIC_RELAXED)+2u;
+ __atomic_store_n(d,stamp,__ATOMIC_RELEASE);
+}
+
+#endif

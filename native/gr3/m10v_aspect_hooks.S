@@ -28,8 +28,9 @@ entry common_class
     pop {r0-r4,r6,ip,lr}
     jump 0x534371ec
 entry mapper_class
-    bhi 1f
-    ldrb r4,[r3,r0]
+    /* Raw0 has no table entry; retain its native class0, but still let the
+     * ADJ canvas use a newer private UI ratio than the capture snapshot. */
+    ldrbls r4,[r3,r0]
     push {r0-r3,r5,r6,ip,lr}
     mrs r6,apsr
     mov r1,r4

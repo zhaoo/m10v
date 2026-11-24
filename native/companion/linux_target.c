@@ -69,53 +69,57 @@ int m10v_linux_target_init(m10v_linux_target*t,const m10v_linux_target_config*c,
  if(!t->io.bind_request(t->io.ctx,t->wire+128,sizeof(m10v_resident_message)))return fail(t);
  return 0;
 }
-#if M10V_COMPANION_LIVE_SOURCE
+#if M10V_COMPANION_DIAGNOSTICS && M10V_ROLL_LINUX_SERVICE
 static void roll_log(const char *, const uint32_t *, unsigned);
 static int trace_command(uint32_t command) {
- return command==1 || command==2 || command==5 || command==M10V_LIVE_DESCRIBE_COMMAND;
+ return command==1 || command==2 || command==5
+#if M10V_COMPANION_LIVE_SOURCE
+  || command==M10V_LIVE_DESCRIBE_COMMAND
+#endif
+  ;
 }
 #endif
 static int publish(m10v_linux_target*t,uint32_t command,const void*data,uint32_t bytes){
  if(t->failed||t->pending_command||bytes>M10V_RESIDENT_PAYLOAD||t->sequence>0xfffffffcu)return fail(t);
-#if M10V_COMPANION_LIVE_SOURCE
+#if M10V_COMPANION_DIAGNOSTICS && M10V_ROLL_LINUX_SERVICE
  if(command==1)roll_log("HELLO_DISCOVER_BEGIN",0,0);
 #endif
  if(discover(t,0))return fail(t);
-#if M10V_COMPANION_LIVE_SOURCE
+#if M10V_COMPANION_DIAGNOSTICS && M10V_ROLL_LINUX_SERVICE
  if(command==1)roll_log("HELLO_DISCOVER_OK",0,0);
 #endif
-#if M10V_COMPANION_LIVE_SOURCE
+#if M10V_COMPANION_DIAGNOSTICS && M10V_ROLL_LINUX_SERVICE
  if(command==1)roll_log("HELLO_CLEAR_BEGIN",(uint32_t[]){(uint32_t)(uintptr_t)&t->scratch,sizeof(t->scratch)},2);
 #endif
  clear(&t->scratch,sizeof(t->scratch));uint32_t seq=t->sequence+2;
-#if M10V_COMPANION_LIVE_SOURCE
+#if M10V_COMPANION_DIAGNOSTICS && M10V_ROLL_LINUX_SERVICE
  if(command==1)roll_log("HELLO_CLEAR_OK",0,0);
 #endif
  t->scratch.sequence=seq;t->scratch.command=command;t->scratch.bytes=bytes;
-#if M10V_COMPANION_LIVE_SOURCE
+#if M10V_COMPANION_DIAGNOSTICS && M10V_ROLL_LINUX_SERVICE
  if(command==1)roll_log("HELLO_COPY_BEGIN",(uint32_t[]){(uint32_t)(uintptr_t)data,bytes},2);
 #endif
  if(bytes)copy(t->scratch.payload,data,bytes);
-#if M10V_COMPANION_LIVE_SOURCE
+#if M10V_COMPANION_DIAGNOSTICS && M10V_ROLL_LINUX_SERVICE
  if(command==1)roll_log("HELLO_COPY_OK",0,0);
  if(command==1)roll_log("HELLO_CRC_BEGIN",(uint32_t[]){seq,t->scratch.command,t->scratch.bytes},3);
 #endif
  t->scratch.crc=m10v_resident_crc(&t->scratch,seq);
-#if M10V_COMPANION_LIVE_SOURCE
+#if M10V_COMPANION_DIAGNOSTICS && M10V_ROLL_LINUX_SERVICE
  if(command==1)roll_log("HELLO_CRC_OK",(uint32_t[]){t->scratch.crc},1);
 #endif
  t->pending_crc=t->scratch.crc;t->pending_command=command;t->sequence=seq;
-#if M10V_COMPANION_LIVE_SOURCE
+#if M10V_COMPANION_DIAGNOSTICS && M10V_ROLL_LINUX_SERVICE
  if(command==1)roll_log("HELLO_CLOCK_BEGIN",(uint32_t[]){t->scratch.crc},1);
 #endif
  t->pending_since=t->io.now_ms(t->io.ctx);
-#if M10V_COMPANION_LIVE_SOURCE
+#if M10V_COMPANION_DIAGNOSTICS && M10V_ROLL_LINUX_SERVICE
  if(command==1)roll_log("HELLO_CLOCK_OK",(uint32_t[]){(uint32_t)t->pending_since,(uint32_t)(t->pending_since>>32)},2);
 #endif
  /* Publish odd first, complete body second, even last. A failed syscall can
   * have written bytes: poison this adapter; never replay an uncertain APPLY. */
  uint32_t odd=seq|1u,request=t->wire+128;
-#if M10V_COMPANION_LIVE_SOURCE
+#if M10V_COMPANION_DIAGNOSTICS && M10V_ROLL_LINUX_SERVICE
  if(trace_command(command))roll_log("OWNER_REQUEST_BEGIN",(uint32_t[]){command,seq},2);
 #endif
 
@@ -133,7 +137,7 @@ static int receive(m10v_linux_target*t){
  if(before!=after||t->scratch.sequence!=before)return 1;
  if(t->scratch.bytes>M10V_RESIDENT_PAYLOAD||t->scratch.command!=t->pending_command||t->scratch.correlation!=t->pending_crc||m10v_resident_crc(&t->scratch,before)!=t->scratch.crc)return fail(t),-1;
  if(discover(t,0))return -1;
-#if M10V_COMPANION_LIVE_SOURCE
+#if M10V_COMPANION_DIAGNOSTICS && M10V_ROLL_LINUX_SERVICE
  if(trace_command(t->pending_command))
   roll_log("OWNER_REPLY",(uint32_t[]){t->pending_command,t->sequence,t->scratch.code},3);
 #endif
@@ -150,25 +154,8 @@ int m10v_linux_target_hello(m10v_linux_target*t){
 static void roll_log(const char *event, const uint32_t *values, unsigned count) {
 #if !M10V_COMPANION_DIAGNOSTICS
  (void)event; (void)values; (void)count;
-#elif M10V_COMPANION_LIVE_SOURCE
- m10v_linux_trace(event, values, count);
 #else
- static const char hex[] = "0123456789abcdef";
- static unsigned lines;
- char line[160];
- unsigned length = 0;
- if (lines >= 512u || count > 14u) return;
- while (*event && length < 32u) line[length++] = *event++;
- for (unsigned i = 0; i < count; i++) {
-  line[length++] = ' ';
-  for (unsigned shift = 32; shift; shift -= 4)
-   line[length++] = hex[values[i] >> (shift - 4) & 15u];
- }
- line[length++] = '\n';
- lines++;
- register unsigned r0 __asm__("r0") = 1, r1 __asm__("r1") = (unsigned)(uintptr_t)line,
-  r2 __asm__("r2") = length, r7 __asm__("r7") = 4;
- __asm__ volatile("svc 0" : "+r"(r0) : "r"(r1), "r"(r2), "r"(r7) : "memory", "cc");
+ m10v_linux_trace(event, values, count);
 #endif
 }
 
@@ -212,6 +199,9 @@ static void tick_live(m10v_linux_target *t, uint64_t now) {
 void m10v_linux_target_roll_tick(m10v_linux_target *t, uint8_t *workspace){
  static uint64_t next;
  static uint32_t attempted_ticket, next_diagnostic, last_still, last_frames;
+#if M10V_COMPANION_DIAGNOSTICS
+ static uint32_t last_review_state, last_jpeg_returns, last_handoff[M10V_REVIEW_HANDOFF_STAGES];
+#endif
  static unsigned attempts;
  if(!t||!t->ready||t->failed)return;
  m10v_linux_target_idle(t);
@@ -224,18 +214,54 @@ void m10v_linux_target_roll_tick(m10v_linux_target *t, uint8_t *workspace){
  if(now<next)return;
  next=now+500;
  if(!roll_exchange(t,M10V_ROLL_RECOVERY_NEEDED,0,0)||t->scratch.code)return;
- if(t->scratch.bytes==5+sizeof(m10v_roll_diagnostic)){
+ if(t->scratch.bytes==5+sizeof(m10v_roll_diagnostic)||
+    t->scratch.bytes==5+sizeof(m10v_roll_diagnostic)+sizeof(m10v_review_diagnostic)||
+    t->scratch.bytes==5+sizeof(m10v_roll_diagnostic)+sizeof(m10v_review_diagnostic)+sizeof(m10v_review_handoff)){
   m10v_roll_diagnostic diag;
   copy(&diag,t->scratch.payload+5,sizeof(diag));
   uint32_t time=(uint32_t)now;
+  int emitted=0;
   if(diag.version==M10V_ROLL_DIAGNOSTIC_VERSION&&
      (!next_diagnostic||(int32_t)(time-next_diagnostic)>=0||
       diag.still_producer!=last_still||diag.confirmed_frames!=last_frames)){
    uint32_t values[1+sizeof(diag)/sizeof(uint32_t)];
    values[0]=time;copy(values+1,&diag,sizeof(diag));
    roll_log("ROLL_DIAG",values,sizeof(values)/sizeof(values[0]));
+   emitted=1;
    next_diagnostic=time+5000;last_still=diag.still_producer;last_frames=diag.confirmed_frames;
   }
+#if M10V_COMPANION_DIAGNOSTICS
+  if(t->scratch.bytes==5+sizeof(diag)+sizeof(m10v_review_diagnostic)||
+     t->scratch.bytes==5+sizeof(diag)+sizeof(m10v_review_diagnostic)+sizeof(m10v_review_handoff)){
+   m10v_review_diagnostic review;
+   copy(&review,t->scratch.payload+5+sizeof(diag),sizeof(review));
+   if(review.magic==M10V_REVIEW_DIAGNOSTIC_MAGIC&&
+      (emitted||review.quick_state!=last_review_state||review.jpeg_returns!=last_jpeg_returns)){
+    uint32_t values[1+sizeof(review)/sizeof(uint32_t)];
+    values[0]=time;copy(values+1,&review,sizeof(review));
+    roll_log("R20_REVIEW",values,sizeof(values)/sizeof(values[0]));
+    last_review_state=review.quick_state;last_jpeg_returns=review.jpeg_returns;
+   }
+  }
+  if(t->scratch.bytes==5+sizeof(diag)+sizeof(m10v_review_diagnostic)+sizeof(m10v_review_handoff)){
+   const uint8_t *h=t->scratch.payload+5+sizeof(diag)+sizeof(m10v_review_diagnostic);
+   uint32_t magic;copy(&magic,h,4);
+   if(magic==M10V_REVIEW_HANDOFF_MAGIC)for(uint32_t i=0;i<M10V_REVIEW_HANDOFF_STAGES;i++){
+    uint32_t values[12];values[0]=time;values[1]=i+1u;
+    copy(values+2,h+4u+i*40u,40u);
+    if(!(values[2]&1u)&&values[2]&&(emitted||values[2]!=last_handoff[i])){
+     roll_log("R20_STAGE",values,12);
+     last_handoff[i]=values[2];
+     if(!i){
+      copy(values+1,h+offsetof(m10v_review_handoff,bank),28u);
+      roll_log("R20_BANK",values,8);
+     }
+    }
+   }
+  }
+#else
+  (void)emitted;
+#endif
  }else if(t->scratch.bytes!=5)return;
  if(t->scratch.payload[0]!=1)return;
  uint32_t ticket;copy(&ticket,t->scratch.payload+1,sizeof(ticket));

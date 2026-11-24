@@ -36,5 +36,6 @@ uint32_t m10v_adj_extra_camera_event(uint32_t controller, uint32_t event);
 uint32_t m10v_adj_extra_camera_lever_pending(uint32_t controller);
 uint32_t m10v_adj_extra_camera_slot_type(uint32_t controller, uint32_t slot);
 uint32_t m10v_adj_extra_camera_virtual_focus(uint32_t controller);
+uint32_t m10v_adj_extra_camera_detail_cursor(uint32_t controller);
 
 #endif

@@ -3,7 +3,7 @@
 The capture ratio remains raw2. Native movie/forced-wide consumers retainclass1.
 No camera pixels, display DMA, cache coherency or hardware timing is emulated.
 """
-import struct,unittest
+import os,struct,unittest
 from unicorn import UC_HOOK_CODE,arm_const as A
 from tests import test_gr3_aspect as support
 RAM,STOP=support.RAM,support.STOP
@@ -25,7 +25,11 @@ class WideLiveCompatibility(unittest.TestCase):
      with self.subTest(kind=kind,override=override,raw=raw):
       u=self.fixture(kind,override,raw);profile=RAM+0x6000;u.mem_write(profile+4,b'\xa5')
       u.reg_write(A.UC_ARM_REG_R0,profile);u.reg_write(A.UC_ARM_REG_R1,1);u.emu_start(0x53669424,STOP,count=50000)
-      expected=1 if override else 0 if raw==2 and kind!=1 else stockclass
+      # A complete component also retains the older XPan entry wrapper,
+      # which maps normal-still class4 to full backing for its LCD mask.
+      # The source-only overlay fixture does not include that entry patch.
+      masked=raw==2 or (raw==4 and bool(os.environ.get('M10V_ASPECT_BIN')))
+      expected=1 if override else 0 if masked and kind!=1 else stockclass
       self.assertEqual(u.reg_read(A.UC_ARM_REG_R0),expected);self.assertEqual(bytes(u.mem_read(profile+4,1)),bytes([expected]))
  def test_wide_mask_is_opaque_and_matches_even_projection_of_saved_photo(self):
   for width,height,margin in((720,480,38),(360,240,19)):

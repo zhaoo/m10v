@@ -40,7 +40,7 @@ static long syscall6(unsigned number,unsigned a,unsigned b,unsigned c,unsigned d
 static long input(int fd,void*out,unsigned size){return syscall6(3,(unsigned)fd,(unsigned)(uintptr_t)out,size,0,0,0);}
 static long output(int fd,const void*in,unsigned size){return syscall6(289,(unsigned)fd,(unsigned)(uintptr_t)in,size,0x4000,0,0);}
 static void close_fd(int fd){syscall6(6,(unsigned)fd,0,0,0,0,0);}
-#if M10V_COMPANION_DIAGNOSTICS && M10V_COMPANION_LIVE_SOURCE
+#if M10V_COMPANION_DIAGNOSTICS
 /* Ordinary traces publish metadata by closing each append. The separate
  * preopened fault descriptor is used only by a fatal handler, then closed. */
 static int diagnostic_fd = -1;
@@ -71,7 +71,7 @@ void m10v_linux_trace(const char *event, const uint32_t *values, unsigned count)
  /* A RAM copy distinguishes execution from SD publication or blocking.
   * Both sinks are bounded by diagnostic_lines; no request retries depend on IO. */
  diagnostic_append("/tmp/m10v-worker-1101.log", line, length, 0x441u);
- diagnostic_append("/media/storage1/M10V/R16WORK.TXT", line, length, 0x101441u);
+ diagnostic_append("/media/storage1/M10V/R20WORK.TXT", line, length, 0x101441u);
  if (diagnostic_stdout) syscall6(4, 1, (unsigned)(uintptr_t)line, length, 0, 0, 0);
 }
 
@@ -106,10 +106,10 @@ static __attribute__((noreturn)) void diagnostic_signal(unsigned signal,
 }
 
 void m10v_linux_diagnostics_start(void) {
- static const char entry[] = "R16_ENTRY_BEFORE_SD\n";
+ static const char entry[] = "R20_ENTRY_BEFORE_SD\n";
  diagnostic_append("/tmp/m10v-worker-1101.log", entry, sizeof(entry)-1, 0x441u);
  diagnostic_fd = (int)syscall6(5,
-  (unsigned)(uintptr_t)"/media/storage1/M10V/R16FAULT.TXT", 0x101441u, 0600, 0, 0, 0);
+  (unsigned)(uintptr_t)"/media/storage1/M10V/R20FAULT.TXT", 0x101441u, 0600, 0, 0, 0);
  /* Linux ARM kernel sigaction uses a 64-bit signal mask. SA_SIGINFO supplies
   * the fault information. Block other signals to bound handler nesting.
   * The handler exits, so no restorer is needed. */
@@ -137,7 +137,7 @@ void m10v_linux_diagnostics_start(void) {
 
 int m10v_linux_random(void*ctx,uint8_t*out,uint32_t bytes){(void)ctx;long fd=syscall6(5,(unsigned)(uintptr_t)"/dev/urandom",0,0,0,0,0);if(fd<0)return 0;unsigned have=0;while(have<bytes){long n=input((int)fd,out+have,bytes-have);if(n<=0){close_fd((int)fd);return 0;}have+=(unsigned)n;}close_fd((int)fd);return 1;}
 uint64_t m10v_linux_now_ms(void*ctx){(void)ctx;int32_t t[2];if(syscall6(263,1,(unsigned)(uintptr_t)t,0,0,0,0)||t[0]<0||t[1]<0||t[1]>=1000000000)return 0;return (uint64_t)(uint32_t)t[0]*1000+(uint32_t)t[1]/1000000;}
-#if M10V_COMPANION_LIVE_SOURCE && M10V_COMPANION_DIAGNOSTICS
+#if M10V_COMPANION_DIAGNOSTICS
 static unsigned wifi_attempts;
 static int wifi_trace_enabled;
 static void wifi_trace(const char *event, const uint32_t *values, unsigned count) {
@@ -166,7 +166,7 @@ static int wifi_query(void *ctx, unsigned command, void *out, unsigned bytes) {
 int m10v_linux_prepare_wifi(m10v_companion_server_config *cfg) {
  if (!cfg) return 0;
  cfg->wifi_verified = 0;
-#if M10V_COMPANION_LIVE_SOURCE && M10V_COMPANION_DIAGNOSTICS
+#if M10V_COMPANION_DIAGNOSTICS
  wifi_trace_enabled = wifi_attempts < 4;
  if (wifi_trace_enabled) wifi_attempts++;
 #endif

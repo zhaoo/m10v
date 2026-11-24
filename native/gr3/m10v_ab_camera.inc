@@ -475,6 +475,27 @@ uint32_t m10v_settings_controller_ab_dispatch(uint32_t c,uint32_t event){
   return result;
  }
 #endif
+#if M10V_MENU_HUB
+ if(raw==4u&&ab_ram(c,0x128u)){
+  uint32_t payload=*(const uint32_t *)(uintptr_t)(event+4u);
+  m10v_settings_controller *owned=ab_owner();
+  if(owned&&ab_ram(payload,8u)&&*(const uint8_t *)(uintptr_t)payload==1u&&
+     *(const uint32_t *)(uintptr_t)(payload+4u)==1u){
+   uint32_t owner=(uint32_t)(uintptr_t)owned-M10V_SETTINGS_OWNER_BYTES;
+   uint32_t route=ab_host_word(c,0x124u),vt=ab_host_word(c,0u);
+   int private_route=(route>=0x0200f100u&&route<=0x0200f10au&&route!=0x0200f106u)||
+       (route>=0x0200f110u&&route<=0x0200f114u);
+   if(c>=owner+M10V_SETTINGS_OWNER_BYTES&&c<owner+M10V_SETTINGS_HUB_BYTES&&
+      vt>=0x540b6000u&&vt<0x55000000u&&private_route&&ab_route()==route){
+    /* Keep the original synchronous service/virtual dispatch, but use its
+     * logical Back event so the native physical-MENU exit filter cannot
+     * skip the owned handler. The original packet remains unchanged. */
+    uint32_t back[3]={0x89u,payload,0u};
+    return m10v_ab_dispatch_original(c,(uint32_t)(uintptr_t)back);
+   }
+  }
+ }
+#endif
  if(raw==1){
   uint32_t packet=*(const uint32_t *)(uintptr_t)(event+4);
   if(ab_ram(packet,8)&&*(const uint8_t *)(uintptr_t)packet==2&&ab_host_word(packet,4)==0)ab_main_off();
@@ -595,23 +616,34 @@ int m10v_settings_controller_remote_aspect_read(uint32_t *value){
  if(v>6)return -1;*value=v;return 0;
 }
 int m10v_settings_controller_remote_aspect_write(uint32_t value){
- if(value>6||m10v_settings_controller_remote_busy())return 1;
+ if(value>6||m10v_settings_controller_remote_busy()){
+  M10V_LOG(407u,value,1u,7u,1u);return 1;
+ }
  if(m10v_roll_device_locked()){
   m10v_roll_record locked;
   /* The roll worker uses this adapter to converge to its journalled ratio.
    * Reject other requests before writing or enabling private Half state. */
-  if(m10v_roll_device_snapshot(&locked)<=0||value!=locked.aspect)return 1;
+  if(m10v_roll_device_snapshot(&locked)<=0||value!=locked.aspect){
+   M10V_LOG(407u,value,1u,7u,2u);return 1;
+  }
  }
  uint32_t root=((uint32_t(*)(void))0x5320ad88u)(),model=root?((fn1)0x5320b31cu)(root):0;
- if(!model)return 1;
+ M10V_LOG(406u,value,root,model,m10v_roll_device_locked());
+ if(!model){M10V_LOG(407u,value,1u,7u,3u);return 1;}
 #if M10V_HALF_PAIR_ENABLED
 #if M10V_MENU_HUB
- if(value==6)return m10v_settings_half_remote_select(model);
+ if(value==6){
+  int result=m10v_settings_half_remote_select(model);
+  M10V_LOG(407u,value,(uint32_t)result,((fn1)0x53245260u)(model),4u);
+  return result;
+ }
 #endif
  (void)m10v_half_pair_select(model,value);
 #else
  if(value==6)return 1;((fn2)0x532525a4u)(model,value);
 #endif
- uint32_t actual;return !m10v_settings_controller_remote_aspect_read(&actual)&&actual==value?0:2;
+ uint32_t actual=7u;int result=!m10v_settings_controller_remote_aspect_read(&actual)&&actual==value?0:2;
+ M10V_LOG(407u,value,(uint32_t)result,actual,5u);
+ return result;
 }
 #endif

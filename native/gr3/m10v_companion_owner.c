@@ -215,7 +215,41 @@ static int execute(void*v,uint32_t command,const uint8_t*in,uint32_t bytes,uint8
    .confirmed_frames=c->roll.owner.loaded==1?c->roll.owner.current.count:0
   };
   copy(out+M10V_ROLL_NEEDED_BYTES,&diagnostic,sizeof(diagnostic));
-  *length=M10V_ROLL_NEEDED_BYTES+sizeof(diagnostic);return 0;
+  *length=M10V_ROLL_NEEDED_BYTES+sizeof(diagnostic);
+#if M10V_DEBUG_MODE
+  /* AppMain reads guarded scalar state on its existing polling turn. No
+   * accessor initialization, UI action, lock, allocation or filesystem call. */
+  m10v_review_diagnostic review={.magic=M10V_REVIEW_DIAGNOSTIC_MAGIC,
+   .jpeg_submits=__atomic_load_n(&channel->jpeg_submits,__ATOMIC_RELAXED),
+   .jpeg_returns=__atomic_load_n(&channel->jpeg_returns,__ATOMIC_RELAXED),
+   .jpeg_main_bytes=__atomic_load_n(&channel->jpeg_main_bytes,__ATOMIC_RELAXED),
+   .jpeg_extra_bytes=__atomic_load_n(&channel->jpeg_extra_bytes,__ATOMIC_RELAXED),
+   .model_state=0xffffffffu,.model_busy=0xffffffffu,.quick_state=0xffffffffu};
+  if((*(volatile uint32_t*)0x55064398u&1u)&&*(volatile uint32_t*)0x55067958u==0x53b4e7b0u){
+   const volatile uint8_t *m=(const volatile uint8_t*)0x55067958u;
+   review.model_state=m[8]|((uint32_t)m[9]<<8)|((uint32_t)m[10]<<16);
+   review.model_busy=m[0x2f]|((uint32_t)m[0x30]<<8)|((uint32_t)m[0x31]<<16)|((uint32_t)m[0x8a3]<<24);
+  }
+  if(*(volatile uint32_t*)0x55063910u&1u){
+   uint32_t q=*(volatile uint32_t*)0x550639ecu;
+   if(!(q&3u)&&q>=0x55000000u&&q<=0x60000000u-0x184u&&*(volatile uint32_t*)(uintptr_t)q==0x53b41380u){
+    const volatile uint8_t *v=(const volatile uint8_t*)(uintptr_t)q;
+    review.quick_state=v[0x16c]|((uint32_t)v[0x180]<<8)|((uint32_t)v[0x181]<<16)|((uint32_t)v[0x182]<<24);
+    review.timer_review=*(volatile uint32_t*)(uintptr_t)(q+0x178);
+    review.timer_wait=*(volatile uint32_t*)(uintptr_t)(q+0x17c);
+   }
+  }
+  copy(out+*length,&review,sizeof(review));*length+=sizeof(review);
+  m10v_review_handoff handoff={.magic=M10V_REVIEW_HANDOFF_MAGIC};
+  for(uint32_t i=0;i<M10V_REVIEW_HANDOFF_STAGES;i++){
+   uint32_t seq=__atomic_load_n(&channel->review_records[i][0],__ATOMIC_ACQUIRE);
+   copy(handoff.records[i],channel->review_records[i],sizeof(handoff.records[i]));
+   if(!i)copy(handoff.bank,channel->review_bank,sizeof(handoff.bank));
+   if((seq&1u)||seq!=__atomic_load_n(&channel->review_records[i][0],__ATOMIC_ACQUIRE))handoff.records[i][0]|=1u;
+  }
+  copy(out+*length,&handoff,sizeof(handoff));*length+=sizeof(handoff);
+#endif
+  return 0;
  }
  if(command==M10V_ROLL_RECOVERY_ABORT){
   *length=0;

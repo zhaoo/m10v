@@ -32,6 +32,11 @@ typedef struct {
     uint32_t expected_film;
     uint32_t lcd_direct, lcd_configured, still_producer, still_claimed;
     uint32_t lcd_direct_at_still, lcd_configured_at_still, visible_geometry;
+#if M10V_DEBUG_MODE
+    /* Diagnostic-only scalar mailbox. Never retains a plane or owns a frame. */
+    uint32_t jpeg_submits, jpeg_returns, jpeg_context, jpeg_main_bytes, jpeg_extra_bytes;
+    uint32_t review_records[6][10], review_bank[7], review_clock;
+#endif
 } m10v_roll_capture_channel;
 
 int m10v_roll_capture_arm(m10v_roll_capture_channel *, uint32_t ticket,

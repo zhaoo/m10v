@@ -69,6 +69,7 @@ typedef struct {
 typedef struct {uint32_t magic,version; m10v_library_state state;custom_profile profiles[M10V_SLOT_COUNT];
 #if M10V_PHOTO_RECIPE
  uint32_t adj_tone,box;
+ uint32_t detail_tone,detail_ui,detail_box,detail_film;
 #endif
 #if M10V_ROLL_NATIVE_DEVICE
  uint32_t roll_tone,roll_crc;
@@ -260,6 +261,44 @@ uint32_t m10v_camera_library_adj_tone(void){
  preview_cache *p=preview_owner();
  return p?__atomic_load_n(&p->adj_tone,__ATOMIC_ACQUIRE):0;
 }
+/* A native Fn route exits ADJ before its child snapshots the look. Keep that
+ * explicit route handoff separate from the disposable LiveView candidate. */
+uint32_t m10v_camera_library_detail_stage(uint32_t tone){
+ preview_cache *p=preview_owner();if(!p)return 0;
+ m10v_library_state state;
+ uint32_t slot=m10v_tone_slot(tone);
+ if(slot>=M10V_SLOT_COUNT||!preview_state(&state,0)||preview_owner()!=p||
+    slot>=m10v_library_count(&state))tone=0;
+ p->detail_ui=0;p->detail_box=active_box();p->detail_tone=tone;
+ p->detail_film=tone?state.slots[slot].film:0;
+ return tone;
+}
+uint32_t m10v_camera_library_detail_claim(uint32_t ui){
+ preview_cache *p=preview_owner();if(!p||!ram((const void *)(uintptr_t)ui,0x1a0))return 0;
+ uint32_t tone=p->detail_tone,slot=m10v_tone_slot(tone);
+ uint32_t route=*(const uint32_t *)(uintptr_t)(ui+0x124),parent=*(const uint32_t *)(uintptr_t)(ui+0x150);
+ /* Cached controllers can enter from MENU without running their ctor again.
+  * Once BaseController has supplied routing, an ADJ handoff is valid only
+  * for its genuine ImageControl detail child and ADJ parent. */
+ /* Native ctor starts both routes at10000000. Offset128 is a flag (1),
+  * never a route; genuine enter5316dfe8/5316dff0 supplies124/150 later. */
+ if((route&&route!=0x10000000u&&route!=0x02000014u)||
+    (parent&&parent!=0x10000000u&&parent!=0x02000000u)){
+  p->detail_tone=0;p->detail_ui=0;return 0;
+ }
+ m10v_library_state state;
+ if(!tone||slot>=M10V_SLOT_COUNT||p->detail_box!=active_box()||
+    !preview_state(&state,0)||preview_owner()!=p||
+    state.slots[slot].film!=p->detail_film)return 0;
+ if(p->detail_ui){
+  if(p->detail_ui!=ui)return 0;
+  /* The genuine detail ctor531afe24 resets198 to stock tone11. A reused
+   * allocation belongs to a new page and cannot inherit an earlier handoff. */
+  if(*(const uint8_t *)(uintptr_t)(ui+0x198)!=tone){p->detail_tone=0;p->detail_ui=0;return 0;}
+ }else p->detail_ui=ui;
+ return tone;
+}
+
 int m10v_camera_library_custom_hash(const m10v_library_state *state,uint32_t slot,uint8_t out[32]){
  preview_cache *p=preview_owner();
  if(!p||!state||!ram(out,32)||slot>=M10V_SLOT_COUNT)return 0;
@@ -283,6 +322,7 @@ void m10v_camera_library_preview_init(uint32_t owner){
 #endif
 #if M10V_PHOTO_RECIPE
     p->adj_tone=0;p->box=0;
+    p->detail_tone=p->detail_ui=p->detail_box=p->detail_film=0;
 #endif
     for(uint32_t i=0;i<M10V_SLOT_COUNT;i++)p->profiles[i].id=p->profiles[i].bank=0;
     p->magic=PREVIEW_MAGIC;

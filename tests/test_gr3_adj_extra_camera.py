@@ -59,7 +59,8 @@ process.stdout.write(decoded.subarray(at+16,at+16+decoded.readUInt32LE(at+12)));
             cls.hdf_cache = OWNER + manifest["hdf_menu"]["owner_offset"] + manifest["hdf_adj"]["cache"]["offset"]
             cls.code = None
             patches = manifest["adj_extra"]["patches"]
-            if len(patches) != (28 if (manifest.get("debug_log") or {}).get("adj_exit_trace") else 9):
+            legacy_trace = (manifest.get("debug_log") or {}).get("adj_exit_trace") and manifest.get("debug_scope") != "controls"
+            if len(patches) != (28 if legacy_trace else 9):
                 raise AssertionError("final ADJ patch inventory differs")
             for patch in patches:
                 word = struct.unpack_from("<I", cls.rom, patch["address"] - 0x53000000)[0]

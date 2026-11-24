@@ -2,6 +2,21 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.25.1",
+      "date": "2026-11-25",
+      "title": "修复扩展 ADJ 光标胶卷 Fn 设置与预览",
+      "changes": [
+        "GR III 2.10 扩展 ADJ 第 6–9 格的影像控制可直接设置光标停留胶卷，无需先切换拍摄卷；各卷参数独立保存。",
+        "修正 ADJ XPan、6×7、Half 背景预览，并保留拍摄比例及胶卷锁定规则。",
+        "M10V 子菜单按 MENU 逐级返回，首页按 MENU 退出。",
+        "正式完整包包含固件、SD 服务、胶卷与菜单资源、GRemote 1.2.15 Android App；关闭诊断日志，Live 继续不可用。"
+      ],
+      "notice": "用户已确认 R20 候选本轮操作正常。正式包仅关闭诊断并完成对应产物检查；不扩大为所有功能或其他机型的全面真机保证。边框回显此前未闭环，不将新增诊断当作修复结论。发布范围为 GR III。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.24.1",
       "date": "2026-11-24",
       "title": "修复 ADJ 胶卷参数绑定与画幅锁定提示",
@@ -12,9 +27,9 @@
         "本次发布范围限定 GR III，明确跳过 IIIx／IV 构建；保留 GR III 的构建、身份与健康校验。"
       ],
       "notice": "GR III 2.10 正式完整包需配套更新固件和SD服务，App使用GRemote1.2.15。关键成品路径与菜单已完成离线检查；全量历史Node套件仍有失败，不扩大为全机身真机验收。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "7cbdd176f32f8bcadfb46a21671c301c378d60c1",
+      "evidence": "deployment",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/45319005402"
     },
     {
       "version": "2026.11.23.1",

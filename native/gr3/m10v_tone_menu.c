@@ -2,6 +2,7 @@
  * Custom2, then up to ten enabled films. Model APIs keep their separate dynamic-tone
  * domain; Custom1/2 are bank selectors, never tone IDs written to a frame. */
 #include "m10v_tone.h"
+#include "m10v_debug.h"
 #include "m10v_library.h"
 #include "m10v_roll_device.h"
 #ifndef M10V_NATIVE_BASE
@@ -80,12 +81,15 @@ uint32_t m10v_tone_menu_adj_select(uint32_t controller,uint32_t row){
   return 0;
  }
 #if M10V_PHOTO_RECIPE
+ M10V_LOG(380,controller,row,(uint32_t)(uintptr_t)m,adj_scope(controller));
  if(adj_scope(controller)&&shooting(m)){
   uint32_t tone=m10v_tone_menu_index((uint32_t)(uintptr_t)m,row);
   if(row!=12&&row!=13&&row<m10v_camera_library_menu_index()&&m10v_tone_valid(tone)){
-   m10v_camera_library_adj_tone_set(tone);return 0;
+   m10v_camera_library_adj_tone_set(tone);
+   M10V_LOG(381,controller,row,tone,1);return 0;
   }
   m10v_camera_library_adj_tone_set(0);
+  M10V_LOG(381,controller,row,tone,0);
   /* Factory Custom1/2 select a backing bank. Leave their native handling
    * to confirmation rather than showing an unrelated virtual look. */
   return 0;

@@ -65,6 +65,8 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=
   if reg=='ip':text+='mov lr,#12;'
   text+='pop {r0-r12,pc};'
   entries[name]=stub(text,name)
+ entries['adj_fn']=stub(f'b {hex(symbols["m10v_detail_open"])}','native ADJ Fn selected-row handoff')
+ entries['adj_fn_original']=stub('mov ip,sp;b 0x531a4a84','original ADJ Fn prologue')
  entries['tone_snapshot']=stub(f'mov r1,r4;b {hex(symbols["m10v_detail_tone"])}','Fn selected-tone snapshot')
  entries['tone_kind']=stub(f'b {hex(symbols["m10v_detail_kind"])}','Fn appended carrier kind')
  # Constructor precedes tone selection; reserve stock max11 + max10 private rows.

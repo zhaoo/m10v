@@ -18,14 +18,14 @@ POST=RECIPE+0x904
 HEAP=0x55580000
 WORKERS=(0x55500000,0x55501000,0x55502000)
 
-def build_runtime():
+def build_runtime(guard_flags=()):
  folder=tempfile.TemporaryDirectory(prefix='border_recovery_runtime_');p=Path(folder.name)
  names=('m10v_border','m10v_border_bank','m10v_border_shot','m10v_border_prepare',
         'm10v_border_canvas','m10v_border_fill_plan','m10v_border_wait_guard','m10v_border_runtime')
  sources=[ROOT/'native/gr3'/f'{name}.c' for name in names]+[ROOT/'scripts/border_recovery_wait_guard.S']
  objs=[]
  for i,source in enumerate(sources):
-  obj=p/f'{i}.o';subprocess.run([shutil.which('clang'),*FLAGS,'-c',str(source),'-o',str(obj)],check=True,capture_output=True);objs.append(str(obj))
+  obj=p/f'{i}.o';subprocess.run([shutil.which('clang'),*FLAGS,*(guard_flags if source.stem=='m10v_border_wait_guard' else ()), '-c',str(source),'-o',str(obj)],check=True,capture_output=True);objs.append(str(obj))
  script=p/'link.ld';script.write_text(f'''m10v_capture_library = 0x53000100;
 m10v_border_camera_snapshot = 0x53000104;
 m10v_save_trace_recipe_mark = 0x53000108;
@@ -53,7 +53,7 @@ class BorderRuntimeArmTests(unittest.TestCase):
  model='gr3'
  @classmethod
  def setUpClass(cls):
-  cls.folder,cls.code,cls.syms=build_runtime();cls.addClassCleanup(cls.folder.cleanup)
+  cls.folder,cls.code,cls.syms=build_runtime(getattr(cls,'guard_flags',()));cls.addClassCleanup(cls.folder.cleanup)
  def setUp(self):
   path='builds/gr3-extension-validation/official-rtos.bin' if self.model=='gr3' else 'builds/gr3-border-iip-20261027/gr3x-official-rtos.bin'
   self.stock=(ROOT/path).read_bytes();self.assertEqual(hashlib.sha256(self.stock).hexdigest(),MODELS[self.model]['rtos_sha256'])

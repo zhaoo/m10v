@@ -35,7 +35,11 @@ void m10v_view_deferred_on_producer(uint32_t m){
 void m10v_view_deferred_on_169(uint32_t q){
  typedef void (*complete_fn)(uint32_t);
  ((complete_fn)(uintptr_t)0x531cbe78u)(q);
- if(q==quick()&&validmodel(M10V_VIEW_MODEL))m10v_view_deferred_mark(token(q),byte(q+0x16cu),!byte(M10V_VIEW_MODEL+0x2fu)&&!byte(M10V_VIEW_MODEL+0x31u)&&byte(M10V_VIEW_MODEL+0x30u));
+ /* The genuine producer sends169 before its native stores clear31/2f.
+  * A dispatcher scheduled there must retain this generation's completion.
+  * Stop-reply still requires every native busy flag clear before retrying;
+  * capture-start/re-entry invalidate the generation, as before. */
+ if(q==quick()&&validmodel(M10V_VIEW_MODEL))m10v_view_deferred_mark(token(q),byte(q+0x16cu),busy(M10V_VIEW_MODEL));
 }
 void m10v_view_deferred_on_capture_start(uint32_t m){
  uint32_t q;if(!validmodel(m))return;q=quick();if(q)m10v_view_deferred_invalidate(token(q));

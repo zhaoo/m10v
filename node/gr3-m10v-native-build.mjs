@@ -546,6 +546,7 @@ function checkRuntime(runtime, manifest) {
   }
 }
 const detailHooks=[
+ [0x531a4a80,0xe1a0c00d,'adj_fn',false],
  [0x531acc04,0xeb0442aa,'tone_snapshot',true],
  [0x531acc14,0xebffff9f,'tone_kind',true],
  [0x531afc20,0xebffffa4,'capacity',true],
@@ -555,6 +556,8 @@ const detailHooks=[
  [0x531b05e4,0xea00005c,'setup',false],[0x531b0bf4,0xea000093,'callback',false],
  [0x531acd24,0xeb0456c0,'reset',true]];
 const detailInstructions={"capacity":[0xe3a00016,0xe12fff1e],"table_ip":[3912065023,3775856640,3912040451,3852271624,[14,true,"m10v_detail_table"],3851223096,3904700419,3777818624,0xe3a0e00c,3904741375],"table_r3":[3912065023,3775856640,3912040451,3852271624,[14,true,"m10v_detail_table"],3851223060,3904700419,3777818624,3904741375],"table_selected":[3912065023,3775856640,3912040451,3852271640,[14,true,"m10v_detail_table"],3851223060,3904700419,3777818624,3904741375],"row":[3796090898,3814457356,[8,false,1394278828],3912060943,3785359365,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394278828],3796049938,3785369602,3783401476,3785363461,3818913795,[14,true,"m10v_detail_control"],[14,false,1394278500]],"current":[3796156434,3814457356,[8,false,1394279828],3912060943,3785359365,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394279828],3796115474,3785363461,3818913793,[14,true,"m10v_detail_control"],3785375744,[14,false,1394279516]],"default":[3785363456,3818913796,3818921984,[14,false,"m10v_detail_control"]],"setup":[0xe240c012,0xe35c000c,[8,false,0x531b075c],0xe92d500f,0xe1a00004,[14,true,"m10v_detail_table"],0xe304c88c,0xe345c3b3,0xe150000c,0xe8bd500f,[0,false,0x531b075c],0xe1a0c000,0xe1a00004,0xe24bd010,0xe89d6810,[14,false,"slider_dispatch"]],"callback":[3796221970,3814457356,[8,false,1394282056],3912060943,3785359364,[14,true,"m10v_detail_table"],3808741516,3813000115,3780116492,3904720911,[0,false,1394282056],3796181010,3785368578,3783401478,3785363460,3818913794,[14,true,"m10v_detail_control"],3813670912,[1,false,1394281580],3796619292,3902646512],"reset":[3912056848,[14,true,1395402796],3785363461,3818913799,3818921984,[14,true,"m10v_detail_control"],3904733200]};
+detailInstructions.adj_fn=[[14,false,'m10v_detail_open']];
+detailInstructions.adj_fn_original=[0xe1a0c00d,[14,false,0x531a4a84]];
 detailInstructions.tone_snapshot=[0xe1a01004,[14,false,'m10v_detail_tone']];
 detailInstructions.tone_kind=[[14,false,'m10v_detail_kind']];
 detailInstructions.exposure_dispatch=[0xe92d5011,0xe1a01000,0xe3a00009,0xe3a02000,[14,true,'m10v_detail_control'],0xe3500001,0xe8bd5011,[0,false,'slider1'],[14,false,'slider2']];
@@ -805,6 +808,14 @@ export function rollCapturePatches(runtime,manifest) {
   'invalid GR III roll capture contract');
  for(const name of rollbackSymbols)need(inCode(manifest.symbols?.[name]),'missing GR III roll binding '+name);
  if(live)for(const name of liveSymbols)need(inCode(manifest.symbols?.[name]),'missing GR III Live binding '+name);
+ const diagnostic=roll.review_diagnostic!==undefined,handoffs=roll.review_handoffs!==undefined;
+ const debugNames=['m10v_roll_camera_jpeg_wait','m10v_roll_camera_jpeg_return'];
+ need(diagnostic?(manifest.debug_mode===true&&roll.review_diagnostic==='scalar-pre/post-JPEG-wait-v1'&&
+  debugNames.every(n=>inCode(roll.exports?.[n])&&roll.exports[n]===manifest.symbols?.[n])):
+  !debugNames.some(n=>manifest.symbols?.[n]),'partial GR III JPEG diagnostics');
+ need(handoffs?(diagnostic&&roll.review_handoffs==='native-publication-playback-display-v2'&&
+  inCode(roll.exports?.m10v_roll_camera_review)&&roll.exports.m10v_roll_camera_review===manifest.symbols?.m10v_roll_camera_review):
+  !manifest.symbols?.m10v_roll_camera_review,'partial GR III review handoff diagnostics');
  const sites=[
   [0x5351eaa0,0xe30d3440,'reserve',[0xe1a00001]],
   [0x5350c438,0xeb067e3a,'group_start',[0xe1a00001,0xe1a01004],0x536abd28],
@@ -816,6 +827,16 @@ export function rollCapturePatches(runtime,manifest) {
   [0x5345a2c8,0xeb09aec3,'lcd_direct',[0xe1a00004,...(live?[0xe59d1108,0xe59d2114,0xe59d3140]:[])],0x536c5ddc],
   [0x5345a3c0,0xeb09ae4f,'lcd_configured',[0xe1a00004,...(live?[0xe59d1108,0xe1a02006,0xe08a3006]:[])],0x536c5d04],
  ];
+ if(diagnostic)sites.push(
+  [0x53504944,0xeb069550,'jpeg_wait',[0xe1a00004],0x536a9e8c],
+  [0x5350494c,0xe5943050,'jpeg_return',[0xe1a00004]]);
+ if(handoffs)sites.push(
+  [0x535180c0,0xe3a03001,'review',[0xe1a03004,0xe1a0200a,0xe2881004,0xe3a00001]],
+  [0x534bbeb4,0xe1a01008,'review',[0xe1a01006,0xe1a02004,0xe3a00002]],
+  [0x534bbee0,0xe2506000,'review',[0xe1a02000,0xe24b1068,0xe3a00003]],
+  [0x534bbf00,0xe1a06000,'review',[0xe1a02000,0xe594100c,0xe3a00004]],
+  [0x535211f0,0xe5903008,'review',[0xe1a01000,0xe3a00005]],
+  [0x532d546c,0xebfcd645,'review',[0xe1a02005,0xe2851004,0xe3a00006],0x5320ad88]);
  need(roll.patches?.length===sites.length,'unexpected roll capture patch inventory');
  return sites.map(([address,expected,name,args,target],i)=>{
   const row=roll.patches[i],helper=roll.exports?.['m10v_roll_camera_'+name];

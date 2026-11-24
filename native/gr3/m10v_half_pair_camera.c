@@ -57,9 +57,9 @@ static void clear_first(session *s){
  }
  s->cookie=0;s->orientation=0;s->generation++;
 }
-void m10v_half_pair_init(uint32_t owner){session *s=state(owner);if(!s)return;zero(s,sizeof(*s));s->generation=1;__atomic_store_n(&s->magic,MAGIC,__ATOMIC_RELEASE);}
+void m10v_half_pair_init(uint32_t owner){session *s=state(owner);if(!s)return;zero(s,sizeof(*s));s->generation=1;__atomic_store_n(&s->magic,MAGIC,__ATOMIC_RELEASE);M10V_LOG(415u,owner,U(s),s->generation,0u);}
 void m10v_half_pair_destroy(uint32_t owner){
- session *s=state(owner);if(!s)return;__atomic_fetch_or(&s->control,CLOSING,__ATOMIC_ACQ_REL);__atomic_store_n(&s->magic,0,__ATOMIC_RELEASE);
+ session *s=state(owner);if(!s)return;M10V_LOG(415u,owner,U(s),s->generation,1u);__atomic_fetch_or(&s->control,CLOSING,__ATOMIC_ACQ_REL);__atomic_store_n(&s->magic,0,__ATOMIC_RELEASE);
  while(__atomic_load_n(&s->control,__ATOMIC_ACQUIRE)&BUSY)((void(*)(uint32_t))0x536b0a74u)(1u);
  M10V_LOG(221u,owner,s->generation,s->first.token,3u);clear_first(s);
 }
@@ -96,43 +96,72 @@ static int can_restore_ratio(uint32_t model){
 }
 
 int m10v_settings_half_set(uint32_t enabled){
- session *s=state(current_owner());
- if(!s||enabled>1u)return -1;
- if(enabled==__atomic_load_n(&s->half_enabled,__ATOMIC_ACQUIRE))return 0;
+ uint32_t owner=current_owner();session *s=state(owner);
+ M10V_LOG(403u,owner,enabled,s?s->half_enabled:2u,s?s->generation:0u);
+ if(!s||enabled>1u){M10V_LOG(405u,owner,enabled,(uint32_t)-1,2u);return -1;}
+ if(enabled==__atomic_load_n(&s->half_enabled,__ATOMIC_ACQUIRE)){
+  M10V_LOG(405u,owner,enabled,0u,s->half_enabled);return 0;
+ }
  if(!enabled){
   uint32_t root=((uint32_t(*)(void))0x5320ad88u)();
   uint32_t model=root?((uint32_t(*)(uint32_t))0x5320b31cu)(root):0;
   uint32_t ratio=live_ratio(model);
-  if(ratio>6u)return -1;
-  if(ratio==6u&&(!can_restore_ratio(model)||!m10v_half_pair_select(model,0)))return -1;
+  M10V_LOG(404u,root,model,ratio,ratio<=6u?can_restore_ratio(model):0u);
+  if(ratio>6u){M10V_LOG(405u,owner,enabled,(uint32_t)-1,s->half_enabled);return -1;}
+  if(ratio==6u&&(!can_restore_ratio(model)||!m10v_half_pair_select(model,0))){
+   M10V_LOG(405u,owner,enabled,(uint32_t)-1,s->half_enabled);return -1;
+  }
  }
  __atomic_store_n(&s->half_enabled,enabled,__ATOMIC_RELEASE);
+ M10V_LOG(405u,owner,enabled,0u,s->half_enabled);
  return 0;
 }
 
 int m10v_settings_half_remote_select(uint32_t model){
  session *s=state(current_owner());
- if(!s||live_ratio(model)>6u||!can_restore_ratio(model))return 1;
+ if(!s||live_ratio(model)>6u||!can_restore_ratio(model)){
+  M10V_LOG(416u,model,1u,live_ratio(model),s?s->half_enabled:2u);return 1;
+ }
  /* The companion's explicit raw6 write is also its Half opt-in. Publish
   * the shared setting only after the native write reads back successfully. */
- if(!native_select(model,6)||live_ratio(model)!=6u||state(current_owner())!=s)return 2;
+ if(!native_select(model,6)||live_ratio(model)!=6u||state(current_owner())!=s){
+  M10V_LOG(416u,model,2u,live_ratio(model),s->half_enabled);return 2;
+ }
  __atomic_store_n(&s->half_enabled,1,__ATOMIC_RELEASE);
+ M10V_LOG(416u,model,0u,live_ratio(model),s->half_enabled);
  return 0;
 }
 
 void m10v_settings_half_sanitize(uint32_t model){
  /* Normalize just the active InputPropertyModel copy before native apply;
   * the original U box and every previously captured image retain raw6. */
- if(!m10v_settings_half_enabled()&&live_ratio(model)==6u&&can_restore_ratio(model))
+ if(!m10v_settings_half_enabled()&&live_ratio(model)==6u&&can_restore_ratio(model)){
+  M10V_LOG(414u,model,6u,m10v_settings_half_enabled(),1u);
   (void)m10v_half_pair_select(model,0);
+ }
 }
 #endif
 
 uint32_t m10v_half_pair_select(uint32_t model,uint32_t raw){
 #if M10V_MENU_HUB
- if(raw==6u&&!m10v_settings_half_enabled())return 0;
+ M10V_LOG(400u,model,raw,word(0x55063988u),m10v_settings_half_enabled());
+ M10V_LOG(417u,model,(uint32_t)(uintptr_t)__builtin_return_address(0),raw,current_owner());
+#if M10V_DEBUG_MODE
+ uint32_t global_owner=word(0x55063988u),validated_owner=current_owner();
+ session *observed=state(global_owner);
+ M10V_LOG(413u,global_owner,validated_owner,observed?observed->magic:0u,observed?observed->generation:0u);
+ uint32_t props=ram(model,8u)?word(model+4u):0u;
+ M10V_LOG(401u,model,props,ram(props,0x4c3u)?P(props)[0x4c2u]:7u,
+     ram(props,0x45u)?P(props)[0x44u]:255u);
+#endif
+ if(raw==6u&&!m10v_settings_half_enabled()){
+  M10V_LOG(402u,model,raw,0u,live_ratio(model));return 0;
+ }
 #endif
  uint32_t answer=native_select(model,raw);
+#if M10V_MENU_HUB
+ M10V_LOG(402u,model,raw,answer,live_ratio(model));
+#endif
  if(answer&&raw!=6u)(void)m10v_half_pair_reset();
  return answer;
 }

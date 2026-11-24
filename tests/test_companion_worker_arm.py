@@ -30,6 +30,7 @@ class WorkerArmTests(unittest.TestCase):
         if not path:
             self.skipTest('requires the actual compiled delivery service')
         binary = Path(path).read_bytes()
+        self.diagnostic_prefix = next((p for p in ('R20','R19','R18','R17') if (p+'WORK.TXT').encode() in binary),'R16')
         self.machine = Uc(UC_ARCH_ARM, UC_MODE_ARM)
         self.machine.ctl_set_cpu_model(UC_CPU_ARM_CORTEX_A9)
         self.machine.mem_map(0x10000, 0x100000)
@@ -103,7 +104,7 @@ class WorkerArmTests(unittest.TestCase):
         elif command == 12:
             payload = b''
         elif command == 9:
-            payload = bytes(5)
+            payload = getattr(self, "recovery_payload", bytes(5))
         else:
             self.fail(f'unexpected native command {command}')
         checksum = zlib.crc32(words(sequence, command, len(payload), crc, reply_code) + payload)
@@ -131,7 +132,7 @@ class WorkerArmTests(unittest.TestCase):
             self.actions[args[0]] = action[0]
         elif number == 5:
             path = self.text(args[0])
-            if path.endswith(('/R9WORK.TXT', '/R10WORK.TXT', '/R16WORK.TXT', '/R16FAULT.TXT')) or path == '/tmp/m10v-worker-1101.log':
+            if path.endswith(('/R9WORK.TXT', '/R10WORK.TXT', '/R16WORK.TXT', '/R16FAULT.TXT', '/R18WORK.TXT', '/R18FAULT.TXT', '/R19WORK.TXT', '/R19FAULT.TXT', '/R20WORK.TXT', '/R20FAULT.TXT')) or path == '/tmp/m10v-worker-1101.log':
                 expected = 0x441 if path.startswith('/tmp/') else 0x101441
                 self.assertEqual(args[1:3], [expected, 0o600])
                 result = 57 if path.startswith('/tmp/') else 56 if 'FAULT' in path else 55
@@ -257,14 +258,14 @@ class WorkerArmTests(unittest.TestCase):
 
     def test_sd_trace_is_published_on_close_before_return(self):
         self.diagnostics()
-        published = self.published_files.get('/media/storage1/M10V/R16WORK.TXT', b'')
+        published = self.published_files.get('/media/storage1/M10V/'+self.diagnostic_prefix+'WORK.TXT', b'')
         self.assertIn(b'PROCESS_START ', published,
                       'a completed trace must close its SD descriptor so readers see its size')
 
     def test_ram_entry_precedes_any_sd_open(self):
         self.diagnostics()
         self.assertEqual(self.open_paths[0], '/tmp/m10v-worker-1101.log')
-        self.assertIn(b'R16_ENTRY_BEFORE_SD',
+        self.assertIn((self.diagnostic_prefix+'_ENTRY_BEFORE_SD').encode(),
                       self.published_files.get('/tmp/m10v-worker-1101.log', b''))
 
     def test_fault_logs_pc_and_address_when_inherited_stdout_fails(self):
@@ -279,7 +280,7 @@ class WorkerArmTests(unittest.TestCase):
         self.assertEqual(self.exit_code, 139)
         self.assertIn((56, b'WORKER_SIGNAL 0000000b 00000001 deadbeef 0003ebe0\n'), self.logs)
         self.assertEqual(sum(number == 5 for number, _ in self.calls), before)
-        self.assertIn(b'WORKER_SIGNAL ', self.published_files['/media/storage1/M10V/R16FAULT.TXT'])
+        self.assertIn(b'WORKER_SIGNAL ', self.published_files['/media/storage1/M10V/'+self.diagnostic_prefix+'FAULT.TXT'])
 
     def run_actual_worker(self):
         config_address = self.symbols['target_config']

@@ -351,6 +351,16 @@ static uint8_t assignment(const camera_state *s, uint32_t c, unsigned slot)
     return m10v_adj_extra_function(&s->session, c, s->generation, slot);
 }
 
+uint32_t m10v_adj_extra_camera_detail_cursor(uint32_t c)
+{
+    camera_state *s = state();
+    /* Native Image Control has the same highlighted list in either ADJ
+     * bank. The separate Effects shortcut only borrows kind12 to open the
+     * current look; its list is unrelated and must not become a film cursor. */
+    return !focused(s, c) ||
+        (!s->effects_action && assignment(s, c, s->focus) == 12u);
+}
+
 uint32_t m10v_adj_extra_camera_slot_type(uint32_t c, uint32_t slot)
 {
     camera_state *s = state();
@@ -810,6 +820,7 @@ uint32_t m10v_adj_extra_camera_event(uint32_t c, uint32_t event)
     uint32_t id = assignment(s, c, s->focus);
     if (key != 0xd8 || id <= EXTRA_STOCK_ID) return 0;
     if (id == M10V_ADJ_EXTRA_EFFECTS) {
+        M10V_LOG(372,c,id,0x531a4a80u,s->focus);
         if (has_film()) {
             s->effects_action = 1;
             ((fn2)0x531a4a80u)(c, 2);
@@ -823,6 +834,7 @@ uint32_t m10v_adj_extra_camera_event(uint32_t c, uint32_t event)
     /* These shortcuts open full controllers. Both confirmation and cancel
      * use the native parent route, so close to shooting LiveView. Re-enter
      * ADJ on the next lever press through its normal entry from LiveView. */
+    M10V_LOG(372,c,id,route,s->focus);
     ((fn3)0x5316c9d8u)(c, route, LIVE_ROUTE);
     return 1;
 }

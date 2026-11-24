@@ -46,20 +46,55 @@ u32 m10v_aspect_next(u32 value) {
     return 0;
 }
 u32 m10v_aspect_current(void) {
+#if M10V_HALF_FRAME
+    /* Preview follows the immediate ADJ/MENU copy. The committed capture
+     * SettingsModel can still contain the previous ratio until native apply;
+     * reading it here leaves the LCD at 3:2 while the UI already shows 6x7.
+     * Do not initialize a UI singleton from a display callback during boot. */
+    if(*(const volatile u32 *)0x55063ed0u&1u) {
+        u32 ui_root=CALL(0x5320ad88,u32 (*)(void))();
+        u32 model=ui_root?CALL(0x5320b31c,u32 (*)(u32))(ui_root):0;
+        if(!(model&3u) && model>=0x55000000u && model<=0x7ffffff8u) {
+            u32 properties=WORD(model,4);
+            if(!(properties&3u) && properties>=0x55000000u && properties<=0x7ffffb3cu) {
+                u32 ratio=CALL(0x53245260,u32 (*)(u32))(model);
+                if(ratio<=6u) return ratio;
+            }
+        }
+    }
+#endif
     u32 root=CALL(0x53525d5c,u32 (*)(void))();
     return root && WORD(root,0) ? CALL(0x5354a778,u32 (*)(u32))(WORD(root,0)) : 0;
 }
-u32 m10v_aspect_mask_active(void) {
-    u32 ratio=m10v_aspect_current();
-    if(ratio!=4 && ratio!=5 && !(M10V_HALF_FRAME && (ratio==2 || ratio==6))) return 0;
+static u32 aspect_adj_canvas(void) {
+#if M10V_HALF_FRAME
+    /* ADJ owns its background canvas; the LiveView GridView mask is absent. */
+    return (*(const volatile u32 *)0x55063e54u&1u) &&
+           *(const volatile u32 *)0x550645f0u==0x02000000u;
+#else
+    return 0;
+#endif
+}
+static u32 aspect_still_unforced(void) {
     u32 root=CALL(0x53525d5c,u32 (*)(void))();
     if(!root || !WORD(root,0) || CALL(0x53549958,u32 (*)(u32))(WORD(root,0))==1) return 0;
     u32 manager=CALL(0x53654150,u32 (*)(void))();
     return manager && !CALL(0x53654220,u32 (*)(u32,u32))(manager,0x4a);
 }
+u32 m10v_aspect_mask_active(void) {
+    u32 ratio=m10v_aspect_current();
+    if(ratio!=4 && ratio!=5 && !(M10V_HALF_FRAME && (ratio==2 || ratio==6))) return 0;
+    if(aspect_adj_canvas() && (ratio==4 || ratio==5 || ratio==6)) return 0;
+    return aspect_still_unforced();
+}
 
 /* index is the original table index(raw_id-1), never a native CLASS. */
 u32 m10v_aspect_live_class(u32 index,u32 native_class) {
+    if(aspect_adj_canvas()) {
+        u32 selected=m10v_aspect_current();
+        if((selected==4 || selected==5 || selected==6) && aspect_still_unforced())
+            return selected; /* Existing private LCD size/source-rectangle adapters. */
+    }
     if(M10V_HALF_FRAME && index==1 && m10v_aspect_mask_active()) return 0;
     return native_class;
 }

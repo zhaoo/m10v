@@ -21,6 +21,58 @@ EVENTS.update({97:'ab.display.snapshot',98:'ab.display.return'})
 EVENTS.update({76:'film.touch.down',77:'film.swipe.release',78:'film.touch.cancel',79:'film.tap.toggle'})
 EVENTS.update({340:'hub.activate',341:'hub.enter',342:'hub.touch.release',343:'hub.setting.touch'})
 EVENTS[344]='hub.artwork.loaded'
+FILM_SELECTION_TRACE={
+ 360:('film.fn.snapshot',('controller','active_tone','candidate_tone','chosen_tone')),
+ 361:('film.fn.context',('controller','raw_flags','model','candidate_used')),
+ 362:('film.fn.write.before',('controller','operation','argument','target_slot')),
+ 363:('film.fn.write.identity',('controller','film','sequence','crc')),
+ 364:('film.fn.write.after',('controller','target_slot','result','sequence')),
+ 365:('film.catalog.key',('controller','key','catalog_index','expected_film')),
+ 366:('film.catalog.context',('controller','route','screen_slot','active_tone')),
+ 367:('film.catalog.selection',('controller','catalog_index','expected_film','source')),
+ 368:('film.catalog.detail.open.before',('controller','catalog_index','expected_film','directory_film')),
+ 369:('film.catalog.detail.open.after',('controller','expected_film','target_slot','gate')),
+ 370:('film.catalog.write.before',('state','expected_film','target_slot','field_value')),
+ 371:('film.catalog.write.after',('state','expected_film','result','sequence')),
+ 372:('film.adj.shortcut',('controller','function','destination','virtual_slot')),
+ 373:('film.catalog.loaded',('controller','sequence','crc','expected_film')),
+ 374:('film.catalog.write.identity',('state','sequence','crc','actual_film')),
+ 376:('film.adj.fn.entry',('controller','action','native_function','list')),
+ 377:('film.adj.fn.row',('controller','row','tone','target_slot')),
+ 378:('film.adj.fn.stage',('controller','tone','staged_tone','virtual_focus')),
+ 379:('film.fn.handoff',('controller','handoff_tone','preview_candidate','context_word')),
+ 380:('film.adj.highlight',('controller','row','model','valid_scope')),
+ 381:('film.adj.highlight.result',('controller','row','tone','accepted')),
+ 383:('film.fn.native-routing',('controller','route','parent_route','native_flag128')),
+}
+EVENTS.update({event:row[0] for event,row in FILM_SELECTION_TRACE.items()})
+
+ASPECT_DIAGNOSTIC_FIELDS={
+    400:('model','requested_raw','global_owner','half_enabled'),
+    401:('model','properties','previous_raw','properties_active'),
+    402:('model','requested_raw','native_result','readback_raw'),
+    403:('owner','requested_enabled','previous_enabled','generation'),
+    404:('root','model','live_raw','can_restore'),
+    405:('owner','requested_enabled','result','enabled_after'),
+    406:('requested_raw','root','model','roll_locked'),
+    407:('requested_raw','result','readback_raw','stage_id'),
+    408:('controller','pane','row','requested_route'),
+    409:('controller','requested_enabled','screen','roll_locked'),
+    410:('selected_model','applied_aspect','previous_aspect','applied_tone'),
+    411:('selected_model','actual_ratio','aspect_read_status','applied_aspect'),
+    412:('selected_model','actual_before_restore','previous_aspect','aspect_write_status'),
+    413:('global_owner','validated_owner','session_magic','generation'),
+    414:('model','live_raw','half_enabled','can_restore'),
+    415:('owner','session','generation','transition_id'),
+    416:('model','result','readback_raw','half_enabled'),
+    417:('model','caller_lr','requested_raw','validated_owner'),
+}
+EVENTS.update({400:'aspect.select.request',401:'aspect.select.properties',402:'aspect.select.result',
+               403:'aspect.half.request',404:'aspect.half.disable-context',405:'aspect.half.result',
+               406:'aspect.remote.request',407:'aspect.remote.result',408:'aspect.hub.route',
+               409:'aspect.hub.half-confirm',410:'aspect.roll.clear-context',
+               411:'aspect.roll.clear-current',412:'aspect.roll.restore-result',413:'aspect.owner.snapshot',414:'aspect.half.sanitize',
+               415:'aspect.owner.lifecycle',416:'aspect.remote.half-result',417:'aspect.select.caller'})
 EVENTS.update(dict(enumerate([
     'adj.event.before','adj.event.after','adj.restore.before',
     'adj.restore.refresh.before','adj.restore.refresh.after',
@@ -100,6 +152,9 @@ def page_records(data):
         records.append({'sequence':r[2],'event':r[3],'stage':EVENTS.get(r[3],f'unknown.{r[3]}'),
                         'arguments':list(r[4:8]),'build_id':f'{r[8]:08x}','channel':{1:'menu',2:'capture',3:'io',4:'ab',5:'torn'}[r[9]]})
     for record in records:
+        if record['event'] in ASPECT_DIAGNOSTIC_FIELDS:
+            record['aspect_diagnostic']=dict(zip(ASPECT_DIAGNOSTIC_FIELDS[record['event']],record['arguments']))
+            record['aspect_diagnostic']['diagnostic_only']=True
         if record['event']==198:
             recipe,tag,a,b=record['arguments']
             fields={0x46583030:('magic','owner'),0x46583031:('ready','sequence'),
@@ -189,6 +244,24 @@ def page_records(data):
         if record['event']==139:
             context,film_code,_,_=record['arguments']
             record['raw_development']={'context':hex(context),'film_code':film_code or None}
+        if record['event'] in FILM_SELECTION_TRACE:
+            _,fields=FILM_SELECTION_TRACE[record['event']]
+            trace=dict(zip(fields,record['arguments']))
+            for field in ('controller','state','model','route','destination','parent_route'):
+                if field in trace:trace[field]=hex(trace[field])
+            if 'result' in trace and trace['result']>=0x80000000:trace['result']-=0x100000000
+            if 'screen_slot' in trace:
+                packed=trace.pop('screen_slot');trace.update(screen=packed>>16,target_slot=packed&65535)
+            if 'field_value' in trace:
+                packed=trace.pop('field_value');trace.update(field=packed>>16,value=packed&255,editing=bool(packed&256))
+            if 'candidate_used' in trace:
+                packed=trace['candidate_used'];trace.update(candidate_used=bool(packed&1),model_context=(packed>>8)&255)
+            if 'raw_flags' in trace:
+                flags=trace['raw_flags'];trace.update(raw_detail=bool(flags&255),raw_development=bool((flags>>8)&255))
+            if record['event']==369:
+                trace['gate_name']={0:'opened',1:'selection-or-load-invalid',2:'film-not-enabled'}.get(trace['gate'],'unknown')
+            trace['diagnostic_only']=True
+            record['film_selection']=trace
         if record['event']==144:
             row,candidate,_,_=record['arguments']
             record['recipe_adj']={'confirmed_row':row,'preview_tone':candidate or None}

@@ -68,6 +68,28 @@ def main(delivery=None):
   assert transitions==([0] if patched else [])
   assert posts==([0x15d,0xf1] if patched else [0x15d])
   if patched:
+   # Native producer queues169 BEFORE clearing31/2f. Permit the genuine
+   # dispatcher to run at that exact instruction boundary, then resume the
+   # producer and deliver its genuine stop reply. No busy flag is cleared by
+   # the harness: the original instructions at36778/3677c do the clearing.
+   reset();u.mem_write(model+0x2f,b'\x01\x01\x01')
+   watch[0]=0x5323676c
+   u.reg_write(UC_ARM_REG_R0,model);u.reg_write(UC_ARM_REG_SP,0x5810ff00);u.reg_write(UC_ARM_REG_LR,stop)
+   u.emu_start(0x53236734,stop+4,count=200000)
+   assert u.reg_read(UC_ARM_REG_PC)==watch[0]
+   saved_regs=[getattr(arm,'UC_ARM_REG_R'+str(i)) for i in range(13)]+[UC_ARM_REG_SP,UC_ARM_REG_LR,UC_ARM_REG_PC,arm.UC_ARM_REG_CPSR]
+   saved=[u.reg_read(r) for r in saved_regs];watch[0]=0
+   # Separate dispatcher stack models scheduling at the asynchronous sender.
+   u.reg_write(UC_ARM_REG_R0,q);u.reg_write(UC_ARM_REG_R1,msg)
+   u.reg_write(UC_ARM_REG_SP,0x5810ef00);u.reg_write(UC_ARM_REG_LR,stop)
+   u.emu_start(0x531cbfc4,stop+4,count=200000)
+   assert bytes(u.mem_read(q+0x16c,1))==b'\x02'
+   for r,v in zip(saved_regs,saved):u.reg_write(r,v)
+   u.emu_start(0x5323676c,stop+4,count=200000)
+   assert bytes(u.mem_read(model+0x2f,3))==b'\x00\x01\x00'
+   posts.clear();run(0x53239b80,model)
+   assert transitions==[0], 'native169 delivered before producer clears31/2f was lost'
+   assert posts==[0x15d,0xf1]
    # Re-enter or a fresh native capture invalidates pending prior completion.
    for invalidate in ('m10v_view_deferred_on_enter','m10v_view_deferred_on_capture_start'):
     reset();run(0x53236734,model);posts.clear();run(0x531cbfc4);run(manifest['exports'][invalidate],q if invalidate.endswith('enter') else model)
@@ -115,7 +137,7 @@ def main(delivery=None):
    assert [u.reg_read(r) for r in regs]==before
    assert [u.reg_read(getattr(arm,'UC_ARM_REG_D'+str(i))) for i in range(32)]==fp_before
    assert u.reg_read(arm.UC_ARM_REG_FPSCR)==0x01000000
- print('PASS: stock ARM retains QuickView state2 after busy169+stop reply; patched ARM performs one native completion, invalidates on reentry/new capture, rejects duplicate reply. UI/OS services stubbed; no hardware claim.')
+ print('PASS: native169-before-clear31/2f interleaving recovered; stock ARM retains QuickView state2 after busy169+stop reply; patched ARM performs one native completion, invalidates on reentry/new capture, rejects duplicate reply. UI/OS services stubbed; no hardware claim.')
 if __name__=='__main__':
  import sys
  main(sys.argv[1] if len(sys.argv)>1 else None)

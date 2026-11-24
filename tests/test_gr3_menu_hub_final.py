@@ -229,6 +229,103 @@ class FinalMenuHub(unittest.TestCase):
         self.touch(5, end, 203)
         self.touch(10, end, 203)
 
+    def physical_menu_dispatch(self, controller=PAGE, route=HUB, phase=1, value=1):
+        # Execute the installed bridge AND original full BaseController
+        # dispatcher. Peripheral UI service updates are explicit endpoints.
+        service, vtable, endpoint = RAM+0xc0000, RAM+0xc1000, RAM+0xc2000
+        self.arm.mem_write(service, struct.pack('<I', vtable))
+        for offset in (8, 0x10):
+            self.arm.mem_write(vtable+offset, struct.pack('<I', endpoint))
+        getter = {0x5320af5c,0x5320afbc,0x5320b19c,0x5320b73c,
+                  0x5320b8bc,0x5320b13c,0x5320b3dc,0x5320b07c,
+                  0x5320ae3c,0x5320bcdc,0x5320c03c,0x5320b1fc,
+                  0x5320c120,0x5320addc,0x5320b79c}
+        updates = {0x53229464,0x5322ae44,0x532b2618,0x5322ce9c,endpoint}
+        observed = []
+        def services(arm, address, _size, _context):
+            if address in getter:
+                result = service
+            elif address in updates:
+                packet = arm.reg_read(A.UC_ARM_REG_R1)
+                observed.append(struct.unpack('<H', arm.mem_read(packet,2))[0])
+                result = 0
+            else:
+                return
+            arm.reg_write(A.UC_ARM_REG_R0, result)
+            arm.reg_write(A.UC_ARM_REG_PC, arm.reg_read(A.UC_ARM_REG_LR))
+        handle = self.arm.hook_add(UC_HOOK_CODE, services)
+        self.arm.mem_write(0x55063e54, struct.pack('<I', 1))
+        self.arm.mem_write(0x550645f0, struct.pack('<I', route))
+        self.arm.mem_write(controller+0x124, struct.pack('<I', route))
+        self.arm.mem_write(PACKET, struct.pack('<II', phase, value))
+        self.arm.mem_write(EVENT, struct.pack('<II', 4, PACKET))
+        try:
+            result = self.call_symbol('m10v_settings_controller_ab_dispatch', controller, EVENT)
+        finally:
+            self.arm.hook_del(handle)
+        self.assertTrue(observed, 'original native service updates did not execute')
+        self.assertEqual(struct.unpack('<II',self.arm.mem_read(EVENT,8)),(4,PACKET))
+        self.assertEqual(struct.unpack('<II',self.arm.mem_read(PACKET,8)),(phase,value))
+        return result, observed
+
+    def test_physical_menu_returns_hub_child_to_home_then_exits_only_at_home(self):
+        self.tap(560,250)
+        self.assertEqual(self.draws[-1][0],7)
+        result, observed = self.physical_menu_dispatch()
+        self.assertEqual(result,1)
+        self.assertIn(self.draws[-1][0],(0,1,2,3,11))
+        self.assertEqual(observed,[0x89]*len(observed))
+        self.assertEqual(self.closed_routes,[])
+        self.assertEqual(self.routes,[])
+        self.physical_menu_dispatch()
+        self.assertEqual(self.closed_routes[-1][0],PAGE)
+
+    def test_physical_menu_from_catalog_returns_parent_without_camera_route(self):
+        state=RAM+0x5000
+        self.call_symbol('m10v_library_init',state)
+        size,=struct.unpack('<H',self.arm.mem_read(state+6,2))
+        self.library_state=bytes(self.arm.mem_read(state,size))
+        self.detail_widgets=True
+        films=0x0200f100
+        catalog=self.call('factory',0,films)
+        self.assertEqual(self.call('ready',catalog,films),1)
+        self.call('enter',catalog,films,0)
+        self.assertEqual(self.physical_menu_dispatch(catalog,films)[0],1)
+        self.assertTrue(self.closed_routes,'MENU must return to the catalog parent')
+        self.assertEqual(self.closed_routes[-1][0],catalog)
+        self.assertFalse(any(row[1]==0x08000000 for row in self.routes))
+
+    def test_physical_menu_from_effect_field_rolls_back_one_level_then_returns_hub(self):
+        route=0x0200f113
+        address=OWNER+self.manifest['hdf_menu']['owner_offset']
+        controller,widgets=self.effect_screen(route,address)
+        self.arm.mem_write(controller,struct.pack('<I',self.manifest['hdf_menu']['vtable']))
+        self.effect_gesture(controller,170,160,160)
+        self.assertEqual(self.captions[widgets[4]],973)
+        self.assertEqual(self.physical_menu_dispatch(controller,route)[0],1)
+        self.assertEqual([self.captions[w] for w in widgets[4:6]],[1215,1216])
+        self.assertEqual(self.closed_routes,[])
+        self.assertEqual(self.saved_effects,[])
+        self.physical_menu_dispatch(controller,route)
+        self.assertEqual(self.closed_routes[-1][0],controller)
+        self.assertEqual(self.saved_effects,[])
+        self.assertFalse(any(row[1]==0x08000000 for row in self.routes))
+
+    def test_physical_menu_does_not_translate_an_unowned_stock_route(self):
+        self.tap(560,250)
+        before=len(self.draws)
+        _,observed=self.physical_menu_dispatch(route=0x02000073)
+        self.assertEqual(observed,[4]*len(observed))
+        self.assertEqual(len(self.draws),before)
+        self.assertEqual(self.closed_routes,[])
+
+    def test_physical_menu_release_does_not_go_back(self):
+        self.tap(560,250)
+        before=len(self.draws)
+        self.physical_menu_dispatch(phase=0,value=1)
+        self.assertEqual(len(self.draws),before)
+        self.assertEqual(self.closed_routes,[])
+
     def test_swipe_reaches_second_screen_without_opening_info(self):
         self.assertEqual(self.draws[-1][0], 0)
         self.swipe(430, 275)
@@ -399,9 +496,10 @@ class FinalMenuHub(unittest.TestCase):
             self.assertEqual(self.routes, [])
             self.assertEqual(self.closed_routes, [])
 
-    def effect_screen(self, route):
+    def effect_screen(self, route, controller=None):
         self.detail_widgets = self.effect_fixture = True
-        controller = RAM+0x82000
+        if controller is None:
+            controller = RAM+0x82000
         self.assertEqual(self.call_symbol("m10v_hdf_menu_ready", controller, route),1)
         self.call_symbol("m10v_hdf_menu_enter", controller, route,0)
         widgets = struct.unpack("<9I",self.arm.mem_read(controller+0x158,36))

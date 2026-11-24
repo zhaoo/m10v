@@ -109,7 +109,7 @@ def _embedded_owner_identity(rom,manifest):
  from scripts.build_gr3_m10v_library import FLAGS,link_object
  from scripts.build_gr3_companion_owner import identity_flags
  component=manifest['companion'];identity=component['identity']
- flags=identity_flags(identity)
+ flags=identity_flags(identity)+[f'-DM10V_DEBUG_MODE={int(manifest.get("debug_mode") is True)}']
  features=component.get('extensions',{}).get('features',{})
  required={'ab','hdf','border','isp','zoom','aspect'}
  if not (required<=set(features)<=required|{'torn','wb','roll','live'}) or any(type(v)is not bool for v in features.values()):raise ValueError('runtime owner extension layout differs')
@@ -269,10 +269,8 @@ static unsigned boot_used;
 static void stage(const char*p){
 #if !M10V_COMPANION_DIAGNOSTICS
  (void)p;
-#elif M10V_COMPANION_LIVE_SOURCE
- m10v_linux_trace(p,0,0);
 #else
- unsigned n=0;while(p[n])n++;register unsigned r0 __asm__("r0")=1,r1 __asm__("r1")=(unsigned)(uintptr_t)p,r2 __asm__("r2")=n,r7 __asm__("r7")=4;__asm__ volatile("svc 0":"+r"(r0):"r"(r1),"r"(r2),"r"(r7):"memory","cc");
+ m10v_linux_trace(p,0,0);
 #endif
 }
 static int seeded_random(void*c,uint8_t*out,uint32_t n){(void)c;if(!boot_used){if(n!=16)return 0;for(unsigned i=0;i<16;i++)out[i]=target_config.nonce[i];boot_used=1;return 1;}return m10v_linux_random(0,out,n);}
@@ -337,9 +335,9 @@ static int run(void){
 }
 __attribute__((noreturn))void _start(void){
  int result;
-#if M10V_COMPANION_LIVE_SOURCE
+#if M10V_COMPANION_DIAGNOSTICS
  m10v_linux_diagnostics_start();
- stage("R16_ELF_ENTRY\\n");
+ stage("R20_ELF_ENTRY\\n");
  stage("ROLL_WORKER\\n");
  result=run();
  stage("ROLL_WORKER_STOP\\n");

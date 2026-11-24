@@ -11,7 +11,7 @@ if mkdir /tmp/m10v-companion-1101.lock 2>/dev/null; then
 fi
 exit 0
 '''
-FORBIDDEN = (b'R16WORK.TXT', b'R16FAULT.TXT', b'm10v-worker-1101.log', b'R16_ELF_ENTRY', b'ROLL_DIAG', b'ROLL_SD')
+FORBIDDEN = (b'R17WORK.TXT', b'R17FAULT.TXT', b'R17_ELF_ENTRY', b'R16WORK.TXT', b'R16FAULT.TXT', b'm10v-worker-1101.log', b'R16_ELF_ENTRY', b'ROLL_DIAG', b'ROLL_SD', b'R19_REVIEW', b'R19_STAGE', b'R19_BANK')
 
 def package(candidate, apk, output):
     candidate, apk, output = Path(candidate), Path(apk), Path(output)
@@ -22,7 +22,11 @@ def package(candidate, apk, output):
          'formal release must disable native Live')
     need(not any(name.startswith('m10v_live_device_') or name.startswith('m10v_live_camera_') for name in native['symbols']),
          'Live producer or allocator remains linked')
-    need(native.get('debug_mode') is False, 'debug firmware is prohibited')
+    need(native.get('debug_mode') is False and native['companion'].get('debug_mode') is False,
+         'debug firmware is prohibited')
+    need(not native['roll_capture'].get('review_diagnostic') and not native['roll_capture'].get('review_handoffs') and
+         not any(name in native['symbols'] for name in ('m10v_roll_camera_jpeg_wait', 'm10v_roll_camera_jpeg_return', 'm10v_roll_camera_review')),
+         'diagnostic capture observers remain linked')
     menu = (ROOT/'web/gr3/MENU-R8.M10').read_bytes()
     menu_meta = json.loads((ROOT/'web/gr3/MENU-R8.json').read_text())
     need(sha(menu) == menu_meta['sha256'] and struct.unpack_from('<4sIII', menu) ==
@@ -35,7 +39,9 @@ def package(candidate, apk, output):
         _audit_elf(elf)
         need(service['firmwareSha256'] == sha(firmware) and service['serviceSha256'] == sha(elf), 'service identity differs')
         need(service['diagnosticsEnabled'] is False and service['liveEnabled'] is False and
-             not any(marker in elf for marker in FORBIDDEN), 'diagnostic or Live service is prohibited')
+             not any(marker in elf for marker in FORBIDDEN) and
+             not re.search(rb'R[0-9]+(?:WORK|FAULT|BOOT|RAM|TTL)\.TXT|R[0-9]+_(?:ELF_ENTRY|ENTRY_BEFORE_SD)', elf),
+             'diagnostic or Live service is prohibited')
         need(service['reachableStackBoundBytes'] <= 4096 and service['stagingStaticBytes'] + 4096 <= 65536,
              'service memory budget exceeded')
         films, film_audit = _film_pack(work, identity)
@@ -47,11 +53,11 @@ ADJ 高亮胶卷的 Fn 设置绑定所选胶卷，不影响其他槽。拍摄中
 
 安装前关机，备份 SD 卡、原固件、SCRIPT/STARTUP.TTL、M10V 目录及自定义 LUT。
 1. 按 GR III 固件升级流程使用 01_FIRMWARE/SD_ROOT/fwdc239b.bin，完成后关机并移走卡根目录的升级 BIN。
-2. 将 02_SERVICE/SD_ROOT 的 SCRIPT 内容合并到卡中。已有 STARTUP.TTL 或插件时保留原配置并合并启动命令，不覆盖整个 SCRIPT。
+2. 将 02_SERVICE/SD_ROOT 的 SCRIPT 内容合并到卡中，替换 M10V 的 SERVICE.BIN / SERVICE.SH。STARTUP.TTL 中旧的 M10V/R20 诊断启动段须替换为本包普通启动段，不要同时保留；其他插件命令继续保留，不覆盖整个 SCRIPT。
 3. 将 03_FILMS/SD_ROOT/M10V/FILMS.M10 和 04_MENU/SD_ROOT/M10V/MENU.M10 放到卡的 M10V 目录；保留自定义 LUT 和个人配置。
 4. Android 安装 05_ANDROID/GRemote.apk。相机开机后连接相机 Wi-Fi，再打开 App。
 相机须已启用 SD 脚本；服务每次开机只启动一次。异常时关机重开，勿在同次开机热重启。
-本包默认不生成启动、工作、故障、RAM 或 TTL 诊断日志，不自动写卡或刷机。
+本包默认不生成启动、工作、故障、RAM 或 TTL 诊断日志，不自动写卡或刷机。旧诊断文件不会自动删除，其存在不代表本包仍在写日志。
 恢复：关机后恢复备份的 STARTUP.TTL 和固件，仅撤除本包 MCW1101 服务；保留其他插件、设置和照片。
 真机适用范围沿用已反馈的胶卷和连接结果；本次正式产物的离线验证不替代新增真机性能结论。
 '''

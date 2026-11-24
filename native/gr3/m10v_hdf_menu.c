@@ -408,6 +408,13 @@ uint32_t m10v_hdf_menu_key(page *p,uint32_t event){
 #endif
  uint32_t key=*(const uint16_t *)(uintptr_t)event;
 #if M10V_MENU_HUB
+ if(key==4u){
+  uint32_t payload=*(const uint32_t *)(uintptr_t)(event+4u);
+  if((payload&3u)||payload<0x55000000u||payload>0x80000000u-8u||
+     *(const uint8_t *)(uintptr_t)payload!=1u||
+     *(const uint32_t *)(uintptr_t)(payload+4u)!=1u)return 0;
+  key=0x89u;
+ }
  if(key==0x30){
   uint32_t address=*(const uint32_t *)(uintptr_t)(event+4);
   if((address&3)||address<0x55000000u||address>0x80000000u-0x58u){p->touch=0;return 0;}

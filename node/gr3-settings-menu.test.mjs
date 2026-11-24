@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {buildNativeLibrary} from './gr3-m10v-native-build.mjs';
-import {settingsPatches,checkSettings} from './gr3-settings-menu.mjs';
+import {settingsPatches,checkSettings,adjExtraPatches} from './gr3-settings-menu.mjs';
 test('independent settings audit binds owned controllers, original fallback and root captions',()=>{
  const dir=mkdtempSync(join(tmpdir(),'m10v-settings-audit-'));
  try{
@@ -44,4 +44,22 @@ test('independent settings audit binds owned controllers, original fallback and 
   const captions=structuredClone(m);captions.resources.texts[151]='Image Control';
   assert.throws(()=>checkSettings(r,captions),/captions/);
  }finally{rmSync(dir,{recursive:true,force:true});}
+});
+
+test('focused controls retain all product ADJ hooks and reject policy/patch tampering',{
+ skip:!process.env.M10V_CONTROLS_CANDIDATE,
+},()=>{
+ const folder=process.env.M10V_CONTROLS_CANDIDATE;
+ const m=JSON.parse(readFileSync(join(folder,'M10V-runtime-manifest.json'))),runtime=readFileSync(join(folder,'M10V-runtime-arm.bin'));
+ assert.equal(adjExtraPatches(runtime,m).length,9);
+ for(const change of [
+  value=>{value.debug_scope='full';},
+  value=>{value.flags=value.flags.filter(flag=>flag!=='-DM10V_CONTROLS_TRACE_ONLY=1');},
+  value=>{value.control_debug_compile_flags=value.control_debug_compile_flags.filter(flag=>flag!=='-DM10V_ADJ_EXIT_TRACE=0');},
+  value=>{value.symbols.m10v_adj_extra_camera_trace_keys=value.base;},
+  value=>{value.adj_extra.patches[0].replacement^=1;},
+ ]){
+  const broken=structuredClone(m);change(broken);
+  assert.throws(()=>adjExtraPatches(runtime,broken),/diagnostic policy|patch count|patch contract/);
+ }
 });

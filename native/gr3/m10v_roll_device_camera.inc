@@ -1,5 +1,6 @@
 /* Exact GR III 2.10. This is included by the permanent AppMain owner so
  * filesystem calls use the same native task and owner lifetime as settings. */
+#include "m10v_debug.h"
 typedef uint32_t (*roll_sd_get)(void);
 typedef int (*roll_sd_open_fn)(uint32_t, const char *, uint32_t, uint32_t *, uint32_t *);
 typedef int (*roll_sd_close_fn)(uint32_t, uint32_t, uint32_t *);
@@ -285,10 +286,20 @@ static void roll_clear(ui_context *c) {
     uint32_t selected=c->roll.previous_model;
     if(!selected)return;
     if(model()==selected){
-        uint32_t ratio;
-        if(c->roll.applied_aspect!=c->roll.previous_aspect &&
-           !m10v_settings_controller_remote_aspect_read(&ratio) && ratio==c->roll.applied_aspect)
-            (void)m10v_settings_controller_remote_aspect_write(c->roll.previous_aspect);
+        M10V_LOG(410,selected,c->roll.applied_aspect,c->roll.previous_aspect,c->roll.applied_tone);
+        if(c->roll.applied_aspect!=c->roll.previous_aspect){
+            uint32_t ratio;
+#if M10V_DEBUG_MODE
+            ratio=0xffffffffu;
+#endif
+            int read_status=m10v_settings_controller_remote_aspect_read(&ratio);
+            M10V_LOG(411,selected,ratio,(uint32_t)read_status,c->roll.applied_aspect);
+            if(!read_status&&ratio==c->roll.applied_aspect){
+                int write_status=m10v_settings_controller_remote_aspect_write(c->roll.previous_aspect);
+                M10V_LOG(412,selected,ratio,c->roll.previous_aspect,(uint32_t)write_status);
+                (void)write_status;
+            }
+        }
         if((c->roll.applied_tone!=c->roll.previous_tone||c->roll.previous_bank) &&
            !((fn1)0x532bd6d4u)(selected) &&
            ((fn1)0x532bd6b4u)(selected)==c->roll.applied_tone)

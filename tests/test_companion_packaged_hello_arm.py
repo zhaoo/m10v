@@ -86,7 +86,7 @@ class PackagedHelloArmTests(unittest.TestCase):
             if number == 5:
                 result = 10 + sum(item[0] == 5 for item in calls)
                 path = bytes(machine.mem_read(args[0], 128)).split(b'\0', 1)[0].decode()
-                if path in ('/tmp/m10v-worker-1101.log', '/media/storage1/M10V/R16WORK.TXT'):
+                if path in ('/tmp/m10v-worker-1101.log', '/media/storage1/M10V/R16WORK.TXT', '/media/storage1/M10V/R17WORK.TXT', '/media/storage1/M10V/R18WORK.TXT', '/media/storage1/M10V/R19WORK.TXT'):
                     self.assertEqual(args[1], 0x441 if path.startswith('/tmp/') else 0x101441)
                     log_descriptors[result] = path
                 else:

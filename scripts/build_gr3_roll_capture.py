@@ -74,10 +74,13 @@ def _replay(site, stock, target):
     return f"movw lr,#{continuation & 0xffff};movt lr,#{continuation >> 16};{jump}"
 
 
-def build_observers(rom, base, imports, live=False):
+def build_observers(rom, base, imports, live=False, debug=False):
     """Require the exact original RTOS and an already-linked device channel."""
     if hashlib.sha256(rom).hexdigest() != SHA:
         raise ValueError("roll capture requires the exact GR III 2.10 RTOS")
+    if type(debug)is not bool:raise ValueError("debug requires boolean opt-in")
+    diagnostic_api=tuple("m10v_roll_camera_"+n for n in ("jpeg_wait","jpeg_return","review")) if debug else ()
+    camera_api=(*CAMERA_API,*diagnostic_api)
     required = (*CAPTURE_API, "m10v_roll_device_capture_channel",
                 *(("m10v_live_device_camera",) if live else ()))
     if any(type(imports.get(name)) is not int or imports[name] & 3 or
@@ -98,22 +101,33 @@ def build_observers(rom, base, imports, live=False):
                 '#include "' + str(ROOT / "native/gr3/m10v_roll_camera_capture.c") + '"',
             )))
             combined, exports = _compile(source, "m10v_roll_camera_", base,
-                (*CAMERA_API, *LIVE_API, *SAVE_API),
+                (*camera_api, *LIVE_API, *SAVE_API),
                 {**imports, "__aeabi_uidiv": 0x5313d850},
-                flags=("-DM10V_LIVE_NATIVE_DEVICE=1", "-DM10V_ROLL_LIVE_AMALGAMATION=1", "-Oz"))
+                flags=("-DM10V_LIVE_NATIVE_DEVICE=1", "-DM10V_ROLL_LIVE_AMALGAMATION=1", f"-DM10V_DEBUG_MODE={int(debug)}", "-Oz"))
         save_symbols = {name: exports[name] for name in SAVE_API}
         live_symbols = {name: exports[name] for name in LIVE_API}
-        camera_symbols = {name: exports[name] for name in CAMERA_API}
+        camera_symbols = {name: exports[name] for name in camera_api}
         code = bytearray(combined)
     else:
         save, save_symbols = _compile("m10v_roll_save.c", "m10v_roll_save_", base, SAVE_API)
         camera, camera_symbols = _compile(
             "m10v_roll_camera_capture.c", "m10v_roll_camera_", base + len(save),
-            CAMERA_API, {**imports, **save_symbols, "__aeabi_uidiv": 0x5313d850})
+            camera_api, {**imports, **save_symbols, "__aeabi_uidiv": 0x5313d850},
+            flags=(f"-DM10V_DEBUG_MODE={int(debug)}",))
         live_symbols = {}
         code = bytearray(save + camera)
+    diagnostic_sites=(
+        (0x53504944,0xeb069550,"jpeg_wait","mov r0,r4;",0x536a9e8c),
+        (0x5350494c,0xe5943050,"jpeg_return","mov r0,r4;",None),
+        (0x535180c0,0xe3a03001,"review","mov r3,r4;mov r2,sl;add r1,r8,#4;mov r0,#1;",None),
+        (0x534bbeb4,0xe1a01008,"review","mov r1,r6;mov r2,r4;mov r0,#2;",None),
+        (0x534bbee0,0xe2506000,"review","mov r2,r0;sub r1,fp,#0x68;mov r0,#3;",None),
+        (0x534bbf00,0xe1a06000,"review","mov r2,r0;ldr r1,[r4,#12];mov r0,#4;",None),
+        (0x535211f0,0xe5903008,"review","mov r1,r0;mov r0,#5;",None),
+        (0x532d546c,0xebfcd645,"review","mov r2,r5;add r1,r5,#4;mov r0,#6;",0x5320ad88),
+    ) if debug else ()
     patches = []
-    for site, expected, name, arguments, target in SITES:
+    for site, expected, name, arguments, target in (*SITES,*diagnostic_sites):
         if struct.unpack_from("<I", rom, site - 0x53000000)[0] != expected:
             raise ValueError(f"roll capture stock instruction changed at {site:#x}")
         entry = base + len(code)
@@ -126,4 +140,5 @@ def build_observers(rom, base, imports, live=False):
                              sha256=hashlib.sha256(code).hexdigest(), rtos_sha256=SHA,
                              exports={**save_symbols, **live_symbols, **camera_symbols}, patches=patches,
                              **({"live": "mono-nv12-192x128"} if live else {}),
-                             camera_tested=False, scheduler_filesystem_calls=0)
+                             camera_tested=False, scheduler_filesystem_calls=0,
+                             **({"review_diagnostic":"scalar-pre/post-JPEG-wait-v1","review_handoffs":"native-publication-playback-display-v2"} if debug else {}))
