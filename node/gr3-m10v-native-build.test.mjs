@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { buildNativeLibrary, auditNativeLibrary } from './gr3-m10v-native-build.mjs';
 import { decodeFrameMap } from './gr3-frames.mjs';
 import {MAX_NATIVE_RTOS_GROWTH} from './gr3-native-budget.mjs';
+import {directoryFilm} from './gr3-film-directory.mjs';
 
 const source = readFileSync(new URL('../bin/fwdc239b-gr3-official.bin', import.meta.url));
 
@@ -21,7 +22,12 @@ test('M10V native library builds from official bytes without a compatibility run
     const result = buildNativeLibrary(source, runtime, manifest);
     assert.deepEqual(result.receipt.changed_sections, ['RTOS']);
     assert.equal(result.receipt.camera_tested, false);
-    assert.equal(result.receipt.film_count, 107);
+    // fa1f860 registered these stable IDs after the 107-film inventory.
+    // The four Leica looks require the separately enabled owned ISP profile.
+    assert.deepEqual([328,329,330].map(id=>[id,directoryFilm(id)?.name]), [
+      [328,'SHD50'],[329,'Revolog KOLOR'],[330,'Pegasus'],
+    ]);
+    assert.equal(result.receipt.film_count, 110);
     assert.equal(result.receipt.external_film_pack, false);
     assert.deepEqual(auditNativeLibrary(source, result.candidate, runtime, manifest), result.receipt);
     // Data appended to the valid runtime must not hit an arbitrary byte ceiling.
@@ -31,9 +37,11 @@ test('M10V native library builds from official bytes without a compatibility run
     assert.ok(largeRuntime.length>runtime.length);
     assert.deepEqual(auditNativeLibrary(source,large.candidate,largeRuntime,largeManifest),large.receipt);
 
-    // Reproduce the website's observed RTOS extent independently of compiler
-    // padding; appended ROM data still receives full mapping and byte audits.
-    const serverGrowth=1156188,ceiling=MAX_NATIVE_RTOS_GROWTH;
+    // Retain the historical website extent when it fits; newer native code
+    // still gets positive padding and the same independent byte/MMU audits.
+    const ceiling=MAX_NATIVE_RTOS_GROWTH;
+    const serverGrowth=Math.max(1156188,result.receipt.rtos_growth+8192);
+    assert.ok(serverGrowth<=ceiling);
     const withGrowth=growth=>{
       const bytes=Buffer.concat([runtime,Buffer.alloc(growth-result.receipt.rtos_growth)]);
       return [bytes,{...manifest,code_bytes:bytes.length,code_sha256:createHash('sha256').update(bytes).digest('hex')}];

@@ -94,23 +94,22 @@ class FinalHalfSetting(unittest.TestCase):
         self.assertEqual(call(0x540b9300, 5), 6)
         call(self.menu[6], 0, 6)
         self.assertEqual(self.ratio(), 6)
-        cleanups = []
-        camera, registers = self.camera, self.camera.A
-
-        def record_cleanup():
-            if camera.u.reg_read(registers.UC_ARM_REG_R0) == 221:
-                owner = camera.u.reg_read(registers.UC_ARM_REG_R1)
-                sp = camera.u.reg_read(registers.UC_ARM_REG_SP)
-                cleanups.append((owner, camera.read_words(sp, 1)[0]))
-            return 0
-
-        camera.boundaries[self.symbols["m10v_debug_log"]] = record_cleanup
+        # Observe the owned session itself: formal builds compile out logs.
+        data = bytes(self.camera.u.mem_read(OWNER, 0x10000))
+        marker = struct.pack('<I', 0x37535048)
+        offset = data.index(marker)
+        self.assertEqual(data.find(marker, offset + 4), -1)
+        session = OWNER + offset
+        generation = self.camera.read_words(session + 12, 1)[0]
         self.events.clear()
         self.assertEqual(self.change(0), 0)
         self.assertEqual(self.enabled(), 0)
         self.assertEqual(self.ratio(), 0)
         self.assertEqual(self.events, [0x183])
-        self.assertEqual(cleanups, [(OWNER, 2)])  # Explicit pair cancellation.
+        # Explicit pair cancellation increments generation, marks CANCEL, and
+        # releases the control lock even when no first frame is retained.
+        self.assertEqual(self.camera.read_words(session + 12, 1), [generation + 1])
+        self.assertEqual(self.camera.read_words(session + 4, 2), [0, 1])
         self.assertEqual(call(self.menu[2]), 6)
 
     def test_assignable_aspect_cycle_skips_half_until_enabled(self):

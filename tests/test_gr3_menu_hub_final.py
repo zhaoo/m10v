@@ -31,6 +31,7 @@ class FinalMenuHub(unittest.TestCase):
         candidate = Path(directory)
         cls.assets = Path(os.environ["M10V_MENU_HUB_ASSETS"])
         cls.pack = (cls.assets / "MENU.M10").read_bytes()
+        cls.reference = Path(os.environ.get("M10V_MENU_HUB_REFERENCE", cls.assets / "reference"))
         cls.manifest = json.loads((candidate / "M10V-runtime-manifest.json").read_text())
         cls.symbols = cls.manifest["symbols"]
         cls.rt = subprocess.check_output(["node", "--input-type=module",
@@ -56,6 +57,7 @@ class FinalMenuHub(unittest.TestCase):
         self.detail_widgets = False
         self.rects, self.colors, self.inks, self.captions, self.visibility = {}, {}, {}, {}, {}
         self.icons, self.closed_routes, self.saved_effects = {}, [], []
+        self.texts = {}
         self.effect_fixture = False
         self.fn_row = 0
         self.library_state = None
@@ -118,9 +120,12 @@ class FinalMenuHub(unittest.TestCase):
                               bytes([arm.reg_read(A.UC_ARM_REG_R1)]))
             elif (self.fn_row or self.detail_widgets) and address == 0x533AB548:
                 widget, rect = (arm.reg_read(reg) for reg in REGS[:2])
+                self.rects[widget] = struct.unpack('<4I', arm.mem_read(rect, 16))
                 arm.mem_write(widget+0x20, bytes(arm.mem_read(rect,16)))
             elif self.detail_widgets and address == 0x53390EF8:
-                self.detail_name = bytes(arm.mem_read(arm.reg_read(A.UC_ARM_REG_R1), 24)).split(b"\0")[0]
+                value = bytes(arm.mem_read(arm.reg_read(A.UC_ARM_REG_R1), 256)).split(b"\0")[0]
+                self.texts[arm.reg_read(A.UC_ARM_REG_R0)] = value
+                self.detail_name = value
             elif self.detail_widgets and address == 0x536AF2A8:
                 result = self.alloc
                 self.alloc += (arm.reg_read(A.UC_ARM_REG_R0) + 15) & ~15
@@ -344,7 +349,11 @@ class FinalMenuHub(unittest.TestCase):
         state = RAM + 0x5000
         self.call_symbol("m10v_library_init", state)
         size, = struct.unpack("<H", self.arm.mem_read(state+6, 2))
-        self.library_state = bytes(self.arm.mem_read(state, size))
+        import zlib
+        saved = bytearray(self.arm.mem_read(state, size))
+        struct.pack_into("<H", saved, 12, 332)  # Explicit enabled Leica Brass.
+        struct.pack_into("<I", saved, size - 4, zlib.crc32(saved[:-4]))
+        self.library_state = bytes(saved)
         self.detail_widgets = True
         films = 0x0200F100
         catalog = self.call("factory", 0, films)
@@ -361,6 +370,34 @@ class FinalMenuHub(unittest.TestCase):
         self.arm.mem_write(EVENT, struct.pack("<I", 0x89))
         self.assertEqual(self.call("key", catalog, EVENT), 1)
         self.assertEqual(self.closed_routes, [])
+
+    def test_catalog_fn_tracks_two_named_selections_and_browsing_does_not_change_slots(self):
+        import zlib
+        state = RAM + 0x5000
+        self.call_symbol("m10v_library_init", state)
+        size, = struct.unpack("<H", self.arm.mem_read(state + 6, 2))
+        saved = bytearray(self.arm.mem_read(state, size))
+        struct.pack_into("<H", saved, 12, 331)
+        struct.pack_into("<H", saved, 20, 332)
+        struct.pack_into("<I", saved, size - 4, zlib.crc32(saved[:-4]))
+        self.library_state = bytes(saved)
+        self.detail_widgets = True
+        films = 0x0200F100
+        catalog = self.call("factory", 0, films)
+        self.assertEqual(self.call("ready", catalog, films), 1)
+        self.call("enter", catalog, films, 0)
+        for x, name in ((49, b"Leica Chrome"), (185, b"Leica Brass"), (49, b"Leica Chrome")):
+            for kind in (1, 2, 10):
+                self.touch(kind, x, 213, catalog)
+            self.arm.mem_write(PACKET, struct.pack("<II", 1, 1))
+            self.arm.mem_write(EVENT, struct.pack("<II", 0x1b, PACKET))
+            self.assertEqual(self.call("key", catalog, EVENT), 1)
+            self.assertEqual(self.detail_name, name)
+            self.arm.mem_write(EVENT, struct.pack("<I", 0x89))
+            self.assertEqual(self.call("key", catalog, EVENT), 1)
+            self.assertEqual(self.library_state, bytes(saved))
+            self.assertEqual(self.routes, [])
+            self.assertEqual(self.closed_routes, [])
 
     def effect_screen(self, route):
         self.detail_widgets = self.effect_fixture = True
@@ -452,11 +489,12 @@ class FinalMenuHub(unittest.TestCase):
         self.assertEqual(struct.unpack("<4I",self.arm.mem_read(label+0x20,16)),(50,10,40,40))
         self.assertEqual(bytes(self.arm.mem_read(label+0xea,1)),b"\x1f")
 
-    def art(self, frame, patch=0, film=0):
+    def art(self, frame, patch=0, film=0, notice=0):
         self.draw_real_view = True
         self.view, paint = PAGE + 0x158, RAM + 0x5200
         self.arm.mem_write(self.view + 56 * 4, struct.pack("<I", 6))
         self.arm.mem_write(paint, struct.pack("<13I", frame, 0xffffffff, patch, *([0]*8), film, 0))
+        self.arm.mem_write(paint + 36, struct.pack("<I", notice))
         return self.call_symbol("m10v_settings_view_hub", self.view, paint)
 
     def test_approved_default_screens_match_native_blit_pixel_for_pixel(self):
@@ -471,17 +509,36 @@ class FinalMenuHub(unittest.TestCase):
                 self.assertEqual(self.call_symbol(0x53209FCC,0,858),720)
                 self.assertEqual(self.call_symbol(0x5320A000,0,858),480)
                 self.call_symbol(0x5320A020,RAM+0x20400,surface,0,0,stack=(0,0,720,480,descriptor,HEAP))
-                expected = Image.open(self.assets/"reference"/f"{frame}.png").convert("RGBA").tobytes()
+                expected = Image.open(self.reference/f"{frame}.png").convert("RGBA").tobytes()
                 self.assertEqual(bytes(self.arm.mem_read(FRAMEBUFFER,len(expected))), expected)
 
     def test_status_patch_does_not_replace_the_base_art(self):
         patch = 64+3*48+3  # HDF strong in the fully featured effects screen
         self.assertEqual(self.art(7,patch),1)
-        expected = Image.open(self.assets/"reference"/"7.png").convert("RGBA")
+        expected = Image.open(self.reference/"7.png").convert("RGBA")
         _,_,x,y,w,h = struct.unpack_from("<II4H", self.pack,16+patch*16)
-        variant = Image.open(self.assets/"reference"/f"{patch}.png").convert("RGBA")
+        variant = Image.open(self.reference/f"{patch}.png").convert("RGBA")
         expected.paste(variant.crop((x,y,x+w,y+h)),(x,y))
         self.assertEqual(bytes(self.arm.mem_read(HEAP,720*480*4)),expected.tobytes())
+
+    def test_active_ratio_notice_uses_native_text_without_sd_error_or_sticky_visibility(self):
+        self.detail_widgets = True
+        view = PAGE + 0x158
+        widgets = [RAM + 0xb0000 + 0x100 * index for index in range(6)]
+        self.arm.mem_write(view, struct.pack('<6I', *widgets))
+        diag = widgets[5]
+        for raw, label in ((0, '3:2'), (4, 'XPan'), (5, '6x7')):
+            self.assertEqual(self.art(9, notice=300 + raw), 1)
+            self.assertEqual(self.texts[diag].decode('utf-8'), '本卷画幅已锁定：' + label)
+            self.assertEqual(self.rects[diag], (260, 25, 426, 35))
+            self.assertEqual(self.visibility[diag], 1)
+            self.assertEqual(self.visibility[widgets[2]], 0)
+        self.assertEqual(self.art(9), 1)
+        self.assertEqual(self.visibility[diag], 0)
+        self.assertEqual(self.art(9, notice=100), 1)
+        self.assertEqual(self.texts[diag], b'ROLL E000')
+        self.assertEqual(self.rects[diag], (48, 368, 510, 40))
+        self.assertEqual(self.visibility[diag], 1)
 
     def test_short_or_corrupt_read_invalidates_bitmap_and_closes(self):
         self.assertEqual(self.art(0),1)

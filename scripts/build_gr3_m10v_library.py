@@ -196,7 +196,7 @@ def link_object(elf, base, externals=None, prefix='m10v_library_', additional_ex
         'm10v_settings_': {'m10v_settings_open','m10v_settings_key','m10v_settings_catalog_tap'},
         'm10v_settings_view_': {'m10v_settings_view_create','m10v_settings_view_draw','m10v_settings_view_destroy'},
         'm10v_settings_controller_': {'m10v_settings_controller_card_directory','m10v_settings_controller_owner_size','m10v_settings_controller_top_ctor','m10v_settings_controller_top_dtor','m10v_settings_controller_destroy','m10v_settings_controller_factory','m10v_settings_controller_ready','m10v_settings_controller_enter','m10v_settings_controller_key','m10v_settings_controller_key_route'},
-        'm10v_detail_': {'m10v_detail_table','m10v_detail_control'},
+        'm10v_detail_': {'m10v_detail_table','m10v_detail_control','m10v_detail_tone','m10v_detail_kind'},
         'm10v_hdf_': {'m10v_hdf_alloc','m10v_hdf_producer','m10v_hdf_gate','m10v_hdf_settings','m10v_hdf_load','m10v_hdf_save','m10v_hdf_done','m10v_hdf_cached','m10v_hdf_bootstrap','m10v_hdf_reserve','m10v_hdf_task_snapshot','m10v_hdf_shot_read'},
         'm10v_hdf_adj_': {'m10v_hdf_adj_'+n for n in ('enter','draw','current','set','count','available','event')},
         'm10v_hdf_menu_': {'m10v_hdf_menu_top_ctor','m10v_hdf_menu_top_dtor','m10v_hdf_menu_cache_init','m10v_hdf_menu_destroy','m10v_hdf_menu_factory','m10v_hdf_menu_ready','m10v_hdf_menu_enter','m10v_hdf_menu_key','m10v_hdf_menu_key_route'},
@@ -837,7 +837,7 @@ def build(out_dir, base=0x540b6000, initial_state_hex=None, debug_mode=False, de
         # Link dedicated stock-detail backend against the same camera journal.
         from scripts.build_gr3_native_detail import build_detail, STOCK_TABLE
         detail_obj=folder/'detail.o'
-        subprocess.run([compiler,*compile_flags,*debug_flags,'-c',str(ROOT/'native/gr3/m10v_detail.c'),'-o',str(detail_obj)],check=True,capture_output=True)
+        subprocess.run([compiler,*compile_flags,*debug_flags,f'-DM10V_PHOTO_RECIPE={int(photo_recipe)}','-c',str(ROOT/'native/gr3/m10v_detail.c'),'-o',str(detail_obj)],check=True,capture_output=True)
         detail_base=(base+len(image)+15)&~15
         provisional,detail_symbols=link_object(detail_obj.read_bytes(),detail_base,{**symbols,**{n:detail_base for n in ['m10v_detail_tables','m10v_detail_common_tables','m10v_detail_red_tables','m10v_detail_phoenix_tables','m10v_detail_charmera_tables','m10v_detail_pixel_tables']}},'m10v_detail_')
         shims_base=(detail_base+len(provisional)+15)&~15

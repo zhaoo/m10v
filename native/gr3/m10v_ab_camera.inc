@@ -596,6 +596,12 @@ int m10v_settings_controller_remote_aspect_read(uint32_t *value){
 }
 int m10v_settings_controller_remote_aspect_write(uint32_t value){
  if(value>6||m10v_settings_controller_remote_busy())return 1;
+ if(m10v_roll_device_locked()){
+  m10v_roll_record locked;
+  /* The roll worker uses this adapter to converge to its journalled ratio.
+   * Reject other requests before writing or enabling private Half state. */
+  if(m10v_roll_device_snapshot(&locked)<=0||value!=locked.aspect)return 1;
+ }
  uint32_t root=((uint32_t(*)(void))0x5320ad88u)(),model=root?((fn1)0x5320b31cu)(root):0;
  if(!model)return 1;
 #if M10V_HALF_PAIR_ENABLED

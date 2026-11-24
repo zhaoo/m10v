@@ -43,6 +43,7 @@ def package(candidate, apk, output):
     instructions = '''M10V GR III 2.10 正式完整包
 仅适用于 GR III 官方 2.10 基线，不适用于 IIIx、IV 或其他机型。
 Live 暂不可用，已关闭采集、缓存分配与接口；历史 Live 配置保留但不生效。胶卷模式、离线计数及锁定继续保留。
+ADJ 高亮胶卷的 Fn 设置绑定所选胶卷，不影响其他槽。拍摄中的胶卷锁定本卷画幅；请先暂停或收卷再切换 XPan/Half。Half 需先在效果中开启半格。
 
 安装前关机，备份 SD 卡、原固件、SCRIPT/STARTUP.TTL、M10V 目录及自定义 LUT。
 1. 按 GR III 固件升级流程使用 01_FIRMWARE/SD_ROOT/fwdc239b.bin，完成后关机并移走卡根目录的升级 BIN。

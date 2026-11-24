@@ -41,9 +41,9 @@ function expected(g,x,c){
    for(let off=0;off<a.payload.length;off++)if(a.payload[off]!==p.payload[off])changed++;
    chunks.push(target);
   }else if(name==='ICONBIN'){
-   need(a.block.equals(b.block)&&a.size===p.size&&a.block.subarray(0,16).equals(p.block.subarray(0,16)),'ICONBIN baseline/header differs');chunks.push(Buffer.from(p.block));
+   need(a.block.equals(b.block)&&a.size===p.size&&a.block.subarray(0,16).equals(p.block.subarray(0,16)),'ICONBIN baseline/header differs');chunks.push(p.block);
   }else{
-   need(p.block.equals(a.block),'native candidate changed unrelated section '+name);chunks.push(Buffer.from(b.block));
+   need(p.block.equals(a.block),'native candidate changed unrelated section '+name);chunks.push(b.block);
   }
  }
  const target=Buffer.concat([...chunks,Buffer.alloc(4)]);repair(target);return {target,words,changed,growth:c.sections.RTOS.size-g.sections.RTOS.size};
@@ -73,7 +73,9 @@ function pack(base,original,target,identity){
 }
 export function verifyGr3xNativePort(gr3official,xofficial,gr3candidate,xcandidate){
  // Derive intent again from the three source buffers. Never trust a builder receipt.
- const i=inputs(gr3official,xofficial,gr3candidate),actual=read(xcandidate,i.layout);
+ const i=verificationIntent(gr3official,xofficial,gr3candidate);
+ global.gc?.();
+ const actual=read(xcandidate,i.layout);
  need(xcandidate.subarray(0,128).equals(xofficial.subarray(0,128))&&xcandidate.subarray(-24,-12).equals(xofficial.subarray(-24,-12)),'GR IIIx outer identity/version differs');
  const want=readDecoded(i.target,i.layout);
  for(const [name,section] of Object.entries(want.sections))need(actual.sections[name].block.equals(section.block),'final section differs from independently derived intent: '+name);
@@ -82,8 +84,21 @@ export function verifyGr3xNativePort(gr3official,xofficial,gr3candidate,xcandida
 }
 // Split a reconstructed decoded image using the same section boundaries as its intent.
 function readDecoded(decoded,layout){let at=0;const sections={};for(const row of layout){const size=row.name==='RTOS'?decoded.readUInt32LE(at+12)+16:row.size;sections[row.name]={block:decoded.subarray(at,at+size)};at+=size;}need(at+4===decoded.length,'expected extent differs');return {sections};}
+// Do not retain the three decoded input containers while decoding the final
+// image. The verifier still derives intent afresh, independently of the builder.
+function verificationIntent(gr3official,xofficial,gr3candidate){
+ const {layout,target,words,changed,growth}=inputs(gr3official,xofficial,gr3candidate);
+ return {layout,target,words,changed,growth};
+}
+function encodeNativePort(gr3official,xofficial,gr3candidate){
+ const i=inputs(gr3official,xofficial,gr3candidate);
+ return pack(gr3candidate,i.native,i.target,xofficial);
+}
 export function portNativeToGr3x(gr3official,xofficial,gr3candidate){
- const i=inputs(gr3official,xofficial,gr3candidate),encoded=pack(gr3candidate,i.native,i.target,xofficial);
+ // Finish and release builder intent before independent verification allocates
+ // its own decoded containers. No buffers or receipt are reused for checking.
+ const encoded=encodeNativePort(gr3official,xofficial,gr3candidate);
+ global.gc?.();
  return {candidate:encoded.candidate,receipt:{...verifyGr3xNativePort(gr3official,xofficial,gr3candidate,encoded.candidate),reused_frames:encoded.reused_frames,replaced_frames:encoded.replaced_frames}};
 }
 // Pure codec/intent primitives for generated fixtures; public entry points always pin official hashes.

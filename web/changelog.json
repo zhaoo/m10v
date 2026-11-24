@@ -2,6 +2,21 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.24.1",
+      "date": "2026-11-24",
+      "title": "修复 ADJ 胶卷参数绑定与画幅锁定提示",
+      "changes": [
+        "Fn 参数页绑定 ADJ 当前高亮胶卷，独立保存各卷参数；取消、存储失败和 RAW 开发保持原路径。",
+        "拍摄中的胶卷在 M10V 画幅和 Half 入口明确显示本卷画幅已锁定，暂停及收卷后可切换；保留本卷比例约束。",
+        "保留胶卷计数归档、JPEG/RAW 标记、HDF、下载及连接功能；Live 继续不可用，正式包不启用排障日志。",
+        "本次发布范围限定 GR III，明确跳过 IIIx／IV 构建；保留 GR III 的构建、身份与健康校验。"
+      ],
+      "notice": "GR III 2.10 正式完整包需配套更新固件和SD服务，App使用GRemote1.2.15。关键成品路径与菜单已完成离线检查；全量历史Node套件仍有失败，不扩大为全机身真机验收。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.23.1",
       "date": "2026-11-23",
       "title": "GR III 机内胶卷正式包与 GRemote 1.2.15",
@@ -11,10 +26,10 @@
         "Live 暂不可用：正式完整包关闭采集、缓存分配和接口；历史文件与配置保留。",
         "正式完整包默认关闭排障日志，配套 GRemote 1.2.15 正式签名 Android APK；相册及胶卷支持单张、多选和 JPG／RAW／RAW+JPG 下载。"
       ],
-      "notice": "正式包适用于 GR III 官方 2.10 基线，需要配套更新固件、SD 服务及 App。机身胶卷与连接沿用用户反馈范围；本次关闭 Live 的正式产物完成离线验证，不扩大真机性能或其他机型兼容性结论。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "notice": "正式包适用于 GR III 官方 2.10 基线，需要配套更新固件、SD 服务及 App。机身胶卷与连接沿用用户反馈范围；本次关闭 Live 的正式产物完成离线验证，不扩大真机性能或其他机型兼容性结论。 该次服务器IIIx资源检查超时，部署已回滚，未宣称上线成功。",
+      "commit": "c81414b34cac201b7aaa1b3840217f6becfc59e4",
+      "evidence": "documented",
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/45212344012"
     },
     {
       "version": "2026.11.16.3",

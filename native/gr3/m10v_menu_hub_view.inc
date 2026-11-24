@@ -204,7 +204,19 @@ uint32_t m10v_settings_view_hub(m10v_settings_view *v,const m10v_hub_paint *pain
  visible(v->widgets[HUB_DIAG],ok&&code>=100);
  if(!ok){caption(v->widgets[HUB_ERROR],1245);caption(v->widgets[HUB_BACK],1246);}
  else if(code==1)caption(v->widgets[HUB_ERROR],M10V_VIEW_FAILED);
+ else if(code>=M10V_HUB_ASPECT_LOCKED&&code<=M10V_HUB_ASPECT_LOCKED+6u){
+  static const char *const labels[]={
+   "本卷画幅已锁定：3:2","本卷画幅已锁定：4:3","本卷画幅已锁定：16:9",
+   "本卷画幅已锁定：1:1","本卷画幅已锁定：XPan","本卷画幅已锁定：6x7",
+   "本卷画幅已锁定：Half"
+  };
+  const uint32_t rect[4]={260,25,426,35};
+  ((void (*)(uint32_t,const uint32_t *))0x533ab548u)(v->widgets[HUB_DIAG],rect);
+  ((fn2)0x53390ef8u)(v->widgets[HUB_DIAG],ptr(labels[code-M10V_HUB_ASPECT_LOCKED]));
+ }
  else if(code>=100){
+  const uint32_t rect[4]={48,368,510,40};
+  ((void (*)(uint32_t,const uint32_t *))0x533ab548u)(v->widgets[HUB_DIAG],rect);
   char text[10]={'R','O','L','L',' ', 'E', '0', '0', '0', 0};
   if(code>=200&&paint->frame==13){text[0]='L';text[1]='I';text[2]='V';text[3]='E';code-=200;}
   else code-=100;

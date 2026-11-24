@@ -394,6 +394,12 @@ static void hub_draw(m10v_settings_controller *p){
  }else if(s->screen==HUB_ROLL_DISPLAY||s->screen==HUB_ROLL_SETTINGS)
   hub_roll_draw(p,&paint);
  else paint.frame=s->screen==3?10:12;
+ if(s->slot==2u&&(s->screen==1u||s->screen==2u||s->screen==HUB_HALF)&&
+    m10v_roll_device_locked()){
+  m10v_roll_record locked;
+  if(m10v_roll_device_snapshot(&locked)>0&&locked.aspect<=6u)
+   paint.save_error=M10V_HUB_ASPECT_LOCKED+locked.aspect;
+ }
  uint32_t painted=m10v_settings_view_hub(&p->view,&paint);
  p->state.error=!painted;
  M10V_LOG(344,paint.frame,painted,paint.patch[0],paint.patch[1]);
@@ -461,6 +467,12 @@ static uint32_t hub_roll_key(m10v_settings_controller *p,uint32_t key){
  hub_draw(p);
  return 1;
 }
+static int hub_aspect_locked(m10v_settings_controller *p){
+ if(!m10v_roll_device_locked())return 0;
+ p->state.slot=2u;
+ hub_draw(p);
+ return 1;
+}
 static void hub_activate(m10v_settings_controller *p,uint32_t item){
  static const uint32_t routes[2][7]={
   {0x0200f110u,0x0200f111u,0x0200f112u,0x0200f113u,0x0200f114u,0,M10V_SETTINGS_AB_ROUTE},
@@ -482,6 +494,7 @@ static void hub_activate(m10v_settings_controller *p,uint32_t item){
    uint32_t i=(mask&128u)&&slot>=6?13-slot:slot;
    if(!((mask>>i)&1u))continue;
    if(!item){
+    if(((pane==1&&i==5)||(pane==2&&i==2))&&hub_aspect_locked(p))return;
     if(pane==1&&i==5){
      p->state.group=p->state.focus;
      p->state.screen=HUB_HALF;
@@ -533,6 +546,7 @@ static uint32_t hub_key(m10v_settings_controller *p,uint32_t key){
 #endif
  if(s->screen==HUB_HALF&&!s->error){
   if(key==M10V_KEY_OK){
+   if(hub_aspect_locked(p))return 1;
 #if M10V_HALF_PAIR_ENABLED
    if(m10v_settings_half_set(s->focus)){
     s->slot=1;hub_draw(p);return 1;

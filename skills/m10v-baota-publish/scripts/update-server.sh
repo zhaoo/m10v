@@ -90,7 +90,16 @@ trap 'exit 1' HUP INT TERM
 changed=1
 git merge --ff-only "$expected"
 [[ $(git rev-parse HEAD) == "$expected" ]]
+# A versioned, explicitly validated release scope selects affected models.
+models="gr3 gr3x gr4"
+if [[ -f deploy/release-scope.json ]]; then
+  models=$("$repo/.venv/bin/python" -c 'import json,sys; v=json.load(open(sys.argv[1])); m=v.get("models"); assert v.get("schema")=="m10v-release-scope/v1" and isinstance(m,list) and m and len(m)==len(set(m)) and all(x in ("gr3","gr3x","gr4") for x in m); print(" ".join(m))' deploy/release-scope.json)
+fi
 for model in gr3 gr3x gr4; do
+  if [[ " $models " != *" $model "* ]]; then
+    printf 'FIRMWARE_BUILD_SKIP model=%s reason=outside_release_scope\n' "$model"
+    continue
+  fi
   if [[ $model == gr3 ]]; then
     build_args=(scripts/build_gr3_device_candidate.mjs "$work/$model")
   elif [[ $model == gr3x ]]; then

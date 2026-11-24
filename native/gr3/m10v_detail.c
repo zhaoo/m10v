@@ -13,6 +13,32 @@ typedef uint32_t (*fn1)(uint32_t);
 typedef uint32_t (*fn2)(uint32_t,uint32_t);
 typedef void (*text_fn)(uint32_t,uint32_t,const char *);
 static int ram(uint32_t p,uint32_t n){return !(p&3)&&p>=0x55000000u&&p<0x80000000u&&n<=0x80000000u-p;}
+/* Fn owns a frozen editing target. ADJ browsing deliberately does not change
+ * the shooting model: sample its pending look only at this page entry. Never
+ * retarget a slider while another highlight or live preview changes later. */
+uint32_t m10v_detail_tone(uint32_t address,uint32_t ui){
+ (void)ui; /* Profiles without photo recipes keep the exact stock getter. */
+#if M10V_PHOTO_RECIPE
+ extern uint32_t m10v_camera_library_adj_tone(void);
+ if(ram(ui,0x1a0)&&!((const uint8_t *)(uintptr_t)ui)[0x19b]&&
+    !((const uint8_t *)(uintptr_t)ui)[0x19d]&&
+    address==0x55068200u&&!((const uint8_t *)(uintptr_t)address)[0x1b]){
+  uint32_t candidate=m10v_camera_library_adj_tone();
+  if(m10v_tone_slot(candidate)<M10V_SLOT_COUNT)return candidate;
+ }
+#endif
+ return ((fn1)0x532bd6b4u)(address);
+}
+uint32_t m10v_detail_kind(uint32_t ui,uint32_t tone){
+ /* All appended carriers use the private per-film list; the stock switch has
+  * only twelve factory kinds and asserts for tones25..34. Custom banks and
+  * RAW development keep its exact original mapping. */
+ if(M10V_APPENDED_SLOTS&&ram(ui,0x1a0)&&
+    !((const uint8_t *)(uintptr_t)ui)[0x19b]&&
+    !((const uint8_t *)(uintptr_t)ui)[0x19d]&&
+    m10v_tone_slot(tone)<M10V_SLOT_COUNT)return 0;
+ return ((fn2)0x531aca98u)(ui,tone);
+}
 static int slot(uint32_t ui){
 
  if(!ram(ui,0x1a0))return -1;

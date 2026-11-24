@@ -65,6 +65,8 @@ def build_detail(base,symbols,sd_library=True,appended_slots=False,native_grain=
   if reg=='ip':text+='mov lr,#12;'
   text+='pop {r0-r12,pc};'
   entries[name]=stub(text,name)
+ entries['tone_snapshot']=stub(f'mov r1,r4;b {hex(symbols["m10v_detail_tone"])}','Fn selected-tone snapshot')
+ entries['tone_kind']=stub(f'b {hex(symbols["m10v_detail_kind"])}','Fn appended carrier kind')
  # Constructor precedes tone selection; reserve stock max11 + max10 private rows.
  entries['capacity']=stub('mov r0,#22;bx lr','detail constructor capacity')
  control=symbols['m10v_detail_control']

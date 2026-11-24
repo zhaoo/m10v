@@ -53,7 +53,7 @@ class RollDevice(unittest.TestCase):
         return m
 
     def card_machine(self, files, absent=-15, start_timer=True, original_stat=False, open_error=12,
-                     alternate=False, model_address=0x55820000):
+                     alternate=False, model_address=0x55820000, original_aspect=False):
         m = self.machine()
         m.set(STATIC_SD_MANAGER - 4, 1)  # Initialized flag read by original getter.
         m.set(STATIC_SD_MANAGER + 20, STATIC_SD_FILESYSTEM)
@@ -101,6 +101,8 @@ class RollDevice(unittest.TestCase):
             elif address == self.symbols["m10v_settings_controller_remote_busy"]:
                 result = 0
             elif address == self.symbols["m10v_settings_controller_remote_aspect_read"]:
+                if original_aspect:
+                    return
                 m.set(r0, 0)
                 result = 0
             elif address == 0x535964C4:

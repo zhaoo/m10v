@@ -40,3 +40,10 @@ test('history-dependent compressed frame must be replaced after prior model chan
 test('public APIs reject fabricated official identities',()=>{
  const {g,x,c}=setup();assert.throws(()=>portNativeToGr3x(g,x,c),/container: project mismatch/);assert.throws(()=>verifyGr3xNativePort(g,x,c,c),/container: project mismatch/);
 });
+test('intent assembly and its mutable output preserve every decoded input',()=>{
+ const {a,b,p}=setup(),snapshots=[a,b,p].map(value=>Buffer.from(value.decoded));
+ const intent=t.expected(a,b,p);
+ for(const [index,value] of [a,b,p].entries())assert.deepEqual(value.decoded,snapshots[index]);
+ intent.target.fill(0);
+ for(const [index,value] of [a,b,p].entries())assert.deepEqual(value.decoded,snapshots[index]);
+});
