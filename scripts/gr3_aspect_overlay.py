@@ -52,17 +52,33 @@ def branch(site, target, link=False):
     return (0xeb000000 if link else 0xea000000)|((delta>>2)&0xffffff)
 
 
+class CropModuleOverflow(ValueError):
+    """All allocation sections are immutable, but exceed the fixed crop slot."""
+
+
 def elf_image(data):
     if data[:7]!=b'\x7fELF\x01\x01\x01': raise ValueError('expected ARM ELF32')
     offset=struct.unpack_from('<I',data,32)[0]
     stride,count,names=struct.unpack_from('<HHH',data,46)
     sections=[struct.unpack_from('<10I',data,offset+i*stride) for i in range(count)]
-    image=bytearray(END-MODULE);last=0;symbols={}
+    names_section=sections[names]
+    section_names=data[names_section[4]:names_section[4]+names_section[5]]
+    image=bytearray(END-MODULE);last=0;symbols={};overflow=[]
+    # Validate every allocation before treating a failure as size-only. A
+    # later writable section must never be hidden by an earlier overflow.
+    for row in sections:
+        if not row[2]&2 or not row[5]:continue
+        name=section_names[row[0]:].split(b'\0',1)[0].decode('ascii','replace')
+        detail=(f'{name} type={row[1]} flags={row[2]:#x} '
+                f'range={row[3]:#x}..{row[3]+row[5]:#x} '
+                f'allowed={MODULE:#x}..{END:#x}')
+        if row[1]!=1 or row[2]&1 or row[3]<MODULE:
+            raise ValueError('crop module has writable or out-of-range storage: '+detail)
+        if row[3]+row[5]>END:overflow.append(detail)
+    if overflow:raise CropModuleOverflow('crop module exceeds fixed readonly allocation: '+'; '.join(overflow))
     for row in sections:
         if row[2]&2 and row[5]:
             start=row[3]-MODULE;stop=start+row[5]
-            if row[1]!=1 or row[2]&1 or not 0<=start<stop<=len(image):
-                raise ValueError('crop module has writable or out-of-range storage')
             image[start:stop]=data[row[4]:row[4]+row[5]];last=max(last,stop)
         if row[1]==2:
             strings=sections[row[6]];strings=data[strings[4]:strings[4]+strings[5]]
@@ -80,16 +96,26 @@ def build_module(half_frame=True):
         lld=next((p for p in ['/opt/homebrew/opt/lld/bin/ld.lld','/usr/local/opt/lld/bin/ld.lld','/usr/bin/ld.lld'] if Path(p).exists()),None)
     if not clang or not lld: raise ValueError('crop extension requires clang and ld.lld')
     with tempfile.TemporaryDirectory(prefix='m10v-crop-') as directory:
-        directory=Path(directory);objects=[]
-        for name in SOURCES:
-            obj=directory/(name+'.o')
-            subprocess.run([clang,*FLAGS,f'-DM10V_HALF_FRAME={int(half_frame)}','-c',str(ROOT/'native/gr3'/name),'-o',str(obj)],check=True,capture_output=True)
-            objects.append(str(obj))
+        directory=Path(directory)
         script=directory/'layout.ld'
         script.write_text(f'SECTIONS {{ . = {MODULE}; .text : {{ *(.text*) }} .rodata : {{ *(.rodata*) }} /DISCARD/ : {{ *(.ARM.exidx*) *(.comment*) *(.ARM.attributes*) }} }}')
         elf=directory/'crop.elf'
-        subprocess.run([lld,'-T',str(script),*objects,*[f'--defsym={name}={address}' for name,address in BINDINGS.items()],'-o',str(elf)],check=True,capture_output=True)
-        return elf_image(elf.read_bytes())
+        def compile_image(flags):
+            objects=[]
+            for name in SOURCES:
+                obj=directory/(name+'.o')
+                subprocess.run([clang,*flags,f'-DM10V_HALF_FRAME={int(half_frame)}','-c',str(ROOT/'native/gr3'/name),'-o',str(obj)],check=True,capture_output=True)
+                objects.append(str(obj))
+            subprocess.run([lld,'-T',str(script),*objects,*[f'--defsym={name}={address}' for name,address in BINDINGS.items()],'-o',str(elf)],check=True,capture_output=True)
+            return elf_image(elf.read_bytes())
+        try:
+            return compile_image(FLAGS)
+        except CropModuleOverflow as error:
+            if '-Os' not in FLAGS:raise
+            # Clang versions differ in code size. Retry only proven immutable
+            # overflow; the second build passes the identical hard 8 KiB gate.
+            sys.stderr.write(str(error)+'; retrying size optimization -Oz\n')
+            return compile_image(['-Oz' if flag=='-Os' else flag for flag in FLAGS])
 
 
 def apply_overlay(rtos,half_frame=True):
