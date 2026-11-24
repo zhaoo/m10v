@@ -2,6 +2,19 @@
   "schema": "m10v-changelog/v1",
   "releases": [
     {
+      "version": "2026.11.25.3",
+      "date": "2026-11-25",
+      "title": "同步 R20 正式版本与发布记录",
+      "changes": [
+        "发布 GR III R20 ADJ/Fn 与画幅修正，正式完整包配套 GRemote 1.2.15。",
+        "补齐历史发布证据链接，保留服务器编译大小兼容及严格内存校验。"
+      ],
+      "notice": "仅发布记录调整，正式完整包内容不变。",
+      "commit": null,
+      "evidence": "current",
+      "evidence_url": null
+    },
+    {
       "version": "2026.11.25.2",
       "date": "2026-11-25",
       "title": "兼容服务器裁切模块编译大小",
@@ -10,9 +23,9 @@
         "正常构建字节不变，沿用已确认的 GR III ADJ/Fn 修复与正式完整包。"
       ],
       "notice": "构建兼容修正，不改变正常生成的相机运行体或放宽内存边界。",
-      "commit": null,
-      "evidence": "current",
-      "evidence_url": null
+      "commit": "ee2e569ed24bf4c900ea9976ae52db0905e63b19",
+      "evidence": "source",
+      "evidence_url": "https://github.com/zhaoo/m10v/commit/ee2e569ed24bf4c900ea9976ae52db0905e63b19"
     },
     {
       "version": "2026.11.25.1",
@@ -27,7 +40,7 @@
       "notice": "用户已确认 R20 候选本轮操作正常。正式包仅关闭诊断并完成对应产物检查；不扩大为所有功能或其他机型的全面真机保证。边框回显此前未闭环，不将新增诊断当作修复结论。发布范围为 GR III。 首次部署因服务器编译器的裁切模块校验失败回滚。",
       "commit": "72de59845beb16b0871ee084125eb06448352831",
       "evidence": "source",
-      "evidence_url": null
+      "evidence_url": "https://github.com/zhaoo/m10v/actions/runs/45443071122"
     },
     {
       "version": "2026.11.24.1",
